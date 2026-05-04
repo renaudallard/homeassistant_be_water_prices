@@ -62,8 +62,8 @@ from ..const import (
     FLANDERS_VASTRECHT_TOTAL,
     REGION_FLANDERS,
 )
-from ._pdf import USER_AGENT, to_float
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from ._pdf import USER_AGENT, fetch_text, to_float
+from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,10 +153,10 @@ def parse_tariff(
     )
 
 
-async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> str:
     payload = {
         "switcher": "WaterRateInformation",
-        "municipality": DEFAULT_MUNICIPALITY_ID,
+        "municipality": commune_id,
         "current_page_nid": _CURRENT_PAGE_NID,
         "form_id": "farys_municipalities_switcher_form",
         "_triggering_element_name": "municipality",
@@ -174,10 +174,45 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
         ) as resp:
             if resp.status >= 400:
                 raise ExtractorError(f"HTTP {resp.status} fetching {ENDPOINT_URL}")
-            text = await resp.text()
+            return await resp.text()
     except aiohttp.ClientError as err:
         raise ExtractorError(f"network error fetching Farys AJAX endpoint: {err}") from err
+
+
+async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+    text = await _post_for_commune(session, DEFAULT_MUNICIPALITY_ID)
     return parse_tariff(text)
+
+
+async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
+    text = await _post_for_commune(session, commune)
+    return parse_tariff(text, municipality_label=commune)
+
+
+# Each <option> is "<postcode> - <commune> (<gemeente>)" with value =
+# numeric ID. We store the numeric ID as the option's id and the full
+# label as its display string.
+_OPTION_RE = re.compile(
+    r'<option[^>]*value="(\d+)"[^>]*>\s*([^<]+?)\s*</option>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
+    """Discover all 290+ Farys communes by scraping the watertarieven dropdown."""
+    html = await fetch_text(session, PAGE_URL)
+    communes: list[CommuneOption] = []
+    seen: set[str] = set()
+    for match in _OPTION_RE.finditer(html):
+        commune_id = match.group(1)
+        label = match.group(2).strip()
+        if not label or commune_id in seen:
+            continue
+        seen.add(commune_id)
+        communes.append(CommuneOption(id=commune_id, label=label))
+    if not communes:
+        raise ExtractorError("could not discover any Farys communes from the watertarieven page")
+    return tuple(communes)
 
 
 EXTRACTOR = WaterExtractor(
@@ -185,4 +220,6 @@ EXTRACTOR = WaterExtractor(
     label=LABEL,
     region=REGION_FLANDERS,
     fetch=fetch,
+    fetch_for_commune=fetch_for_commune,
+    list_communes=list_communes,
 )

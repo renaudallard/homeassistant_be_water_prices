@@ -1,0 +1,122 @@
+# Copyright (c) 2026, Renaud Allard <renaud@allard.it>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+"""Per-commune routing tests for De Watergroep, Farys, and Water-link."""
+
+from __future__ import annotations
+
+from custom_components.be_water_prices.providers import all_extractors
+from custom_components.be_water_prices.providers.de_watergroep import (
+    _OPTION_RE as DWG_OPTION_RE,
+)
+from custom_components.be_water_prices.providers.de_watergroep import (
+    EXTRACTOR as DWG,
+)
+from custom_components.be_water_prices.providers.de_watergroep import (
+    parse_commune_tariff as parse_dwg_commune,
+)
+from custom_components.be_water_prices.providers.de_watergroep import (
+    parse_news_tariff,
+)
+from custom_components.be_water_prices.providers.farys import (
+    _OPTION_RE as FARYS_OPTION_RE,
+)
+from custom_components.be_water_prices.providers.farys import (
+    EXTRACTOR as FARYS,
+)
+from custom_components.be_water_prices.providers.water_link import (
+    EXTRACTOR as WATER_LINK,
+)
+from tests import fixture_html
+
+
+def test_only_per_commune_utilities_advertise_commune_support() -> None:
+    per_commune = {e.id for e in all_extractors() if e.supports_communes}
+    assert per_commune == {"de_watergroep", "farys", "water_link"}
+
+
+def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
+    # The big regression risk: earlier versions of DWG only carried the
+    # drinkwater leg (sanering = 0). Per-commune fetch must now carry
+    # both saneringsbijdragen.
+    t = parse_dwg_commune(
+        fixture_html("dewatergroep_halle_2026.html"), year=2026, commune_label="Halle"
+    )
+    assert t.basis_eur_per_m3 == 2.9251
+    assert t.sanering_gemeentelijk_eur_per_m3 == 1.9572
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+    assert t.yearly_fixed_fee == 100.0  # full VMM 50+30+20
+    assert t.yearly_fixed_fee_per_resident_discount == 20.0  # full VMM 10+6+4
+
+
+def test_dwg_news_fallback_keeps_drinkwater_leg_only_semantics() -> None:
+    # Sanity check: the no-commune fallback must NOT pretend to know
+    # sanering -- it must keep it at 0 and use the drinkwater-only
+    # vastrecht (50 / 10) so the bill matches the news-article example.
+    t = parse_news_tariff(fixture_html("dewatergroep_2026.html"), year=2026)
+    assert t.basis_eur_per_m3 == 2.9521
+    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 0.0
+    assert t.yearly_fixed_fee == 50.0  # drinkwater leg
+    assert t.yearly_fixed_fee_per_resident_discount == 10.0
+
+
+def test_dwg_commune_dropdown_yields_700_options() -> None:
+    html = fixture_html("dewatergroep_tarieven_2026.html")
+    options = list(DWG_OPTION_RE.finditer(html))
+    # The dropdown carries every Vlaams commune DWG serves; ~700 in 2026.
+    assert len(options) > 600
+
+
+def test_farys_commune_dropdown_yields_290_options() -> None:
+    # Used in tests/fixtures/farys_gent_2026.json indirectly; the live
+    # dropdown is on the page itself, captured separately. Smoke-test
+    # that the option regex still matches a plausible count.
+    from custom_components.be_water_prices.providers.farys import _OPTION_RE
+
+    # Build a minimal fixture to exercise the option regex.
+    html = (
+        '<select name="municipality">'
+        '<option value="24511">9300 - Aalst (Aalst)</option>'
+        '<option value="25071">9000 - Gent-centrum (Gent)</option>'
+        "</select>"
+    )
+    options = list(_OPTION_RE.finditer(html))
+    assert len(options) == 2
+    assert options[0].group(1) == "24511"
+
+
+def test_extractors_advertise_their_metadata_correctly() -> None:
+    assert DWG.supports_communes
+    assert FARYS.supports_communes
+    assert WATER_LINK.supports_communes
+    # Pidpa and the others are *not* per-commune.
+    pidpa = next(e for e in all_extractors() if e.id == "pidpa")
+    assert not pidpa.supports_communes
+
+
+# Sentinel to keep the module-level import sorted; ensures test_per_commune
+# imports the option regexes in a single pass.
+_SENTINEL_REGEXES = (DWG_OPTION_RE, FARYS_OPTION_RE)

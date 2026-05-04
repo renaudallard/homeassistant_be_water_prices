@@ -41,6 +41,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_COMMUNE,
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_SOCIAL_TARIFF,
@@ -118,8 +119,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     async def _async_update_data(self) -> CoordinatorData:
         session = async_get_clientsession(self.hass)
+        commune = self.entry.options.get(CONF_COMMUNE)
         try:
-            tariff = await self._extractor.fetch(session)
+            if commune and self._extractor.fetch_for_commune is not None:
+                tariff = await self._extractor.fetch_for_commune(session, str(commune))
+            else:
+                tariff = await self._extractor.fetch(session)
         except ExtractorError as err:
             # On fetch failure keep serving the last good snapshot rather
             # than blanking every sensor; the recorded staleness gives the
