@@ -23,7 +23,7 @@
           "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
           "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
           "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)",
-          "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Water-link)"
+          "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Pidpa / Water-link)"
         }
       }
     },
@@ -40,7 +40,7 @@
           "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
           "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
           "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)",
-          "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Water-link)"
+          "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Pidpa / Water-link)"
         }
       }
     }

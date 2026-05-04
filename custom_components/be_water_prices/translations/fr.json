@@ -23,7 +23,7 @@
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
           "social_tariff": "Tarif social (Flandre, réduction 80%)",
           "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
-          "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Water-link)"
+          "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Pidpa / Water-link)"
         }
       }
     },
@@ -40,7 +40,7 @@
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
           "social_tariff": "Tarif social (Flandre, réduction 80%)",
           "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
-          "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Water-link)"
+          "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Pidpa / Water-link)"
         }
       }
     }
