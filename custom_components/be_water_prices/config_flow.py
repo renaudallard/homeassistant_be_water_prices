@@ -34,6 +34,7 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -59,8 +60,8 @@ from .providers import all_extractors, get
 from .providers._postcodes import resolve as _resolve_postcode
 
 
-def _utility_options() -> list[dict[str, str]]:
-    return [{"value": e.id, "label": e.label} for e in all_extractors()]
+def _utility_options() -> list[SelectOptionDict]:
+    return [SelectOptionDict(value=e.id, label=e.label) for e in all_extractors()]
 
 
 _USER_SCHEMA = vol.Schema(
@@ -124,7 +125,7 @@ def _is_flanders(utility_id: str) -> bool:
     return get(utility_id).region == REGION_FLANDERS
 
 
-class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
+class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
@@ -167,12 +168,13 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return BeWaterPricesOptionsFlow(config_entry)
+        return BeWaterPricesOptionsFlow()
 
 
 class BeWaterPricesOptionsFlow(OptionsFlow):
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        self.config_entry = config_entry
+    # ``config_entry`` is a read-only property exposed by HA's OptionsFlow base
+    # class; assigning to it from __init__ raises in modern HA. Inherit the
+    # default no-arg constructor and use ``self.config_entry`` directly.
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
