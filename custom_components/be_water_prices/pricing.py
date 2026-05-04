@@ -14,23 +14,33 @@ def compute_annual_cost(
     tariff: WaterTariff,
     consumption_m3: float,
     persons: int,
+    *,
+    social_tariff: bool = False,
 ) -> float | None:
     """Return the projected VAT-incl annual cost in EUR.
 
     Returns ``None`` when the tariff is shaped for a region whose math
-    is not yet wired in (v0.2 will add the Flanders branch).
+    is not yet wired in.
 
-    Brussels: linear single rate plus annual redevance. Persons unused.
+    **Brussels** (linear): ``consumption × (linear + sanering) + redevance``,
+    then VAT. ``persons`` unused.
 
-    Wallonia: 7-tier residential structure simplified to the residential
-    cap (≤ 30 m³). The first 30 m³ pay 50 % of CVD on top of CVA + FSE;
-    consumption above 30 m³ pays the full CVD. The redevance carried by
-    :attr:`WaterTariff.yearly_fixed_fee` is the regulator-defined
-    ``20·CVD + 30·CVA`` formula already collapsed into one number by the
-    extractor (so this branch does not re-derive it).
+    **Wallonia** (tier): the first 30 m³ pay ``0.5·CVD + CVA + FSE`` per
+    m³, above 30 m³ pays the full ``CVD + CVA + FSE``, plus the redevance
+    that the extractor already materialised from ``20·CVD + 30·CVA`` into
+    :attr:`WaterTariff.yearly_fixed_fee`. ``persons`` unused.
+
+    **Flanders** (block): basis volume = ``30 + 30·persons`` m³ (capped at
+    persons=5 by the config flow). Inside the basis volume each m³ pays
+    ``basis + sanering_boven + sanering_gemeente``; above it each m³
+    pays the comforttarief which is exactly ``2 ×`` each of those
+    components -- this 2× rule is mandated by VMM and applies uniformly,
+    so the calc engine doubles the sanering values rather than the
+    extractors carrying duplicate fields. The annual vastrecht is
+    ``yearly_fixed_fee − persons × yearly_fixed_fee_per_resident_discount``,
+    floored at zero. ``social_tariff=True`` applies the VMM 80 %
+    reduction on the post-calc total.
     """
-    _ = persons  # Flanders block math (v0.2) reads this; other branches don't.
-
     if tariff.region == "brussels":
         if tariff.linear_eur_per_m3 is None:
             return None
@@ -50,5 +60,26 @@ def compute_annual_cost(
         rest = max(0.0, consumption_m3 - 30.0) * (cvd + cva + fse)
         ex_vat = first_block + rest + tariff.yearly_fixed_fee
         return round(ex_vat * (1.0 + tariff.vat_rate), 2)
+
+    if tariff.region == "flanders":
+        if tariff.basis_eur_per_m3 is None:
+            return None
+        comfort = tariff.comfort_eur_per_m3 or (2.0 * tariff.basis_eur_per_m3)
+        san = tariff.sanering_bovengemeentelijk_eur_per_m3 + tariff.sanering_gemeentelijk_eur_per_m3
+        basis_volume = 30.0 + 30.0 * persons
+        consumed_basis = min(consumption_m3, basis_volume)
+        consumed_comfort = max(0.0, consumption_m3 - basis_volume)
+        per_m3_basis = tariff.basis_eur_per_m3 + san
+        per_m3_comfort = comfort + 2.0 * san
+        volumetric = consumed_basis * per_m3_basis + consumed_comfort * per_m3_comfort
+        vastrecht = max(
+            0.0,
+            tariff.yearly_fixed_fee - persons * tariff.yearly_fixed_fee_per_resident_discount,
+        )
+        ex_vat = volumetric + vastrecht
+        total = ex_vat * (1.0 + tariff.vat_rate)
+        if social_tariff:
+            total *= 0.20  # VMM social tariff = 80% reduction on the post-calc total.
+        return round(total, 2)
 
     return None

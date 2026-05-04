@@ -12,21 +12,33 @@ daily-refresh `DataUpdateCoordinator`, no Python-source EUR values).
 
 ## Status
 
-**v0.3** -- Brussels (VIVAQUA) + Wallonia (SWDE). Flemish utilities
-land in v0.2 (still pending). See `SCOPE.md` for the full roadmap.
+**v0.2** -- Brussels (VIVAQUA), Flanders (De Watergroep, Pidpa) and
+Wallonia (SWDE). Farys (Oost-Vl. + parts of West-Vl. and Vl-Br.) is
+intentionally not yet wired: its watertarieven page is JS-rendered
+and the static HTML carries no per-m³ numbers; landing in a follow-up
+once we discover the Drupal endpoint or use a per-commune fallback
+URL. See `SCOPE.md` for the full roadmap.
 
 ## Supported utilities
 
-| Region   | Utility   | Source                                              |
-|----------|-----------|-----------------------------------------------------|
-| Brussels | VIVAQUA   | https://www.vivaqua.be/en/the-domestic-linear-rate/ |
-| Wallonia | SWDE      | https://www.swde.be/en/water-prices-swde            |
+| Region   | Utility       | Source                                              |
+|----------|---------------|-----------------------------------------------------|
+| Brussels | VIVAQUA       | https://www.vivaqua.be/en/the-domestic-linear-rate/ |
+| Flanders | De Watergroep | https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tarieven-2026 (drinkwater leg only -- per-commune sanering coming in v0.4) |
+| Flanders | Pidpa         | https://www.pidpa.be/sites/default/files/2024-05/Tariefplan_2025-2030_simulatie_type_gezin.pdf (PDF) |
+| Wallonia | SWDE          | https://www.swde.be/en/water-prices-swde            |
 
-Postcode resolver: 1000-1299 → VIVAQUA, 4000-7999 → SWDE. Other
-postcodes (Flanders 1500-3999 / 8000-9999, Brabant Wallon 1300-1499,
-and the Walloon long tail of CILE / INASEP / régies) drop into the
-manual utility picker until v0.4 lands the Géoportail Wallonie ZDE
-GeoPackage refinement and the VMM Waterloket Flanders dump.
+Postcode resolver:
+
+* 1000-1299 → VIVAQUA
+* 1500-1999, 3000-3999 → De Watergroep
+* 2000-2999 → Pidpa
+* 4000-7999 → SWDE
+
+Brabant Wallon (1300-1499) and West-/Oost-Vl (8000-9999) drop into
+the manual utility picker; v0.4 will fold in the Géoportail Wallonie
+ZDE GeoPackage and the VMM Waterloket Flanders dump for per-commune
+precision.
 
 ## Sensors
 
@@ -53,14 +65,16 @@ Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
 
 ## Configuration
 
-* **Postcode** -- used to auto-resolve your utility. v0.1 maps Brussels
-  postcodes (1000-1299) to VIVAQUA; non-resolved postcodes drop into a
-  manual utility picker.
+* **Postcode** -- used to auto-resolve your utility. Non-resolved
+  postcodes drop into a manual utility picker.
 * **Annual consumption (m³/yr)** -- defaults to 80; feeds the projected-
   cost sensor.
-
-The Flanders-only `gedomicilieerd_persons` and `social_tariff` options
-arrive in v0.2 along with the block-tariff math.
+* **Gedomicilieerd_persons (Flanders only)** -- 1 to 5; sets the
+  basisvolume (`30 + 30·persons` m³) and the per-resident vastrecht
+  korting (10 EUR per persoon for the drinkwater leg, 20 EUR total
+  when sanering is included). Defaults to 1.
+* **Social tariff (Flanders only)** -- VMM means-tested 80 % reduction
+  on the post-calc bill. Off by default.
 
 ## Development
 

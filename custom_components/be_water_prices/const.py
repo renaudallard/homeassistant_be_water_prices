@@ -25,6 +25,28 @@ WALLONIA_FSE_EUR_PER_M3 = 0.0339
 # Standard Belgian residential VAT rate on water.
 DEFAULT_VAT_RATE = 0.06
 
+# Standard VMM "integrale waterprijs" vastrecht structure for Flanders.
+# Mandated by the Vlaamse regering since 2016 and uniform across operators
+# (De Watergroep, Pidpa, Farys, Water-link, Aquaduin, AGSO Knokke). Each
+# component is split into its own line on the bill but the operator-side
+# numbers are identical, so we keep one source of truth here.
+FLANDERS_VASTRECHT_DRINKWATER = 50.0
+FLANDERS_VASTRECHT_GEMEENTELIJK = 30.0
+FLANDERS_VASTRECHT_BOVENGEMEENTELIJK = 20.0
+FLANDERS_VASTRECHT_TOTAL = (
+    FLANDERS_VASTRECHT_DRINKWATER
+    + FLANDERS_VASTRECHT_GEMEENTELIJK
+    + FLANDERS_VASTRECHT_BOVENGEMEENTELIJK
+)
+FLANDERS_KORTING_DRINKWATER_PER_PERSON = 10.0
+FLANDERS_KORTING_GEMEENTELIJK_PER_PERSON = 6.0
+FLANDERS_KORTING_BOVENGEMEENTELIJK_PER_PERSON = 4.0
+FLANDERS_KORTING_TOTAL_PER_PERSON = (
+    FLANDERS_KORTING_DRINKWATER_PER_PERSON
+    + FLANDERS_KORTING_GEMEENTELIJK_PER_PERSON
+    + FLANDERS_KORTING_BOVENGEMEENTELIJK_PER_PERSON
+)
+
 # Config / option keys.
 CONF_UTILITY = "utility"
 CONF_POSTCODE = "postcode"

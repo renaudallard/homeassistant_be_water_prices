@@ -18,22 +18,31 @@ def test_brussels_postcodes_resolve_to_vivaqua() -> None:
 
 
 def test_walloon_postcodes_resolve_to_swde() -> None:
-    # 4000-7999 covers Liège, Namur, Luxembourg, Hainaut where SWDE is
-    # the dominant operator. CILE / INASEP / régies refinements land in
-    # v0.4 from the Géoportail Wallonie ZDE GeoPackage.
     assert _resolve_postcode("4000") == "swde"
     assert _resolve_postcode("5000") == "swde"
     assert _resolve_postcode("7000") == "swde"
     assert _resolve_postcode("7999") == "swde"
 
 
-def test_flanders_postcodes_unresolved_in_v03() -> None:
-    # v0.2 (Flemish core) will fill 1500-3999 + 8000-9999.
-    assert _resolve_postcode("2000") is None
-    assert _resolve_postcode("9000") is None
-    # Brabant Wallon (1300-1499) is also unresolved -- inBW lands in v0.4.
+def test_antwerp_postcodes_resolve_to_pidpa() -> None:
+    assert _resolve_postcode("2000") == "pidpa"
+    assert _resolve_postcode("2300") == "pidpa"
+    assert _resolve_postcode("2999") == "pidpa"
+
+
+def test_other_flanders_postcodes_resolve_to_de_watergroep() -> None:
+    # Vlaams-Brabant + Halle-Vilvoorde + Limburg.
+    assert _resolve_postcode("1500") == "de_watergroep"
+    assert _resolve_postcode("3000") == "de_watergroep"
+    assert _resolve_postcode("3500") == "de_watergroep"
+
+
+def test_unresolved_postcodes_return_none() -> None:
+    # Brabant Wallon (inBW, v0.4) and West-/Oost-Vl (Farys, deferred).
     assert _resolve_postcode("1300") is None
     assert _resolve_postcode("1499") is None
+    assert _resolve_postcode("8000") is None
+    assert _resolve_postcode("9000") is None
 
 
 def test_invalid_postcodes_return_none() -> None:

@@ -17,9 +17,11 @@
       },
       "options": {
         "title": "Jahresverbrauch",
-        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Wird vom Sensor für geschätzte Jahreskosten verwendet; Standardwert 80 m³/Jahr.",
+        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Flämische Versorger benötigen außerdem die Zahl der gemeldeten Bewohner (bestimmt das Basisvolumen) und eine Option für den VMM-Sozialtarif.",
         "data": {
-          "consumption_m3_per_year": "Verbrauch (m³ / Jahr)"
+          "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
+          "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
+          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)"
         }
       }
     },
@@ -32,7 +34,9 @@
       "init": {
         "title": "Jahresverbrauch",
         "data": {
-          "consumption_m3_per_year": "Verbrauch (m³ / Jahr)"
+          "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
+          "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
+          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)"
         }
       }
     }
