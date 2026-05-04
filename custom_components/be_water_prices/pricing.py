@@ -78,6 +78,7 @@ def _compute_bill(
     ``social_tariff=True`` applies the VMM 80 % reduction on the
     post-calc total.
     """
+    consumption_m3 = max(0.0, consumption_m3)
     if tariff.region == "brussels":
         if tariff.linear_eur_per_m3 is None:
             return None
