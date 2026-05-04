@@ -102,10 +102,14 @@ def test_aquaduin_westkust_postcodes_resolve_to_aquaduin() -> None:
         assert _resolve_postcode(pc) == "aquaduin", pc
 
 
-def test_unresolved_postcodes_return_none() -> None:
-    # Most of West-/Oost-Vl (Farys territory, Farys extractor still deferred).
-    assert _resolve_postcode("8000") is None
-    assert _resolve_postcode("9000") is None
+def test_west_oost_vlaanderen_postcodes_resolve_to_farys() -> None:
+    # Farys covers most of 8000-9999; AGSO Knokke and Aquaduin carve-outs win first.
+    assert _resolve_postcode("9000") == "farys"  # Gent
+    assert _resolve_postcode("8500") == "farys"
+    assert _resolve_postcode("8000") == "farys"
+    # Carve-out: 8300 stays AGSO, 8670 stays Aquaduin (tested separately above).
+    assert _resolve_postcode("8300") == "agso_knokke"
+    assert _resolve_postcode("8670") == "aquaduin"
 
 
 def test_invalid_postcodes_return_none() -> None:

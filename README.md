@@ -61,6 +61,7 @@ publication and how to parse it.
 | --- | --- | --- | --- |
 | **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
 | **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — *drinkwater leg only* | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — the basistarief from the news article `over-de-watergroep/nieuws/tarieven-<year>`. Per-commune saneringsbijdragen sit behind a JS commune picker on `/drinkwater/tarieven` and arrive in a follow-up |
+| **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Per-commune selection in OptionsFlow lands later |
 | **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`. Pulls the year column for basistarief / comforttarief plus the gemeentelijke (afvoer) and bovengemeentelijke (zuivering) saneringsbijdragen |
 | **Water-link** | Flanders (Antwerp city + ring) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py) — the per-year PDF `water-link.be/sites/default/files/<YYYY>-01/<YYYY>%20HH.pdf` parsed via `pdfplumber`. Drinkwater + zuivering are uniform across the service area; gemeentelijke afvoer differs per commune (Antwerpen at 1.3345 €/m³, ring communes at 1.9572). Defaults to Antwerpen rates -- ring-commune users see a slight under-estimate on sanering until per-commune selection lands |
 | **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py) — gold-standard numeric PDF at `aquaduin.be/drinkwater/tarieven/overzicht-tarieven-<year>.pdf`. Publishes a single integrated basistarief (drinkwater + sanering combined) -- highest in Flanders |
@@ -77,7 +78,6 @@ publication and how to parse it.
 
 **Still deferred:**
 
-- **Farys** (~22 % of Flanders, biggest remaining gap) — `farys.be/nl/watertarieven` is JS-rendered with no static numbers in the HTML. Needs the Drupal endpoint discovered via browser network-tab inspection, or a per-commune fallback URL.
 - **~30 régies communales** (Chimay, Theux, Libramont, …) — no central publication channel; deferred indefinitely on dev-hours / customer ratio.
 
 Adding another utility is a self-contained PR: drop a new module under
@@ -104,7 +104,7 @@ dominant operator for that area:
 | 5060, 5070, 5081, 5310, 5340, 5360, 5370, 5500, 5530, 5640 | Namur sud (INASEP service area) | INASEP |
 | 8300, 8301 | Knokke-Heist | AGSO Knokke-Heist |
 | 8430, 8450, 8620, 8630, 8660, 8670 | Westkust (Aquaduin communes) | Aquaduin |
-| Other 8000-9999 | mostly Farys territory | *unresolved* — manual picker |
+| 8000-9999 (rest) | West-Vl. + Oost-Vl. (mostly Farys) | Farys |
 
 Postcodes outside these mappings drop into the manual utility picker.
 A future Géoportail Wallonie ZDE GeoPackage scrape plus a VMM
