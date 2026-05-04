@@ -57,7 +57,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        from homeassistant.helpers import issue_registry as ir
+
+        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
     return unloaded
 
 

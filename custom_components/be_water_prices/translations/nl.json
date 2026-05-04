@@ -72,5 +72,11 @@
         "name": "Verbruik dit jaar"
       }
     }
+  },
+  "issues": {
+    "snapshot_stale": {
+      "title": "Tariefsnapshot van {utility} is verouderd",
+      "description": "Het laatst succesvol opgehaalde tarief van {utility} is {age_days} dagen oud (geldig tot {valid_until}). De integratie blijft de gecachete cijfers tonen, maar die kunnen afwijken van het gepubliceerde tarief. Laatste fout: {last_error}.\n\nDit lost zich meestal vanzelf op zodra de maatschappij de pagina opnieuw publiceert of het netwerkprobleem voorbij is. Blijft het hangen? Kijk naar de issues op GitHub of de dagelijkse live-check workflow run."
+    }
   }
 }
