@@ -267,34 +267,21 @@ reporting an issue.
 
 ## Known limitations
 
-- **De Watergroep partial coverage.** The current extractor publishes
-  only the *drinkwater leg* of the bill (basistarief + drinkwater
-  vastrecht). Sanering is 0, so the projected-cost sensor under-states
-  the real bill by the per-commune saneringsbijdrage (typically
-  150-300 EUR/year for a normal household). Per-commune sanering
-  arrives in v0.4 once the Drupal commune picker on
-  `dewatergroep.be/nl-be/drinkwater/tarieven` is wired.
+- **De Watergroep no-commune fallback is drinkwater-only.** When no
+  commune is configured the extractor pulls the news-article snapshot,
+  which only carries the drinkwater leg (sanering = 0). Pick your
+  commune in the OptionsFlow to switch to the cookie-driven endpoint
+  and get the full integrale waterprijs (drinkwater + gemeentelijke +
+  bovengemeentelijke saneringsbijdragen).
 - **Pidpa sanering frozen at 2024 values.** The Tariefplan PDF only
   refreshes drinkwater rates per year; the saneringsbijdragen line
   prints 2024 numbers. Drinkwater per-m³ is correct each year.
-- **Wallonia long tail not auto-resolved.** The 4000-7999 range maps
-  to SWDE by default. Customers on CILE (~560 k around Liège), INASEP
-  (~38 k in Namur sud), or one of the smaller régies / intercommunales
-  (IEG, AIEC, AIEM, CIESAC, IDEN) get a confidently-wrong default and
-  need to use the manual picker until v0.4 lands the Géoportail ZDE
-  GeoPackage.
-- **Antwerp city-and-ring on Water-link.** ~200 k Water-link customers
-  live inside the 2000-2999 Pidpa default range. Same workaround:
-  manual picker until the Water-link extractor lands.
-- **Farys not wired.** The watertarieven page is JS-rendered and
-  carries no static numbers; the captured fixtures are commune lists
-  only. ~22 % of Flemish households (Oost-Vl. + parts of West-Vl. and
-  Vl-Br.) drop into the manual picker without a usable target.
-  Deferred until a Drupal endpoint or per-commune fallback URL is
-  identified.
-- **Per-commune saneringsbijdrage refinement.** Even within wired
-  utilities, sanering values are operator-wide averages. The pending
-  VMM Waterloket scrape will fold per-commune precision in.
+- **Wallonia régies communales** (~30 small operators -- Chimay,
+  Theux, Libramont, ...) are deferred indefinitely. They have no
+  central publication channel and the dev-hours / customer ratio
+  doesn't justify per-régie extractors. Postcodes served by these
+  operators are absent from the per-postcode table and drop into the
+  manual picker rather than mis-defaulting to SWDE.
 - **Aquaduin integrated rate.** Aquaduin's PDF only publishes one
   per-m³ figure (5.9908 €/m³ in 2026, the highest in Flanders) for
   the integrale waterprijs basistarief -- it does not split drinkwater
