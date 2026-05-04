@@ -78,6 +78,13 @@ def test_brussels_zero_consumption_only_pays_redevance() -> None:
     assert compute_annual_cost(_vivaqua_2026(), consumption_m3=0, persons=1) == 40.23
 
 
+def test_negative_consumption_is_clamped_to_zero() -> None:
+    # Defensive: compute_annual_cost should never produce a negative bill
+    # for a malformed consumption input. Same redevance as the zero case.
+    assert compute_annual_cost(_vivaqua_2026(), consumption_m3=-5, persons=1) == 40.23
+    assert compute_annual_cost(_swde_2026(), consumption_m3=-5, persons=1) == 156.07
+
+
 def test_wallonia_zero_consumption_pays_full_redevance() -> None:
     # 20·CVD + 30·CVA = 64.80 + 82.44 = 147.24 ex-VAT, ×1.06 = 156.0744 → 156.07.
     assert compute_annual_cost(_swde_2026(), consumption_m3=0, persons=1) == 156.07
