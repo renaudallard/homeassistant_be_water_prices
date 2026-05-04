@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Belgian Water Prices",
+        "description": "Enter your postcode and we'll match you to the right water utility. If we can't, you'll pick from a list on the next step.",
+        "data": {
+          "postcode": "Postcode"
+        }
+      },
+      "manual": {
+        "title": "Pick your water utility",
+        "description": "We could not resolve a utility for that postcode. Pick yours below.",
+        "data": {
+          "utility": "Utility"
+        }
+      },
+      "options": {
+        "title": "Annual consumption",
+        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year.",
+        "data": {
+          "consumption_m3_per_year": "Consumption (m³ / year)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This water utility is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Annual consumption",
+        "data": {
+          "consumption_m3_per_year": "Consumption (m³ / year)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "yearly_fee": {"name": "Yearly fixed fee"},
+      "basis_rate": {"name": "Basis rate"},
+      "comfort_rate": {"name": "Comfort rate"},
+      "sanering_rate": {"name": "Sewerage rate"},
+      "all_in_basis": {"name": "All-in basis rate"},
+      "projected_annual_cost": {"name": "Projected annual cost"}
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Belgische Wasserpreise",
+        "description": "Geben Sie Ihre Postleitzahl ein, wir ordnen sie dem zuständigen Wasserversorger zu. Schlägt das fehl, wählen Sie im nächsten Schritt selbst aus.",
+        "data": {
+          "postcode": "Postleitzahl"
+        }
+      },
+      "manual": {
+        "title": "Wasserversorger wählen",
+        "description": "Für diese Postleitzahl konnte kein Versorger ermittelt werden. Bitte unten auswählen.",
+        "data": {
+          "utility": "Versorger"
+        }
+      },
+      "options": {
+        "title": "Jahresverbrauch",
+        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Wird vom Sensor für geschätzte Jahreskosten verwendet; Standardwert 80 m³/Jahr.",
+        "data": {
+          "consumption_m3_per_year": "Verbrauch (m³ / Jahr)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Dieser Wasserversorger ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Jahresverbrauch",
+        "data": {
+          "consumption_m3_per_year": "Verbrauch (m³ / Jahr)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "yearly_fee": {"name": "Jährliche Grundgebühr"},
+      "basis_rate": {"name": "Basistarif"},
+      "comfort_rate": {"name": "Komforttarif"},
+      "sanering_rate": {"name": "Abwassergebühr"},
+      "all_in_basis": {"name": "Gesamtpreis Basistarif"},
+      "projected_annual_cost": {"name": "Geschätzte Jahreskosten"}
+    }
+  }
+}

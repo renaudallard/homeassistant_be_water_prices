@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Belgische Waterprijzen",
+        "description": "Voer je postcode in en we koppelen je aan de juiste watermaatschappij. Lukt dat niet, dan kies je in de volgende stap zelf.",
+        "data": {
+          "postcode": "Postcode"
+        }
+      },
+      "manual": {
+        "title": "Kies je watermaatschappij",
+        "description": "We konden geen maatschappij koppelen aan die postcode. Kies hieronder de jouwe.",
+        "data": {
+          "utility": "Maatschappij"
+        }
+      },
+      "options": {
+        "title": "Jaarverbruik",
+        "description": "Je jaarlijks waterverbruik in kubieke meter. Gebruikt door de geschatte-kostsensor; standaard 80 m³/jaar.",
+        "data": {
+          "consumption_m3_per_year": "Verbruik (m³ / jaar)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Deze watermaatschappij is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Jaarverbruik",
+        "data": {
+          "consumption_m3_per_year": "Verbruik (m³ / jaar)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "yearly_fee": {"name": "Vastrecht per jaar"},
+      "basis_rate": {"name": "Basistarief"},
+      "comfort_rate": {"name": "Comforttarief"},
+      "sanering_rate": {"name": "Saneringsbijdrage"},
+      "all_in_basis": {"name": "All-in basistarief"},
+      "projected_annual_cost": {"name": "Geschatte jaarkost"}
+    }
+  }
+}
