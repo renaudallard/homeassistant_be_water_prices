@@ -5,5 +5,5 @@
     <rect x="124" y="82" width="22" height="134" fill="#FAE042" rx="2"></rect>
     <rect x="152" y="60" width="22" height="156" fill="#EF3340" rx="2"></rect>
     <rect x="180" y="40" width="22" height="176" fill="#EF3340" rx="2"></rect>
-    <path d="M148 28 C 148 28, 104 100, 104 156 C 104 188, 124 216, 148 216 C 172 216, 192 188, 192 156 C 192 100, 148 28, 148 28 Z" fill="#1A1A1C" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round"></path>
+    <path d="M148 116 C 132 132, 122 156, 122 170 C 122 184.36 133.64 196 148 196 C 162.36 196 174 184.36 174 170 C 174 156 164 132 148 116 Z" fill="#1A1A1C" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"></path>
   </svg>
