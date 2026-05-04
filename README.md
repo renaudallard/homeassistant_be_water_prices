@@ -52,7 +52,7 @@ publication and how to parse it.
 - **Projected annual cost** — every entry has a `water_projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
 - **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `water_current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
 - **Translated UI** — English, Dutch, French and German.
-- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card auto-clears on the next successful, fresh fetch.
+- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch.
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
 - **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured.
 
@@ -208,13 +208,16 @@ auto-resolves and whether the chosen utility is Flemish.
    - **Social tariff** — VMM means-tested 80 % reduction on the
      post-calc bill. Off by default.
 
-   Per-commune utilities (De Watergroep, Farys, Water-link) also
-   show:
+   Per-commune utilities (De Watergroep, Farys, Pidpa, Water-link)
+   also show:
    - **Commune** *(optional)* — pick your specific commune to get
-     the full per-commune integrale waterprijs (correct
-     saneringsbijdragen instead of the operator-wide default).
-     Particularly important for **De Watergroep** users since the
-     no-commune fallback only carries the drinkwater leg.
+     the exact per-commune integrale waterprijs. Without a commune,
+     each of those four utilities falls back to a representative
+     default (Halle for De Watergroep, Gent-centrum for Farys,
+     Antwerpen for Water-link, the May-2024 Tariefplan PDF for
+     Pidpa); the projected-cost sensor is still in the right
+     ballpark but saneringsbijdragen and current-year drinkwater
+     rates may drift from your actual bill.
 
    All entries can additionally point at:
    - **Water meter sensor** *(optional override)* — any
@@ -255,10 +258,12 @@ If a refresh fails, the coordinator keeps serving the last known
 snapshot and surfaces `snapshot_age_hours`, `snapshot_stale` and
 `last_error` as attributes on every sensor. Snapshots older than
 **35 days**, or where the parsed `valid_until` has already passed,
-flip `snapshot_stale` to `true`, raise a Repair issue under
-**Settings → Repairs**, and the daily live-check workflow opens a
-GitHub issue against the integration if the failure persists. The
-Repair card auto-clears once a successful, fresh fetch lands.
+flip `snapshot_stale` to `true` and raise a Repair issue under
+**Settings → Repairs**. The Repair card carries a **Retry** button
+that triggers an immediate coordinator refresh; the issue
+auto-clears as soon as the next fetch returns a fresh snapshot. The
+daily live-check workflow opens a GitHub issue against the
+integration if the failure persists across CI runs.
 
 ### Diagnostics
 
@@ -319,12 +324,25 @@ every registered utility). Refresh a fixture with the utility's
 current page or PDF to re-run against new data; the file naming
 convention is `<utility>_<year>.<ext>`.
 
-A daily GitHub Actions workflow
-([`.github/workflows/live_check.yml`](./.github/workflows/live_check.yml))
-runs every registered extractor against its real publication URL,
-retries up to five times with exponential backoff, and opens or
-updates a GitHub issue titled
-`[live-check] water extractor broken …` on persistent failure.
+Two cron workflows guard against silent regressions:
+
+- [`.github/workflows/live_check.yml`](./.github/workflows/live_check.yml)
+  runs daily, hits every registered extractor against its real
+  publication URL, retries up to five times with exponential
+  backoff, and opens / updates a GitHub issue titled
+  `[live-check] water extractor broken …` on persistent parser
+  failure.
+- [`.github/workflows/fixture_drift.yml`](./.github/workflows/fixture_drift.yml)
+  runs weekly, parses each utility's live publication and diffs
+  the result against the parser's output on the committed test
+  fixture. Opens / updates `[fixture-drift] water fixtures need
+  refresh …` when any tariff field drifts above the threshold
+  (rates `> 0.001` €/m³, fees `> 0.01` €/year). Catches *silent
+  rate drift* that the live check misses.
+
+Both scripts skip Water-link in CI: its CDN HTTP-403s GitHub
+Actions IP ranges. Reachable from residential IPs; rerun either
+script locally to drift-check Water-link.
 
 ## License
 
