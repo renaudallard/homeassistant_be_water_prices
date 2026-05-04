@@ -61,7 +61,7 @@ publication and how to parse it.
 | Utility | Region | Coverage | Source |
 | --- | --- | --- | --- |
 | **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
-| **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — full integrale waterprijs when a commune is configured | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — two ingestion paths: the news-article `over-de-watergroep/nieuws/tarieven-<year>` for the no-commune fallback (drinkwater leg only), and the cookie-driven `/Tarief/UpdateDetailTariefJaar/<year>` endpoint with `dwg_l=<GUID>` for the full per-commune bill (drinkwater + gemeentelijke + bovengemeentelijke saneringsbijdragen). Pick your commune in the OptionsFlow to switch from drinkwater-only to full-bill |
+| **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — full integrale waterprijs out of the box, exact per-commune numbers when a commune is configured | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — two ingestion paths: the cookie-driven `/Tarief/UpdateDetailTariefJaar/<year>` endpoint with `dwg_l=<GUID>` (default GUID = Halle / 1500 if no commune is configured, otherwise the user-picked one) returns the full per-commune bill (drinkwater + gemeentelijke + bovengemeentelijke saneringsbijdragen). Falls back to the news-article `over-de-watergroep/nieuws/tarieven-<year>` (drinkwater leg only) if the cookie endpoint fails |
 | **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Pick a different commune in the OptionsFlow to switch (290+ options) |
 | **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — two paths: the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber` for the no-commune fallback (sanering frozen at the May-2024 publication), and the per-commune `/ons-aanbod/je-gemeente/<slug>` HTML page for current rates. Pick a commune in the OptionsFlow to switch to the live HTML path; commune list comes from Pidpa's public sitemap (63 communes) |
 | **Water-link** | Flanders (Antwerp city + ring) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py) — the per-year PDF `water-link.be/sites/default/files/<YYYY>-01/<YYYY>%20HH.pdf` parsed via `pdfplumber`. Drinkwater + zuivering are uniform across the service area; gemeentelijke afvoer differs per commune (Antwerpen at 1.3345 €/m³, ring communes at 1.9572). Defaults to Antwerpen; pick your commune in the OptionsFlow (Edegem, Hove, Mortsel, Beveren-Kruibeke-Zwijndrecht, …) to get the right sanering |
@@ -270,12 +270,16 @@ reporting an issue.
 
 ## Known limitations
 
-- **De Watergroep no-commune fallback is drinkwater-only.** When no
-  commune is configured the extractor pulls the news-article snapshot,
-  which only carries the drinkwater leg (sanering = 0). Pick your
-  commune in the OptionsFlow to switch to the cookie-driven endpoint
-  and get the full integrale waterprijs (drinkwater + gemeentelijke +
-  bovengemeentelijke saneringsbijdragen).
+- **De Watergroep no-commune fallback uses Halle as a default commune.**
+  Without a commune configured the extractor hits the cookie-driven
+  endpoint with Halle's GUID (postcode 1500) and returns the full
+  integrale waterprijs there. Saneringsbijdragen vary by commune in
+  Flanders, so the result still under- or over-estimates slightly for
+  users in other communes (typically off by tens of EUR/year vs ~200
+  EUR/year before). Pick your commune in the OptionsFlow for exact
+  numbers. If the cookie endpoint fails the integration falls back to
+  the news-article snapshot (drinkwater leg only) so it never goes
+  completely dark.
 - **Pidpa no-commune fallback uses the May-2024 Tariefplan PDF.** The
   PDF's saneringsbijdragen line prints 2024 numbers and the drinkwater
   rates are 2024-published projections. Pick your commune in the
