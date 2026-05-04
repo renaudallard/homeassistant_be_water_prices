@@ -249,7 +249,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
 
         if user_input is not None:
             return self.async_create_entry(
-                title=self._utility.upper(),
+                title=get(self._utility).label,
                 data={CONF_UTILITY: self._utility},
                 options=user_input,
             )
