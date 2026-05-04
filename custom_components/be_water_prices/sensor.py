@@ -19,7 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import CoordinatorData, WaterCoordinator
+from .coordinator import CoordinatorData, WaterCoordinator, utility_device_info
 
 EUR_PER_M3 = f"{CURRENCY_EURO}/{UnitOfVolume.CUBIC_METERS}"
 EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
@@ -151,6 +151,7 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
+        self._attr_device_info = utility_device_info(coordinator)
 
     @property
     def native_value(self) -> float | None:
