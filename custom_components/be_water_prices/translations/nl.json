@@ -15,6 +15,20 @@
           "utility": "Maatschappij"
         }
       },
+      "reconfigure": {
+        "title": "Postcode bijwerken",
+        "description": "Voer de nieuwe postcode in voor deze invoer. We koppelen opnieuw aan een maatschappij en herladen de integratie. Jaarverbruik, gedomicilieerde personen, sociaal tarief en de watermetersensor blijven behouden; de opgeslagen gemeente wordt gewist als de gekoppelde maatschappij verandert (de nieuwe maatschappij gebruikt andere gemeente-IDs).",
+        "data": {
+          "postcode": "Postcode"
+        }
+      },
+      "reconfigure_manual": {
+        "title": "Kies je watermaatschappij",
+        "description": "We konden geen maatschappij koppelen aan die postcode. Kies hieronder de jouwe.",
+        "data": {
+          "utility": "Maatschappij"
+        }
+      },
       "options": {
         "title": "Jaarverbruik",
         "description": "Je jaarlijks waterverbruik in kubieke meter. Vlaamse maatschappijen vragen ook het aantal gedomicilieerde personen (bepaalt het basisvolume) en een keuze voor het VMM-sociaal tarief. Optioneel: koppel een watermetersensor (cumulatief m³, device_class=water) zodat de YTD-kostsensor het verbruik sinds 1 januari uit de recorder kan lezen.",

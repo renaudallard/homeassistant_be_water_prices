@@ -15,6 +15,20 @@
           "utility": "Utility"
         }
       },
+      "reconfigure": {
+        "title": "Update your postcode",
+        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption, registered residents, social tariff and the water meter sensor are kept; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs).",
+        "data": {
+          "postcode": "Postcode"
+        }
+      },
+      "reconfigure_manual": {
+        "title": "Pick your water utility",
+        "description": "We could not resolve a utility for that postcode. Pick yours below.",
+        "data": {
+          "utility": "Utility"
+        }
+      },
       "options": {
         "title": "Annual consumption",
         "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year. Flemish utilities also need the number of registered residents (drives the basis volume) and an opt-in for the VMM social tariff. Optionally point at a water meter sensor (cumulative m³, device_class=water) so the year-to-date cost sensor can read consumption since 1 January from Home Assistant's recorder.",

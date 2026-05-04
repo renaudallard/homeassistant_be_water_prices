@@ -238,9 +238,17 @@ auto-resolves and whether the chosen utility is Flemish.
 ### Reconfiguring later
 
 **Settings → Devices & services → Belgian Water Prices → Configure**
-re-prompts only the **Options** step. To switch utility (e.g. you
-moved house or the postcode auto-resolver picked the wrong default),
-remove the entry and add it again with the new postcode.
+re-prompts only the **Options** step (consumption, persons, social
+tariff, commune, water meter sensor).
+
+To switch utility (you moved house, or the postcode auto-resolver
+picked the wrong default the first time), open the entry's three-dot
+menu and pick **Reconfigure**: it re-prompts the postcode, re-runs
+the resolver, and reloads the integration in place. Annual
+consumption, registered residents, social tariff and the water-meter
+sensor carry over; the saved commune is cleared when the resolved
+utility changes (the new operator uses different commune IDs, so a
+stale value would silently fail at fetch time).
 
 ## Daily operation
 
