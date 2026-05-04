@@ -47,14 +47,13 @@ one canonical set of rates for the year, broken down per commune::
 
 Drinkwater (Water column) and zuivering (Zuivering column) are uniform
 across the service area; only the gemeentelijke afvoer differs by
-commune (Antwerpen sits lower at 1.3345 €/m³, the surrounding ring
-communes at 1.9572 €/m³). The extractor stores **Antwerpen's rates**
-as the default since Antwerpen is the city Water-link is named after
-and accounts for the bulk of customers; users in the ring communes
-(Beveren-Kruibeke-Zwijndrecht, Edegem, Hemiksem, Hove, Mortsel, Ranst,
-Schoten, Zwijndrecht-Burcht) see a slight under-estimate on the
-sanering rate. Per-commune precision lands when the OptionsFlow grows
-a commune selector for Water-link entries.
+commune (Antwerpen sits lower at 1.3345 €/m³, the four ring communes
+at 1.9572 €/m³). The PDF carries one BASISTARIEF row per commune --
+five in 2026: Antwerpen, Beveren-Kruibeke-Zwijndrecht, Edegem, Hove,
+Mortsel. The extractor stores **Antwerpen's rates** as the default
+since it is the city Water-link is named after and accounts for the
+bulk of customers; ring-commune users pick their commune via the
+OptionsFlow to get the right sanering rate.
 
 Comforttarief is exactly 2× basis per VMM mandate; we cross-check.
 """
