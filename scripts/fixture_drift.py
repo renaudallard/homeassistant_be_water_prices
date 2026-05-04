@@ -247,6 +247,21 @@ class DriftResult:
     check: FixtureCheck
     deltas: list[FieldDelta]
     error: str | None
+    skipped: str | None = None  # set when CI cannot reach this utility
+
+
+# Utilities whose live publication is unreachable from GitHub Actions
+# runners. Water-link's CDN returns HTTP 403 to datacenter IP ranges
+# (residential IPs work fine; verified via local curl + r.jina.ai
+# proxy attempt). Skipping in CI keeps the workflow's signal-to-noise
+# clean -- the fixture-based unit tests still cover these parsers, and
+# a maintainer can re-run the script from a residential IP on demand.
+CI_BLOCKED: dict[str, str] = {
+    "Water-link (Antwerpen default)": (
+        "Water-link's CDN blocks GitHub Actions IP ranges (HTTP 403). "
+        "Reachable from residential IPs; rerun locally to drift-check."
+    ),
+}
 
 
 def _is_drifting(field_name: str, fixture_v: float, live_v: float) -> bool:
@@ -279,18 +294,22 @@ def _diff(fixture_t: WaterTariff, live_t: WaterTariff) -> list[FieldDelta]:
 async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> DriftResult:
     fixture_path = FIXTURES / chk.fixture
     if not fixture_path.exists():
-        return DriftResult(chk, deltas=[], error=f"fixture missing: {fixture_path}")
+        return DriftResult(chk, [], error=f"fixture missing: {fixture_path}")
     try:
         fixture_t = chk.parse_fixture(fixture_path.read_bytes())
     except Exception:
-        return DriftResult(chk, deltas=[], error=f"fixture parse failed:\n{traceback.format_exc()}")
+        return DriftResult(chk, [], error=f"fixture parse failed:\n{traceback.format_exc()}")
+
+    if chk.label in CI_BLOCKED:
+        return DriftResult(chk, [], error=None, skipped=CI_BLOCKED[chk.label])
+
     try:
         live_t = await chk.fetch_live(session)
     except ExtractorError as err:
-        return DriftResult(chk, deltas=[], error=f"live fetch failed: {err}")
+        return DriftResult(chk, [], error=f"live fetch failed: {err}")
     except Exception:
-        return DriftResult(chk, deltas=[], error=f"live fetch crashed:\n{traceback.format_exc()}")
-    return DriftResult(chk, deltas=_diff(fixture_t, live_t), error=None)
+        return DriftResult(chk, [], error=f"live fetch crashed:\n{traceback.format_exc()}")
+    return DriftResult(chk, _diff(fixture_t, live_t), error=None)
 
 
 async def _run() -> tuple[list[DriftResult], int]:
@@ -298,6 +317,10 @@ async def _run() -> tuple[list[DriftResult], int]:
         results = [await _check_one(session, c) for c in CHECKS]
     drifted = sum(1 for r in results if r.deltas)
     errored = sum(1 for r in results if r.error is not None)
+    # Skipped entries (CI-unreachable utilities) do not flip the exit
+    # code: we cannot drift-check them from the runner, but a real
+    # user is unaffected. The skip reason still appears in the report
+    # so the maintainer can rerun locally.
     return results, 1 if (drifted or errored) else 0
 
 
@@ -310,14 +333,29 @@ def _fmt(value: float | None) -> str:
 def _render(results: list[DriftResult]) -> str:
     drifted = [r for r in results if r.deltas]
     errored = [r for r in results if r.error is not None]
-    clean = [r for r in results if not r.deltas and r.error is None]
+    skipped = [r for r in results if r.skipped is not None]
+    clean = [r for r in results if not r.deltas and r.error is None and r.skipped is None]
 
     lines = ["# Water fixture drift report", ""]
     if not drifted and not errored:
-        lines.append(f"All {len(results)} fixtures match live within threshold.")
+        lines.append(
+            f"All {len(clean)} fixtures match live within threshold "
+            f"({len(skipped)} skipped: see below)."
+            if skipped
+            else f"All {len(results)} fixtures match live within threshold."
+        )
+        if skipped:
+            lines.append("")
+            lines.append("## Skipped (CI-unreachable, no issue raised)")
+            lines.append("")
+            for r in skipped:
+                lines.append(f"- **{r.check.label}**: {r.skipped}")
         return "\n".join(lines)
 
-    lines.append(f"**{len(drifted)} drifted, {len(errored)} errored, {len(clean)} clean.**")
+    lines.append(
+        f"**{len(drifted)} drifted, {len(errored)} errored, "
+        f"{len(skipped)} skipped, {len(clean)} clean.**"
+    )
     lines.append("")
     lines.append(
         "Drift threshold: rates "
@@ -343,6 +381,13 @@ def _render(results: list[DriftResult]) -> str:
         lines.append("")
         for r in errored:
             lines.append(f"- **{r.check.label}**: {r.error}")
+
+    if skipped:
+        lines.append("")
+        lines.append("## Skipped (CI-unreachable, no issue raised)")
+        lines.append("")
+        for r in skipped:
+            lines.append(f"- **{r.check.label}**: {r.skipped}")
 
     if clean:
         lines.append("")

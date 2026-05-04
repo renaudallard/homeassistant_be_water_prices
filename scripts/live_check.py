@@ -73,14 +73,27 @@ MAX_FEE_EUR_YEAR = 500.0
 MIN_RATE_EUR_M3 = 0.5
 MAX_RATE_EUR_M3 = 20.0
 
+# Utilities whose live publication is unreachable from GitHub Actions
+# runners. Water-link's CDN returns HTTP 403 to datacenter IP ranges
+# (residential IPs work fine). Skipping in CI keeps the workflow's
+# signal-to-noise clean -- the fixture-based unit tests still cover
+# these parsers, and a maintainer can rerun this script from a
+# residential IP on demand.
+CI_BLOCKED: dict[str, str] = {
+    "water_link": (
+        "Water-link's CDN blocks GitHub Actions IP ranges (HTTP 403). "
+        "Reachable from residential IPs; rerun locally to live-check."
+    ),
+}
+
 
 @dataclass
 class CheckResult:
     extractor_id: str
     label: str
     region: str
-    ok: bool
-    detail: str  # human-readable summary on success, traceback on failure
+    status: str  # "OK", "FAIL", or "SKIP"
+    detail: str
 
 
 def _validate(tariff: WaterTariff, extractor: WaterExtractor) -> str | None:
@@ -115,27 +128,32 @@ def _validate(tariff: WaterTariff, extractor: WaterExtractor) -> str | None:
 
 
 async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
+    if extractor.id in CI_BLOCKED:
+        return CheckResult(
+            extractor.id, extractor.label, extractor.region, "SKIP", CI_BLOCKED[extractor.id]
+        )
+
     try:
         tariff = await extractor.fetch(session)
     except ExtractorError as err:
-        return CheckResult(extractor.id, extractor.label, extractor.region, False, str(err))
+        return CheckResult(extractor.id, extractor.label, extractor.region, "FAIL", str(err))
     except Exception:  # top-level: report anything unexpected as a failure row
         return CheckResult(
             extractor.id,
             extractor.label,
             extractor.region,
-            False,
+            "FAIL",
             traceback.format_exc(),
         )
 
     complaint = _validate(tariff, extractor)
     if complaint is not None:
-        return CheckResult(extractor.id, extractor.label, extractor.region, False, complaint)
+        return CheckResult(extractor.id, extractor.label, extractor.region, "FAIL", complaint)
     return CheckResult(
         extractor.id,
         extractor.label,
         extractor.region,
-        True,
+        "OK",
         f"valid {tariff.valid_from} → {tariff.valid_until}, fee {tariff.yearly_fixed_fee:.2f} EUR/yr ex-VAT",
     )
 
@@ -143,7 +161,10 @@ async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) 
 async def _run() -> tuple[list[CheckResult], int]:
     async with aiohttp.ClientSession() as session:
         results = [await _check_one(session, e) for e in all_extractors()]
-    rc = 0 if all(r.ok for r in results) else 1
+    # SKIP rows do not flip the exit code: a CI-unreachable utility
+    # is healthy from a residential IP, so flagging it as broken would
+    # be a false positive and quickly poison the workflow's signal.
+    rc = 0 if all(r.status != "FAIL" for r in results) else 1
     return results, rc
 
 
@@ -152,16 +173,22 @@ def _render(results: list[CheckResult]) -> str:
     lines.append("| utility | region | status | detail |")
     lines.append("|---|---|---|---|")
     for r in results:
-        status = "OK" if r.ok else "FAIL"
         detail = r.detail.replace("\n", "<br>").replace("|", "\\|")
-        lines.append(f"| {r.label} | {r.region} | {status} | {detail} |")
-    failed = [r for r in results if not r.ok]
+        lines.append(f"| {r.label} | {r.region} | {r.status} | {detail} |")
+    failed = [r for r in results if r.status == "FAIL"]
+    skipped = [r for r in results if r.status == "SKIP"]
+    lines.append("")
     if failed:
-        lines.append("")
-        lines.append(f"**{len(failed)} of {len(results)} extractors failed.**")
+        lines.append(
+            f"**{len(failed)} of {len(results)} extractors failed.**"
+            + (f" ({len(skipped)} skipped)" if skipped else "")
+        )
     else:
-        lines.append("")
-        lines.append(f"All {len(results)} extractors green.")
+        lines.append(
+            f"All reachable extractors green ({len(results) - len(skipped)} OK"
+            + (f", {len(skipped)} skipped" if skipped else "")
+            + ")."
+        )
     return "\n".join(lines)
 
 
