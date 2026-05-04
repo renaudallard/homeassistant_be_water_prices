@@ -169,7 +169,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         age_days = (datetime.now(UTC) - fetched_at).days
         if age_days > SNAPSHOT_STALE_AFTER_DAYS:
             return True
-        return tariff.valid_until is not None and tariff.valid_until < datetime.now().date()
+        return tariff.valid_until is not None and tariff.valid_until < dt_util.now().date()
 
     def _project_cost(self, tariff: WaterTariff) -> float | None:
         opts = self.entry.options
