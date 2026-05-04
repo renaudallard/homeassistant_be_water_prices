@@ -228,7 +228,12 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
     source dicts -- so a coordinator tick never crashes on this path.
     """
     try:
-        from homeassistant.components.energy import async_get_manager
+        # async_get_manager is the documented public entry point but is not
+        # listed in homeassistant.components.energy.__all__, so mypy --strict
+        # flags it; the ignore matches the recorder pattern in this file.
+        from homeassistant.components.energy import (  # type: ignore[attr-defined]
+            async_get_manager,
+        )
     except ImportError:
         return None
     try:
