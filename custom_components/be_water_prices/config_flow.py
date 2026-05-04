@@ -74,6 +74,7 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_COMMUNE,
+    CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
@@ -273,10 +274,20 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
     # default no-arg constructor and use ``self.config_entry`` directly.
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
         utility_id = self.config_entry.data[CONF_UTILITY]
         communes = await _async_communes(self.hass, utility_id)
+        if user_input is not None:
+            final = dict(user_input)
+            chosen = final.get(CONF_COMMUNE)
+            if chosen:
+                # Resolve the opaque commune id back to its display label so
+                # downstream surfaces (publication_label, diagnostics) show
+                # "Gent" rather than the bare "25071" or GUID.
+                for option in communes:
+                    if option.id == chosen:
+                        final[CONF_COMMUNE_LABEL] = option.label
+                        break
+            return self.async_create_entry(title="", data=final)
         return self.async_show_form(
             step_id="init",
             data_schema=_options_schema(

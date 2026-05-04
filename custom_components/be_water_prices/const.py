@@ -82,6 +82,7 @@ CONF_PERSONS = "gedomicilieerd_persons"
 CONF_SOCIAL_TARIFF = "social_tariff"
 CONF_WATER_METER_SENSOR = "water_meter_sensor"
 CONF_COMMUNE = "commune"
+CONF_COMMUNE_LABEL = "commune_label"
 
 DEFAULT_CONSUMPTION_M3 = 80
 DEFAULT_PERSONS = 1
