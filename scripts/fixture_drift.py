@@ -136,9 +136,16 @@ CHECKS: list[FixtureCheck] = [
         lambda s: get("vivaqua").fetch(s),
     ),
     FixtureCheck(
-        "De Watergroep (drinkwater fallback)",
-        "dewatergroep_2026.html",
-        lambda b: de_watergroep.parse_news_tariff(_t(b), year=2026),
+        # The no-commune fetch hits the cookie-driven endpoint with the
+        # Halle default GUID; the captured per-commune response for
+        # Halle is the matching fixture. The legacy news-article fixture
+        # (dewatergroep_2026.html) is only exercised by the fallback path
+        # and the unit tests in test_per_commune.py / test_de_watergroep.py.
+        "De Watergroep (default commune)",
+        "dewatergroep_halle_2026.html",
+        lambda b: de_watergroep.parse_commune_tariff(
+            _t(b), year=2026, commune_label="Halle (DWG-served default)"
+        ),
         lambda s: get("de_watergroep").fetch(s),
     ),
     FixtureCheck(

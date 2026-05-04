@@ -75,6 +75,17 @@ NEWS_URL_FMT = "https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tari
 COMMUNE_LIST_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
 COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/{year}"
 
+# Default commune for the no-commune fallback. Halle (postcode 1500) is
+# a representative DWG-served commune in Vlaams-Brabant; we use it
+# because the cookie-driven endpoint returns the *full* integrale
+# waterprijs (drinkwater + gemeentelijke + bovengemeentelijke) where
+# the news-article path only has the drinkwater leg. Saneringsbijdragen
+# in Flanders vary by commune, so this still under- or over-estimates
+# slightly for users who don't pick their commune in OptionsFlow, but
+# the average error is ~25 EUR/year vs. the news article's ~200 EUR.
+_DEFAULT_COMMUNE_GUID = "{B16A143A-49E6-4CE5-A241-1AA09BFC406A}"
+_DEFAULT_COMMUNE_LABEL = "Halle (DWG-served default)"
+
 # News article wording: "2,9521 euro voor 1.000 liter".
 _BASIS_NEWS_RE = re.compile(
     r"([\d]+,\s*\d{3,5})\s*euro\s+voor\s+1[.,]?000\s+liter",
@@ -173,17 +184,32 @@ parse_tariff = parse_news_tariff
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    """Drinkwater-only fallback fetch via the news article."""
+    """No-commune fallback fetch.
+
+    Returns the full integrale waterprijs by hitting the cookie-driven
+    per-commune endpoint with a known DWG-served default commune
+    (Halle, postcode 1500). Falls back to the news-article ingestion
+    (drinkwater leg only, sanering = 0) if the per-commune endpoint
+    raises so the integration keeps producing *some* tariff rather
+    than going completely dark.
+    """
     target = date.today().year
     try:
-        html = await fetch_html(session, NEWS_URL_FMT.format(year=target))
-        return parse_news_tariff(html, year=target)
-    except ExtractorError as err:
+        return await fetch_for_commune(session, _DEFAULT_COMMUNE_GUID)
+    except ExtractorError as default_err:
         _LOGGER.info(
-            "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1
+            "De Watergroep default-commune fetch failed (%s); falling back to news article",
+            default_err,
         )
-        html = await fetch_html(session, NEWS_URL_FMT.format(year=target - 1))
-        return parse_news_tariff(html, year=target - 1)
+        try:
+            html = await fetch_html(session, NEWS_URL_FMT.format(year=target))
+            return parse_news_tariff(html, year=target)
+        except ExtractorError as err:
+            _LOGGER.info(
+                "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1
+            )
+            html = await fetch_html(session, NEWS_URL_FMT.format(year=target - 1))
+            return parse_news_tariff(html, year=target - 1)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
