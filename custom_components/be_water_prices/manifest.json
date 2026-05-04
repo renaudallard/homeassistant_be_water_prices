@@ -1,7 +1,7 @@
 {
   "domain": "be_water_prices",
   "name": "Belgian Water Prices",
-  "after_dependencies": ["recorder"],
+  "after_dependencies": ["recorder", "energy"],
   "codeowners": ["@renaudallard"],
   "config_flow": true,
   "documentation": "https://github.com/renaudallard/homeassistant_be_water_prices",
