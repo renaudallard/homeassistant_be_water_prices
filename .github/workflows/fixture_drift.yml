@@ -1,0 +1,88 @@
+name: Fixture drift check
+
+on:
+  schedule:
+    # 06:30 UTC Sunday = 30 min after the daily live_check fires.
+    # Tariffs are annual; weekly is plenty for catching mid-year revisions.
+    - cron: "30 6 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pypdf pdfplumber aiohttp beautifulsoup4
+
+      - name: Run fixture drift check
+        id: check
+        run: |
+          set +e
+          python scripts/fixture_drift.py > report.md
+          rc=$?
+          cat report.md
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # Exit 0 here so the issue-management step always runs.
+          exit 0
+
+      - name: Open or update fixture-drift issue
+        if: steps.check.outputs.rc != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title_prefix='[fixture-drift] water fixtures need refresh'
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          {
+            echo "## Run"
+            echo
+            echo "$run_url"
+            echo
+            echo "## Latest report"
+            echo
+            cat report.md
+          } > issue_body.md
+
+          existing=$(gh issue list \
+            --state open \
+            --search "\"$title_prefix\" in:title" \
+            --json number,title \
+            --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            echo "appending comment to issue #$existing"
+            gh issue comment "$existing" --body-file issue_body.md
+          else
+            gh issue create \
+              --title "$title_prefix ($(date -u +%Y-%m-%d))" \
+              --body-file issue_body.md
+          fi
+
+      - name: Note drift cleared on existing issue
+        if: steps.check.outputs.rc == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Add a "drift cleared" comment to any open drift issue so
+          # the maintainer sees that the situation resolved itself,
+          # but never close the issue automatically.
+          title_prefix='[fixture-drift] water fixtures need refresh'
+          existing=$(gh issue list \
+            --state open \
+            --search "\"$title_prefix\" in:title" \
+            --json number,title \
+            --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" \
+              --body "Drift cleared on $(date -u +%Y-%m-%d). Safe to close."
+          fi
