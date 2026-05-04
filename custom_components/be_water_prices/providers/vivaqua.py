@@ -76,7 +76,10 @@ def _label_for_year(year: int) -> str:
 
 def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
     """Try to parse the ``<table>`` for ``year``; return None if absent."""
-    table = find_table(soup, must_contain=(str(year), "vat"))
+    # Pin to the residential 6 % card. A non-residential 21 % card on
+    # the same page would also contain "vat" + the year and silently
+    # bind to the wrong rate.
+    table = find_table(soup, must_contain=(str(year), "vat included 6"))
     if table is None:
         return None
 
