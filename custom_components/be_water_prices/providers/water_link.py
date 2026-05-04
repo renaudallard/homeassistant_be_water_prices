@@ -74,7 +74,7 @@ from ..const import (
     REGION_FLANDERS,
 )
 from ._pdf import fetch_pdf_text_layout, to_float
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,15 +146,56 @@ def parse_tariff(
     )
 
 
-async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
+    """Fetch this year's PDF, falling back to last year. Returns (text, year)."""
     target = date.today().year
     try:
-        text = await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target))
-        return parse_tariff(text, year=target)
+        return await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target)), target
     except ExtractorError as err:
         _LOGGER.info("Water-link %d PDF unavailable (%s); trying %d", target, err, target - 1)
         text = await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target - 1))
-        return parse_tariff(text, year=target - 1)
+        return text, target - 1
+
+
+async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+    text, year = await _fetch_pdf_text(session)
+    return parse_tariff(text, year=year)
+
+
+async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
+    text, year = await _fetch_pdf_text(session)
+    return parse_tariff(text, year=year, commune=commune)
+
+
+# Anchored on the start-of-line: each commune row in the PDF starts at
+# column 0 followed by 5 EUR amounts (Water, Afvoer, Zuivering, Total ex,
+# Total incl). We extract the commune name token (everything before the
+# first run of digits-comma) and use it as both the id and the label.
+_COMMUNE_LINE_RE = re.compile(
+    r"^([A-Z][A-Za-zÀ-ÿ\- ]+?)\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s*$",
+    re.MULTILINE,
+)
+
+
+async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
+    """Discover the communes Water-link serves from the BASISTARIEF block."""
+    text, _ = await _fetch_pdf_text(session)
+    cut = text.find("BASISTARIEF")
+    end = text.find("COMFORTTARIEF", cut) if cut >= 0 else -1
+    if cut < 0 or end < 0:
+        raise ExtractorError("could not isolate the Water-link BASISTARIEF block")
+    block = text[cut:end]
+    communes: list[CommuneOption] = []
+    seen: set[str] = set()
+    for match in _COMMUNE_LINE_RE.finditer(block):
+        name = match.group(1).strip()
+        if name in seen or name.lower() in {"basistarief", "comforttarief"}:
+            continue
+        seen.add(name)
+        communes.append(CommuneOption(id=name, label=name))
+    if not communes:
+        raise ExtractorError("Water-link BASISTARIEF block had no commune rows")
+    return tuple(communes)
 
 
 EXTRACTOR = WaterExtractor(
@@ -162,4 +203,6 @@ EXTRACTOR = WaterExtractor(
     label=LABEL,
     region=REGION_FLANDERS,
     fetch=fetch,
+    fetch_for_commune=fetch_for_commune,
+    list_communes=list_communes,
 )

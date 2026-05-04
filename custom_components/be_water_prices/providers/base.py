@@ -87,16 +87,41 @@ class WaterTariff:
 
 
 WaterTariffFetcher = Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]]
+CommuneFetcher = Callable[[aiohttp.ClientSession, str], Awaitable[WaterTariff]]
+CommuneLister = Callable[[aiohttp.ClientSession], Awaitable[tuple["CommuneOption", ...]]]
+
+
+@dataclass(frozen=True, kw_only=True)
+class CommuneOption:
+    """One commune the user can pick for a per-commune utility."""
+
+    id: str  # opaque utility-internal identifier (GUID, integer, name)
+    label: str  # human-readable, typically "<postcode> - <commune>"
 
 
 @dataclass(frozen=True, kw_only=True)
 class WaterExtractor:
-    """Registry entry for one utility."""
+    """Registry entry for one utility.
+
+    Per-commune utilities (where saneringsbijdragen vary commune-by-
+    commune within the same operator -- De Watergroep, Farys,
+    Water-link) set ``list_communes`` and ``fetch_for_commune``. The
+    coordinator routes through ``fetch_for_commune`` when the user
+    picks a commune in the OptionsFlow; ``fetch`` remains the default
+    fallback (used for the "no commune configured" path and for the
+    daily live_check).
+    """
 
     id: str
     label: str
     region: str
     fetch: WaterTariffFetcher
+    fetch_for_commune: CommuneFetcher | None = None
+    list_communes: CommuneLister | None = None
+
+    @property
+    def supports_communes(self) -> bool:
+        return self.fetch_for_commune is not None and self.list_communes is not None
 
 
 class WaterExtractorProtocol(Protocol):

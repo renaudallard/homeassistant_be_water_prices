@@ -25,25 +25,22 @@
 
 """De Watergroep -- 167 communes / ~3.3 M customers (~49.5 % of Flanders).
 
-The operator publishes its annual basistarief in a news-style article
-on its own site (one URL per year):
+Two ingestion paths:
 
-    https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tarieven-<year>
+  - **Default fetch** (no commune configured) hits the operator-wide
+    news article ``over-de-watergroep/nieuws/tarieven-<year>``. That
+    page only carries the drinkwater basistarief; sanering stays at 0
+    so the projected-cost sensor under-states the real bill.
 
-That page carries the per-m³ basistarief in plain prose, e.g.::
+  - **Per-commune fetch** GETs ``/Tarief/UpdateDetailTariefJaar/<year>``
+    with a ``dwg_l=<GUID>`` cookie. The response is the full per-commune
+    integrale waterprijs page: drinkwater + gemeentelijke +
+    bovengemeentelijke saneringsbijdragen with the standard VMM
+    50/30/20 + 10/6/4 vastrecht/korting structure.
 
-    : 2,9521 euro voor 1.000 liter of 0,0029 euro (dat is 0,29 cent) per liter.
-
-The full per-commune integrale waterprijs (drinkwater + bovengemeentelijk
-+ gemeentelijk sanering) sits behind a JS-rendered commune picker on
-``/nl-be/drinkwater/tarieven`` and is not in the static HTML. For v0.2
-we publish only the **drinkwater leg** of the bill: drinkwater
-basistarief / comforttarief and the drinkwater portion of vastrecht
-(``FLANDERS_VASTRECHT_DRINKWATER`` = 50 EUR with 10 EUR/persoon
-korting). Saneringsbijdragen stay at 0 -- the projected-cost sensor
-will under-state the real bill by the per-commune sanering total
-(typically 2-4 EUR/m³). v0.4 will add per-commune sanering once we
-have a stable map.
+Commune list discovery: scrape the dropdown on
+``/nl-be/drinkwater/tarieven`` (700+ ``<option>`` entries with GUID
+values).
 
 Comforttarief is exactly ``2 ×`` the basistarief by VMM mandate; we
 materialise it.
@@ -61,67 +58,182 @@ from bs4 import BeautifulSoup
 from ..const import (
     DEFAULT_VAT_RATE,
     FLANDERS_KORTING_DRINKWATER_PER_PERSON,
+    FLANDERS_KORTING_TOTAL_PER_PERSON,
     FLANDERS_VASTRECHT_DRINKWATER,
+    FLANDERS_VASTRECHT_TOTAL,
     REGION_FLANDERS,
 )
 from ._html import fetch_html
-from ._pdf import to_float
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from ._pdf import USER_AGENT, to_float
+from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "de_watergroep"
 LABEL = "De Watergroep"
-SOURCE_URL_FMT = "https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tarieven-{year}"
+NEWS_URL_FMT = "https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tarieven-{year}"
+COMMUNE_LIST_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
+COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/{year}"
 
-# The article phrases the basistarief as e.g. "2,9521 euro voor 1.000 liter".
-# Anchor on the "voor 1.000 liter" suffix so an unrelated "X,YYYY euro"
-# elsewhere in the article body cannot win.
-_BASIS_RE = re.compile(
+# News article wording: "2,9521 euro voor 1.000 liter".
+_BASIS_NEWS_RE = re.compile(
     r"([\d]+,\s*\d{3,5})\s*euro\s+voor\s+1[.,]?000\s+liter",
     re.IGNORECASE,
 )
 
+# Per-commune endpoint rows (after stripping HTML to whitespace text):
+#   "Basistarief per m³ Waterverbruik drinkwater € 2,9251 (incl. ...)
+#    Afvoer van afvalwater € 1,9572 (incl. ...) Zuivering van
+#    afvalwater € 1,7019 (incl. ...)"
+_BASIS_DRINKWATER_RE = re.compile(
+    r"Basistarief\s+per\s+m³.*?Waterverbruik\s+drinkwater\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE | re.DOTALL,
+)
+_BASIS_AFVOER_RE = re.compile(
+    r"Basistarief\s+per\s+m³.*?Afvoer\s+van\s+afvalwater\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE | re.DOTALL,
+)
+_BASIS_ZUIVERING_RE = re.compile(
+    r"Basistarief\s+per\s+m³.*?Zuivering\s+van\s+afvalwater\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE | re.DOTALL,
+)
 
-def parse_tariff(html: str, year: int) -> WaterTariff:
-    """Parse a captured ``tarieven-<year>`` article."""
+
+def parse_news_tariff(html: str, year: int) -> WaterTariff:
+    """Parse the news-article fallback (drinkwater leg only).
+
+    Used when no commune is configured; sanering stays at 0 because
+    the news article does not carry per-commune sewerage rates.
+    """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)
-    match = _BASIS_RE.search(text)
+    match = _BASIS_NEWS_RE.search(text)
     if match is None:
         raise ExtractorError(
             f"could not locate De Watergroep basistarief for {year} on the news article"
         )
     basis = to_float(match.group(1))
+    return WaterTariff(
+        utility=UTILITY_ID,
+        region=REGION_FLANDERS,
+        valid_from=date(year, 1, 1),
+        valid_until=date(year, 12, 31),
+        publication_label=f"De Watergroep tarieven {year} (drinkwater leg only)",
+        source_url=NEWS_URL_FMT.format(year=year),
+        yearly_fixed_fee=FLANDERS_VASTRECHT_DRINKWATER,
+        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_DRINKWATER_PER_PERSON,
+        basis_eur_per_m3=basis,
+        comfort_eur_per_m3=2.0 * basis,  # VMM-mandated 2× rule
+        vat_rate=DEFAULT_VAT_RATE,
+    )
+
+
+def parse_commune_tariff(
+    html: str,
+    *,
+    year: int,
+    commune_label: str,
+) -> WaterTariff:
+    """Parse the per-commune AJAX response (full integrale waterprijs)."""
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text(" ", strip=True)
+
+    drinkwater = _BASIS_DRINKWATER_RE.search(text)
+    afvoer = _BASIS_AFVOER_RE.search(text)
+    zuivering = _BASIS_ZUIVERING_RE.search(text)
+    if drinkwater is None or afvoer is None or zuivering is None:
+        raise ExtractorError(
+            "could not parse De Watergroep per-commune basis rows "
+            f"(drinkwater={drinkwater is not None}, "
+            f"afvoer={afvoer is not None}, zuivering={zuivering is not None})"
+        )
+    basis = to_float(drinkwater.group(1))
+    san_gem = to_float(afvoer.group(1))
+    san_bov = to_float(zuivering.group(1))
 
     return WaterTariff(
         utility=UTILITY_ID,
         region=REGION_FLANDERS,
         valid_from=date(year, 1, 1),
         valid_until=date(year, 12, 31),
-        publication_label=f"De Watergroep tarieven {year}",
-        source_url=SOURCE_URL_FMT.format(year=year),
-        yearly_fixed_fee=FLANDERS_VASTRECHT_DRINKWATER,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_DRINKWATER_PER_PERSON,
+        publication_label=f"De Watergroep tarieven {year} ({commune_label})",
+        source_url=COMMUNE_DETAIL_URL_FMT.format(year=year),
+        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
+        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
         basis_eur_per_m3=basis,
-        comfort_eur_per_m3=2.0 * basis,  # VMM-mandated 2× rule.
-        # Sanering is per-commune; left at 0 for v0.2 (see module docstring).
+        comfort_eur_per_m3=2.0 * basis,  # VMM-mandated 2× rule
+        sanering_gemeentelijk_eur_per_m3=san_gem,
+        sanering_bovengemeentelijk_eur_per_m3=san_bov,
         vat_rate=DEFAULT_VAT_RATE,
     )
 
 
+# Backwards-compat alias for tests pinned to the old name.
+parse_tariff = parse_news_tariff
+
+
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    """Try the current calendar year's article, fall back to last year's."""
+    """Drinkwater-only fallback fetch via the news article."""
     target = date.today().year
     try:
-        html = await fetch_html(session, SOURCE_URL_FMT.format(year=target))
-        return parse_tariff(html, year=target)
+        html = await fetch_html(session, NEWS_URL_FMT.format(year=target))
+        return parse_news_tariff(html, year=target)
     except ExtractorError as err:
         _LOGGER.info(
             "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1
         )
-        html = await fetch_html(session, SOURCE_URL_FMT.format(year=target - 1))
-        return parse_tariff(html, year=target - 1)
+        html = await fetch_html(session, NEWS_URL_FMT.format(year=target - 1))
+        return parse_news_tariff(html, year=target - 1)
+
+
+async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
+    """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint."""
+    target = date.today().year
+    url = COMMUNE_DETAIL_URL_FMT.format(year=target)
+    try:
+        async with session.get(
+            url,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Cookie": f"dwg_l={commune}",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            if resp.status >= 400:
+                raise ExtractorError(f"HTTP {resp.status} fetching {url}")
+            text = await resp.text()
+    except aiohttp.ClientError as err:
+        raise ExtractorError(f"network error fetching De Watergroep AJAX endpoint: {err}") from err
+    if not text.strip() or "Basistarief" not in text:
+        raise ExtractorError(
+            f"De Watergroep returned an empty body for commune {commune!r} "
+            "(probably an invalid GUID)"
+        )
+    return parse_commune_tariff(text, year=target, commune_label=commune)
+
+
+_OPTION_RE = re.compile(
+    r'<option[^>]*value="(\{[0-9A-Fa-f-]+\})"[^>]*>\s*([^<]+?)\s*</option>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
+    """Discover the 700 De Watergroep communes by scraping the dropdown."""
+    html = await fetch_html(session, COMMUNE_LIST_URL)
+    communes: list[CommuneOption] = []
+    seen: set[str] = set()
+    for match in _OPTION_RE.finditer(html):
+        guid = match.group(1)
+        label = match.group(2).strip()
+        if not label or guid in seen:
+            continue
+        seen.add(guid)
+        communes.append(CommuneOption(id=guid, label=label))
+    if not communes:
+        raise ExtractorError("could not discover any De Watergroep communes from the dropdown")
+    return tuple(communes)
 
 
 EXTRACTOR = WaterExtractor(
@@ -129,4 +241,6 @@ EXTRACTOR = WaterExtractor(
     label=LABEL,
     region=REGION_FLANDERS,
     fetch=fetch,
+    fetch_for_commune=fetch_for_commune,
+    list_communes=list_communes,
 )

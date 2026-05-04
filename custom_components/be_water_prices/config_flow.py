@@ -44,6 +44,7 @@ The flow is three steps:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -54,7 +55,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
     BooleanSelector,
     EntitySelector,
@@ -72,6 +73,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_COMMUNE,
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
@@ -87,6 +89,9 @@ from .const import (
 )
 from .providers import all_extractors, get
 from .providers._postcodes import resolve as _resolve_postcode
+from .providers.base import CommuneOption
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _utility_options() -> list[SelectOptionDict]:
@@ -113,7 +118,12 @@ def _manual_schema() -> vol.Schema:
     )
 
 
-def _options_schema(current: dict[str, Any], *, flanders: bool) -> vol.Schema:
+def _options_schema(
+    current: dict[str, Any],
+    *,
+    flanders: bool,
+    communes: tuple[CommuneOption, ...] = (),
+) -> vol.Schema:
     fields: dict[Any, Any] = {
         vol.Required(
             CONF_CONSUMPTION_M3_PER_YEAR,
@@ -148,6 +158,23 @@ def _options_schema(current: dict[str, Any], *, flanders: bool) -> vol.Schema:
             )
         ] = BooleanSelector()
 
+    # Per-commune utilities (De Watergroep, Farys, Water-link) get a
+    # commune dropdown. The id is the utility's internal opaque
+    # identifier (GUID for DWG, integer for Farys, name for Water-link).
+    if communes:
+        commune_default = current.get(CONF_COMMUNE)
+        fields[
+            vol.Optional(
+                CONF_COMMUNE,
+                description={"suggested_value": commune_default} if commune_default else None,
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=[SelectOptionDict(value=c.id, label=c.label) for c in communes],
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        )
+
     # Optional: a water-meter sensor (cumulative m³) that powers the
     # ``water_current_year_cost`` YTD sensor. Filtered to entities whose
     # device_class is ``water`` so the dropdown only surfaces sensors
@@ -169,6 +196,26 @@ def _options_schema(current: dict[str, Any], *, flanders: bool) -> vol.Schema:
 
 def _is_flanders(utility_id: str) -> bool:
     return get(utility_id).region == REGION_FLANDERS
+
+
+async def _async_communes(hass: HomeAssistant, utility_id: str) -> tuple[CommuneOption, ...]:
+    """Return the commune list for a per-commune utility, or () otherwise.
+
+    Network failures are swallowed -- the OptionsFlow falls back to
+    no commune selector rather than blocking the user.
+    """
+    extractor = get(utility_id)
+    if not extractor.supports_communes:
+        return ()
+    assert extractor.list_communes is not None
+    try:
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+        session = async_get_clientsession(hass)
+        return await extractor.list_communes(session)
+    except Exception:  # network or parser failure: degrade gracefully
+        _LOGGER.exception("could not fetch commune list for %s", utility_id)
+        return ()
 
 
 class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg, unused-ignore]
@@ -206,9 +253,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
                 data={CONF_UTILITY: self._utility},
                 options=user_input,
             )
+        communes = await _async_communes(self.hass, self._utility)
         return self.async_show_form(
             step_id="options",
-            data_schema=_options_schema({}, flanders=_is_flanders(self._utility)),
+            data_schema=_options_schema(
+                {}, flanders=_is_flanders(self._utility), communes=communes
+            ),
         )
 
     @staticmethod
@@ -226,10 +276,12 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
         utility_id = self.config_entry.data[CONF_UTILITY]
+        communes = await _async_communes(self.hass, utility_id)
         return self.async_show_form(
             step_id="init",
             data_schema=_options_schema(
                 dict(self.config_entry.options),
                 flanders=_is_flanders(utility_id),
+                communes=communes,
             ),
         )

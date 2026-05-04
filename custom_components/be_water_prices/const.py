@@ -80,6 +80,7 @@ CONF_CONSUMPTION_M3_PER_YEAR = "consumption_m3_per_year"
 CONF_PERSONS = "gedomicilieerd_persons"
 CONF_SOCIAL_TARIFF = "social_tariff"
 CONF_WATER_METER_SENSOR = "water_meter_sensor"
+CONF_COMMUNE = "commune"
 
 DEFAULT_CONSUMPTION_M3 = 80
 DEFAULT_PERSONS = 1

@@ -66,3 +66,30 @@ def test_parses_2026_ring_commune_overrides_sanering() -> None:
 def test_raises_when_pdf_text_is_garbage() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("nothing here", year=2026)
+
+
+def test_extractor_supports_communes_and_lists_them() -> None:
+    # Per-commune support is what unlocks the OptionsFlow commune dropdown.
+    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
+    from custom_components.be_water_prices.providers.water_link import _COMMUNE_LINE_RE
+
+    assert EXTRACTOR.supports_communes
+    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    cut = text.find("BASISTARIEF")
+    end = text.find("COMFORTTARIEF", cut)
+    block = text[cut:end]
+    found = [m.group(1).strip() for m in _COMMUNE_LINE_RE.finditer(block)]
+    assert "Antwerpen" in found
+    assert "Edegem" in found
+    assert "Mortsel" in found
+
+
+def test_parse_tariff_with_specific_commune_returns_ring_sanering() -> None:
+    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
+
+    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    edegem = parse_tariff(text, year=2026, commune="Edegem")
+    assert edegem.sanering_gemeentelijk_eur_per_m3 == 1.9572  # ring rate
+
+
+# Imports needed for the new tests above.
