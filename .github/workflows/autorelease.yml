@@ -31,17 +31,25 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "tag=v$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Check if tag exists
+      - name: Check if tag and release exist
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git tag -l "${{ steps.version.outputs.tag }}" | grep -q .; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          tag="${{ steps.version.outputs.tag }}"
+          if git ls-remote --tags --exit-code origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build release zip
-        if: steps.check.outputs.exists == 'false'
+        if: steps.check.outputs.release_exists == 'false'
         run: |
           mkdir -p dist
           cd custom_components/be_water_prices
@@ -50,14 +58,30 @@ jobs:
           cd ../..
           unzip -l dist/be_water_prices.zip
 
-      - name: Tag and release
-        if: steps.check.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Push tag (when missing)
+        if: steps.check.outputs.tag_exists == 'false'
         run: |
           tag="${{ steps.version.outputs.tag }}"
           git tag "$tag"
           git push origin "$tag"
+
+      - name: Create release (with retry on transient API errors)
+        if: steps.check.outputs.release_exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          set +e
+          for delay in 10 30 90; do
+            gh release create "$tag" \
+              --title "$tag" \
+              --generate-notes \
+              dist/be_water_prices.zip && exit 0
+            echo "release create failed, sleeping ${delay}s..." >&2
+            sleep "$delay"
+          done
+          # Final attempt; surface its exit code so the run fails if it still
+          # returns non-zero after the three retries.
           gh release create "$tag" \
             --title "$tag" \
             --generate-notes \
