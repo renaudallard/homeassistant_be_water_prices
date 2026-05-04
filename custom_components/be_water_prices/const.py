@@ -38,7 +38,8 @@ REGIONS: tuple[str, ...] = (REGION_FLANDERS, REGION_WALLONIA, REGION_BRUSSELS)
 UPDATE_INTERVAL_HOURS = 24
 
 # Treat the snapshot as stale once it has not been refreshed for this many days
-# OR the parsed valid_until is in the past. Triggers a repair issue in HA.
+# OR the parsed valid_until is in the past. Surfaced as a sensor attribute and
+# logged; persistent failure is caught by the daily live_check workflow.
 SNAPSHOT_STALE_AFTER_DAYS = 35
 
 # Wallonia uses two flat-Wallonia volumetric components on top of each

@@ -127,8 +127,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 tariff = await self._extractor.fetch(session)
         except ExtractorError as err:
             # On fetch failure keep serving the last good snapshot rather
-            # than blanking every sensor; the recorded staleness gives the
-            # user (and the repair issue) a clear signal.
+            # than blanking every sensor; snapshot_age_hours and last_error
+            # are surfaced as attributes so dashboards can flag the issue.
             if self._last_good is not None:
                 _LOGGER.warning("water tariff fetch failed, serving cached: %s", err)
                 stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)

@@ -52,7 +52,7 @@ publication and how to parse it.
 - **Projected annual cost** — every entry has a `water_projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
 - **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `water_current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
 - **Translated UI** — English, Dutch, French and German.
-- **Self-healing** — last-known prices keep serving on outage; a repair issue surfaces if the snapshot goes stale (>35 days or past the published `valid_until`).
+- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes so dashboards can alert when the snapshot goes stale (>35 days or past the published `valid_until`).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
 
 ## Supported utilities
