@@ -15,6 +15,20 @@
           "utility": "Compagnie"
         }
       },
+      "reconfigure": {
+        "title": "Mettre à jour le code postal",
+        "description": "Entrez le nouveau code postal pour cette entrée. Nous identifierons à nouveau la compagnie et rechargerons l'intégration. Consommation annuelle, personnes domiciliées, tarif social et capteur de compteur d'eau sont conservés ; la commune enregistrée est effacée si la compagnie identifiée change (la nouvelle compagnie utilise des identifiants de commune différents).",
+        "data": {
+          "postcode": "Code postal"
+        }
+      },
+      "reconfigure_manual": {
+        "title": "Choisissez votre compagnie",
+        "description": "Aucune compagnie n'a pu être identifiée pour ce code postal. Sélectionnez la vôtre ci-dessous.",
+        "data": {
+          "utility": "Compagnie"
+        }
+      },
       "options": {
         "title": "Consommation annuelle",
         "description": "Votre consommation annuelle d'eau en mètres cubes. Pour les distributeurs flamands, indiquez aussi le nombre de personnes domiciliées (détermine le volume du tarif de base) et l'option pour le tarif social VMM. Optionnel : pointez un capteur compteur d'eau (cumulatif m³, device_class=water) pour que le capteur de coût annuel lise la consommation depuis le 1er janvier depuis l'historique Home Assistant.",

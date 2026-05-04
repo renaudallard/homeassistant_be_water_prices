@@ -207,3 +207,152 @@ async def test_options_flow_clears_commune_when_user_explicitly_deselects(
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_swaps_utility_and_clears_commune(
+    hass: HomeAssistant,
+) -> None:
+    """Reconfigure with a postcode that resolves to a different utility:
+    entry.data[CONF_UTILITY] flips, options carry over, but the
+    operator-specific commune fields are dropped because Farys's numeric
+    IDs mean nothing to VIVAQUA.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_COMMUNE: "25071",
+            CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_POSTCODE: "1000"},  # Brussels → VIVAQUA
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    assert entry.data[CONF_UTILITY] == "vivaqua"
+    assert entry.unique_id == f"{DOMAIN}_vivaqua"
+    assert entry.title == "VIVAQUA"
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options
+    # Non-commune options preserved verbatim.
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
+    assert entry.options[CONF_PERSONS] == 2
+    assert entry.options[CONF_SOCIAL_TARIFF] is False
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_keeps_commune_when_utility_unchanged(
+    hass: HomeAssistant,
+) -> None:
+    """Reconfigure with a postcode that resolves to the same utility:
+    options (including the commune) carry over untouched. The reload
+    still happens so the user gets a fresh fetch.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_COMMUNE: "25071",
+            CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_POSTCODE: "9000"},  # also Farys
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    assert entry.data[CONF_UTILITY] == "farys"
+    assert entry.options[CONF_COMMUNE] == "25071"
+    assert entry.options[CONF_COMMUNE_LABEL] == "9000 - Gent (Centrum)"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_falls_through_to_manual_picker(
+    hass: HomeAssistant,
+) -> None:
+    """An unresolved postcode goes to the reconfigure-manual step; the
+    user picks a utility manually and the entry is rewritten.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_POSTCODE: "99999"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reconfigure_manual"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_UTILITY: "swde"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "swde"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_aborts_when_target_utility_already_configured(
+    hass: HomeAssistant,
+) -> None:
+    """If the user has separate entries for two utilities and tries to
+    reconfigure one toward the other's utility, abort rather than
+    end up with two entries sharing the same unique_id.
+    """
+    vivaqua = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    vivaqua.add_to_hass(hass)
+    farys = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_farys",
+    )
+    farys.add_to_hass(hass)
+
+    result = await farys.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_POSTCODE: "1000"},  # already-configured VIVAQUA
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    # Original Farys entry untouched.
+    assert farys.data[CONF_UTILITY] == "farys"

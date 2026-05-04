@@ -15,6 +15,20 @@
           "utility": "Versorger"
         }
       },
+      "reconfigure": {
+        "title": "Postleitzahl aktualisieren",
+        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch, gemeldete Bewohner, Sozialtarif und der Wasserzähler-Sensor bleiben erhalten; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs).",
+        "data": {
+          "postcode": "Postleitzahl"
+        }
+      },
+      "reconfigure_manual": {
+        "title": "Wasserversorger wählen",
+        "description": "Für diese Postleitzahl konnte kein Versorger ermittelt werden. Bitte unten auswählen.",
+        "data": {
+          "utility": "Versorger"
+        }
+      },
       "options": {
         "title": "Jahresverbrauch",
         "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Flämische Versorger benötigen außerdem die Zahl der gemeldeten Bewohner (bestimmt das Basisvolumen) und eine Option für den VMM-Sozialtarif. Optional: ein Wasserzähler-Sensor (kumulative m³, device_class=water) für den Jahres-Sensor, der den Verbrauch ab 1. Januar aus dem HA-Recorder liest.",
