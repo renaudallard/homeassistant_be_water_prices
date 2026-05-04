@@ -37,12 +37,23 @@ __all__ = [
 ]
 
 
-_AMOUNT_RE = re.compile(r"€\s*([0-9]+(?:[.,][0-9]+)?)")
+_AMOUNT_BEFORE_EURO = re.compile(r"€\s*([0-9]+(?:[.,][0-9]+)?)")
+_AMOUNT_AFTER_EURO = re.compile(r"([0-9]+(?:[.,][0-9]+)?)\s*€")
 
 
 def extract_amounts(text: str) -> list[float]:
-    """Return every ``€ N[,N]`` amount found in ``text``, in order."""
-    return [to_float(m.group(1)) for m in _AMOUNT_RE.finditer(text)]
+    """Return every euro amount found in ``text``, in order.
+
+    Accepts both Dutch / English layout (``€ 12,34``) and French layout
+    (``12,34 €``); some Walloon utility pages publish the symbol after
+    the number. Hits are de-duplicated by start position so a string
+    like "€ 12,34 €" reports 12.34 once.
+    """
+    seen: dict[int, float] = {}
+    for pattern in (_AMOUNT_BEFORE_EURO, _AMOUNT_AFTER_EURO):
+        for m in pattern.finditer(text):
+            seen[m.start(1)] = to_float(m.group(1))
+    return [seen[k] for k in sorted(seen)]
 
 
 def find_table(

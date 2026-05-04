@@ -10,7 +10,7 @@ Wallonie ZDE GeoPackage and the VMM Waterloket Flanders dump.
 Today's coverage:
 
   * 1000-1299    Brussels-Capital                → VIVAQUA
-  * 1300-1499    Brabant Wallon                  → unresolved (inBW, v0.4)
+  * 1300-1499    Brabant Wallon                  → inBW
   * 1500-1999,
     3000-3499    Vlaams-Brabant + Halle-Vilvoorde → DE WATERGROEP
   * 2000-2999    Antwerp province               → PIDPA
@@ -32,6 +32,8 @@ def resolve(postcode: str) -> str | None:
         return None
     if 1000 <= code <= 1299:
         return "vivaqua"
+    if 1300 <= code <= 1499:
+        return "inbw"
     if 2000 <= code <= 2999:
         return "pidpa"
     if 1500 <= code <= 1999 or 3000 <= code <= 3999:

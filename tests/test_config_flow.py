@@ -37,10 +37,14 @@ def test_other_flanders_postcodes_resolve_to_de_watergroep() -> None:
     assert _resolve_postcode("3500") == "de_watergroep"
 
 
+def test_brabant_wallon_postcodes_resolve_to_inbw() -> None:
+    assert _resolve_postcode("1300") == "inbw"
+    assert _resolve_postcode("1380") == "inbw"
+    assert _resolve_postcode("1499") == "inbw"
+
+
 def test_unresolved_postcodes_return_none() -> None:
-    # Brabant Wallon (inBW, v0.4) and West-/Oost-Vl (Farys, deferred).
-    assert _resolve_postcode("1300") is None
-    assert _resolve_postcode("1499") is None
+    # West-/Oost-Vl (Farys, Aquaduin, AGSO Knokke -- all deferred).
     assert _resolve_postcode("8000") is None
     assert _resolve_postcode("9000") is None
 

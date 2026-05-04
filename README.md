@@ -12,9 +12,9 @@ daily-refresh `DataUpdateCoordinator`, no Python-source EUR values).
 
 ## Status
 
-**v0.2** -- Brussels (VIVAQUA), Flanders (De Watergroep, Pidpa) and
-Wallonia (SWDE). Farys (Oost-Vl. + parts of West-Vl. and Vl-Br.) is
-intentionally not yet wired: its watertarieven page is JS-rendered
+**v0.2** -- Brussels (VIVAQUA), Flanders (De Watergroep, Pidpa),
+Wallonia (SWDE, inBW). Farys (Oost-Vl. + parts of West-Vl. and Vl-Br.)
+is intentionally not yet wired: its watertarieven page is JS-rendered
 and the static HTML carries no per-m³ numbers; landing in a follow-up
 once we discover the Drupal endpoint or use a per-commune fallback
 URL. See `SCOPE.md` for the full roadmap.
@@ -27,18 +27,19 @@ URL. See `SCOPE.md` for the full roadmap.
 | Flanders | De Watergroep | https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tarieven-2026 (drinkwater leg only -- per-commune sanering coming in v0.4) |
 | Flanders | Pidpa         | https://www.pidpa.be/sites/default/files/2024-05/Tariefplan_2025-2030_simulatie_type_gezin.pdf (PDF) |
 | Wallonia | SWDE          | https://www.swde.be/en/water-prices-swde            |
+| Wallonia | inBW          | https://eau.inbw.be/prix-de-leau (TLS chain misconfigured server-side; we fetch with `verify_ssl=False`) |
 
 Postcode resolver:
 
 * 1000-1299 → VIVAQUA
+* 1300-1499 → inBW (Brabant Wallon)
 * 1500-1999, 3000-3999 → De Watergroep
 * 2000-2999 → Pidpa
 * 4000-7999 → SWDE
 
-Brabant Wallon (1300-1499) and West-/Oost-Vl (8000-9999) drop into
-the manual utility picker; v0.4 will fold in the Géoportail Wallonie
-ZDE GeoPackage and the VMM Waterloket Flanders dump for per-commune
-precision.
+West-/Oost-Vl (8000-9999) drops into the manual utility picker;
+v0.4 will fold in the Géoportail Wallonie ZDE GeoPackage and the VMM
+Waterloket Flanders dump for per-commune precision.
 
 ## Sensors
 
