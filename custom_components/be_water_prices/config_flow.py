@@ -287,6 +287,18 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
                     if option.id == chosen:
                         final[CONF_COMMUNE_LABEL] = option.label
                         break
+            elif not communes:
+                # Could not fetch the commune list (transient network /
+                # parser failure). The form did not render the commune
+                # field, so user_input cannot carry it. Preserve the
+                # previously-saved commune so a transient outage does
+                # not silently wipe the user's selection back to the
+                # operator-wide default.
+                existing = self.config_entry.options
+                if existing.get(CONF_COMMUNE):
+                    final[CONF_COMMUNE] = existing[CONF_COMMUNE]
+                if existing.get(CONF_COMMUNE_LABEL):
+                    final[CONF_COMMUNE_LABEL] = existing[CONF_COMMUNE_LABEL]
             return self.async_create_entry(title="", data=final)
         return self.async_show_form(
             step_id="init",
