@@ -76,7 +76,15 @@
   "issues": {
     "snapshot_stale": {
       "title": "Snapshot de tarif {utility} obsolète",
-      "description": "Le dernier tarif {utility} récupéré avec succès a {age_days} jours (valable jusqu'au {valid_until}). L'intégration continue de servir les valeurs en cache, mais elles peuvent ne plus correspondre au tarif publié. Dernière erreur : {last_error}.\n\nCela se résout généralement tout seul dès que la compagnie republie la page ou que le problème réseau est résolu. Si cela persiste, consultez les issues GitHub ou le run quotidien de la workflow live-check."
+      "description": "Le dernier tarif {utility} récupéré avec succès a {age_days} jours (valable jusqu'au {valid_until}). L'intégration continue de servir les valeurs en cache, mais elles peuvent ne plus correspondre au tarif publié. Dernière erreur : {last_error}.\n\nCela se résout généralement tout seul dès que la compagnie republie la page ou que le problème réseau est résolu. Si cela persiste, consultez les issues GitHub ou le run quotidien de la workflow live-check.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Réessayer la récupération du tarif",
+            "description": "Déclenche un rafraîchissement immédiat. La carte Repair disparaît automatiquement si la prochaine récupération renvoie un nouveau snapshot ; sinon elle reste affichée pour réessayer ou investiguer."
+          }
+        }
+      }
     }
   }
 }

@@ -198,7 +198,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 self.hass,
                 DOMAIN,
                 self.stale_issue_id,
-                is_fixable=False,
+                is_fixable=True,
                 is_persistent=False,
                 severity=ir.IssueSeverity.WARNING,
                 translation_key="snapshot_stale",
@@ -212,6 +212,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     ),
                     "last_error": data.last_error or "(none)",
                 },
+                # Carry the entry id so the Repairs UI flow handler in
+                # repairs.py knows which coordinator to refresh when the
+                # user clicks the fix button.
+                data={"entry_id": self.entry.entry_id},
             )
         else:
             ir.async_delete_issue(self.hass, DOMAIN, self.stale_issue_id)
