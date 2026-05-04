@@ -275,4 +275,4 @@ updates a GitHub issue titled
 
 ## License
 
-BSD 3-Clause. See [LICENSE](./LICENSE).
+BSD 2-Clause. See [LICENSE](./LICENSE).
