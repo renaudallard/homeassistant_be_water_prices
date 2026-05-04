@@ -25,28 +25,71 @@
 
 """Postcode → utility resolver.
 
-The map is intentionally coarse for v0.2 / v0.3 -- it picks the
-dominant operator per regional postcode block. Per-commune precision
-(splitting Liège between SWDE and CILE, splitting Oost-Vl between
-Farys and De Watergroep, etc.) waits for v0.4 once
-``scripts/refresh_postcodes.py`` learns to ingest the Géoportail
-Wallonie ZDE GeoPackage and the VMM Waterloket Flanders dump.
+The map is intentionally coarse -- it picks the dominant operator per
+regional postcode block, with a few hand-curated carve-outs for
+small operators on well-known postcodes (AGSO Knokke-Heist's 8300/8301,
+the Aquaduin Westkust postcodes, CILE's Liège core 4000-4099, INASEP's
+Namur sud cluster). Per-commune precision for the rest of Wallonia
+(splitting the long tail of CILE / Aquaduin / Water-link footprint
+across the wider 4000-7999 range) waits for the Géoportail Wallonie
+ZDE GeoPackage scrape.
 
-Today's coverage:
+Coverage today:
 
-  * 1000-1299    Brussels-Capital                → VIVAQUA
-  * 1300-1499    Brabant Wallon                  → inBW
+  * 1000-1299    Brussels-Capital                       → VIVAQUA
+  * 1300-1499    Brabant Wallon                         → inBW
   * 1500-1999,
-    3000-3499    Vlaams-Brabant + Halle-Vilvoorde → DE WATERGROEP
-  * 2000-2999    Antwerp province               → PIDPA
-  * 3500-3999    Limburg                        → DE WATERGROEP
-  * 4000-7999    Liège / Namur / Lux. / Hainaut → SWDE
-  * 8000-9999    West-Vl. + Oost-Vl.            → unresolved
-                 (Farys serves the bulk; deferred until the
-                  Farys extractor lands)
+    3000-3999    Vlaams-Brabant + Halle-Vilvoorde
+                 + Limburg                              → DE WATERGROEP
+  * 2000-2999    Antwerp province                       → PIDPA
+                 (Water-link in Antwerp city/ring is
+                  the wrong default for ~200 k users;
+                  manual picker until Water-link lands)
+  * 4000-4099    Liège city core                        → CILE
+  * 4100-4999    Liège region                           → SWDE
+  * 5000-5099,
+    5060-5101    Namur sud (INASEP service area)        → INASEP
+  * 5100-5999,
+    6000-7999    rest of Namur / Hainaut / Luxembourg    → SWDE
+  * 8300-8301    Knokke-Heist                           → AGSO Knokke-Heist
+  * 8430, 8450,
+    8620, 8630,
+    8660, 8670   Aquaduin Westkust communes             → AQUADUIN
+  * everything else (most of West-/Oost-Vl, parts of
+    Vlaams-Brabant served by Farys)                     → unresolved
 """
 
 from __future__ import annotations
+
+# Aquaduin's 6 Westkust communes (Koksijde, De Panne, Nieuwpoort, Veurne,
+# Bredene, Middelkerke). Hand-curated because they're scattered inside the
+# 8000-8999 West-Vlaanderen block where Farys would otherwise be the default.
+_AQUADUIN_POSTCODES: frozenset[int] = frozenset(
+    {
+        8430,  # Middelkerke
+        8450,  # Bredene
+        8620,  # Nieuwpoort
+        8630,  # Veurne
+        8660,  # De Panne
+        8670,  # Koksijde
+    }
+)
+
+# INASEP's 10 Namur sud communes.
+_INASEP_POSTCODES: frozenset[int] = frozenset(
+    {
+        5060,  # Sambreville
+        5070,  # Fosses-la-Ville
+        5081,  # Meux (La Bruyère)
+        5310,  # Eghezée
+        5340,  # Gesves
+        5360,  # Hamois
+        5370,  # Havelange
+        5500,  # Dinant
+        5530,  # Yvoir
+        5640,  # Mettet
+    }
+)
 
 
 def resolve(postcode: str) -> str | None:
@@ -55,14 +98,29 @@ def resolve(postcode: str) -> str | None:
         code = int(postcode)
     except ValueError:
         return None
+
+    # Brussels.
     if 1000 <= code <= 1299:
         return "vivaqua"
+    # Brabant Wallon.
     if 1300 <= code <= 1499:
         return "inbw"
+    # Antwerp province (Water-link wrong-default for Antwerp city/ring noted above).
     if 2000 <= code <= 2999:
         return "pidpa"
+    # Vlaams-Brabant + Halle-Vilvoorde + Limburg.
     if 1500 <= code <= 1999 or 3000 <= code <= 3999:
         return "de_watergroep"
+    # Wallonia carve-outs first, then SWDE default.
+    if 4000 <= code <= 4099:
+        return "cile"
+    if code in _INASEP_POSTCODES:
+        return "inasep"
     if 4000 <= code <= 7999:
         return "swde"
+    # Flanders carve-outs in West-Vl.
+    if code in (8300, 8301):
+        return "agso_knokke"
+    if code in _AQUADUIN_POSTCODES:
+        return "aquaduin"
     return None

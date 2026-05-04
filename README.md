@@ -60,10 +60,20 @@ publication and how to parse it.
 | Utility | Region | Coverage | Source |
 | --- | --- | --- | --- |
 | **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
-| **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — *drinkwater leg only* | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — the basistarief from the news article `over-de-watergroep/nieuws/tarieven-<year>`. Per-commune saneringsbijdragen sit behind a JS commune picker on `/drinkwater/tarieven` and arrive in v0.4 |
+| **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — *drinkwater leg only* | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — the basistarief from the news article `over-de-watergroep/nieuws/tarieven-<year>`. Per-commune saneringsbijdragen sit behind a JS commune picker on `/drinkwater/tarieven` and arrive in a follow-up |
 | **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`. Pulls the year column for basistarief / comforttarief plus the gemeentelijke (afvoer) and bovengemeentelijke (zuivering) saneringsbijdragen |
+| **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py) — gold-standard numeric PDF at `aquaduin.be/drinkwater/tarieven/overzicht-tarieven-<year>.pdf`. Publishes a single integrated basistarief (drinkwater + sanering combined) -- highest in Flanders |
+| **AGSO Knokke-Heist** | Flanders (1 commune) | ~33 k | [`providers/agso_knokke.py`](./custom_components/be_water_prices/providers/agso_knokke.py) — bs4 walker over the per-component "Integrale waterprijs" table at `agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers`. Page shows previous + current year side-by-side; parser picks the higher-priced table since rates only ever index up |
 | **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py) — bs4-anchored on the `<h3>` headings of [swde.be/en/water-prices-swde](https://www.swde.be/en/water-prices-swde) (the FR slug 4xxs, the EN one works). CVA / FSE come from the SPGE flat-Wallonia constants and drift-warn on divergence |
 | **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py) — bs4 walker over the per-tier facture table on [eau.inbw.be/prix-de-leau](https://eau.inbw.be/prix-de-leau). The server's TLS chain is misconfigured (GoDaddy intermediate not sent), so we fetch with `verify_ssl=False`; risk note in the module docstring |
+| **CILE** | Wallonia (Liège region) | 24 communes (~560 k) | [`providers/cile.py`](./custom_components/be_water_prices/providers/cile.py) — clean 4-row HTML table on [cile.be/facturation/le-prix-de-leau](https://www.cile.be/facturation/le-prix-de-leau). Same pattern as SWDE / inBW: CVD parsed live, CVA / FSE cross-checked against the SPGE constants |
+| **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP states the CVD inline ("A l'INASEP, il est de N,NNNN €/m³") rather than in a table. Parser anchors on that exact phrase (tolerating Unicode quotes) |
+
+**Still deferred** (each blocked on a separate constraint):
+
+- **Farys** (~22 % of Flanders, biggest single gap) — `farys.be/nl/watertarieven` is JS-rendered with no static numbers in the HTML. Needs the Drupal endpoint discovered via browser network-tab inspection, or a per-commune fallback URL.
+- **Water-link** (~200 k Antwerp city + ring) — per-commune subpages exist but expose 22 unlabelled rate tables with no year markers; can't reliably pick the current year without an external signal.
+- **Small Walloon intercommunales** (IEG / AIEC / AIEM / CIESAC / IDEN) and the **~30 régies communales** — no central publication channel found; SCOPE.md flagged the régies for indefinite deferral on dev-hours / customer ratio.
 
 Adding another utility is a self-contained PR: drop a new module under
 [`custom_components/be_water_prices/providers/`](./custom_components/be_water_prices/providers/),
@@ -82,15 +92,18 @@ dominant operator for that area:
 | 1000-1299 | Brussels-Capital | VIVAQUA |
 | 1300-1499 | Brabant Wallon | inBW |
 | 1500-1999, 3000-3999 | Vlaams-Brabant + Halle-Vilvoorde + Limburg | De Watergroep |
-| 2000-2999 | Antwerp province | Pidpa |
-| 4000-7999 | Liège / Namur / Luxembourg / Hainaut | SWDE |
-| 8000-9999 | West-Vl. + Oost-Vl. | *unresolved* (Farys / Aquaduin / AGSO Knokke not yet wired) |
+| 2000-2999 | Antwerp province | Pidpa *(Water-link in Antwerp city/ring is wrong-defaulted; manual picker until that extractor lands)* |
+| 4000-4099 | Liège core | CILE |
+| 4100-7999 | Liège region / Namur / Lux. / Hainaut | SWDE *(except curated INASEP communes)* |
+| 5060, 5070, 5081, 5310, 5340, 5360, 5370, 5500, 5530, 5640 | Namur sud (INASEP service area) | INASEP |
+| 8300, 8301 | Knokke-Heist | AGSO Knokke-Heist |
+| 8430, 8450, 8620, 8630, 8660, 8670 | Westkust (Aquaduin communes) | Aquaduin |
+| Other 8000-9999 | mostly Farys territory | *unresolved* — manual picker |
 
-Postcodes outside these ranges, or where the dominant default is wrong
-for your specific commune (CILE around Liège, INASEP in Namur sud,
-Water-link in central Antwerp, etc.) drop into the manual utility
-picker. v0.4 will fold in the Géoportail Wallonie ZDE GeoPackage and
-the VMM Waterloket Flanders dump for per-commune precision.
+Postcodes outside these mappings drop into the manual utility picker.
+A future Géoportail Wallonie ZDE GeoPackage scrape plus a VMM
+Waterloket Flanders dump will fill in the long tail at per-commune
+precision.
 
 ### How often the integration polls
 
@@ -262,12 +275,17 @@ reporting an issue.
   Vl-Br.) drop into the manual picker without a usable target.
   Deferred until a Drupal endpoint or per-commune fallback URL is
   identified.
-- **Aquaduin / AGSO Knokke / Water-link / inBW long tail.** Aquaduin
-  has a gold-standard numeric PDF already captured; the others are
-  v0.4 work along with the Wallonia long tail.
 - **Per-commune saneringsbijdrage refinement.** Even within wired
-  utilities, sanering values are operator-wide averages. v0.4 plus
-  the VMM Waterloket scrape will fold per-commune precision in.
+  utilities, sanering values are operator-wide averages. The pending
+  VMM Waterloket scrape will fold per-commune precision in.
+- **Aquaduin integrated rate.** Aquaduin's PDF only publishes one
+  per-m³ figure (5.9908 €/m³ in 2026, the highest in Flanders) for
+  the integrale waterprijs basistarief -- it does not split drinkwater
+  from sanering. We store the integrated value in `basis_eur_per_m3`
+  with sanering = 0; the bill total is correct but the
+  `water_basis_rate` sensor shows the integrated rate rather than
+  drinkwater alone. Pidpa and AGSO Knokke publish split components
+  and surface drinkwater-only on `water_basis_rate`.
 
 ## Development
 
