@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -42,9 +43,15 @@ from homeassistant.const import CURRENCY_EURO, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import (
+    CONF_UTILITY,
+    DOMAIN,
+    REGION_FLANDERS,
+)
 from .coordinator import CoordinatorData, WaterCoordinator, utility_device_info
+from .providers import get
 
 EUR_PER_M3 = f"{CURRENCY_EURO}/{UnitOfVolume.CUBIC_METERS}"
 EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
@@ -53,6 +60,21 @@ EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
 @dataclass(frozen=True, kw_only=True)
 class WaterSensorDescription(SensorEntityDescription):
     value_fn: Callable[[CoordinatorData], float | None]
+    # Optional: returns the timestamp of the last reset for ``TOTAL``
+    # state-class sensors (the YTD ones). HA's long-term-statistics
+    # engine uses this to bucket each reset cycle as its own period;
+    # without it ``TOTAL`` falls back to detecting drops as resets,
+    # which is fragile around year boundaries.
+    last_reset_fn: Callable[[], datetime] | None = None
+
+
+def _jan_1_local() -> datetime:
+    """Return the local-timezone start of the current calendar year.
+
+    Used as ``last_reset`` for the YTD sensors so the statistics engine
+    treats each calendar year as its own bucket.
+    """
+    return dt_util.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _basis_or_linear(data: CoordinatorData) -> float | None:
@@ -163,22 +185,51 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
     WaterSensorDescription(
         key="current_year_cost",
         translation_key="current_year_cost",
+        # Running bill since Jan 1: pro-rated annual fees + YTD volumetric.
+        # MONETARY rules out TOTAL_INCREASING (HA only allows None or TOTAL
+        # for monetary). TOTAL with a Jan 1 last_reset lets the long-term
+        # stats engine treat each year as its own bucket and tolerates the
+        # natural drop on Jan 1 without flagging it as a meter reset.
         native_unit_of_measurement=CURRENCY_EURO,
         device_class=SensorDeviceClass.MONETARY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
         value_fn=_current_year_cost,
+        last_reset_fn=_jan_1_local,
     ),
     WaterSensorDescription(
         key="ytd_consumption",
         translation_key="ytd_consumption",
+        # YTD m³ resets to ~0 on Jan 1, so TOTAL + last_reset is the right
+        # state-class even though WATER would also accept TOTAL_INCREASING:
+        # the latter would treat the Jan 1 drop as a meter reset and emit
+        # a spike in the long-term-stats deltas.
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         device_class=SensorDeviceClass.WATER,
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        state_class=SensorStateClass.TOTAL,
         suggested_display_precision=3,
         value_fn=_ytd_consumption,
+        last_reset_fn=_jan_1_local,
     ),
 )
+
+
+def _is_applicable(desc: WaterSensorDescription, *, region: str, has_meter: bool) -> bool:
+    """Filter sensors that don't apply to this entry's utility/options.
+
+    Comfort tarief is a Flemish-only construct -- creating the entity
+    for Brussels or Wallonia entries leaves it permanently ``unknown``,
+    which is just noise on the device card.
+
+    The YTD pair (current_year_cost + ytd_consumption) requires a
+    configured water meter sensor to produce values; without one they
+    would also stay ``unknown`` forever. Adding a meter via the
+    OptionsFlow triggers ``hass.config_entries.async_reload``, which
+    re-runs ``async_setup_entry`` and creates the entities for real.
+    """
+    if desc.key == "comfort_rate" and region != REGION_FLANDERS:
+        return False
+    return not (desc.key in ("current_year_cost", "ytd_consumption") and not has_meter)
 
 
 async def async_setup_entry(
@@ -187,7 +238,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(WaterSensor(coordinator, desc) for desc in SENSORS)
+    region = get(entry.data[CONF_UTILITY]).region
+    # Resolve the meter entity once at setup time: explicit override or
+    # the Energy dashboard's water_consumption source. Reload-on-options
+    # in __init__.py re-runs setup so a freshly-configured meter shows up
+    # without a HA restart.
+    meter_entity = await coordinator.async_resolve_meter_entity()
+    has_meter = meter_entity is not None
+    async_add_entities(
+        WaterSensor(coordinator, desc)
+        for desc in SENSORS
+        if _is_applicable(desc, region=region, has_meter=has_meter)
+    )
 
 
 class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
@@ -209,6 +271,11 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
         if self.coordinator.data is None:
             return None
         return self.entity_description.value_fn(self.coordinator.data)
+
+    @property
+    def last_reset(self) -> datetime | None:
+        fn = self.entity_description.last_reset_fn
+        return fn() if fn is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

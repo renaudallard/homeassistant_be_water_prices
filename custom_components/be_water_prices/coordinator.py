@@ -173,18 +173,38 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         social = bool(opts.get(CONF_SOCIAL_TARIFF, False))
         return compute_annual_cost(tariff, consumption, persons, social_tariff=social)
 
+    async def async_resolve_meter_entity(self) -> str | None:
+        """Return the water-meter entity_id to query for YTD computations.
+
+        Priority order:
+
+          1. ``CONF_WATER_METER_SENSOR`` from the OptionsFlow -- explicit
+             override that wins over auto-discovery.
+          2. The first ``water`` source configured in HA's Energy
+             dashboard. Most users wire their water meter there once
+             already; auto-discovering it from that config means the
+             YTD sensors light up without having to re-pick the same
+             entity in our OptionsFlow.
+          3. ``None`` -- YTD entities stay unavailable.
+        """
+        explicit = self.entry.options.get(CONF_WATER_METER_SENSOR)
+        if explicit:
+            return str(explicit)
+        return await _discover_energy_water_meter(self.hass)
+
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
         """Read YTD m³ from the recorder and apply the bill math.
 
         Returns ``(ytd_m3, ytd_cost_eur)``. Both are ``None`` when no
-        water meter is configured or the recorder has no usable data.
+        water meter is configured (neither explicitly nor via the
+        Energy dashboard) or the recorder has no usable data.
         """
-        meter = self.entry.options.get(CONF_WATER_METER_SENSOR)
+        meter = await self.async_resolve_meter_entity()
         if not meter:
             return None, None
         today = dt_util.now().date()
         jan1 = date(today.year, 1, 1)
-        ytd_m3 = await _recorder_ytd_m3(self.hass, str(meter), jan1, today)
+        ytd_m3 = await _recorder_ytd_m3(self.hass, meter, jan1, today)
         if ytd_m3 is None:
             return None, None
 
@@ -196,6 +216,38 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         social = bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False))
         cost = compute_ytd_cost(tariff, ytd_m3, persons, fraction, social_tariff=social)
         return ytd_m3, cost
+
+
+async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
+    """Return the first ``water`` source's ``stat_energy_from`` from
+    HA's Energy dashboard, or ``None`` when no water source is
+    configured (or the energy component is unavailable).
+
+    Wraps every failure mode -- ImportError on old HA without the
+    energy component, manager raising on a fresh install, malformed
+    source dicts -- so a coordinator tick never crashes on this path.
+    """
+    try:
+        from homeassistant.components.energy import async_get_manager
+    except ImportError:
+        return None
+    try:
+        manager = await async_get_manager(hass)
+    except Exception as err:  # energy component may surface anything; degrade gracefully
+        _LOGGER.debug("energy manager unavailable: %s", err)
+        return None
+    data = getattr(manager, "data", None)
+    if not data:
+        return None
+    for source in data.get("energy_sources", []):
+        if not isinstance(source, dict):
+            continue
+        if source.get("type") != "water":
+            continue
+        stat = source.get("stat_energy_from")
+        if stat:
+            return str(stat)
+    return None
 
 
 async def _recorder_ytd_m3(

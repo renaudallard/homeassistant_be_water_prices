@@ -22,7 +22,7 @@
           "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
           "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
           "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
-          "water_meter_sensor": "Wasserzähler-Sensor (optional, für Jahres-Kosten)"
+          "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)"
         }
       }
     },
@@ -38,21 +38,37 @@
           "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
           "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
           "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
-          "water_meter_sensor": "Wasserzähler-Sensor (optional, für Jahres-Kosten)"
+          "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)"
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "yearly_fee": {"name": "Jährliche Grundgebühr"},
-      "basis_rate": {"name": "Basistarif"},
-      "comfort_rate": {"name": "Komforttarif"},
-      "sanering_rate": {"name": "Abwassergebühr"},
-      "all_in_basis": {"name": "Gesamtpreis Basistarif"},
-      "projected_annual_cost": {"name": "Geschätzte Jahreskosten"},
-      "current_year_cost": {"name": "Kosten dieses Jahr"},
-      "ytd_consumption": {"name": "Verbrauch dieses Jahr"}
+      "yearly_fee": {
+        "name": "Jährliche Grundgebühr"
+      },
+      "basis_rate": {
+        "name": "Basistarif"
+      },
+      "comfort_rate": {
+        "name": "Komforttarif"
+      },
+      "sanering_rate": {
+        "name": "Abwassergebühr"
+      },
+      "all_in_basis": {
+        "name": "Gesamtpreis Basistarif"
+      },
+      "projected_annual_cost": {
+        "name": "Geschätzte Jahreskosten"
+      },
+      "current_year_cost": {
+        "name": "Kosten dieses Jahr"
+      },
+      "ytd_consumption": {
+        "name": "Verbrauch dieses Jahr"
+      }
     }
   }
 }
