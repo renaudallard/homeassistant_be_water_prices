@@ -62,7 +62,7 @@ publication and how to parse it.
 | **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
 | **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — full integrale waterprijs when a commune is configured | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — two ingestion paths: the news-article `over-de-watergroep/nieuws/tarieven-<year>` for the no-commune fallback (drinkwater leg only), and the cookie-driven `/Tarief/UpdateDetailTariefJaar/<year>` endpoint with `dwg_l=<GUID>` for the full per-commune bill (drinkwater + gemeentelijke + bovengemeentelijke saneringsbijdragen). Pick your commune in the OptionsFlow to switch from drinkwater-only to full-bill |
 | **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Pick a different commune in the OptionsFlow to switch (290+ options) |
-| **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`. Pulls the year column for basistarief / comforttarief plus the gemeentelijke (afvoer) and bovengemeentelijke (zuivering) saneringsbijdragen |
+| **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — two paths: the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber` for the no-commune fallback (sanering frozen at the May-2024 publication), and the per-commune `/ons-aanbod/je-gemeente/<slug>` HTML page for current rates. Pick a commune in the OptionsFlow to switch to the live HTML path; commune list comes from Pidpa's public sitemap (63 communes) |
 | **Water-link** | Flanders (Antwerp city + ring) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py) — the per-year PDF `water-link.be/sites/default/files/<YYYY>-01/<YYYY>%20HH.pdf` parsed via `pdfplumber`. Drinkwater + zuivering are uniform across the service area; gemeentelijke afvoer differs per commune (Antwerpen at 1.3345 €/m³, ring communes at 1.9572). Defaults to Antwerpen; pick your commune in the OptionsFlow (Edegem, Hove, Mortsel, Beveren-Kruibeke-Zwijndrecht, …) to get the right sanering |
 | **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py) — gold-standard numeric PDF at `aquaduin.be/drinkwater/tarieven/overzicht-tarieven-<year>.pdf`. Publishes a single integrated basistarief (drinkwater + sanering combined) -- highest in Flanders |
 | **AGSO Knokke-Heist** | Flanders (1 commune) | ~33 k | [`providers/agso_knokke.py`](./custom_components/be_water_prices/providers/agso_knokke.py) — bs4 walker over the per-component "Integrale waterprijs" table at `agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers`. Page shows previous + current year side-by-side; parser picks the higher-priced table since rates only ever index up |
@@ -275,9 +275,14 @@ reporting an issue.
   commune in the OptionsFlow to switch to the cookie-driven endpoint
   and get the full integrale waterprijs (drinkwater + gemeentelijke +
   bovengemeentelijke saneringsbijdragen).
-- **Pidpa sanering frozen at 2024 values.** The Tariefplan PDF only
-  refreshes drinkwater rates per year; the saneringsbijdragen line
-  prints 2024 numbers. Drinkwater per-m³ is correct each year.
+- **Pidpa no-commune fallback uses the May-2024 Tariefplan PDF.** The
+  PDF's saneringsbijdragen line prints 2024 numbers and the drinkwater
+  rates are 2024-published projections. Pick your commune in the
+  OptionsFlow to switch to the per-commune HTML page, which carries
+  the current published rates. The province-wide numbers on the
+  per-commune pages are uniform today (Pidpa charges the same rate
+  everywhere); the OptionsFlow exposes the full sitemap-derived
+  commune list anyway in case Pidpa starts varying rates per commune.
 - **Wallonia régies communales** (~30 small operators -- Chimay,
   Theux, Libramont, ...) are deferred indefinitely. They have no
   central publication channel and the dev-hours / customer ratio

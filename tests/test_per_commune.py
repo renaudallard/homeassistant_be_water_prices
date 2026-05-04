@@ -60,7 +60,7 @@ from tests import fixture_html
 
 def test_only_per_commune_utilities_advertise_commune_support() -> None:
     per_commune = {e.id for e in all_extractors() if e.supports_communes}
-    assert per_commune == {"de_watergroep", "farys", "water_link"}
+    assert per_commune == {"de_watergroep", "farys", "pidpa", "water_link"}
 
 
 def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
@@ -118,9 +118,13 @@ def test_extractors_advertise_their_metadata_correctly() -> None:
     assert DWG.supports_communes
     assert FARYS.supports_communes
     assert WATER_LINK.supports_communes
-    # Pidpa and the others are *not* per-commune.
+    # Pidpa joined the per-commune set in v0.5.x once the
+    # /ons-aanbod/je-gemeente/<slug> ingestion path landed.
     pidpa = next(e for e in all_extractors() if e.id == "pidpa")
-    assert not pidpa.supports_communes
+    assert pidpa.supports_communes
+    # VIVAQUA, SWDE and the rest are still single-fetch.
+    aquaduin = next(e for e in all_extractors() if e.id == "aquaduin")
+    assert not aquaduin.supports_communes
 
 
 # Sentinel to keep the module-level import sorted; ensures test_per_commune
