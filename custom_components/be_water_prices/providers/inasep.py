@@ -71,7 +71,7 @@ SOURCE_URL = "https://www.inasep.be/votre-eau-au-cout-verite"
 # plain ``3`` after one of the bs4 normalisation passes. Tolerate both
 # the ASCII and the Unicode quote, plus space-then-3 instead of m³.
 _CVD_RE = re.compile(
-    r"A\s+l['’’]INASEP[^0-9]*?([\d]+,\d{3,5})\s*€",
+    r"A\s+l['’]INASEP[^0-9]*?([\d]+,\d{3,5})\s*€",
     re.IGNORECASE | re.DOTALL,
 )
 
