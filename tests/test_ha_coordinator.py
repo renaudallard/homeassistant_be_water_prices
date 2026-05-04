@@ -51,6 +51,7 @@ from custom_components.be_water_prices.providers.base import (
     WaterExtractor,
     WaterTariff,
 )
+from custom_components.be_water_prices.repairs import async_create_fix_flow
 
 
 def _fresh_tariff(valid_until: date | None = None) -> WaterTariff:
@@ -168,6 +169,36 @@ async def test_extractor_error_serves_cached_snapshot(hass: HomeAssistant) -> No
     # Cached snapshot is served; tariff identity preserved.
     assert second.tariff is first.tariff
     assert "HTTP 503" in second.last_error
+
+
+@pytest.mark.asyncio
+async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant) -> None:
+    yesterday = date.today() - timedelta(days=1)
+    fetch_results = [_fresh_tariff(valid_until=yesterday), _fresh_tariff()]
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return fetch_results.pop(0)
+
+    entry = await _setup_entry(hass, _fetch)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    issue_reg = ir.async_get(hass)
+    issue = issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id)
+    assert issue is not None and issue.is_fixable
+
+    # Walk the fix flow: open it, then submit the confirmation step.
+    flow = await async_create_fix_flow(hass, coordinator.stale_issue_id, issue.data)
+    flow.hass = hass
+    result = await flow.async_step_init()
+    assert result["type"] == "form"
+    result = await flow.async_step_init({})
+    assert result["type"] == "create_entry"
+    await hass.async_block_till_done()
+
+    # The fix flow consumed the second (fresh) fetch result, so the
+    # snapshot is no longer stale and the issue cleared itself.
+    assert coordinator.data is not None
+    assert coordinator.data.snapshot_stale is False
+    assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
 
 
 @pytest.mark.asyncio

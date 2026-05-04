@@ -76,7 +76,15 @@
   "issues": {
     "snapshot_stale": {
       "title": "{utility}-Tarif-Snapshot ist veraltet",
-      "description": "Der letzte erfolgreich abgerufene {utility}-Tarif ist {age_days} Tage alt (gültig bis {valid_until}). Die Integration liefert weiterhin die zwischengespeicherten Werte, sie könnten aber vom veröffentlichten Tarif abweichen. Letzter Fehler: {last_error}.\n\nDas löst sich meist von selbst, sobald der Versorger die Seite neu veröffentlicht oder das Netzwerkproblem behoben ist. Bleibt der Hinweis bestehen? Prüfen Sie die GitHub-Issues oder den täglichen live-check Workflow-Lauf."
+      "description": "Der letzte erfolgreich abgerufene {utility}-Tarif ist {age_days} Tage alt (gültig bis {valid_until}). Die Integration liefert weiterhin die zwischengespeicherten Werte, sie könnten aber vom veröffentlichten Tarif abweichen. Letzter Fehler: {last_error}.\n\nDas löst sich meist von selbst, sobald der Versorger die Seite neu veröffentlicht oder das Netzwerkproblem behoben ist. Bleibt der Hinweis bestehen? Prüfen Sie die GitHub-Issues oder den täglichen live-check Workflow-Lauf.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Tarifabruf erneut versuchen",
+            "description": "Sofortige Aktualisierung auslösen. Die Repair-Karte verschwindet automatisch, wenn der nächste Abruf einen neuen Snapshot liefert; andernfalls bleibt sie sichtbar, um es erneut zu versuchen oder den Fehler zu untersuchen."
+          }
+        }
+      }
     }
   }
 }
