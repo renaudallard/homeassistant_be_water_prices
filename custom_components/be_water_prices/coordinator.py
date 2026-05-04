@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -27,6 +28,36 @@ from .providers import ExtractorError, WaterTariff, get
 from .providers.base import WaterExtractor
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
+    """Build the HA DeviceInfo block shared by every entity on this entry.
+
+    Anchors every sensor onto one per-entry device identified by
+    ``(DOMAIN, entry.entry_id)`` so the integration's *Devices* tab
+    shows a single card per configured utility instead of orphan
+    entities. ``manufacturer`` carries the utility label, ``model``
+    carries the region, and ``configuration_url`` deep-links to the
+    utility's tariff publication for one-click verification.
+    """
+    utility_id = str(coordinator.entry.data.get(CONF_UTILITY, ""))
+    try:
+        extractor = get(utility_id)
+        manufacturer = extractor.label
+        model = extractor.region.title()
+    except ExtractorError:
+        manufacturer = utility_id or "Belgian Water"
+        model = ""
+    source_url: str | None = None
+    if coordinator.data is not None:
+        source_url = coordinator.data.tariff.source_url
+    return DeviceInfo(
+        identifiers={(DOMAIN, coordinator.entry.entry_id)},
+        name=coordinator.entry.title,
+        manufacturer=manufacturer,
+        model=model or None,
+        configuration_url=source_url,
+    )
 
 
 @dataclass
