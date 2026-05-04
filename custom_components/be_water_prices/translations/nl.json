@@ -76,12 +76,11 @@
   "issues": {
     "snapshot_stale": {
       "title": "Tariefsnapshot van {utility} is verouderd",
-      "description": "Het laatst succesvol opgehaalde tarief van {utility} is {age_days} dagen oud (geldig tot {valid_until}). De integratie blijft de gecachete cijfers tonen, maar die kunnen afwijken van het gepubliceerde tarief. Laatste fout: {last_error}.\n\nDit lost zich meestal vanzelf op zodra de maatschappij de pagina opnieuw publiceert of het netwerkprobleem voorbij is. Blijft het hangen? Kijk naar de issues op GitHub of de dagelijkse live-check workflow run.",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Tariefophaling opnieuw proberen",
-            "description": "Forceer een onmiddellijke vernieuwing. De Repair-kaart verdwijnt automatisch als de volgende ophaling een nieuwe snapshot teruggeeft; zo niet, dan blijft hij staan om opnieuw te proberen of te onderzoeken."
+            "title": "Tariefophaling van {utility} opnieuw proberen",
+            "description": "Het laatst succesvol opgehaalde tarief van {utility} is {age_days} dagen oud (geldig tot {valid_until}). Laatste fout: {last_error}.\n\nKlik op Indienen om onmiddellijk te vernieuwen. De Repair-kaart verdwijnt automatisch als de volgende ophaling een nieuwe snapshot teruggeeft; zo niet, dan blijft hij staan om opnieuw te proberen of de onderliggende fout te onderzoeken (kijk naar de issues op GitHub of de dagelijkse live-check workflow run)."
           }
         }
       }
