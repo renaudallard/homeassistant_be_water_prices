@@ -43,6 +43,7 @@ from .base import (
 from .ciesac import EXTRACTOR as _CIESAC
 from .cile import EXTRACTOR as _CILE
 from .de_watergroep import EXTRACTOR as _DE_WATERGROEP
+from .farys import EXTRACTOR as _FARYS
 from .iden import EXTRACTOR as _IDEN
 from .ieg import EXTRACTOR as _IEG
 from .inasep import EXTRACTOR as _INASEP
@@ -59,6 +60,7 @@ EXTRACTORS: dict[str, WaterExtractor] = {
     _AQUADUIN.id: _AQUADUIN,
     _AGSO_KNOKKE.id: _AGSO_KNOKKE,
     _WATER_LINK.id: _WATER_LINK,
+    _FARYS.id: _FARYS,
     _SWDE.id: _SWDE,
     _INBW.id: _INBW,
     _CILE.id: _CILE,
@@ -69,7 +71,6 @@ EXTRACTORS: dict[str, WaterExtractor] = {
     _CIESAC.id: _CIESAC,
     _IDEN.id: _IDEN,
     # Still deferred:
-    #   - Farys: watertarieven page is JS-rendered and carries no static numbers.
     #   - ~30 régies communales: no central publication channel found yet;
     #     deferred indefinitely on dev-hours / customer ratio.
 }

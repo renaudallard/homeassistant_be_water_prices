@@ -59,8 +59,8 @@ Coverage today:
   * 8430, 8450,
     8620, 8630,
     8660, 8670   Aquaduin Westkust communes             → AQUADUIN
-  * everything else (most of West-/Oost-Vl, parts of
-    Vlaams-Brabant served by Farys)                     → unresolved
+  * 8000-9999 (rest, mostly Oost-Vl. and West-Vl.)     → FARYS
+  * everything else                                     → unresolved
 """
 
 from __future__ import annotations
@@ -132,4 +132,8 @@ def resolve(postcode: str) -> str | None:
         return "agso_knokke"
     if code in _AQUADUIN_POSTCODES:
         return "aquaduin"
+    # Most of West-Vl. + Oost-Vl. is Farys territory; the carve-outs above
+    # (AGSO Knokke postcodes, Aquaduin Westkust postcodes) win first.
+    if 8000 <= code <= 9999:
+        return "farys"
     return None
