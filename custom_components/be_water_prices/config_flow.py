@@ -1,3 +1,28 @@
+# Copyright (c) 2026, Renaud Allard <renaud@allard.it>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 """Config + options flow for be_water_prices.
 
 The flow is three steps:
@@ -22,6 +47,7 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -31,6 +57,8 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -49,6 +77,7 @@ from .const import (
     CONF_POSTCODE,
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
+    CONF_WATER_METER_SENSOR,
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
@@ -118,6 +147,23 @@ def _options_schema(current: dict[str, Any], *, flanders: bool) -> vol.Schema:
                 default=current.get(CONF_SOCIAL_TARIFF, False),
             )
         ] = BooleanSelector()
+
+    # Optional: a water-meter sensor (cumulative m³) that powers the
+    # ``water_current_year_cost`` YTD sensor. Filtered to entities whose
+    # device_class is ``water`` so the dropdown only surfaces sensors
+    # the integration actually knows how to read.
+    meter_default = current.get(CONF_WATER_METER_SENSOR)
+    fields[
+        vol.Optional(
+            CONF_WATER_METER_SENSOR,
+            description={"suggested_value": meter_default} if meter_default else None,
+        )
+    ] = EntitySelector(
+        EntitySelectorConfig(
+            domain="sensor",
+            device_class=SensorDeviceClass.WATER,
+        )
+    )
     return vol.Schema(fields)
 
 
@@ -125,7 +171,7 @@ def _is_flanders(utility_id: str) -> bool:
     return get(utility_id).region == REGION_FLANDERS
 
 
-class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):
+class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg, unused-ignore]
     VERSION = 1
 
     def __init__(self) -> None:

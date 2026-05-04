@@ -17,11 +17,12 @@
       },
       "options": {
         "title": "Jahresverbrauch",
-        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Flämische Versorger benötigen außerdem die Zahl der gemeldeten Bewohner (bestimmt das Basisvolumen) und eine Option für den VMM-Sozialtarif.",
+        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Flämische Versorger benötigen außerdem die Zahl der gemeldeten Bewohner (bestimmt das Basisvolumen) und eine Option für den VMM-Sozialtarif. Optional: ein Wasserzähler-Sensor (kumulative m³, device_class=water) für den Jahres-Sensor, der den Verbrauch ab 1. Januar aus dem HA-Recorder liest.",
         "data": {
           "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
           "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
-          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)"
+          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
+          "water_meter_sensor": "Wasserzähler-Sensor (optional, für Jahres-Kosten)"
         }
       }
     },
@@ -36,7 +37,8 @@
         "data": {
           "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
           "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
-          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)"
+          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
+          "water_meter_sensor": "Wasserzähler-Sensor (optional, für Jahres-Kosten)"
         }
       }
     }
@@ -48,7 +50,9 @@
       "comfort_rate": {"name": "Komforttarif"},
       "sanering_rate": {"name": "Abwassergebühr"},
       "all_in_basis": {"name": "Gesamtpreis Basistarif"},
-      "projected_annual_cost": {"name": "Geschätzte Jahreskosten"}
+      "projected_annual_cost": {"name": "Geschätzte Jahreskosten"},
+      "current_year_cost": {"name": "Kosten dieses Jahr"},
+      "ytd_consumption": {"name": "Verbrauch dieses Jahr"}
     }
   }
 }

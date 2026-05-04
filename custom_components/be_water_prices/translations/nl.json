@@ -17,11 +17,12 @@
       },
       "options": {
         "title": "Jaarverbruik",
-        "description": "Je jaarlijks waterverbruik in kubieke meter. Vlaamse maatschappijen vragen ook het aantal gedomicilieerde personen (bepaalt het basisvolume) en een keuze voor het VMM-sociaal tarief.",
+        "description": "Je jaarlijks waterverbruik in kubieke meter. Vlaamse maatschappijen vragen ook het aantal gedomicilieerde personen (bepaalt het basisvolume) en een keuze voor het VMM-sociaal tarief. Optioneel: koppel een watermetersensor (cumulatief m³, device_class=water) zodat de YTD-kostsensor het verbruik sinds 1 januari uit de recorder kan lezen.",
         "data": {
           "consumption_m3_per_year": "Verbruik (m³ / jaar)",
           "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
-          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)"
+          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
+          "water_meter_sensor": "Watermetersensor (optioneel, voor YTD-kost)"
         }
       }
     },
@@ -36,7 +37,8 @@
         "data": {
           "consumption_m3_per_year": "Verbruik (m³ / jaar)",
           "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
-          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)"
+          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
+          "water_meter_sensor": "Watermetersensor (optioneel, voor YTD-kost)"
         }
       }
     }
@@ -48,7 +50,9 @@
       "comfort_rate": {"name": "Comforttarief"},
       "sanering_rate": {"name": "Saneringsbijdrage"},
       "all_in_basis": {"name": "All-in basistarief"},
-      "projected_annual_cost": {"name": "Geschatte jaarkost"}
+      "projected_annual_cost": {"name": "Geschatte jaarkost"},
+      "current_year_cost": {"name": "Kost dit jaar"},
+      "ytd_consumption": {"name": "Verbruik dit jaar"}
     }
   }
 }

@@ -1,3 +1,28 @@
+# Copyright (c) 2026, Renaud Allard <renaud@allard.it>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 """Cost-computation tests (Brussels and Wallonia branches)."""
 
 from __future__ import annotations
@@ -8,7 +33,7 @@ from custom_components.be_water_prices.const import (
     WALLONIA_CVA_EUR_PER_M3,
     WALLONIA_FSE_EUR_PER_M3,
 )
-from custom_components.be_water_prices.pricing import compute_annual_cost
+from custom_components.be_water_prices.pricing import compute_annual_cost, compute_ytd_cost
 from custom_components.be_water_prices.providers.base import WaterTariff
 
 
@@ -176,3 +201,67 @@ def test_returns_none_for_unwired_region() -> None:
         basis_eur_per_m3=2.95,
     )
     assert compute_annual_cost(bogus, 80, 2) is None
+
+
+# ---------------------------------------------------------------------------
+# YTD (compute_ytd_cost) tests
+# ---------------------------------------------------------------------------
+
+
+def test_ytd_on_jan_1_with_no_consumption_is_zero() -> None:
+    # Brand new year, 0 m³ consumed, ~0 days elapsed → 0 EUR (no fees yet).
+    assert compute_ytd_cost(_vivaqua_2026(), 0, 1, 0.0) == 0.0
+
+
+def test_ytd_at_year_end_matches_annual_projection() -> None:
+    # Full year elapsed, full annual consumption -> identical to annual.
+    annual = compute_annual_cost(_vivaqua_2026(), 80, 1)
+    ytd = compute_ytd_cost(_vivaqua_2026(), 80, 1, 1.0)
+    assert annual == ytd
+
+
+def test_ytd_brussels_pro_rates_redevance_at_half_year() -> None:
+    # 40 m³ consumed by mid-year (fee_factor = 0.5).
+    # ex-VAT = 40·(5.35/1.06) + 0.5·(40.23/1.06) = 220.8632...
+    # ×1.06 = 234.115; banker's rounding → 234.12.
+    assert compute_ytd_cost(_vivaqua_2026(), 40, 1, 0.5) == 234.12
+
+
+def test_ytd_wallonia_pro_rates_redevance_only() -> None:
+    # SWDE 80 m³, mid-year:
+    # first_block = 30 · 1.6539 = 49.617
+    # rest        = 50 · 6.0219 = 301.095
+    # redevance·0.5 = 0.5 · 147.24 = 73.62
+    # ex-VAT = 49.617 + 301.095 + 73.62 = 424.332; ×1.06 = 449.79
+    assert compute_ytd_cost(_swde_2026(), 80, 1, 0.5) == 449.79
+
+
+def test_ytd_flanders_full_consumption_pro_rated_vastrecht() -> None:
+    # Pidpa, 80 m³, 1 person, mid-year:
+    # volumetric (same as annual) = 491.90 ex-VAT
+    # vastrecht = max(0, 100 - 1·20) · 0.5 = 40
+    # ex-VAT = 491.90 + 40 = 531.90; ×1.06 = 563.81
+    assert compute_ytd_cost(_pidpa_2026(), 80, 1, 0.5) == 563.81
+
+
+def test_ytd_year_elapsed_fraction_clamps_to_unit_interval() -> None:
+    # Negative or >1 fractions are silently clamped so a clock-skew bug
+    # in the coordinator can't produce a nonsense bill.
+    low = compute_ytd_cost(_vivaqua_2026(), 0, 1, -0.5)
+    high = compute_ytd_cost(_vivaqua_2026(), 0, 1, 1.5)
+    assert low == 0.0
+    assert high == compute_ytd_cost(_vivaqua_2026(), 0, 1, 1.0)
+
+
+def test_ytd_returns_none_for_unwired_region() -> None:
+    bogus = WaterTariff(
+        utility="other",
+        region="atlantis",
+        valid_from=date(2026, 1, 1),
+        valid_until=None,
+        publication_label="x",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=50.0,
+        basis_eur_per_m3=2.95,
+    )
+    assert compute_ytd_cost(bogus, 40, 1, 0.5) is None

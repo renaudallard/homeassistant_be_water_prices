@@ -1,29 +1,58 @@
+# Copyright (c) 2026, Renaud Allard <renaud@allard.it>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 """Daily-refresh coordinator for be_water_prices."""
 
 from __future__ import annotations
 
+import calendar
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
+    CONF_WATER_METER_SENSOR,
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
     SNAPSHOT_STALE_AFTER_DAYS,
     UPDATE_INTERVAL_HOURS,
 )
-from .pricing import compute_annual_cost
+from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, WaterTariff, get
 from .providers.base import WaterExtractor
 
@@ -68,6 +97,8 @@ class CoordinatorData:
     snapshot_stale: bool
     last_error: str = ""
     projected_annual_cost_eur: float | None = None
+    current_year_cost_eur: float | None = None
+    ytd_consumption_m3: float | None = None
 
 
 class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
@@ -96,6 +127,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if self._last_good is not None:
                 _LOGGER.warning("water tariff fetch failed, serving cached: %s", err)
                 stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)
+                ytd_m3, ytd_cost = await self._compute_ytd(self._last_good.tariff)
                 cached = CoordinatorData(
                     tariff=self._last_good.tariff,
                     fetched_at=self._last_good.fetched_at,
@@ -103,17 +135,22 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     snapshot_stale=stale,
                     last_error=str(err),
                     projected_annual_cost_eur=self._project_cost(self._last_good.tariff),
+                    current_year_cost_eur=ytd_cost,
+                    ytd_consumption_m3=ytd_m3,
                 )
                 return cached
             raise UpdateFailed(str(err)) from err
 
         now = datetime.now(UTC)
+        ytd_m3, ytd_cost = await self._compute_ytd(tariff)
         data = CoordinatorData(
             tariff=tariff,
             fetched_at=now,
             snapshot_age_hours=0.0,
             snapshot_stale=self._is_stale(tariff, now),
             projected_annual_cost_eur=self._project_cost(tariff),
+            current_year_cost_eur=ytd_cost,
+            ytd_consumption_m3=ytd_m3,
         )
         self._last_good = data
         return data
@@ -135,3 +172,89 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         persons = int(opts.get(CONF_PERSONS, DEFAULT_PERSONS))
         social = bool(opts.get(CONF_SOCIAL_TARIFF, False))
         return compute_annual_cost(tariff, consumption, persons, social_tariff=social)
+
+    async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
+        """Read YTD m³ from the recorder and apply the bill math.
+
+        Returns ``(ytd_m3, ytd_cost_eur)``. Both are ``None`` when no
+        water meter is configured or the recorder has no usable data.
+        """
+        meter = self.entry.options.get(CONF_WATER_METER_SENSOR)
+        if not meter:
+            return None, None
+        today = dt_util.now().date()
+        jan1 = date(today.year, 1, 1)
+        ytd_m3 = await _recorder_ytd_m3(self.hass, str(meter), jan1, today)
+        if ytd_m3 is None:
+            return None, None
+
+        elapsed = (today - jan1).days + 1  # include today
+        days_in_year = 366 if calendar.isleap(today.year) else 365
+        fraction = elapsed / days_in_year
+
+        persons = int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS))
+        social = bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False))
+        cost = compute_ytd_cost(tariff, ytd_m3, persons, fraction, social_tariff=social)
+        return ytd_m3, cost
+
+
+async def _recorder_ytd_m3(
+    hass: HomeAssistant, entity_id: str, start: date, end: date
+) -> float | None:
+    """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
+
+    Wraps :func:`statistics_during_period` via the recorder's executor
+    so the SQLite query never runs on the event loop. Returns ``None``
+    when the recorder is unavailable, the meter has no statistics, or
+    a transient query failure -- callers fall back to surfacing the
+    YTD sensor as ``unknown`` rather than zero.
+
+    Reads the ``change`` field, which the recorder defines as the
+    delta of the cumulative ``sum`` between the bucket's first and
+    last sample. Reading ``sum`` directly would yield the all-time
+    running total -- summing those would multiply the figure by however
+    many years of meter history exist.
+    """
+    try:
+        # mypy --strict flags both names because the recorder module
+        # does not re-export them via __all__; they're public per HA's
+        # docs and import-time errors degrade gracefully via the
+        # ImportError handler below.
+        from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+            get_instance,
+        )
+        from homeassistant.components.recorder.statistics import (
+            statistics_during_period,
+        )
+    except ImportError:
+        return None
+
+    start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
+    end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
+    try:
+        stats = await get_instance(hass).async_add_executor_job(
+            statistics_during_period,
+            hass,
+            start_dt,
+            end_dt,
+            {entity_id},
+            "day",
+            None,
+            {"change"},
+        )
+    except Exception as err:
+        _LOGGER.debug("recorder query for %s failed: %s", entity_id, err)
+        return None
+
+    rows: list[Any] = list(stats.get(entity_id, []))
+    if not rows:
+        return None
+    total = 0.0
+    seen = False
+    for row in rows:
+        delta = row.get("change")
+        if delta is None:
+            continue
+        total += float(delta)
+        seen = True
+    return total if seen else None

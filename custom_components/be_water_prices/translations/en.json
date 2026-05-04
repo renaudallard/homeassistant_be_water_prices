@@ -17,11 +17,12 @@
       },
       "options": {
         "title": "Annual consumption",
-        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year. Flemish utilities also need the number of registered residents (drives the basis volume) and an opt-in for the VMM social tariff.",
+        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year. Flemish utilities also need the number of registered residents (drives the basis volume) and an opt-in for the VMM social tariff. Optionally point at a water meter sensor (cumulative m³, device_class=water) so the year-to-date cost sensor can read consumption since 1 January from Home Assistant's recorder.",
         "data": {
           "consumption_m3_per_year": "Consumption (m³ / year)",
           "gedomicilieerd_persons": "Registered residents (Flanders only)",
-          "social_tariff": "Social tariff (Flanders, 80% reduction)"
+          "social_tariff": "Social tariff (Flanders, 80% reduction)",
+          "water_meter_sensor": "Water meter sensor (optional, for YTD cost)"
         }
       }
     },
@@ -36,7 +37,8 @@
         "data": {
           "consumption_m3_per_year": "Consumption (m³ / year)",
           "gedomicilieerd_persons": "Registered residents (Flanders only)",
-          "social_tariff": "Social tariff (Flanders, 80% reduction)"
+          "social_tariff": "Social tariff (Flanders, 80% reduction)",
+          "water_meter_sensor": "Water meter sensor (optional, for YTD cost)"
         }
       }
     }
@@ -48,7 +50,9 @@
       "comfort_rate": {"name": "Comfort rate"},
       "sanering_rate": {"name": "Sewerage rate"},
       "all_in_basis": {"name": "All-in basis rate"},
-      "projected_annual_cost": {"name": "Projected annual cost"}
+      "projected_annual_cost": {"name": "Projected annual cost"},
+      "current_year_cost": {"name": "Current year cost"},
+      "ytd_consumption": {"name": "Year-to-date consumption"}
     }
   }
 }
