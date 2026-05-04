@@ -22,7 +22,7 @@
           "consumption_m3_per_year": "Verbruik (m³ / jaar)",
           "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
           "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
-          "water_meter_sensor": "Watermetersensor (optioneel, voor YTD-kost)"
+          "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)"
         }
       }
     },
@@ -38,21 +38,37 @@
           "consumption_m3_per_year": "Verbruik (m³ / jaar)",
           "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
           "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
-          "water_meter_sensor": "Watermetersensor (optioneel, voor YTD-kost)"
+          "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)"
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "yearly_fee": {"name": "Vastrecht per jaar"},
-      "basis_rate": {"name": "Basistarief"},
-      "comfort_rate": {"name": "Comforttarief"},
-      "sanering_rate": {"name": "Saneringsbijdrage"},
-      "all_in_basis": {"name": "All-in basistarief"},
-      "projected_annual_cost": {"name": "Geschatte jaarkost"},
-      "current_year_cost": {"name": "Kost dit jaar"},
-      "ytd_consumption": {"name": "Verbruik dit jaar"}
+      "yearly_fee": {
+        "name": "Vastrecht per jaar"
+      },
+      "basis_rate": {
+        "name": "Basistarief"
+      },
+      "comfort_rate": {
+        "name": "Comforttarief"
+      },
+      "sanering_rate": {
+        "name": "Saneringsbijdrage"
+      },
+      "all_in_basis": {
+        "name": "All-in basistarief"
+      },
+      "projected_annual_cost": {
+        "name": "Geschatte jaarkost"
+      },
+      "current_year_cost": {
+        "name": "Kost dit jaar"
+      },
+      "ytd_consumption": {
+        "name": "Verbruik dit jaar"
+      }
     }
   }
 }

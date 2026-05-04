@@ -22,7 +22,7 @@
           "consumption_m3_per_year": "Consommation (m³ / an)",
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
           "social_tariff": "Tarif social (Flandre, réduction 80%)",
-          "water_meter_sensor": "Capteur compteur d'eau (optionnel, pour le coût annuel)"
+          "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)"
         }
       }
     },
@@ -38,21 +38,37 @@
           "consumption_m3_per_year": "Consommation (m³ / an)",
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
           "social_tariff": "Tarif social (Flandre, réduction 80%)",
-          "water_meter_sensor": "Capteur compteur d'eau (optionnel, pour le coût annuel)"
+          "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)"
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "yearly_fee": {"name": "Redevance annuelle"},
-      "basis_rate": {"name": "Tarif de base"},
-      "comfort_rate": {"name": "Tarif confort"},
-      "sanering_rate": {"name": "Assainissement"},
-      "all_in_basis": {"name": "Tarif tout compris"},
-      "projected_annual_cost": {"name": "Coût annuel projeté"},
-      "current_year_cost": {"name": "Coût depuis le 1er janvier"},
-      "ytd_consumption": {"name": "Consommation depuis le 1er janvier"}
+      "yearly_fee": {
+        "name": "Redevance annuelle"
+      },
+      "basis_rate": {
+        "name": "Tarif de base"
+      },
+      "comfort_rate": {
+        "name": "Tarif confort"
+      },
+      "sanering_rate": {
+        "name": "Assainissement"
+      },
+      "all_in_basis": {
+        "name": "Tarif tout compris"
+      },
+      "projected_annual_cost": {
+        "name": "Coût annuel projeté"
+      },
+      "current_year_cost": {
+        "name": "Coût depuis le 1er janvier"
+      },
+      "ytd_consumption": {
+        "name": "Consommation depuis le 1er janvier"
+      }
     }
   }
 }

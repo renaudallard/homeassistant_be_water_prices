@@ -62,7 +62,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    from .coordinator import WaterCoordinator
+    """Fully reload the entry when options change.
 
-    coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
-    await coordinator.async_request_refresh()
+    A simple ``async_request_refresh`` would re-run the coordinator but
+    leave the entity set untouched. The YTD entities are only created
+    when a water meter is configured, so adding or removing the meter
+    in OptionsFlow needs ``async_setup_entry`` to re-run -- which only
+    a full reload triggers.
+    """
+    await hass.config_entries.async_reload(entry.entry_id)

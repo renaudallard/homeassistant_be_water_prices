@@ -50,7 +50,7 @@ publication and how to parse it.
 - **Brussels linear** — VIVAQUA's single-rate domestic tariff plus the annual fixed fee.
 - **Postcode auto-resolution** — enter your postcode and the right utility is picked automatically. Fall through to a manual picker for the long tail.
 - **Projected annual cost** — every entry has a `water_projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
-- **Year-to-date cost** — point the integration at any `device_class=water` cumulative-m³ sensor (P1, watermeter custom component, Pulse counter…) and the `water_current_year_cost` sensor reports your running bill since 1 January, computed from HA's recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor.
+- **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `water_current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
 - **Translated UI** — English, Dutch, French and German.
 - **Self-healing** — last-known prices keep serving on outage; a repair issue surfaces if the snapshot goes stale (>35 days or past the published `valid_until`).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
@@ -186,12 +186,20 @@ auto-resolves and whether the chosen utility is Flemish.
      post-calc bill. Off by default.
 
    All entries can additionally point at:
-   - **Water meter sensor** *(optional)* — any `device_class=water`
-     cumulative-m³ sensor (e.g. from the
+   - **Water meter sensor** *(optional override)* — any
+     `device_class=water` cumulative-m³ sensor (e.g. from the
      [`watermeter`](https://github.com/Olen/homeassistant-watermeter)
      custom component, a P1 reader integration, or a Pulse counter).
-     Wires the `water_current_year_cost` and `water_ytd_consumption`
-     sensors. Without it those entities stay `unknown`.
+     **Leave blank** to auto-pick the meter you already configured in
+     HA's Energy dashboard (Settings → Dashboards → Energy → Water
+     consumption); set it only when you want a different sensor than
+     what the Energy dashboard sees. The
+     `water_current_year_cost` and `water_ytd_consumption` entities
+     are only created when *either* an override is set *or* the
+     Energy dashboard has a water source -- otherwise they stay out
+     of the device card entirely. Adding a meter via the OptionsFlow
+     reloads the entry so the new entities appear without an HA
+     restart.
 
 ### Reconfiguring later
 
