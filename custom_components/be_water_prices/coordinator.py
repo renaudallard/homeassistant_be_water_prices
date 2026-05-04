@@ -35,6 +35,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -149,6 +150,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     current_year_cost_eur=ytd_cost,
                     ytd_consumption_m3=ytd_m3,
                 )
+                self._sync_repair_issue(cached)
                 return cached
             raise UpdateFailed(str(err)) from err
 
@@ -164,6 +166,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             ytd_consumption_m3=ytd_m3,
         )
         self._last_good = data
+        self._sync_repair_issue(data)
         return data
 
     @staticmethod
@@ -176,6 +179,42 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if age_days > SNAPSHOT_STALE_AFTER_DAYS:
             return True
         return tariff.valid_until is not None and tariff.valid_until < dt_util.now().date()
+
+    @property
+    def stale_issue_id(self) -> str:
+        """Stable Repairs issue id for this entry's stale-snapshot warning."""
+        return f"snapshot_stale_{self.entry.entry_id}"
+
+    def _sync_repair_issue(self, data: CoordinatorData) -> None:
+        """Create or clear the stale-snapshot Repair issue for this entry.
+
+        Surfaces in Settings -> Repairs as a warning card when the
+        snapshot has not refreshed for SNAPSHOT_STALE_AFTER_DAYS days
+        or the parsed valid_until is in the past. Auto-clears on the
+        next successful, fresh fetch.
+        """
+        if data.snapshot_stale:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self.stale_issue_id,
+                is_fixable=False,
+                is_persistent=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="snapshot_stale",
+                translation_placeholders={
+                    "utility": self._extractor.label,
+                    "age_days": f"{int(data.snapshot_age_hours // 24)}",
+                    "valid_until": (
+                        data.tariff.valid_until.isoformat()
+                        if data.tariff.valid_until is not None
+                        else "unknown"
+                    ),
+                    "last_error": data.last_error or "(none)",
+                },
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, self.stale_issue_id)
 
     def _project_cost(self, tariff: WaterTariff) -> float | None:
         opts = self.entry.options
