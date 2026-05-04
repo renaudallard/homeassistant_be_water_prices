@@ -45,6 +45,7 @@ from .inbw import EXTRACTOR as _INBW
 from .pidpa import EXTRACTOR as _PIDPA
 from .swde import EXTRACTOR as _SWDE
 from .vivaqua import EXTRACTOR as _VIVAQUA
+from .water_link import EXTRACTOR as _WATER_LINK
 
 EXTRACTORS: dict[str, WaterExtractor] = {
     _VIVAQUA.id: _VIVAQUA,
@@ -52,16 +53,15 @@ EXTRACTORS: dict[str, WaterExtractor] = {
     _PIDPA.id: _PIDPA,
     _AQUADUIN.id: _AQUADUIN,
     _AGSO_KNOKKE.id: _AGSO_KNOKKE,
+    _WATER_LINK.id: _WATER_LINK,
     _SWDE.id: _SWDE,
     _INBW.id: _INBW,
     _CILE.id: _CILE,
     _INASEP.id: _INASEP,
     # Still deferred:
     #   - Farys: watertarieven page is JS-rendered and carries no static numbers.
-    #   - Water-link: per-commune subpages have 22 unlabelled rate tables;
-    #     no year markers to reliably pick the current year's table.
     #   - Small Walloon intercommunales (IEG / AIEC / AIEM / CIESAC / IDEN)
-    #     and ~30 régies communales: no central publication channel found yet,
+    #     and ~30 régies communales: no central publication channel found
     #     yet; the régies are deferred indefinitely on dev-hours / customer
     #     ratio.
 }

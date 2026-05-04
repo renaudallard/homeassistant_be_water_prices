@@ -41,10 +41,14 @@ Coverage today:
   * 1500-1999,
     3000-3999    Vlaams-Brabant + Halle-Vilvoorde
                  + Limburg                              → DE WATERGROEP
-  * 2000-2999    Antwerp province                       → PIDPA
-                 (Water-link in Antwerp city/ring is
-                  the wrong default for ~200 k users;
-                  manual picker until Water-link lands)
+  * 2000-2070    Antwerp city core (Water-link)         → WATER-LINK
+  * 2100-2999    Rest of Antwerp province               → PIDPA
+                 (Water-link's ring communes -- Edegem,
+                  Hove, Mortsel, Schoten, Beveren, etc.
+                  -- need the manual picker; their
+                  postcodes overlap with Pidpa's wider
+                  service area so we default to Pidpa
+                  outside the city core)
   * 4000-4099    Liège city core                        → CILE
   * 4100-4999    Liège region                           → SWDE
   * 5000-5099,
@@ -105,7 +109,12 @@ def resolve(postcode: str) -> str | None:
     # Brabant Wallon.
     if 1300 <= code <= 1499:
         return "inbw"
-    # Antwerp province (Water-link wrong-default for Antwerp city/ring noted above).
+    # Antwerp city core is Water-link; rest of the province is Pidpa. Ring
+    # communes (Edegem, Hove, Mortsel, etc.) overlap with Pidpa's wider
+    # service area so we default to Pidpa there and let the user override
+    # via the manual picker.
+    if 2000 <= code <= 2070:
+        return "water_link"
     if 2000 <= code <= 2999:
         return "pidpa"
     # Vlaams-Brabant + Halle-Vilvoorde + Limburg.
