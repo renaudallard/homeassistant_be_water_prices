@@ -69,11 +69,16 @@ publication and how to parse it.
 | **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py) — bs4 walker over the per-tier facture table on [eau.inbw.be/prix-de-leau](https://eau.inbw.be/prix-de-leau). The server's TLS chain is misconfigured (GoDaddy intermediate not sent), so we fetch with `verify_ssl=False`; risk note in the module docstring |
 | **CILE** | Wallonia (Liège region) | 24 communes (~560 k) | [`providers/cile.py`](./custom_components/be_water_prices/providers/cile.py) — clean 4-row HTML table on [cile.be/facturation/le-prix-de-leau](https://www.cile.be/facturation/le-prix-de-leau). Same pattern as SWDE / inBW: CVD parsed live, CVA / FSE cross-checked against the SPGE constants |
 | **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP states the CVD inline ("A l'INASEP, il est de N,NNNN €/m³") rather than in a table. Parser anchors on that exact phrase (tolerating Unicode quotes) |
+| **IEG** | Wallonia (Mouscron) | ~50 k | [`providers/ieg.py`](./custom_components/be_water_prices/providers/ieg.py) — operator's own page at `ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/`. Uses the shared CWaPE residential tier math via [`_walloon_simple.py`](./custom_components/be_water_prices/providers/_walloon_simple.py) |
+| **AIEM** | Wallonia (Molignée) | ~12 k connections (~25 k people) | [`providers/aiem.py`](./custom_components/be_water_prices/providers/aiem.py) — `aiem.be/prix-de-l-eau`. The page spells out formula examples (`0,5 x CVD (soit 1,435€)`) before listing the actual current value, so the shared parser anchors on `actuelle du CVD` to skip the example |
+| **AIEC** | Wallonia (Condroz) | small | [`providers/aiec.py`](./custom_components/be_water_prices/providers/aiec.py) — pulled from `callmepower.be/fr/eau/distributeurs/aiec` (public aggregator) since the operator's own site doesn't carry the rate |
+| **CIESAC** | Wallonia (Clavier / Durbuy / Ouffet / Tinlot) | 4 communes | [`providers/ciesac.py`](./custom_components/be_water_prices/providers/ciesac.py) — same Callmepower path; `ciesac.be` is intermittently unreachable and doesn't publish structured rates |
+| **IDEN** | Wallonia (Nandrin / Tinlot / Modave) | 3 communes | [`providers/iden.py`](./custom_components/be_water_prices/providers/iden.py) — same Callmepower path; the operator's own site (`iden-eau.be`) carries CVD/CVA explainers but no numbers |
 
-**Still deferred** (each blocked on a separate constraint):
+**Still deferred:**
 
-- **Farys** (~22 % of Flanders, biggest single gap) — `farys.be/nl/watertarieven` is JS-rendered with no static numbers in the HTML. Needs the Drupal endpoint discovered via browser network-tab inspection, or a per-commune fallback URL.
-- **Small Walloon intercommunales** (IEG / AIEC / AIEM / CIESAC / IDEN) and the **~30 régies communales** — no central publication channel found (Aquawal's contact form requires session state, the .be domains for those acronyms point to unrelated business directories); the régies are deferred indefinitely on dev-hours / customer ratio.
+- **Farys** (~22 % of Flanders, biggest remaining gap) — `farys.be/nl/watertarieven` is JS-rendered with no static numbers in the HTML. Needs the Drupal endpoint discovered via browser network-tab inspection, or a per-commune fallback URL.
+- **~30 régies communales** (Chimay, Theux, Libramont, …) — no central publication channel; deferred indefinitely on dev-hours / customer ratio.
 
 Adding another utility is a self-contained PR: drop a new module under
 [`custom_components/be_water_prices/providers/`](./custom_components/be_water_prices/providers/),

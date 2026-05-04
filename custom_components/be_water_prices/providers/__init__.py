@@ -32,14 +32,19 @@ utility means writing a new module and registering it below.
 from __future__ import annotations
 
 from .agso_knokke import EXTRACTOR as _AGSO_KNOKKE
+from .aiec import EXTRACTOR as _AIEC
+from .aiem import EXTRACTOR as _AIEM
 from .aquaduin import EXTRACTOR as _AQUADUIN
 from .base import (
     ExtractorError,
     WaterExtractor,
     WaterTariff,
 )
+from .ciesac import EXTRACTOR as _CIESAC
 from .cile import EXTRACTOR as _CILE
 from .de_watergroep import EXTRACTOR as _DE_WATERGROEP
+from .iden import EXTRACTOR as _IDEN
+from .ieg import EXTRACTOR as _IEG
 from .inasep import EXTRACTOR as _INASEP
 from .inbw import EXTRACTOR as _INBW
 from .pidpa import EXTRACTOR as _PIDPA
@@ -58,12 +63,15 @@ EXTRACTORS: dict[str, WaterExtractor] = {
     _INBW.id: _INBW,
     _CILE.id: _CILE,
     _INASEP.id: _INASEP,
+    _IEG.id: _IEG,
+    _AIEM.id: _AIEM,
+    _AIEC.id: _AIEC,
+    _CIESAC.id: _CIESAC,
+    _IDEN.id: _IDEN,
     # Still deferred:
     #   - Farys: watertarieven page is JS-rendered and carries no static numbers.
-    #   - Small Walloon intercommunales (IEG / AIEC / AIEM / CIESAC / IDEN)
-    #     and ~30 régies communales: no central publication channel found
-    #     yet; the régies are deferred indefinitely on dev-hours / customer
-    #     ratio.
+    #   - ~30 régies communales: no central publication channel found yet;
+    #     deferred indefinitely on dev-hours / customer ratio.
 }
 
 
