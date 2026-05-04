@@ -116,9 +116,10 @@ SOURCE_URL = (
 COMMUNE_URL_FMT = "https://www.pidpa.be/ons-aanbod/je-gemeente/{slug}"
 SITEMAP_URL = "https://www.pidpa.be/sitemap.xml"
 
-# The PDF lays the year header out as: "(excl. BTW) 2025 2026 2027 2028 2029 2030".
-# We capture the per-year basis row underneath and pull the column matching
-# our target year.
+# The PDF text extraction yields "Drinkwatertarief\n2025 2026 2027 2028 2029 2030\n(excl. BTW)\n…",
+# i.e. the year header sits between the section title and "(excl. BTW)". We
+# anchor on "Drinkwatertarief" + the year run, then capture the per-year
+# basis row underneath and pull the column matching our target year.
 _BASIS_RE = re.compile(
     r"basistarief\s+huishoudelijk\s+([\d.,]+(?:\s+[\d.,]+)+)",
     re.IGNORECASE,
