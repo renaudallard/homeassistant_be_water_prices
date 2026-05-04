@@ -31,8 +31,20 @@ class WaterSensorDescription(SensorEntityDescription):
 
 
 def _basis_or_linear(data: CoordinatorData) -> float | None:
+    """Headline distributor rate per m³.
+
+    Prefers the explicit basis (Flanders block 1) or linear (Brussels);
+    falls back to the Walloon CVD when neither is set so the SWDE-style
+    breakdown still surfaces something on this sensor.
+    """
     t = data.tariff
-    return t.basis_eur_per_m3 if t.basis_eur_per_m3 is not None else t.linear_eur_per_m3
+    if t.basis_eur_per_m3 is not None:
+        return t.basis_eur_per_m3
+    if t.linear_eur_per_m3 is not None:
+        return t.linear_eur_per_m3
+    if t.cvd_eur_per_m3:
+        return t.cvd_eur_per_m3
+    return None
 
 
 def _comfort(data: CoordinatorData) -> float | None:

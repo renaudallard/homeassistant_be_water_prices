@@ -12,24 +12,31 @@ daily-refresh `DataUpdateCoordinator`, no Python-source EUR values).
 
 ## Status
 
-**v0.1** -- Brussels-Capital Region only (VIVAQUA). Flemish utilities
-land in v0.2; Wallonia in v0.3. See `SCOPE.md` for the full roadmap.
+**v0.3** -- Brussels (VIVAQUA) + Wallonia (SWDE). Flemish utilities
+land in v0.2 (still pending). See `SCOPE.md` for the full roadmap.
 
 ## Supported utilities
 
-| Region   | Utility   | Source                                           |
-|----------|-----------|--------------------------------------------------|
+| Region   | Utility   | Source                                              |
+|----------|-----------|-----------------------------------------------------|
 | Brussels | VIVAQUA   | https://www.vivaqua.be/en/the-domestic-linear-rate/ |
+| Wallonia | SWDE      | https://www.swde.be/en/water-prices-swde            |
+
+Postcode resolver: 1000-1299 → VIVAQUA, 4000-7999 → SWDE. Other
+postcodes (Flanders 1500-3999 / 8000-9999, Brabant Wallon 1300-1499,
+and the Walloon long tail of CILE / INASEP / régies) drop into the
+manual utility picker until v0.4 lands the Géoportail Wallonie ZDE
+GeoPackage refinement and the VMM Waterloket Flanders dump.
 
 ## Sensors
 
 | Entity                           | Unit       | Notes                                     |
 |----------------------------------|------------|-------------------------------------------|
 | `sensor.water_yearly_fee`        | EUR/year   | Vastrecht / redevance, ex-VAT             |
-| `sensor.water_basis_rate`        | EUR/m³     | First-block (Flanders) or linear (Brussels), ex-VAT |
+| `sensor.water_basis_rate`        | EUR/m³     | First-block (Flanders), linear (Brussels), or CVD (Wallonia), ex-VAT |
 | `sensor.water_comfort_rate`      | EUR/m³     | Flanders block 2 only; `None` elsewhere    |
-| `sensor.water_sanering_rate`     | EUR/m³     | Sum of all sewerage components, ex-VAT     |
-| `sensor.water_all_in_basis`      | EUR/m³     | Basis + sanering + VAT (what you pay)      |
+| `sensor.water_sanering_rate`     | EUR/m³     | Sum of all sewerage / CVA / FSE components, ex-VAT |
+| `sensor.water_all_in_basis`      | EUR/m³     | Basis + sanering + VAT. For Wallonia this is the *above-30 m³* headline; the first 30 m³ pay 50 % CVD, see the projected-cost sensor for the actual bill |
 | `sensor.water_projected_annual_cost` | EUR/year | VAT-incl projection from your options    |
 
 Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
