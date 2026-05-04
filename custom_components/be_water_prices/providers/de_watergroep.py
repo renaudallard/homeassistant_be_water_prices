@@ -25,18 +25,23 @@
 
 """De Watergroep -- 167 communes / ~3.3 M customers (~49.5 % of Flanders).
 
-Two ingestion paths:
+Two ingestion paths share the same cookie-driven endpoint:
 
-  - **Default fetch** (no commune configured) hits the operator-wide
-    news article ``over-de-watergroep/nieuws/tarieven-<year>``. That
-    page only carries the drinkwater basistarief; sanering stays at 0
-    so the projected-cost sensor under-states the real bill.
+  - **Default fetch** (no commune configured) hits the cookie-driven
+    ``/Tarief/UpdateDetailTariefJaar/<year>`` endpoint with the Halle
+    GUID and labels the snapshot ``"Halle (DWG-served default)"``.
+    That gives the full integrale waterprijs (drinkwater +
+    gemeentelijke + bovengemeentelijke saneringsbijdragen) for one
+    representative DWG-served commune. If the AJAX endpoint is down
+    we fall through to the news article
+    ``over-de-watergroep/nieuws/tarieven-<year>`` which only carries
+    the drinkwater leg (sanering = 0) so the integration keeps
+    producing *some* tariff.
 
-  - **Per-commune fetch** GETs ``/Tarief/UpdateDetailTariefJaar/<year>``
-    with a ``dwg_l=<GUID>`` cookie. The response is the full per-commune
-    integrale waterprijs page: drinkwater + gemeentelijke +
-    bovengemeentelijke saneringsbijdragen with the standard VMM
-    50/30/20 + 10/6/4 vastrecht/korting structure.
+  - **Per-commune fetch** GETs the same endpoint with the user-picked
+    ``dwg_l=<GUID>`` cookie and returns the integrale waterprijs for
+    that commune, with the standard VMM 50/30/20 + 10/6/4
+    vastrecht/korting structure.
 
 Commune list discovery: scrape the dropdown on
 ``/nl-be/drinkwater/tarieven`` (700+ ``<option>`` entries with GUID
@@ -113,8 +118,9 @@ _BASIS_ZUIVERING_RE = re.compile(
 def parse_news_tariff(html: str, year: int) -> WaterTariff:
     """Parse the news-article fallback (drinkwater leg only).
 
-    Used when no commune is configured; sanering stays at 0 because
-    the news article does not carry per-commune sewerage rates.
+    Used as a deeper fallback when the cookie-driven per-commune
+    endpoint is unreachable; sanering stays at 0 because the news
+    article does not carry per-commune sewerage rates.
     """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)
