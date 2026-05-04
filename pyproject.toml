@@ -11,7 +11,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 # RUF001 flags ambiguous Unicode whitespace; we intentionally handle NBSP /
 # THIN SPACE / LINE SEPARATOR variants because Belgian publications use them
 # in numeric literals (see _pdf._NUMERIC_SEPARATORS, test_pdf).
-ignore = ["E501", "RUF001"]
+ignore = ["E501", "RUF001", "RUF003"]
 
 [[tool.mypy.overrides]]
 module = [

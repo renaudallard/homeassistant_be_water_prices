@@ -11,10 +11,12 @@ from .base import (
     WaterExtractor,
     WaterTariff,
 )
+from .swde import EXTRACTOR as _SWDE
 from .vivaqua import EXTRACTOR as _VIVAQUA
 
 EXTRACTORS: dict[str, WaterExtractor] = {
     _VIVAQUA.id: _VIVAQUA,
+    _SWDE.id: _SWDE,
 }
 
 
