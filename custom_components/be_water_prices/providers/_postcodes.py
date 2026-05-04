@@ -598,11 +598,13 @@ _PER_POSTCODE: dict[str, str] = {
 }
 
 
-def resolve(postcode: str) -> str | None:
+def resolve(postcode: str | None) -> str | None:
     """Return the utility id serving ``postcode``, or ``None`` if unknown."""
+    if not postcode:
+        return None
     try:
         code = int(postcode)
-    except ValueError:
+    except (TypeError, ValueError):
         return None
 
     # Brussels.
