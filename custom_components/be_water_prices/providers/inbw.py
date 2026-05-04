@@ -76,9 +76,17 @@ def _row_amount_after_label(table: Tag, label_keywords: tuple[str, ...]) -> floa
     The inBW table layout::
 
         | Rubrique | Quantité | Prix unitaire | Hors TVA | TVAC |
+
+    Section headings (Coût Vérité Distribution, Fonds Social) sit on a
+    row with the label in column 0 and the rest empty; the matching
+    data row immediately below has an empty column 0. When the matched
+    row carries no amount in *Prix unitaire*, fall through to the next
+    row's *Prix unitaire* so the "Fonds Social" heading still resolves
+    to the 0,0339 €/m³ rate published just below it.
     """
     needles = tuple(k.lower() for k in label_keywords)
-    for tr in table.find_all("tr"):
+    rows = list(table.find_all("tr"))
+    for idx, tr in enumerate(rows):
         cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
         if len(cells) < 3:
             continue
@@ -87,6 +95,18 @@ def _row_amount_after_label(table: Tag, label_keywords: tuple[str, ...]) -> floa
             amounts = extract_amounts(cells[2])
             if amounts:
                 return amounts[0]
+            for next_tr in rows[idx + 1 :]:
+                next_cells = [c.get_text(" ", strip=True) for c in next_tr.find_all(["td", "th"])]
+                if len(next_cells) < 3:
+                    continue
+                if next_cells[0].strip():
+                    # Different labelled row; bail out rather than reaching
+                    # across into an unrelated section.
+                    break
+                amounts = extract_amounts(next_cells[2])
+                if amounts:
+                    return amounts[0]
+            return None
     return None
 
 
