@@ -42,6 +42,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_COMMUNE,
+    CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_SOCIAL_TARIFF,
@@ -55,7 +56,7 @@ from .const import (
 )
 from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, WaterTariff, get
-from .providers.base import WaterExtractor
+from .providers.base import WaterExtractor, relabel_with_human_commune
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,6 +124,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         try:
             if commune and self._extractor.fetch_for_commune is not None:
                 tariff = await self._extractor.fetch_for_commune(session, str(commune))
+                tariff = relabel_with_human_commune(
+                    tariff,
+                    commune_id=str(commune),
+                    commune_label=self.entry.options.get(CONF_COMMUNE_LABEL),
+                )
             else:
                 tariff = await self._extractor.fetch(session)
         except ExtractorError as err:

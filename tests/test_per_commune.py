@@ -27,7 +27,13 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from custom_components.be_water_prices.providers import all_extractors
+from custom_components.be_water_prices.providers.base import (
+    WaterTariff,
+    relabel_with_human_commune,
+)
 from custom_components.be_water_prices.providers.de_watergroep import (
     _OPTION_RE as DWG_OPTION_RE,
 )
@@ -120,3 +126,37 @@ def test_extractors_advertise_their_metadata_correctly() -> None:
 # Sentinel to keep the module-level import sorted; ensures test_per_commune
 # imports the option regexes in a single pass.
 _SENTINEL_REGEXES = (DWG_OPTION_RE, FARYS_OPTION_RE)
+
+
+def _farys_25071_tariff() -> WaterTariff:
+    return WaterTariff(
+        utility="farys",
+        region="flanders",
+        valid_from=date(2026, 1, 1),
+        valid_until=date(2026, 12, 31),
+        publication_label="Farys watertarieven 2026 (25071)",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=100.0,
+        basis_eur_per_m3=1.5,
+    )
+
+
+def test_relabel_swaps_opaque_id_for_human_label() -> None:
+    relabelled = relabel_with_human_commune(
+        _farys_25071_tariff(),
+        commune_id="25071",
+        commune_label="Gent (Centrum)",
+    )
+    assert relabelled.publication_label == "Farys watertarieven 2026 (Gent (Centrum))"
+
+
+def test_relabel_is_a_no_op_when_label_missing_or_equals_id() -> None:
+    base = _farys_25071_tariff()
+    assert relabel_with_human_commune(base, commune_id="25071", commune_label=None) is base
+    assert relabel_with_human_commune(base, commune_id="25071", commune_label="25071") is base
+
+
+def test_relabel_is_a_no_op_when_id_not_in_publication_label() -> None:
+    base = _farys_25071_tariff()
+    out = relabel_with_human_commune(base, commune_id="99999", commune_label="Anywhere")
+    assert out is base

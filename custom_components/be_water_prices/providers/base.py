@@ -42,6 +42,7 @@ time.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
@@ -132,3 +133,27 @@ class WaterExtractorProtocol(Protocol):
 
 class ExtractorError(Exception):
     """Raised when a utility's source cannot be fetched or parsed."""
+
+
+def relabel_with_human_commune(
+    tariff: WaterTariff, *, commune_id: str, commune_label: str | None
+) -> WaterTariff:
+    """Swap an opaque commune id for its human label in publication_label.
+
+    Per-commune extractors embed the commune they were called with
+    inside ``publication_label`` as ``"... (<commune>)"``. Farys uses
+    a numeric id (``25071``) and De Watergroep a GUID; neither makes
+    sense to a human reading the diagnostics dump or the sensor
+    attribute. The OptionsFlow saves the chosen commune's display
+    label as ``CONF_COMMUNE_LABEL`` so the coordinator can substitute
+    it back in here without changing the extractor protocol.
+    """
+    if not commune_label or commune_label == commune_id:
+        return tariff
+    needle = f"({commune_id})"
+    if needle not in tariff.publication_label:
+        return tariff
+    return dataclasses.replace(
+        tariff,
+        publication_label=tariff.publication_label.replace(needle, f"({commune_label})", 1),
+    )
