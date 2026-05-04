@@ -22,7 +22,7 @@
           "consumption_m3_per_year": "Consumption (m³ / year)",
           "gedomicilieerd_persons": "Registered residents (Flanders only)",
           "social_tariff": "Social tariff (Flanders, 80% reduction)",
-          "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Water-link)",
+          "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Pidpa / Water-link)",
           "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)"
         }
       }
@@ -39,7 +39,7 @@
           "consumption_m3_per_year": "Consumption (m³ / year)",
           "gedomicilieerd_persons": "Registered residents (Flanders only)",
           "social_tariff": "Social tariff (Flanders, 80% reduction)",
-          "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Water-link)",
+          "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Pidpa / Water-link)",
           "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)"
         }
       }
