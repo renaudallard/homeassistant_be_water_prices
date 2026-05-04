@@ -62,8 +62,8 @@ EXTRACTORS: dict[str, WaterExtractor] = {
     #     no year markers to reliably pick the current year's table.
     #   - Small Walloon intercommunales (IEG / AIEC / AIEM / CIESAC / IDEN)
     #     and ~30 régies communales: no central publication channel found yet,
-    #     and SCOPE.md flagged the régies for indefinite deferral on
-    #     dev-hours / customer ratio.
+    #     yet; the régies are deferred indefinitely on dev-hours / customer
+    #     ratio.
 }
 
 

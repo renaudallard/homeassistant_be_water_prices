@@ -43,7 +43,8 @@ SNAPSHOT_STALE_AFTER_DAYS = 35
 
 # Wallonia uses two flat-Wallonia volumetric components on top of each
 # distributor's CVD. Both come from SPGE / CWaPE, not from the distributor's
-# own publication, so they live here. Source: SCOPE.md §1 Wallonia.
+# own publication, so they live here. Source: SPGE / CWaPE annual rate
+# decision, mirrored on each Walloon distributor's tariff page.
 WALLONIA_CVA_EUR_PER_M3 = 2.748
 WALLONIA_FSE_EUR_PER_M3 = 0.0339
 

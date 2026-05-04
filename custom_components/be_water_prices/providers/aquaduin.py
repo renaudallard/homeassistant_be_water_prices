@@ -28,7 +28,8 @@
 Source: https://www.aquaduin.be/drinkwater/tarieven/overzicht-tarieven-<year>.pdf
 
 Aquaduin publishes a clean numeric tariff card PDF -- the gold-standard
-example flagged in SCOPE.md. The PDF lays out the residential block as::
+example among Belgian water utilities. The PDF lays out the residential
+block as::
 
     Basistarief 30 m³ + 30 m³ per gedomicilieerde persoon  5,9908 euro/m³  6,35
     Comforttarief > Basisverbruik (pro rata verrekend)     11,9816 euro/m³ 12
@@ -38,8 +39,8 @@ Plus the standard VMM vastrecht / korting (50/30/20 + 10/6/4 -- the
 percentage of the matching vastrecht component).
 
 The 5.9908 €/m³ is the **integrale waterprijs basistarief** (drinkwater
-+ saneringsbijdragen combined into one per-m³ figure -- highest in
-Flanders per SCOPE.md). The PDF does not split it into separate
++ saneringsbijdragen combined into one per-m³ figure -- the highest
+per-m³ rate among Flemish operators). The PDF does not split it into separate
 drinkwater / sanering rows the way Pidpa or AGSO Knokke do. We store
 it as ``basis_eur_per_m3`` with sanering = 0, which keeps the
 volumetric math correct (per_m3_basis = basis + sanering still equals
