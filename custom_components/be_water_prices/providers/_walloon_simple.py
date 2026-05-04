@@ -93,9 +93,10 @@ def parse_cvd(html: str) -> float:
 
     Tries in order:
       1. ``actuelle du CVD : N,NNN €`` (the AIEM "current value" phrasing).
-      2. The first CVD reference in the text whose value falls inside
-         the plausibility window (excludes ``0.5·CVD`` formula examples
-         that some pages spell out before listing the actual rate).
+      2. The largest CVD reference whose value falls inside the
+         plausibility window. Picking the largest rather than the first
+         protects against pages that quote a historic value before the
+         current one (CVDs only index up).
       3. The first CVD reference, plausible or not.
 
     Raises :class:`ExtractorError` when no ``CVD … N,NNN €`` string is
@@ -115,7 +116,7 @@ def parse_cvd(html: str) -> float:
         raise ExtractorError("could not find CVD on the published page")
     plausible = [v for v in matches if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD]
     if plausible:
-        return plausible[0]
+        return max(plausible)
     return matches[0]
 
 
