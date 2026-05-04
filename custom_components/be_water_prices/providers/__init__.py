@@ -11,12 +11,20 @@ from .base import (
     WaterExtractor,
     WaterTariff,
 )
+from .de_watergroep import EXTRACTOR as _DE_WATERGROEP
+from .pidpa import EXTRACTOR as _PIDPA
 from .swde import EXTRACTOR as _SWDE
 from .vivaqua import EXTRACTOR as _VIVAQUA
 
 EXTRACTORS: dict[str, WaterExtractor] = {
     _VIVAQUA.id: _VIVAQUA,
+    _DE_WATERGROEP.id: _DE_WATERGROEP,
+    _PIDPA.id: _PIDPA,
     _SWDE.id: _SWDE,
+    # Farys is intentionally absent: the watertarieven page is JS-rendered
+    # and the static HTML carries no per-m³ numbers (only a commune list).
+    # Will land in a follow-up once we discover the Drupal endpoint or use
+    # a per-commune fallback URL.
 }
 
 

@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
+    CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
@@ -101,4 +102,5 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         opts = self.entry.options
         consumption = float(opts.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3))
         persons = int(opts.get(CONF_PERSONS, DEFAULT_PERSONS))
-        return compute_annual_cost(tariff, consumption, persons)
+        social = bool(opts.get(CONF_SOCIAL_TARIFF, False))
+        return compute_annual_cost(tariff, consumption, persons, social_tariff=social)

@@ -1,18 +1,20 @@
 """Config + options flow for be_water_prices.
 
-v0.1 ships with VIVAQUA as the only registered extractor; the flow is
-intentionally tiny:
+The flow is three steps:
 
-  1. ``user``     -- ask for a postcode. If it resolves to a known
-                     utility, persist that utility and continue to step
-                     ``options``. Brussels postcodes (1000-1299) resolve
-                     to VIVAQUA; everything else falls through.
+  1. ``user``     -- ask for a postcode. Brussels (1000-1299) → VIVAQUA,
+                     Antwerp (2000-2999) → Pidpa, the rest of Flanders
+                     → De Watergroep, Wallonia (4000-7999) → SWDE.
+                     Anything else falls through to ``manual``.
   2. ``manual``   -- shown when the postcode does not resolve. User
                      picks a utility from the dropdown built from the
                      registry.
-  3. ``options``  -- annual consumption (m³/yr). The Flanders-only
-                     ``gedomicilieerd_persons`` and ``social_tariff``
-                     fields land in v0.2.
+  3. ``options``  -- annual consumption (m³/yr) for everyone, plus
+                     Flanders-only ``gedomicilieerd_persons`` (1-5)
+                     and ``social_tariff`` (boolean) when the chosen
+                     utility is Flemish. Block-tariff math relies on
+                     persons; social tariff applies the VMM 80 %
+                     reduction post-calc.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -41,12 +44,18 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
+    CONF_PERSONS,
     CONF_POSTCODE,
+    CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     DEFAULT_CONSUMPTION_M3,
+    DEFAULT_PERSONS,
     DOMAIN,
+    MAX_PERSONS,
+    MIN_PERSONS,
+    REGION_FLANDERS,
 )
-from .providers import all_extractors
+from .providers import all_extractors, get
 from .providers._postcodes import resolve as _resolve_postcode
 
 
@@ -74,22 +83,45 @@ def _manual_schema() -> vol.Schema:
     )
 
 
-def _options_schema(current: dict[str, Any]) -> vol.Schema:
-    return vol.Schema(
-        {
+def _options_schema(current: dict[str, Any], *, flanders: bool) -> vol.Schema:
+    fields: dict[Any, Any] = {
+        vol.Required(
+            CONF_CONSUMPTION_M3_PER_YEAR,
+            default=current.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3),
+        ): NumberSelector(
+            NumberSelectorConfig(
+                min=1,
+                max=2000,
+                step=1,
+                mode=NumberSelectorMode.BOX,
+            )
+        ),
+    }
+    if flanders:
+        fields[
             vol.Required(
-                CONF_CONSUMPTION_M3_PER_YEAR,
-                default=current.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3),
-            ): NumberSelector(
-                NumberSelectorConfig(
-                    min=1,
-                    max=2000,
-                    step=1,
-                    mode=NumberSelectorMode.BOX,
-                )
-            ),
-        }
-    )
+                CONF_PERSONS,
+                default=current.get(CONF_PERSONS, DEFAULT_PERSONS),
+            )
+        ] = NumberSelector(
+            NumberSelectorConfig(
+                min=MIN_PERSONS,
+                max=MAX_PERSONS,
+                step=1,
+                mode=NumberSelectorMode.BOX,
+            )
+        )
+        fields[
+            vol.Required(
+                CONF_SOCIAL_TARIFF,
+                default=current.get(CONF_SOCIAL_TARIFF, False),
+            )
+        ] = BooleanSelector()
+    return vol.Schema(fields)
+
+
+def _is_flanders(utility_id: str) -> bool:
+    return get(utility_id).region == REGION_FLANDERS
 
 
 class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
@@ -129,7 +161,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             )
         return self.async_show_form(
             step_id="options",
-            data_schema=_options_schema({}),
+            data_schema=_options_schema({}, flanders=_is_flanders(self._utility)),
         )
 
     @staticmethod
@@ -145,7 +177,11 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
+        utility_id = self.config_entry.data[CONF_UTILITY]
         return self.async_show_form(
             step_id="init",
-            data_schema=_options_schema(dict(self.config_entry.options)),
+            data_schema=_options_schema(
+                dict(self.config_entry.options),
+                flanders=_is_flanders(utility_id),
+            ),
         )

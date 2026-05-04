@@ -17,9 +17,11 @@
       },
       "options": {
         "title": "Annual consumption",
-        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year.",
+        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year. Flemish utilities also need the number of registered residents (drives the basis volume) and an opt-in for the VMM social tariff.",
         "data": {
-          "consumption_m3_per_year": "Consumption (m³ / year)"
+          "consumption_m3_per_year": "Consumption (m³ / year)",
+          "gedomicilieerd_persons": "Registered residents (Flanders only)",
+          "social_tariff": "Social tariff (Flanders, 80% reduction)"
         }
       }
     },
@@ -32,7 +34,9 @@
       "init": {
         "title": "Annual consumption",
         "data": {
-          "consumption_m3_per_year": "Consumption (m³ / year)"
+          "consumption_m3_per_year": "Consumption (m³ / year)",
+          "gedomicilieerd_persons": "Registered residents (Flanders only)",
+          "social_tariff": "Social tariff (Flanders, 80% reduction)"
         }
       }
     }
