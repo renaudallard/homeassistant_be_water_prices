@@ -62,6 +62,7 @@ publication and how to parse it.
 | **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
 | **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — *drinkwater leg only* | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — the basistarief from the news article `over-de-watergroep/nieuws/tarieven-<year>`. Per-commune saneringsbijdragen sit behind a JS commune picker on `/drinkwater/tarieven` and arrive in a follow-up |
 | **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`. Pulls the year column for basistarief / comforttarief plus the gemeentelijke (afvoer) and bovengemeentelijke (zuivering) saneringsbijdragen |
+| **Water-link** | Flanders (Antwerp city + ring) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py) — the per-year PDF `water-link.be/sites/default/files/<YYYY>-01/<YYYY>%20HH.pdf` parsed via `pdfplumber`. Drinkwater + zuivering are uniform across the service area; gemeentelijke afvoer differs per commune (Antwerpen at 1.3345 €/m³, ring communes at 1.9572). Defaults to Antwerpen rates -- ring-commune users see a slight under-estimate on sanering until per-commune selection lands |
 | **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py) — gold-standard numeric PDF at `aquaduin.be/drinkwater/tarieven/overzicht-tarieven-<year>.pdf`. Publishes a single integrated basistarief (drinkwater + sanering combined) -- highest in Flanders |
 | **AGSO Knokke-Heist** | Flanders (1 commune) | ~33 k | [`providers/agso_knokke.py`](./custom_components/be_water_prices/providers/agso_knokke.py) — bs4 walker over the per-component "Integrale waterprijs" table at `agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers`. Page shows previous + current year side-by-side; parser picks the higher-priced table since rates only ever index up |
 | **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py) — bs4-anchored on the `<h3>` headings of [swde.be/en/water-prices-swde](https://www.swde.be/en/water-prices-swde) (the FR slug 4xxs, the EN one works). CVA / FSE come from the SPGE flat-Wallonia constants and drift-warn on divergence |
@@ -72,8 +73,7 @@ publication and how to parse it.
 **Still deferred** (each blocked on a separate constraint):
 
 - **Farys** (~22 % of Flanders, biggest single gap) — `farys.be/nl/watertarieven` is JS-rendered with no static numbers in the HTML. Needs the Drupal endpoint discovered via browser network-tab inspection, or a per-commune fallback URL.
-- **Water-link** (~200 k Antwerp city + ring) — per-commune subpages exist but expose 22 unlabelled rate tables with no year markers; can't reliably pick the current year without an external signal.
-- **Small Walloon intercommunales** (IEG / AIEC / AIEM / CIESAC / IDEN) and the **~30 régies communales** — no central publication channel found; the régies are deferred indefinitely on dev-hours / customer ratio.
+- **Small Walloon intercommunales** (IEG / AIEC / AIEM / CIESAC / IDEN) and the **~30 régies communales** — no central publication channel found (Aquawal's contact form requires session state, the .be domains for those acronyms point to unrelated business directories); the régies are deferred indefinitely on dev-hours / customer ratio.
 
 Adding another utility is a self-contained PR: drop a new module under
 [`custom_components/be_water_prices/providers/`](./custom_components/be_water_prices/providers/),
@@ -92,7 +92,8 @@ dominant operator for that area:
 | 1000-1299 | Brussels-Capital | VIVAQUA |
 | 1300-1499 | Brabant Wallon | inBW |
 | 1500-1999, 3000-3999 | Vlaams-Brabant + Halle-Vilvoorde + Limburg | De Watergroep |
-| 2000-2999 | Antwerp province | Pidpa *(Water-link in Antwerp city/ring is wrong-defaulted; manual picker until that extractor lands)* |
+| 2000-2070 | Antwerp city core | Water-link |
+| 2100-2999 | rest of Antwerp province | Pidpa *(Water-link's ring communes -- Edegem, Hove, Mortsel, Schoten, Beveren, etc. -- overlap with Pidpa territory; manual picker for those addresses)* |
 | 4000-4099 | Liège core | CILE |
 | 4100-7999 | Liège region / Namur / Lux. / Hainaut | SWDE *(except curated INASEP communes)* |
 | 5060, 5070, 5081, 5310, 5340, 5360, 5370, 5500, 5530, 5640 | Namur sud (INASEP service area) | INASEP |

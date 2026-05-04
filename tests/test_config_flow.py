@@ -51,8 +51,15 @@ def test_walloon_postcodes_resolve_to_swde() -> None:
     assert _resolve_postcode("7999") == "swde"
 
 
-def test_antwerp_postcodes_resolve_to_pidpa() -> None:
-    assert _resolve_postcode("2000") == "pidpa"
+def test_antwerp_city_core_resolves_to_water_link() -> None:
+    # 2000-2070 is the Antwerp city core where Water-link operates.
+    assert _resolve_postcode("2000") == "water_link"
+    assert _resolve_postcode("2030") == "water_link"
+    assert _resolve_postcode("2070") == "water_link"
+
+
+def test_rest_of_antwerp_province_resolves_to_pidpa() -> None:
+    assert _resolve_postcode("2100") == "pidpa"
     assert _resolve_postcode("2300") == "pidpa"
     assert _resolve_postcode("2999") == "pidpa"
 
