@@ -25,10 +25,14 @@ def compute_annual_cost(
     **Brussels** (linear): ``consumption × (linear + sanering) + redevance``,
     then VAT. ``persons`` unused.
 
-    **Wallonia** (tier): the first 30 m³ pay ``0.5·CVD + CVA + FSE`` per
-    m³, above 30 m³ pays the full ``CVD + CVA + FSE``, plus the redevance
-    that the extractor already materialised from ``20·CVD + 30·CVA`` into
-    :attr:`WaterTariff.yearly_fixed_fee`. ``persons`` unused.
+    **Wallonia** (tier): the first 30 m³ pay ``0.5·CVD + 0·CVA + FSE``
+    per m³ (CVA is exempt on the residential first block by CWaPE
+    rule), above 30 m³ pays the full ``CVD + CVA + FSE``, plus the
+    redevance that the extractor already materialised from
+    ``20·CVD + 30·CVA`` into :attr:`WaterTariff.yearly_fixed_fee`.
+    Verified against inBW's own published facture (100 m³ → 584.26 EUR
+    matches to the cent only with the CVA-exempt-on-block-1 rule).
+    ``persons`` unused.
 
     **Flanders** (block): basis volume = ``30 + 30·persons`` m³ (capped at
     persons=5 by the config flow). Inside the basis volume each m³ pays
@@ -56,7 +60,7 @@ def compute_annual_cost(
             return None
         cva = tariff.cva_eur_per_m3
         fse = tariff.fse_eur_per_m3
-        first_block = min(consumption_m3, 30.0) * (0.5 * cvd + cva + fse)
+        first_block = min(consumption_m3, 30.0) * (0.5 * cvd + fse)
         rest = max(0.0, consumption_m3 - 30.0) * (cvd + cva + fse)
         ex_vat = first_block + rest + tariff.yearly_fixed_fee
         return round(ex_vat * (1.0 + tariff.vat_rate), 2)

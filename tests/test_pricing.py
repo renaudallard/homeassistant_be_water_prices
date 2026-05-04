@@ -59,15 +59,18 @@ def test_wallonia_zero_consumption_pays_full_redevance() -> None:
 
 
 def test_wallonia_thirty_m3_uses_only_first_block() -> None:
-    # First-block per-m³ ex-VAT = 0.5·3.24 + 2.748 + 0.0339 = 4.4019.
-    # 30 × 4.4019 + 147.24 = 132.057 + 147.24 = 279.297 ex-VAT, ×1.06 = 296.05.
-    assert compute_annual_cost(_swde_2026(), consumption_m3=30, persons=1) == 296.05
+    # First-block per-m³ ex-VAT = 0.5·CVD + FSE = 0.5·3.24 + 0.0339 = 1.6539
+    # (CVA is exempt on the residential first 30 m³ per CWaPE).
+    # 30 × 1.6539 + redevance(147.24) = 49.617 + 147.24 = 196.857 ex-VAT
+    # ×1.06 = 208.668 → 208.67.
+    assert compute_annual_cost(_swde_2026(), consumption_m3=30, persons=1) == 208.67
 
 
 def test_wallonia_eighty_m3_crosses_into_second_block() -> None:
-    # 30 × 4.4019 + 50 × 6.0219 + 147.24 = 132.057 + 301.095 + 147.24
-    # = 580.392 ex-VAT, ×1.06 = 615.21552 → 615.22.
-    assert compute_annual_cost(_swde_2026(), consumption_m3=80, persons=1) == 615.22
+    # 30 × 1.6539 + 50 × (3.24 + 2.748 + 0.0339) + 147.24
+    # = 49.617 + 50·6.0219 + 147.24
+    # = 49.617 + 301.095 + 147.24 = 497.952 ex-VAT, ×1.06 = 527.829 → 527.83.
+    assert compute_annual_cost(_swde_2026(), consumption_m3=80, persons=1) == 527.83
 
 
 def test_wallonia_returns_none_when_cvd_unset() -> None:
