@@ -39,11 +39,11 @@ in (Gent-centrum = 25071 by default) and parses the rates out of the
 `insert` command's HTML payload. The `form_build_id` field is
 optional; the endpoint accepts a POST without it.
 
-Per-commune data is real and varies (Aalst's drinkwater is 3.0058
-EUR/m³ in 2026, other communes differ). Per-commune selection in the
-OptionsFlow lands later -- for now Gent-centrum is the default since
-Gent is Farys's namesake city and the largest commune in its Oost-Vl.
-heartland.
+Per-commune data is real and varies (Gent-centrum's drinkwater is
+3.0058 EUR/m³ in 2026, other communes differ). Gent-centrum is the
+default since Gent is Farys's namesake city and the largest commune
+in its Oost-Vl. heartland; users override via the OptionsFlow
+commune dropdown.
 """
 
 from __future__ import annotations
