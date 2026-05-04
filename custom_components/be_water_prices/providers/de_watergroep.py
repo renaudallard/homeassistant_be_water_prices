@@ -195,7 +195,8 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     """
     target = date.today().year
     try:
-        return await fetch_for_commune(session, _DEFAULT_COMMUNE_GUID)
+        text, year = await _fetch_commune_ajax(session, _DEFAULT_COMMUNE_GUID)
+        return parse_commune_tariff(text, year=year, commune_label=_DEFAULT_COMMUNE_LABEL)
     except ExtractorError as default_err:
         _LOGGER.info(
             "De Watergroep default-commune fetch failed (%s); falling back to news article",
@@ -212,8 +213,13 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             return parse_news_tariff(html, year=target - 1)
 
 
-async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
-    """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint."""
+async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> tuple[str, int]:
+    """GET the UpdateDetailTariefJaar AJAX response for ``commune``.
+
+    Returns the response body and the year used in the URL. Raised
+    errors are :class:`ExtractorError`; the caller decides what to
+    label the parsed tariff with.
+    """
     target = date.today().year
     url = COMMUNE_DETAIL_URL_FMT.format(year=target)
     try:
@@ -236,7 +242,13 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
             f"De Watergroep returned an empty body for commune {commune!r} "
             "(probably an invalid GUID)"
         )
-    return parse_commune_tariff(text, year=target, commune_label=commune)
+    return text, target
+
+
+async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
+    """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint."""
+    text, year = await _fetch_commune_ajax(session, commune)
+    return parse_commune_tariff(text, year=year, commune_label=commune)
 
 
 _OPTION_RE = re.compile(
