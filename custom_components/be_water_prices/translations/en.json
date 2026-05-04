@@ -60,12 +60,11 @@
   "issues": {
     "snapshot_stale": {
       "title": "{utility} tariff snapshot is stale",
-      "description": "The last successfully fetched {utility} tariff is {age_days} days old (valid until {valid_until}). The integration is still serving the cached numbers, but they may no longer match the published tariff. Last fetch error: {last_error}.\n\nThis usually clears on its own once the utility republishes the page or the network issue resolves. If it persists, check the integration's GitHub issues or the daily live-check workflow run.",
       "fix_flow": {
         "step": {
           "init": {
-            "title": "Retry the tariff fetch",
-            "description": "Trigger an immediate refresh. The Repair card will auto-clear if the next fetch returns a fresh snapshot; otherwise it stays so you can retry again or investigate."
+            "title": "Retry the {utility} tariff fetch",
+            "description": "The last successfully fetched {utility} tariff is {age_days} days old (valid until {valid_until}). Last fetch error: {last_error}.\n\nPress Submit to trigger an immediate refresh. The Repair card auto-clears if the next fetch returns a fresh snapshot; otherwise it stays so you can retry again or investigate the underlying failure (check the integration's GitHub issues or the daily live-check workflow run)."
           }
         }
       }
