@@ -121,3 +121,4 @@ def test_west_oost_vlaanderen_postcodes_resolve_to_farys() -> None:
 def test_invalid_postcodes_return_none() -> None:
     assert _resolve_postcode("abcd") is None
     assert _resolve_postcode("") is None
+    assert _resolve_postcode(None) is None
