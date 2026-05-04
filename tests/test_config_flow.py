@@ -43,12 +43,11 @@ def test_brussels_postcodes_resolve_to_vivaqua() -> None:
 
 
 def test_walloon_postcodes_resolve_to_swde() -> None:
-    # 4000-4099 carved out for CILE; 4100+ is SWDE.
-    assert _resolve_postcode("4100") == "swde"
-    # 5000 is INASEP-uncurated → SWDE (the curated INASEP set covers Namur sud only).
-    assert _resolve_postcode("5000") == "swde"
-    assert _resolve_postcode("7000") == "swde"
-    assert _resolve_postcode("7999") == "swde"
+    # SWDE serves the bulk of Wallonia; spot-check a few core postcodes
+    # the ZDE table maps to it.
+    assert _resolve_postcode("5000") == "swde"  # Namur centre
+    assert _resolve_postcode("7000") == "swde"  # Mons
+    assert _resolve_postcode("6700") == "swde"  # Arlon
 
 
 def test_antwerp_city_core_resolves_to_water_link() -> None:
@@ -77,18 +76,25 @@ def test_brabant_wallon_postcodes_resolve_to_inbw() -> None:
     assert _resolve_postcode("1499") == "inbw"
 
 
-def test_liege_core_resolves_to_cile_rest_to_swde() -> None:
+def test_liege_core_resolves_to_cile() -> None:
+    # The ZDE-derived table has CILE for the entire Liège core (4000-4099)
+    # plus a number of communes further out. SWDE picks up where CILE stops.
     assert _resolve_postcode("4000") == "cile"
     assert _resolve_postcode("4099") == "cile"
-    assert _resolve_postcode("4100") == "swde"
-    assert _resolve_postcode("4500") == "swde"
+    # 4500-area is mixed -- some communes are CILE, others SWDE -- so we
+    # don't pin a specific assertion here; the table is the source of truth.
 
 
-def test_inasep_namur_sud_postcodes_resolve_to_inasep() -> None:
-    assert _resolve_postcode("5060") == "inasep"
-    assert _resolve_postcode("5500") == "inasep"
-    # 5800 is outside the curated INASEP set → falls through to SWDE.
-    assert _resolve_postcode("5800") == "swde"
+def test_walloon_per_postcode_table_resolves_small_intercommunales() -> None:
+    # The ZDE table assigns each Walloon postcode to its actual operator.
+    # These spot-check the small intercommunales we have extractors for.
+    assert _resolve_postcode("5070") == "inasep"  # Fosses-la-Ville
+    assert _resolve_postcode("5640") == "aiem"  # Mettet
+    assert _resolve_postcode("5360") == "aiec"  # Hamois
+    assert _resolve_postcode("7700") == "ieg"  # Mouscron
+    # Régies-served postcode (e.g. Bouillon 6830) returns None so the user
+    # picks manually rather than getting a wrong-default to SWDE.
+    assert _resolve_postcode("6830") is None  # Bouillon (régie)
 
 
 def test_knokke_heist_postcodes_resolve_to_agso() -> None:
