@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Prix de l'eau en Belgique",
+        "description": "Entrez votre code postal et nous identifierons votre compagnie des eaux. Si la résolution échoue, vous choisirez à l'étape suivante.",
+        "data": {
+          "postcode": "Code postal"
+        }
+      },
+      "manual": {
+        "title": "Choisissez votre compagnie",
+        "description": "Aucune compagnie n'a pu être identifiée pour ce code postal. Sélectionnez la vôtre ci-dessous.",
+        "data": {
+          "utility": "Compagnie"
+        }
+      },
+      "options": {
+        "title": "Consommation annuelle",
+        "description": "Votre consommation annuelle d'eau en mètres cubes. Utilisée par le capteur de coût projeté ; valeur par défaut 80 m³/an.",
+        "data": {
+          "consumption_m3_per_year": "Consommation (m³ / an)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Cette compagnie est déjà configurée."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Consommation annuelle",
+        "data": {
+          "consumption_m3_per_year": "Consommation (m³ / an)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "yearly_fee": {"name": "Redevance annuelle"},
+      "basis_rate": {"name": "Tarif de base"},
+      "comfort_rate": {"name": "Tarif confort"},
+      "sanering_rate": {"name": "Assainissement"},
+      "all_in_basis": {"name": "Tarif tout compris"},
+      "projected_annual_cost": {"name": "Coût annuel projeté"}
+    }
+  }
+}

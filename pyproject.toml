@@ -1,0 +1,28 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# RUF001 flags ambiguous Unicode whitespace; we intentionally handle NBSP /
+# THIN SPACE / LINE SEPARATOR variants because Belgian publications use them
+# in numeric literals (see _pdf._NUMERIC_SEPARATORS, test_pdf).
+ignore = ["E501", "RUF001"]
+
+[[tool.mypy.overrides]]
+module = [
+    "pypdf",
+    "pypdf.*",
+    "pdfplumber",
+    "pdfplumber.*",
+    "bs4",
+    "bs4.*",
+    "homeassistant",
+    "homeassistant.*",
+    "voluptuous",
+]
+ignore_missing_imports = true
