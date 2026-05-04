@@ -73,7 +73,7 @@ publication and how to parse it.
 
 - **Farys** (~22 % of Flanders, biggest single gap) — `farys.be/nl/watertarieven` is JS-rendered with no static numbers in the HTML. Needs the Drupal endpoint discovered via browser network-tab inspection, or a per-commune fallback URL.
 - **Water-link** (~200 k Antwerp city + ring) — per-commune subpages exist but expose 22 unlabelled rate tables with no year markers; can't reliably pick the current year without an external signal.
-- **Small Walloon intercommunales** (IEG / AIEC / AIEM / CIESAC / IDEN) and the **~30 régies communales** — no central publication channel found; SCOPE.md flagged the régies for indefinite deferral on dev-hours / customer ratio.
+- **Small Walloon intercommunales** (IEG / AIEC / AIEM / CIESAC / IDEN) and the **~30 régies communales** — no central publication channel found; the régies are deferred indefinitely on dev-hours / customer ratio.
 
 Adding another utility is a self-contained PR: drop a new module under
 [`custom_components/be_water_prices/providers/`](./custom_components/be_water_prices/providers/),

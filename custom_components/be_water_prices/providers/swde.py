@@ -28,7 +28,7 @@
 Largest Walloon distributor: ~2.4 M inhabitants across ~200 communes,
 roughly two-thirds of Wallonia's population. Publishes its own CVD
 (true-cost-of-supply) on https://www.swde.be/en/water-prices-swde
-(the FR slug ``prix-de-l-eau-swde`` is 404 -- noted in SCOPE.md).
+(the FR slug ``prix-de-l-eau-swde`` returns 404).
 
 The page exposes the four bill components under their own ``<h3>``
 headings, each followed by a ``<p>`` containing one ``<strong>`` with
