@@ -118,14 +118,29 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
     return await asyncio.to_thread(extract_pdf_text_layout, payload)
 
 
-async def fetch_text(session: aiohttp.ClientSession, url: str, *, timeout: int = 20) -> str:
-    """GET ``url`` and return the response body as text."""
+async def fetch_text(
+    session: aiohttp.ClientSession,
+    url: str,
+    *,
+    timeout: int = 20,
+    verify_ssl: bool = True,
+) -> str:
+    """GET ``url`` and return the response body as text.
+
+    ``verify_ssl=False`` skips TLS certificate verification for this
+    request only; reserve it for utility servers whose hosts genuinely
+    misconfigure their chain (e.g. inBW, where the GoDaddy intermediate
+    is not sent by the server). The risk is bounded -- worst case is
+    a MitM serving stale tariff numbers, no credentials are involved.
+    """
     try:
-        async with session.get(
-            url,
-            headers={"User-Agent": USER_AGENT},
-            timeout=aiohttp.ClientTimeout(total=timeout),
-        ) as resp:
+        kwargs: dict[str, object] = {
+            "headers": {"User-Agent": USER_AGENT},
+            "timeout": aiohttp.ClientTimeout(total=timeout),
+        }
+        if not verify_ssl:
+            kwargs["ssl"] = False
+        async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
             if resp.status >= 400:
                 raise ExtractorError(f"HTTP {resp.status} fetching {url}")
             return await resp.text()
