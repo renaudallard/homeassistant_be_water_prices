@@ -147,8 +147,11 @@ can surface "your water costs you X EUR per cubic metre" at a glance.
 
 ## Sensors
 
-All sensors share one device per config entry. Six entities per entry,
-no conditional sensors today.
+All sensors share one device per config entry. Up to eight entities
+per entry: `water_comfort_rate` only appears for Flemish utilities, and
+`water_current_year_cost` + `water_ytd_consumption` only appear when a
+water meter is configured (explicit override in the OptionsFlow, or
+auto-discovered from the Energy dashboard).
 
 | Sensor | Description |
 | --- | --- |
