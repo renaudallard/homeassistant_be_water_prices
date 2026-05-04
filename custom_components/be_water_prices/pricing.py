@@ -102,7 +102,11 @@ def _compute_bill(
     if tariff.region == "flanders":
         if tariff.basis_eur_per_m3 is None:
             return None
-        comfort = tariff.comfort_eur_per_m3 or (2.0 * tariff.basis_eur_per_m3)
+        comfort = (
+            tariff.comfort_eur_per_m3
+            if tariff.comfort_eur_per_m3 is not None
+            else 2.0 * tariff.basis_eur_per_m3
+        )
         san = tariff.sanering_bovengemeentelijk_eur_per_m3 + tariff.sanering_gemeentelijk_eur_per_m3
         basis_volume = 30.0 + 30.0 * persons
         consumed_basis = min(consumption_m3, basis_volume)
