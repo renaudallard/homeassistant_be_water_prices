@@ -23,13 +23,32 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Make ``custom_components`` importable from tests without HA installed."""
+"""Test bootstrap.
+
+Bare-pytest tests use the sys.path insertion below so they import
+``custom_components.be_water_prices`` directly. HA-driven tests
+(see test_ha_*.py) opt in to the ``enable_custom_integrations``
+fixture from ``pytest-homeassistant-custom-component``; the fixture
+itself is exported here for any test that needs it.
+"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):  # type: ignore[no-untyped-def]
+    """Auto-load custom integrations for any test that pulls a hass fixture.
+
+    Tests that don't request ``hass`` simply don't trigger the dependency,
+    so the existing pure-pytest tests stay isolated from HA.
+    """
+    yield
