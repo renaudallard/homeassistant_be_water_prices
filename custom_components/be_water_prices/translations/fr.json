@@ -17,11 +17,12 @@
       },
       "options": {
         "title": "Consommation annuelle",
-        "description": "Votre consommation annuelle d'eau en mètres cubes. Pour les distributeurs flamands, indiquez aussi le nombre de personnes domiciliées (détermine le volume du tarif de base) et l'option pour le tarif social VMM.",
+        "description": "Votre consommation annuelle d'eau en mètres cubes. Pour les distributeurs flamands, indiquez aussi le nombre de personnes domiciliées (détermine le volume du tarif de base) et l'option pour le tarif social VMM. Optionnel : pointez un capteur compteur d'eau (cumulatif m³, device_class=water) pour que le capteur de coût annuel lise la consommation depuis le 1er janvier depuis l'historique Home Assistant.",
         "data": {
           "consumption_m3_per_year": "Consommation (m³ / an)",
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
-          "social_tariff": "Tarif social (Flandre, réduction 80%)"
+          "social_tariff": "Tarif social (Flandre, réduction 80%)",
+          "water_meter_sensor": "Capteur compteur d'eau (optionnel, pour le coût annuel)"
         }
       }
     },
@@ -36,7 +37,8 @@
         "data": {
           "consumption_m3_per_year": "Consommation (m³ / an)",
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
-          "social_tariff": "Tarif social (Flandre, réduction 80%)"
+          "social_tariff": "Tarif social (Flandre, réduction 80%)",
+          "water_meter_sensor": "Capteur compteur d'eau (optionnel, pour le coût annuel)"
         }
       }
     }
@@ -48,7 +50,9 @@
       "comfort_rate": {"name": "Tarif confort"},
       "sanering_rate": {"name": "Assainissement"},
       "all_in_basis": {"name": "Tarif tout compris"},
-      "projected_annual_cost": {"name": "Coût annuel projeté"}
+      "projected_annual_cost": {"name": "Coût annuel projeté"},
+      "current_year_cost": {"name": "Coût depuis le 1er janvier"},
+      "ytd_consumption": {"name": "Consommation depuis le 1er janvier"}
     }
   }
 }

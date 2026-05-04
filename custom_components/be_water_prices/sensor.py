@@ -1,3 +1,28 @@
+# Copyright (c) 2026, Renaud Allard <renaud@allard.it>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 """Sensors exposed by be_water_prices."""
 
 from __future__ import annotations
@@ -77,6 +102,14 @@ def _projected_cost(data: CoordinatorData) -> float | None:
     return data.projected_annual_cost_eur
 
 
+def _current_year_cost(data: CoordinatorData) -> float | None:
+    return data.current_year_cost_eur
+
+
+def _ytd_consumption(data: CoordinatorData) -> float | None:
+    return data.ytd_consumption_m3
+
+
 SENSORS: tuple[WaterSensorDescription, ...] = (
     WaterSensorDescription(
         key="yearly_fee",
@@ -126,6 +159,24 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
         value_fn=_projected_cost,
+    ),
+    WaterSensorDescription(
+        key="current_year_cost",
+        translation_key="current_year_cost",
+        native_unit_of_measurement=CURRENCY_EURO,
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=2,
+        value_fn=_current_year_cost,
+    ),
+    WaterSensorDescription(
+        key="ytd_consumption",
+        translation_key="ytd_consumption",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        suggested_display_precision=3,
+        value_fn=_ytd_consumption,
     ),
 )
 

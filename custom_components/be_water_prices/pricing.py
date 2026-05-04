@@ -1,8 +1,41 @@
+# Copyright (c) 2026, Renaud Allard <renaud@allard.it>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
 """Pure cost-projection helpers (no Home Assistant imports).
 
 Kept separate from :mod:`coordinator` so the math is unit-testable from
-a plain venv. The coordinator imports :func:`compute_annual_cost` and
-applies it to the user's stored options.
+a plain venv. The coordinator imports both helpers and applies them to
+the user's stored options:
+
+  * :func:`compute_annual_cost` -- the full-year projection that powers
+    ``sensor.water_projected_annual_cost``. Pro-rates nothing.
+  * :func:`compute_ytd_cost` -- the running year-to-date bill that
+    powers ``sensor.water_current_year_cost``. The volumetric branch is
+    the same; only the annual fees (vastrecht / redevance) are
+    pro-rated by the elapsed fraction of the calendar year so the
+    sensor sits at ~0 on Jan 1 and grows to the full fee by Dec 31.
 """
 
 from __future__ import annotations
@@ -10,40 +43,40 @@ from __future__ import annotations
 from .providers.base import WaterTariff
 
 
-def compute_annual_cost(
+def _compute_bill(
     tariff: WaterTariff,
     consumption_m3: float,
     persons: int,
+    fee_factor: float,
     *,
-    social_tariff: bool = False,
+    social_tariff: bool,
 ) -> float | None:
-    """Return the projected VAT-incl annual cost in EUR.
+    """Internal: same regional bill math, with the annual fee scaled by
+    ``fee_factor`` (1.0 for the full-year projection, 0..1 for YTD).
 
     Returns ``None`` when the tariff is shaped for a region whose math
     is not yet wired in.
 
-    **Brussels** (linear): ``consumption × (linear + sanering) + redevance``,
-    then VAT. ``persons`` unused.
+    **Brussels** (linear): ``consumption × (linear + sanering) +
+    fee_factor · redevance``, then VAT. ``persons`` unused.
 
     **Wallonia** (tier): the first 30 m³ pay ``0.5·CVD + 0·CVA + FSE``
     per m³ (CVA is exempt on the residential first block by CWaPE
-    rule), above 30 m³ pays the full ``CVD + CVA + FSE``, plus the
-    redevance that the extractor already materialised from
-    ``20·CVD + 30·CVA`` into :attr:`WaterTariff.yearly_fixed_fee`.
-    Verified against inBW's own published facture (100 m³ → 584.26 EUR
-    matches to the cent only with the CVA-exempt-on-block-1 rule).
-    ``persons`` unused.
+    rule), above 30 m³ pays the full ``CVD + CVA + FSE``, plus
+    ``fee_factor · redevance``. ``persons`` unused. The block allowance
+    is annual (resets on Jan 1), so YTD consumption fills it up the
+    same way an annual projection does.
 
-    **Flanders** (block): basis volume = ``30 + 30·persons`` m³ (capped at
-    persons=5 by the config flow). Inside the basis volume each m³ pays
-    ``basis + sanering_boven + sanering_gemeente``; above it each m³
-    pays the comforttarief which is exactly ``2 ×`` each of those
-    components -- this 2× rule is mandated by VMM and applies uniformly,
-    so the calc engine doubles the sanering values rather than the
-    extractors carrying duplicate fields. The annual vastrecht is
-    ``yearly_fixed_fee − persons × yearly_fixed_fee_per_resident_discount``,
-    floored at zero. ``social_tariff=True`` applies the VMM 80 %
-    reduction on the post-calc total.
+    **Flanders** (block): basis volume = ``30 + 30·persons`` m³ (capped
+    at persons=5 by the config flow). Inside the basis volume each m³
+    pays ``basis + sanering_boven + sanering_gemeente``; above it each
+    m³ pays the comforttarief which is exactly ``2 ×`` each of those
+    components -- this 2× rule is mandated by VMM and applies
+    uniformly, so the calc engine doubles the sanering values rather
+    than the extractors carrying duplicate fields. The annual vastrecht
+    is ``max(0, yearly_fixed_fee − persons · korting) · fee_factor``.
+    ``social_tariff=True`` applies the VMM 80 % reduction on the
+    post-calc total.
     """
     if tariff.region == "brussels":
         if tariff.linear_eur_per_m3 is None:
@@ -51,8 +84,9 @@ def compute_annual_cost(
         per_m3 = tariff.linear_eur_per_m3 + (
             tariff.sanering_bovengemeentelijk_eur_per_m3 + tariff.sanering_gemeentelijk_eur_per_m3
         )
-        ex_vat = consumption_m3 * per_m3 + tariff.yearly_fixed_fee
-        return round(ex_vat * (1.0 + tariff.vat_rate), 2)
+        ex_vat = consumption_m3 * per_m3 + fee_factor * tariff.yearly_fixed_fee
+        total = ex_vat * (1.0 + tariff.vat_rate)
+        return round(total, 2)
 
     if tariff.region == "wallonia":
         cvd = tariff.cvd_eur_per_m3
@@ -62,7 +96,7 @@ def compute_annual_cost(
         fse = tariff.fse_eur_per_m3
         first_block = min(consumption_m3, 30.0) * (0.5 * cvd + fse)
         rest = max(0.0, consumption_m3 - 30.0) * (cvd + cva + fse)
-        ex_vat = first_block + rest + tariff.yearly_fixed_fee
+        ex_vat = first_block + rest + fee_factor * tariff.yearly_fixed_fee
         return round(ex_vat * (1.0 + tariff.vat_rate), 2)
 
     if tariff.region == "flanders":
@@ -80,10 +114,49 @@ def compute_annual_cost(
             0.0,
             tariff.yearly_fixed_fee - persons * tariff.yearly_fixed_fee_per_resident_discount,
         )
-        ex_vat = volumetric + vastrecht
+        ex_vat = volumetric + fee_factor * vastrecht
         total = ex_vat * (1.0 + tariff.vat_rate)
         if social_tariff:
             total *= 0.20  # VMM social tariff = 80% reduction on the post-calc total.
         return round(total, 2)
 
     return None
+
+
+def compute_annual_cost(
+    tariff: WaterTariff,
+    consumption_m3: float,
+    persons: int,
+    *,
+    social_tariff: bool = False,
+) -> float | None:
+    """Return the full-year projected VAT-incl bill in EUR (annual fees at 100 %).
+
+    See :func:`_compute_bill` for the per-region math.
+    """
+    return _compute_bill(tariff, consumption_m3, persons, 1.0, social_tariff=social_tariff)
+
+
+def compute_ytd_cost(
+    tariff: WaterTariff,
+    consumption_m3_ytd: float,
+    persons: int,
+    year_elapsed_fraction: float,
+    *,
+    social_tariff: bool = False,
+) -> float | None:
+    """Return the running YTD VAT-incl bill in EUR.
+
+    ``consumption_m3_ytd`` is the m³ consumed since Jan 1 of the
+    current year (read from HA's recorder by the coordinator).
+    ``year_elapsed_fraction`` is in ``[0.0, 1.0]`` and pro-rates the
+    annual vastrecht / redevance so the sensor grows day by day instead
+    of jumping to the full annual fee on Jan 1. The volumetric branch
+    is identical to :func:`compute_annual_cost`: block / tier
+    allowances are annual and reset on Jan 1, so YTD consumption fills
+    them up exactly as a full-year projection would.
+    """
+    fee_factor = max(0.0, min(1.0, year_elapsed_fraction))
+    return _compute_bill(
+        tariff, consumption_m3_ytd, persons, fee_factor, social_tariff=social_tariff
+    )

@@ -50,6 +50,7 @@ publication and how to parse it.
 - **Brussels linear** — VIVAQUA's single-rate domestic tariff plus the annual fixed fee.
 - **Postcode auto-resolution** — enter your postcode and the right utility is picked automatically. Fall through to a manual picker for the long tail.
 - **Projected annual cost** — every entry has a `water_projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
+- **Year-to-date cost** — point the integration at any `device_class=water` cumulative-m³ sensor (P1, watermeter custom component, Pulse counter…) and the `water_current_year_cost` sensor reports your running bill since 1 January, computed from HA's recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor.
 - **Translated UI** — English, Dutch, French and German.
 - **Self-healing** — last-known prices keep serving on outage; a repair issue surfaces if the snapshot goes stale (>35 days or past the published `valid_until`).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
@@ -138,6 +139,8 @@ no conditional sensors today.
 | `water_sanering_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `water_all_in_basis` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 | `water_projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
+| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Reads YTD m³ from the configured water meter sensor via HA's recorder daily statistics, applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. Returns `unknown` until a water meter is configured in the options step. |
+| `water_ytd_consumption` | Cumulative m³ consumed since 1 January, summed from the configured water meter sensor's daily deltas. Companion to `water_current_year_cost`. |
 
 Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
 `source_url`, `snapshot_age_hours`, `snapshot_stale`, and `last_error`
@@ -181,6 +184,14 @@ auto-resolves and whether the chosen utility is Flemish.
      Default 1.
    - **Social tariff** — VMM means-tested 80 % reduction on the
      post-calc bill. Off by default.
+
+   All entries can additionally point at:
+   - **Water meter sensor** *(optional)* — any `device_class=water`
+     cumulative-m³ sensor (e.g. from the
+     [`watermeter`](https://github.com/Olen/homeassistant-watermeter)
+     custom component, a P1 reader integration, or a Pulse counter).
+     Wires the `water_current_year_cost` and `water_ytd_consumption`
+     sensors. Without it those entities stay `unknown`.
 
 ### Reconfiguring later
 
