@@ -71,6 +71,26 @@
       "ytd_consumption": {"name": "Year-to-date consumption"}
     }
   },
+  "services": {
+    "backfill_prices": {
+      "name": "Backfill price history",
+      "description": "Import flat-line hourly long-term-statistics rows for this integration's price sensors so the History and Energy dashboards show a tariff line going back further than the install date.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional. The config entry to backfill. Leave empty to backfill every loaded entry."
+        },
+        "start_date": {
+          "name": "Start date",
+          "description": "Optional. Earliest date to backfill. Defaults to 1 January of the current year. Clamped to the tariff snapshot's valid_from."
+        },
+        "clear": {
+          "name": "Clear before importing",
+          "description": "If on, wipe the existing long-term statistics for the targeted sensors before importing. Off by default."
+        }
+      }
+    }
+  },
   "issues": {
     "snapshot_stale": {
       "title": "{utility} tariff snapshot is stale",
