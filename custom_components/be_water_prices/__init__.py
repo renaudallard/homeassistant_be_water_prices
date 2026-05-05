@@ -45,12 +45,22 @@ PLATFORMS = ["sensor"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WaterCoordinator
+    from .statistics import (
+        async_maybe_backfill_once,
+        async_register_services,
+    )
 
     coordinator = WaterCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
+    async_register_services(hass)
+    # Auto-once price-history backfill so the History/Energy graphs are
+    # not empty before the first natural day of recording. Gated on
+    # entry.data["backfill_year"] -- runs once per calendar year.
+    await async_maybe_backfill_once(hass, entry)
     return True
 
 
@@ -59,8 +69,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unloaded:
         from homeassistant.helpers import issue_registry as ir
 
+        from .statistics import async_unregister_services
+
         coordinator = hass.data[DOMAIN].pop(entry.entry_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
+        if not hass.data[DOMAIN]:
+            async_unregister_services(hass)
     return unloaded
 
 

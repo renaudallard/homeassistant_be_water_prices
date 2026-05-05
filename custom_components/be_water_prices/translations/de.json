@@ -87,6 +87,26 @@
       }
     }
   },
+  "services": {
+    "backfill_prices": {
+      "name": "Preisverlauf nachladen",
+      "description": "Importiert flache stündliche Long-Term-Statistics-Zeilen für die Preissensoren dieser Integration, sodass die History- und Energy-Dashboards eine Tariflinie vor dem Installationszeitpunkt anzeigen.",
+      "fields": {
+        "entry_id": {
+          "name": "Konfigurationseintrag",
+          "description": "Optional. Der zu nachladende Konfigurationseintrag. Leer lassen, um jeden geladenen Eintrag zu nachladen."
+        },
+        "start_date": {
+          "name": "Startdatum",
+          "description": "Optional. Frühestes Datum zum Nachladen. Standard ist der 1. Januar des aktuellen Jahres. Wird auf valid_from des Tarif-Snapshots begrenzt."
+        },
+        "clear": {
+          "name": "Vor dem Import löschen",
+          "description": "Wenn aktiv, werden die bestehenden Long-Term-Statistics für die gewählten Sensoren vor dem Import gelöscht. Standardmäßig deaktiviert."
+        }
+      }
+    }
+  },
   "issues": {
     "snapshot_stale": {
       "title": "{utility}-Tarif-Snapshot ist veraltet",

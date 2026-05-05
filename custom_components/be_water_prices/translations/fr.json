@@ -87,6 +87,26 @@
       }
     }
   },
+  "services": {
+    "backfill_prices": {
+      "name": "Backfill de l'historique des prix",
+      "description": "Importe des lignes long-term-statistics horaires pour les capteurs de prix de cette intégration, afin que les tableaux de bord History et Energy affichent une courbe de tarif remontant avant la date d'installation.",
+      "fields": {
+        "entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Optionnel. L'entrée de configuration à backfiller. Laissez vide pour traiter chaque entrée chargée."
+        },
+        "start_date": {
+          "name": "Date de début",
+          "description": "Optionnel. Date la plus ancienne à backfiller. Par défaut le 1er janvier de l'année en cours. Bornée par valid_from du snapshot de tarif."
+        },
+        "clear": {
+          "name": "Effacer avant import",
+          "description": "Si actif, efface les long-term-statistics existantes pour les capteurs ciblés avant l'import. Désactivé par défaut."
+        }
+      }
+    }
+  },
   "issues": {
     "snapshot_stale": {
       "title": "Snapshot de tarif {utility} obsolète",

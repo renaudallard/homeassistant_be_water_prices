@@ -1,0 +1,38 @@
+backfill_prices:
+  name: Backfill price history
+  description: >
+    Import flat-line hourly long-term-statistics rows for this
+    integration's price sensors so the History and Energy dashboards
+    show a tariff line going back further than the install date. The
+    run is automatic once per calendar year on integration setup; this
+    service lets you re-trigger it on demand or extend it to an earlier
+    start date.
+  fields:
+    entry_id:
+      name: Config entry
+      description: >
+        Optional. The config entry to backfill (e.g. one specific
+        utility). Leave empty to backfill every loaded entry.
+      example: 01H8WZK0WZK0WZK0WZK0WZK0WZ
+      selector:
+        config_entry:
+          integration: be_water_prices
+    start_date:
+      name: Start date
+      description: >
+        Optional. Earliest date to backfill. Defaults to 1 January of
+        the current year. The effective start is clamped to the tariff
+        snapshot's valid_from so we never invent prices for periods
+        with no source.
+      example: "2026-01-01"
+      selector:
+        date:
+    clear:
+      name: Clear before importing
+      description: >
+        If on, wipe the existing long-term statistics for the targeted
+        sensors before importing. Use this to overwrite a wrong tariff
+        value cleanly. Off by default (gap-fill behaviour).
+      default: false
+      selector:
+        boolean:

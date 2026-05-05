@@ -87,6 +87,26 @@
       }
     }
   },
+  "services": {
+    "backfill_prices": {
+      "name": "Prijsgeschiedenis aanvullen",
+      "description": "Importeert vlakke uurlijkse long-term-statistics rijen voor de prijssensoren van deze integratie, zodat de History- en Energy-dashboards een tarieflijn tonen die verder teruggaat dan de installatiedatum.",
+      "fields": {
+        "entry_id": {
+          "name": "Configuratie-invoer",
+          "description": "Optioneel. De configuratie-invoer om aan te vullen. Laat leeg om elke geladen invoer aan te vullen."
+        },
+        "start_date": {
+          "name": "Startdatum",
+          "description": "Optioneel. Vroegste datum om aan te vullen. Standaard 1 januari van het huidige jaar. Wordt beperkt tot de valid_from van de tariefsnapshot."
+        },
+        "clear": {
+          "name": "Wissen voor importeren",
+          "description": "Indien aan, wis de bestaande long-term-statistics voor de gekozen sensoren voordat de import gebeurt. Standaard uit."
+        }
+      }
+    }
+  },
   "issues": {
     "snapshot_stale": {
       "title": "Tariefsnapshot van {utility} is verouderd",

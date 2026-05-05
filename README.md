@@ -53,6 +53,7 @@ publication and how to parse it.
 - **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `water_current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
 - **Translated UI** — English, Dutch, French and German.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch.
+- **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
 - **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured.
 
@@ -272,6 +273,43 @@ that triggers an immediate coordinator refresh; the issue
 auto-clears as soon as the next fetch returns a fresh snapshot. The
 daily live-check workflow opens a GitHub issue against the
 integration if the failure persists across CI runs.
+
+### Price-history backfill
+
+Long-term statistics back the price line you see in the History card
+and the Energy dashboard's tariff overlays. A fresh entry has no
+historical statistics, so the line normally starts at the install
+moment.
+
+On every first setup of a calendar year, the integration imports
+hourly flat-line rows from **1 January of the current year up to the
+previous full hour** for every `MEASUREMENT`-class price sensor on
+the entry (`yearly_fee`, `basis_rate`, `comfort_rate` for Flanders,
+`sanering_rate`, `all_in_basis`). The start is clamped to the
+tariff snapshot's `valid_from` so periods with no published source
+are not invented. The auto-once gate is stamped onto the config
+entry's data; when the calendar year rolls over the gate trips and
+the next setup extends the line into the new year. The YTD sensors
+(`current_year_cost`, `ytd_consumption`) are intentionally excluded
+because their values come from the user's actual meter history.
+
+To re-run the backfill on demand (e.g. after fixing a wrong tariff
+or extending coverage to an earlier date), call the
+`be_water_prices.backfill_prices` service:
+
+```yaml
+service: be_water_prices.backfill_prices
+data:
+  entry_id: 01H8WZK0WZK0WZK0WZK0WZK0WZ   # optional; default: every loaded entry
+  start_date: "2026-01-01"                # optional; default: 1 January of the current year
+  clear: false                            # optional; if true, wipe existing stats first
+```
+
+`clear: true` first calls the recorder's `async_clear_statistics`
+on the targeted entities, then re-imports — useful for cleanly
+overwriting a wrong value. Default is gap-fill (the importer
+upserts on `(statistic_id, start)`, so a no-clear re-run is safely
+idempotent).
 
 ### Diagnostics
 
