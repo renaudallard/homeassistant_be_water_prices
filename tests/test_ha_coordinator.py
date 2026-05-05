@@ -69,6 +69,13 @@ def _fresh_tariff(valid_until: date | None = None) -> WaterTariff:
 
 
 async def _setup_entry(hass: HomeAssistant, fetch_callable: Any) -> MockConfigEntry:
+    # The integration is Belgium-only and production code reads HA-local
+    # time (the valid_until staleness check uses dt_util.now().date()).
+    # The harness defaults to US/Pacific which silently flips date
+    # comparisons during the ~8 h overnight window where the system UTC
+    # date is one day ahead of Pacific, making CI flaky around midnight
+    # UTC. Pin to Europe/Brussels so the test clock matches the user's.
+    await hass.config.async_set_time_zone("Europe/Brussels")
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="VIVAQUA",
