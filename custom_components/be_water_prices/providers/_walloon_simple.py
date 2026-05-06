@@ -88,6 +88,32 @@ _MIN_PLAUSIBLE_CVD = 1.5
 _MAX_PLAUSIBLE_CVD = 6.0
 
 
+def warn_constant_drift(
+    *,
+    published: float | None,
+    constant: float,
+    label: str,
+    logger: logging.Logger,
+    threshold: float = 0.005,
+) -> None:
+    """Log a warning when a CVA / FSE value scraped from a utility's page
+    diverges from the SPGE flat-Wallonia constant in :mod:`const`.
+
+    ``label`` should identify both the utility and the component, e.g.
+    ``"SWDE CVA"`` or ``"CILE FSE"``. No-op when ``published`` is ``None``
+    (the row was not present on the page).
+    """
+    if published is None:
+        return
+    if abs(published - constant) > threshold:
+        logger.warning(
+            "%s published value %s differs from Wallonia constant %s",
+            label,
+            published,
+            constant,
+        )
+
+
 def parse_cvd(html: str) -> float:
     """Return the CVD in EUR/m³ from a captured Walloon utility page.
 
