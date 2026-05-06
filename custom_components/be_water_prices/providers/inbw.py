@@ -54,12 +54,12 @@ import aiohttp
 from bs4 import BeautifulSoup, Tag
 
 from ..const import (
-    DEFAULT_VAT_RATE,
     REGION_WALLONIA,
     WALLONIA_CVA_EUR_PER_M3,
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_html
+from ._walloon_simple import build_tariff
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -165,22 +165,12 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         )
 
     target = year or date.today().year
-    cva = WALLONIA_CVA_EUR_PER_M3
-    fse = WALLONIA_FSE_EUR_PER_M3
-    redevance = 20.0 * cvd + 30.0 * cva
-
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_WALLONIA,
-        valid_from=date(target, 1, 1),
-        valid_until=date(target, 12, 31),
-        publication_label=f"inBW prix de l'eau {target}",
+    return build_tariff(
+        utility_id=UTILITY_ID,
+        cvd=cvd,
         source_url=SOURCE_URL,
-        yearly_fixed_fee=redevance,
-        cvd_eur_per_m3=cvd,
-        cva_eur_per_m3=cva,
-        fse_eur_per_m3=fse,
-        vat_rate=DEFAULT_VAT_RATE,
+        publication_label=f"inBW prix de l'eau {target}",
+        year=target,
     )
 
 
