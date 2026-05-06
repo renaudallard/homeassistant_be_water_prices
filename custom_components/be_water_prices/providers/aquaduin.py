@@ -57,12 +57,8 @@ from datetime import date
 
 import aiohttp
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
-    FLANDERS_VASTRECHT_TOTAL,
-    REGION_FLANDERS,
-)
+from ..const import REGION_FLANDERS
+from ._flanders import build_flanders_tariff
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
@@ -100,18 +96,15 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
             f"Aquaduin comforttarief {comfort} is not 2× basistarief {basis} (VMM 2× rule)"
         )
 
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(target, 1, 1),
-        valid_until=date(target, 12, 31),
+    # basis is integrated drinkwater + sanering, see module docstring; the
+    # sanering_* arguments stay at their default of 0.0.
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=target,
         publication_label=f"Aquaduin overzicht tarieven {target}",
         source_url=SOURCE_URL_FMT.format(year=target),
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=basis,  # integrated drinkwater + sanering, see module docstring
-        comfort_eur_per_m3=comfort,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=basis,
+        comfort=comfort,
     )
 
 

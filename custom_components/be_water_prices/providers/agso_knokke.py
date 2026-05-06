@@ -58,12 +58,8 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
-    FLANDERS_VASTRECHT_TOTAL,
-    REGION_FLANDERS,
-)
+from ..const import REGION_FLANDERS
+from ._flanders import build_flanders_tariff
 from ._html import extract_amounts, fetch_html
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
@@ -103,21 +99,15 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
         return None
     # Comforttarief = 2× basis per VMM. Verify drinkwater specifically;
     # the other two are computed by the cost engine.
-    comfort_drinkwater = 2.0 * drinkwater
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(year, 1, 1),
-        valid_until=date(year, 12, 31),
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=year,
         publication_label=f"AGSO Knokke-Heist tarieven {year}",
         source_url=SOURCE_URL,
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=drinkwater,
-        comfort_eur_per_m3=comfort_drinkwater,
-        sanering_gemeentelijk_eur_per_m3=afvoer,
-        sanering_bovengemeentelijk_eur_per_m3=zuivering,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=drinkwater,
+        comfort=2.0 * drinkwater,
+        sanering_gemeentelijk=afvoer,
+        sanering_bovengemeentelijk=zuivering,
     )
 
 

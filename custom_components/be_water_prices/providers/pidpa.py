@@ -96,12 +96,8 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
-    FLANDERS_VASTRECHT_TOTAL,
-    REGION_FLANDERS,
-)
+from ..const import REGION_FLANDERS
+from ._flanders import build_flanders_tariff
 from ._html import fetch_html
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
@@ -205,20 +201,15 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     gemeentelijk = sanering["afvoer"]
     bovengemeentelijk = sanering["zuivering"]
 
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(target, 1, 1),
-        valid_until=date(target, 12, 31),
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=target,
         publication_label=f"Pidpa Tariefplan 2025-2030 column {target}",
         source_url=SOURCE_URL,
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=basis,
-        comfort_eur_per_m3=comfort,
-        sanering_gemeentelijk_eur_per_m3=gemeentelijk,
-        sanering_bovengemeentelijk_eur_per_m3=bovengemeentelijk,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=basis,
+        comfort=comfort,
+        sanering_gemeentelijk=gemeentelijk,
+        sanering_bovengemeentelijk=bovengemeentelijk,
     )
 
 
@@ -308,20 +299,15 @@ def parse_commune_tariff(html: str, *, commune_slug: str, year: int | None = Non
             f" {drink_basis} for {commune_slug!r} {target} (VMM 2× rule)"
         )
 
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(target, 1, 1),
-        valid_until=date(target, 12, 31),
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=target,
         publication_label=f"Pidpa per-commune tarieven {target} ({commune_slug})",
         source_url=COMMUNE_URL_FMT.format(slug=commune_slug),
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=drink_basis,
-        comfort_eur_per_m3=drink_comfort,
-        sanering_gemeentelijk_eur_per_m3=afvoer_basis,
-        sanering_bovengemeentelijk_eur_per_m3=zuivering_basis,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=drink_basis,
+        comfort=drink_comfort,
+        sanering_gemeentelijk=afvoer_basis,
+        sanering_bovengemeentelijk=zuivering_basis,
     )
 
 

@@ -63,11 +63,10 @@ from bs4 import BeautifulSoup
 from ..const import (
     DEFAULT_VAT_RATE,
     FLANDERS_KORTING_DRINKWATER_PER_PERSON,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
     FLANDERS_VASTRECHT_DRINKWATER,
-    FLANDERS_VASTRECHT_TOTAL,
     REGION_FLANDERS,
 )
+from ._flanders import build_flanders_tariff
 from ._html import fetch_html
 from ._pdf import USER_AGENT, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
@@ -168,20 +167,15 @@ def parse_commune_tariff(
     san_gem = to_float(afvoer.group(1))
     san_bov = to_float(zuivering.group(1))
 
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(year, 1, 1),
-        valid_until=date(year, 12, 31),
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=year,
         publication_label=f"De Watergroep tarieven {year} ({commune_label})",
         source_url=COMMUNE_DETAIL_URL_FMT.format(year=year),
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=basis,
-        comfort_eur_per_m3=2.0 * basis,  # VMM-mandated 2× rule
-        sanering_gemeentelijk_eur_per_m3=san_gem,
-        sanering_bovengemeentelijk_eur_per_m3=san_bov,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=basis,
+        comfort=2.0 * basis,  # VMM-mandated 2× rule
+        sanering_gemeentelijk=san_gem,
+        sanering_bovengemeentelijk=san_bov,
     )
 
 
