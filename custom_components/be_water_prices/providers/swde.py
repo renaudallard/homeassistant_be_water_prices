@@ -71,7 +71,7 @@ from ..const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_html
-from ._walloon_simple import build_tariff
+from ._walloon_simple import build_tariff, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,23 +125,18 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if cvd is None:
         raise ExtractorError("could not find SWDE CVD on the tariff page")
 
-    cva_published = _find_component(soup, _CVA_HEADINGS)
-    if cva_published is not None and abs(cva_published - WALLONIA_CVA_EUR_PER_M3) > 0.005:
-        _LOGGER.warning(
-            "SWDE published CVA %s differs from Wallonia constant %s -- "
-            "the constant in const.py needs a refresh",
-            cva_published,
-            WALLONIA_CVA_EUR_PER_M3,
-        )
-
-    fse_published = _find_component(soup, _FSE_HEADINGS)
-    if fse_published is not None and abs(fse_published - WALLONIA_FSE_EUR_PER_M3) > 0.005:
-        _LOGGER.warning(
-            "SWDE published FSE %s differs from Wallonia constant %s -- "
-            "the constant in const.py needs a refresh",
-            fse_published,
-            WALLONIA_FSE_EUR_PER_M3,
-        )
+    warn_constant_drift(
+        published=_find_component(soup, _CVA_HEADINGS),
+        constant=WALLONIA_CVA_EUR_PER_M3,
+        label="SWDE CVA",
+        logger=_LOGGER,
+    )
+    warn_constant_drift(
+        published=_find_component(soup, _FSE_HEADINGS),
+        constant=WALLONIA_FSE_EUR_PER_M3,
+        label="SWDE FSE",
+        logger=_LOGGER,
+    )
 
     target = year or date.today().year
     return build_tariff(

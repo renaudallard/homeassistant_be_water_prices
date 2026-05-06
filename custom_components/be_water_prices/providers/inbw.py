@@ -59,7 +59,7 @@ from ..const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_html
-from ._walloon_simple import build_tariff
+from ._walloon_simple import build_tariff, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -156,13 +156,13 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
             cva_published / 30.0,
             WALLONIA_CVA_EUR_PER_M3,
         )
-    fse_published = _row_amount_after_label(table, ("fonds social",))
-    if fse_published is not None and abs(fse_published - WALLONIA_FSE_EUR_PER_M3) > 0.001:
-        _LOGGER.warning(
-            "inBW published FSE %s differs from constant %s",
-            fse_published,
-            WALLONIA_FSE_EUR_PER_M3,
-        )
+    warn_constant_drift(
+        published=_row_amount_after_label(table, ("fonds social",)),
+        constant=WALLONIA_FSE_EUR_PER_M3,
+        label="inBW FSE",
+        logger=_LOGGER,
+        threshold=0.001,
+    )
 
     target = year or date.today().year
     return build_tariff(
