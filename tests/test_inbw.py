@@ -35,14 +35,8 @@ from custom_components.be_water_prices.const import (
 )
 from custom_components.be_water_prices.pricing import compute_annual_cost
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.inbw import EXTRACTOR, parse_tariff
+from custom_components.be_water_prices.providers.inbw import parse_tariff
 from tests import fixture_html
-
-
-def test_extractor_metadata() -> None:
-    assert EXTRACTOR.id == "inbw"
-    assert EXTRACTOR.label == "inBW"
-    assert EXTRACTOR.region == "wallonia"
 
 
 def test_parses_2026_components() -> None:

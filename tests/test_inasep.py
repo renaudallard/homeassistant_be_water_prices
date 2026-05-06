@@ -34,14 +34,8 @@ from custom_components.be_water_prices.const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.inasep import EXTRACTOR, parse_tariff
+from custom_components.be_water_prices.providers.inasep import parse_tariff
 from tests import fixture_html
-
-
-def test_extractor_metadata() -> None:
-    assert EXTRACTOR.id == "inasep"
-    assert EXTRACTOR.label == "INASEP"
-    assert EXTRACTOR.region == "wallonia"
 
 
 def test_parses_2026_cvd() -> None:

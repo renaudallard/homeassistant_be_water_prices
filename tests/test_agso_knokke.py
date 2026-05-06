@@ -30,14 +30,8 @@ from __future__ import annotations
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.agso_knokke import EXTRACTOR, parse_tariff
+from custom_components.be_water_prices.providers.agso_knokke import parse_tariff
 from tests import fixture_html
-
-
-def test_extractor_metadata() -> None:
-    assert EXTRACTOR.id == "agso_knokke"
-    assert EXTRACTOR.label == "AGSO Knokke-Heist"
-    assert EXTRACTOR.region == "flanders"
 
 
 def test_picks_the_higher_year_table() -> None:

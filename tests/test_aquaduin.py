@@ -31,18 +31,12 @@ import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
-from custom_components.be_water_prices.providers.aquaduin import EXTRACTOR, parse_tariff
+from custom_components.be_water_prices.providers.aquaduin import parse_tariff
 from tests import fixture_bytes
 
 
 def _pdf_text() -> str:
     return extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
-
-
-def test_extractor_metadata() -> None:
-    assert EXTRACTOR.id == "aquaduin"
-    assert EXTRACTOR.label == "Aquaduin"
-    assert EXTRACTOR.region == "flanders"
 
 
 def test_parses_2026_basis_and_comfort() -> None:

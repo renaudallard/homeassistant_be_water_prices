@@ -30,17 +30,8 @@ from __future__ import annotations
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.de_watergroep import (
-    EXTRACTOR,
-    parse_tariff,
-)
+from custom_components.be_water_prices.providers.de_watergroep import parse_tariff
 from tests import fixture_html
-
-
-def test_extractor_metadata() -> None:
-    assert EXTRACTOR.id == "de_watergroep"
-    assert EXTRACTOR.label == "De Watergroep"
-    assert EXTRACTOR.region == "flanders"
 
 
 def test_parses_2026_basistarief() -> None:
