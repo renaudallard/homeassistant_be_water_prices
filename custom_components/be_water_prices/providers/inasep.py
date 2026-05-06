@@ -26,19 +26,21 @@
 """INASEP -- Intercommunale Namuroise de Services Publics.
 
 Wallonia (Namur sud), 10 communes, ~38 600 abonnés (~80-100 k people).
-Source: https://www.inasep.be/votre-eau-au-cout-verite
+Source: https://www.inasep.be/prix-de-leau-et-evolution
 
-The page exposes the components in plain prose, e.g.::
+The page lists the three components under a ``Tarifs YYYY`` heading,
+e.g.::
 
-    Le CVD varie en fonction du distributeur d'eau. A l'INASEP, il
-    est de 2,9952 €/m3
-    janvier 2026, le CVA est de 2,748 €/m3 ...
-    chaque consommateur wallon paye une petite contribution 0,0339 €/m3
+    Tarifs 2026
+    Coût-Vérité Distribution (CVD) = 3,6734 €/m³ depuis le 27 avril 2026
+    Coût-Vérité Assainissement (CVA) = 2,748 €/m³ depuis le 1er janvier 2026
+    Fonds social de l'Eau = 0,0339 €/m³ depuis le 1er janvier 2026
 
 CVA and FSE are the SPGE flat-Wallonia constants and are
 cross-checked. The parser anchors the CVD on the literal phrase
-``A l'INASEP, il est de`` so an unrelated euros amount elsewhere on
-the page can't win.
+``Coût-Vérité Distribution (CVD)`` so the unrelated euros amounts
+elsewhere on the page (annual-impact figures, per-glass examples)
+can't win.
 """
 
 from __future__ import annotations
@@ -64,14 +66,14 @@ _LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "inasep"
 LABEL = "INASEP"
-SOURCE_URL = "https://www.inasep.be/votre-eau-au-cout-verite"
+SOURCE_URL = "https://www.inasep.be/prix-de-leau-et-evolution"
 
-# INASEP renders ``A l'INASEP, il est de 2,9952 €/m³`` -- but the
-# right-single-quote is U+2019 (’) and the ``³`` superscript becomes a
-# plain ``3`` after one of the bs4 normalisation passes. Tolerate both
-# the ASCII and the Unicode quote, plus space-then-3 instead of m³.
+# The page renders ``Coût-Vérité Distribution (CVD) = 3,6734 €/m³``,
+# but bs4's text extraction drops the accents on some passes and the
+# superscript ``³`` becomes a plain ``3``. Tolerate accent-stripped
+# spellings of "Coût" and "Vérité".
 _CVD_RE = re.compile(
-    r"A\s+l['’]INASEP[^0-9]*?([\d]+,\d{3,5})\s*€",
+    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*=?\s*([\d]+,\d{3,5})\s*€",
     re.IGNORECASE | re.DOTALL,
 )
 

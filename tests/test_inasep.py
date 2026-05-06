@@ -46,10 +46,10 @@ def test_extractor_metadata() -> None:
 
 def test_parses_2026_cvd() -> None:
     t = parse_tariff(fixture_html("inasep_2026.html"), year=2026)
-    assert t.cvd_eur_per_m3 == 2.9952
+    assert t.cvd_eur_per_m3 == 3.6734
     assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
     assert t.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
-    assert round(t.yearly_fixed_fee, 2) == round(20 * 2.9952 + 30 * WALLONIA_CVA_EUR_PER_M3, 2)
+    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.6734 + 30 * WALLONIA_CVA_EUR_PER_M3, 2)
 
 
 def test_raises_when_cvd_missing() -> None:
