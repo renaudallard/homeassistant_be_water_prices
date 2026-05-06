@@ -28,11 +28,11 @@
 
 ---
 
-Home Assistant integration that exposes the **integrale waterprijs** for
-Belgian drinking-water customers, taking into account every component of
-a Belgian water bill (drinkwater + saneringsbijdragen + redevance + VAT)
-and the regional bill structure of each operator (Brussels linear,
-Flemish basis/comfort blocks, Walloon CWaPE tiers).
+Home Assistant integration that exposes the **total annual water bill**
+for Belgian drinking-water customers, taking into account every component
+(drinkwater + saneringsbijdragen + redevance + VAT) and the regional bill
+structure of each operator: Brussels linear, Flemish *integrale
+waterprijs* (basis/comfort blocks), and Walloon CWaPE tiers.
 
 Tariffs are fetched **live** from each utility's own published page or
 PDF. **No EUR values are hardcoded in the source.** Add a utility by
