@@ -66,12 +66,8 @@ from datetime import date
 
 import aiohttp
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
-    FLANDERS_VASTRECHT_TOTAL,
-    REGION_FLANDERS,
-)
+from ..const import REGION_FLANDERS
+from ._flanders import build_flanders_tariff
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
@@ -128,20 +124,15 @@ def parse_tariff(
             f"Water-link comforttarief {water_comfort} is not 2× basistarief {water_basis} (VMM 2× rule)"
         )
 
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(target, 1, 1),
-        valid_until=date(target, 12, 31),
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=target,
         publication_label=f"Water-link tarieven huishoudelijk {target} ({commune})",
         source_url=SOURCE_URL_FMT.format(year=target),
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=water_basis,
-        comfort_eur_per_m3=water_comfort,
-        sanering_gemeentelijk_eur_per_m3=afvoer_basis,
-        sanering_bovengemeentelijk_eur_per_m3=zuivering_basis,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=water_basis,
+        comfort=water_comfort,
+        sanering_gemeentelijk=afvoer_basis,
+        sanering_bovengemeentelijk=zuivering_basis,
     )
 
 

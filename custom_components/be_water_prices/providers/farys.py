@@ -56,12 +56,8 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
-    FLANDERS_VASTRECHT_TOTAL,
-    REGION_FLANDERS,
-)
+from ..const import REGION_FLANDERS
+from ._flanders import build_flanders_tariff
 from ._pdf import USER_AGENT, fetch_text, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
@@ -136,20 +132,15 @@ def parse_tariff(
     )
 
     target = year or date.today().year
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(target, 1, 1),
-        valid_until=date(target, 12, 31),
+    return build_flanders_tariff(
+        utility_id=UTILITY_ID,
+        year=target,
         publication_label=f"Farys watertarieven {target} ({municipality_label})",
         source_url=PAGE_URL,
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
-        basis_eur_per_m3=basis,
-        comfort_eur_per_m3=comfort,
-        sanering_gemeentelijk_eur_per_m3=sanering_gem,
-        sanering_bovengemeentelijk_eur_per_m3=sanering_bov,
-        vat_rate=DEFAULT_VAT_RATE,
+        basis=basis,
+        comfort=comfort,
+        sanering_gemeentelijk=sanering_gem,
+        sanering_bovengemeentelijk=sanering_bov,
     )
 
 
