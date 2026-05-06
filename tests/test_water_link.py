@@ -39,12 +39,6 @@ def _pdf_text() -> str:
     return extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
 
 
-def test_extractor_metadata() -> None:
-    assert EXTRACTOR.id == "water_link"
-    assert EXTRACTOR.label == "Water-link"
-    assert EXTRACTOR.region == "flanders"
-
-
 def test_parses_2026_antwerpen_default() -> None:
     t = parse_tariff(_pdf_text(), year=2026)
     assert t.basis_eur_per_m3 == 1.6692

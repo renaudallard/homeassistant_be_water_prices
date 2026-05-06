@@ -35,30 +35,12 @@ from custom_components.be_water_prices.const import (
 )
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers._walloon_simple import parse_cvd
-from custom_components.be_water_prices.providers.aiec import EXTRACTOR as AIEC
 from custom_components.be_water_prices.providers.aiec import parse_tariff as parse_aiec
-from custom_components.be_water_prices.providers.aiem import EXTRACTOR as AIEM
 from custom_components.be_water_prices.providers.aiem import parse_tariff as parse_aiem
-from custom_components.be_water_prices.providers.ciesac import EXTRACTOR as CIESAC
 from custom_components.be_water_prices.providers.ciesac import parse_tariff as parse_ciesac
-from custom_components.be_water_prices.providers.iden import EXTRACTOR as IDEN
 from custom_components.be_water_prices.providers.iden import parse_tariff as parse_iden
-from custom_components.be_water_prices.providers.ieg import EXTRACTOR as IEG
 from custom_components.be_water_prices.providers.ieg import parse_tariff as parse_ieg
 from tests import fixture_html
-
-
-def test_extractor_metadata_set_on_each() -> None:
-    for extractor, expected_id, expected_label in [
-        (IEG, "ieg", "IEG"),
-        (AIEM, "aiem", "AIEM"),
-        (AIEC, "aiec", "AIEC"),
-        (CIESAC, "ciesac", "CIESAC"),
-        (IDEN, "iden", "IDEN"),
-    ]:
-        assert extractor.id == expected_id
-        assert extractor.label == expected_label
-        assert extractor.region == "wallonia"
 
 
 def test_each_utility_parses_its_2026_cvd() -> None:

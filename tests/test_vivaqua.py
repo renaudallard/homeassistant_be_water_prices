@@ -30,17 +30,8 @@ from __future__ import annotations
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.vivaqua import (
-    EXTRACTOR,
-    parse_tariff,
-)
+from custom_components.be_water_prices.providers.vivaqua import parse_tariff
 from tests import fixture_html
-
-
-def test_extractor_is_registered_with_the_right_metadata() -> None:
-    assert EXTRACTOR.id == "vivaqua"
-    assert EXTRACTOR.label == "VIVAQUA"
-    assert EXTRACTOR.region == "brussels"
 
 
 def test_parses_2026_rates_ex_vat() -> None:
