@@ -254,13 +254,24 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         await self.async_set_unique_id(f"{DOMAIN}_{self._utility}")
         self._abort_if_unique_id_configured()
 
+        communes = await _async_communes(self.hass, self._utility)
         if user_input is not None:
+            final = dict(user_input)
+            chosen = final.get(CONF_COMMUNE)
+            if chosen:
+                # Resolve the opaque commune id to its display label so the
+                # very first publication_label / diagnostics dump shows
+                # "Gent" rather than the bare GUID; the OptionsFlow does
+                # the same on later edits.
+                for option in communes:
+                    if option.id == chosen:
+                        final[CONF_COMMUNE_LABEL] = option.label
+                        break
             return self.async_create_entry(
                 title=get(self._utility).label,
                 data={CONF_UTILITY: self._utility},
-                options=user_input,
+                options=final,
             )
-        communes = await _async_communes(self.hass, self._utility)
         return self.async_show_form(
             step_id="options",
             data_schema=_options_schema(
