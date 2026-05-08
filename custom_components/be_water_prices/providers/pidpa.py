@@ -141,7 +141,16 @@ _SAN_RE = re.compile(
 
 
 def _column_for_year(years: list[int], values: list[float], year: int) -> float | None:
-    for y, v in zip(years, values, strict=False):
+    if len(years) != len(values):
+        # The year header and the value row come from the same multi-year
+        # column layout in the PDF; a length mismatch means the table has
+        # been redesigned. Surface it instead of silently truncating with
+        # zip(strict=False) and reporting a wrong-year number under the
+        # right-year label.
+        raise ExtractorError(
+            f"Pidpa year header has {len(years)} columns but value row has {len(values)}"
+        )
+    for y, v in zip(years, values, strict=True):
         if y == year:
             return v
     return None
