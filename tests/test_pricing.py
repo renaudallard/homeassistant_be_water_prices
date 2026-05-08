@@ -188,6 +188,22 @@ def test_flanders_social_tariff_applies_eighty_percent_reduction() -> None:
     assert discounted == round(full * 0.20, 2)
 
 
+def test_flanders_social_tariff_zero_consumption_still_pays_vastrecht_share() -> None:
+    # 0 m³ on social tariff: only the (1-person) vastrecht of 80 EUR ex-VAT,
+    # ×1.06 VAT, ×0.20 social reduction → 16.96.
+    assert compute_annual_cost(_pidpa_2026(), 0, 1, social_tariff=True) == 16.96
+
+
+def test_flanders_consumption_exactly_at_basis_volume_boundary() -> None:
+    # 1 person, basis_volume = 60 m³. Exactly 60 m³ must bill all-basis
+    # with nothing leaking onto the comfort tier.
+    # per_m3_basis = 2.0848 + 1.6533 + 1.1809 = 4.9190
+    # volumetric = 60 · 4.9190 = 295.14
+    # vastrecht  = 100 - 1·20 = 80
+    # ex-VAT = 375.14; ×1.06 = 397.6484 → 397.65.
+    assert compute_annual_cost(_pidpa_2026(), 60, 1) == 397.65
+
+
 def test_flanders_vastrecht_floors_at_zero_for_huge_household() -> None:
     # An extreme: persons=10 would give negative vastrecht under naive math.
     # The MIN/MAX_PERSONS clamp lives in the config flow; the math itself
@@ -218,6 +234,12 @@ def test_returns_none_for_unwired_region() -> None:
 def test_ytd_on_jan_1_with_no_consumption_is_zero() -> None:
     # Brand new year, 0 m³ consumed, ~0 days elapsed → 0 EUR (no fees yet).
     assert compute_ytd_cost(_vivaqua_2026(), 0, 1, 0.0) == 0.0
+
+
+def test_ytd_jan_1_with_consumption_bills_volumetric_no_redevance() -> None:
+    # Some water consumed, but ~0 days elapsed: volumetric only, fee_factor=0.
+    # Brussels: 5 · (2.62/1.06 + 2.73/1.06) ·1.06 = 5 · 5.35 = 26.75.
+    assert compute_ytd_cost(_vivaqua_2026(), 5, 1, 0.0) == 26.75
 
 
 def test_ytd_at_year_end_matches_annual_projection() -> None:
