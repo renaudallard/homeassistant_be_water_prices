@@ -90,6 +90,47 @@ async def test_unknown_postcode_falls_through_to_manual(hass: HomeAssistant) -> 
 
 
 @pytest.mark.asyncio
+async def test_initial_flow_persists_commune_label_for_per_commune_utility(
+    hass: HomeAssistant,
+) -> None:
+    """Picking a commune during initial setup must store the human label
+    alongside the opaque id so the very first publication_label and
+    diagnostics dump read "Gent (Centrum)" rather than the bare numeric id.
+    The OptionsFlow path is covered separately below.
+    """
+    fake_communes = (
+        CommuneOption(id="25071", label="9000 - Gent (Centrum)"),
+        CommuneOption(id="44021", label="9000 - Gent (Mariakerke)"),
+    )
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "options"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_CONSUMPTION_M3_PER_YEAR: 100,
+                CONF_PERSONS: 2,
+                CONF_SOCIAL_TARIFF: False,
+                CONF_COMMUNE: "25071",
+            },
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert result["data"] == {CONF_UTILITY: "farys"}
+    assert result["options"][CONF_COMMUNE] == "25071"
+    assert result["options"][CONF_COMMUNE_LABEL] == "9000 - Gent (Centrum)"
+
+
+@pytest.mark.asyncio
 async def test_options_flow_persists_commune_label_alongside_id(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
