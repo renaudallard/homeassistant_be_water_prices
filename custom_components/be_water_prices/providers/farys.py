@@ -231,6 +231,41 @@ _UNSERVABLE_COMMUNE_LABELS: frozenset[str] = frozenset(
 )
 
 
+# Same set as ``_UNSERVABLE_COMMUNE_LABELS`` but keyed by the numeric
+# option id Farys assigned at the time of the v0.5.x install. Used by
+# ``async_migrate_entry`` to recognise and drop already-saved phantom
+# commune ids from existing config entries when the user upgrades.
+# Refresh by re-scraping Farys's dropdown via the live smoke probe in
+# scripts/live_check.py.
+_UNSERVABLE_COMMUNE_IDS: frozenset[str] = frozenset(
+    {
+        "25126",  # 1500 - Halle (Halle)
+        "24956",  # 1700 - Dilbeek (Dilbeek)
+        "24966",  # 1701 - Itterbeek (Dilbeek)
+        "24961",  # 1702 - Groot-Bijgaarden (Dilbeek)
+        "24971",  # 1703 - Schepdaal (Dilbeek)
+        "25661",  # 1740 - Ternat (Ternat)
+        "25666",  # 1741 - Wambeek (Ternat)
+        "25521",  # 8020 - Hertsberge (Oostkamp)
+        "25531",  # 8020 - Ruddervoorde (Oostkamp)
+        "25536",  # 8020 - Waardamme (Oostkamp)
+        "25411",  # 8432 - Leffinge (Middelkerke)
+        "27251",  # 8450 - Bredene (Bredene)
+        "25201",  # 8490 - Snellegem (Jabbeke)
+        "25216",  # 8490 - Zerkegem (Jabbeke)
+        "25316",  # 9080 - Beervelde (Lochristi)
+        "25326",  # 9080 - Zaffelare (Lochristi)
+        "25331",  # 9080 - Zeveneken (Lochristi)
+        "25161",  # 9550 - Sint-Antelinks (Herzele)
+        "25166",  # 9550 - Sint-Lievens-Esse (Herzele)
+        "25171",  # 9550 - Steenhuize-Wijnhuize (Herzele)
+        "25176",  # 9550 - Woubrechtegem (Herzele)
+        "25291",  # 9570 - Deftinge (Lierde)
+        "25301",  # 9571 - Hemelveerdegem (Lierde)
+    }
+)
+
+
 async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
     """Discover all 290+ Farys communes by scraping the watertarieven dropdown.
 
