@@ -27,7 +27,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -61,12 +60,29 @@ EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
 # the sensor's extra_state_attributes don't expose the user's commune
 # in screenshots, the recorder, or HA exports. Mirrors the redaction
 # applied by diagnostics.py to CONF_COMMUNE_LABEL.
-_PUBLICATION_LABEL_COMMUNE_SUFFIX = re.compile(r"\s*\([^()]+\)\s*$")
 
 
 def _publication_label_without_commune(label: str) -> str:
-    """Return ``label`` with the trailing ``(commune)`` suffix removed."""
-    return _PUBLICATION_LABEL_COMMUNE_SUFFIX.sub("", label).strip()
+    """Return ``label`` with the trailing ``(commune)`` suffix removed.
+
+    Walks backward counting parens so nested labels like the DWG
+    default-commune fallback (``"Halle (DWG-served default)"``) are
+    also stripped correctly. A regex with ``[^()]+`` would match only
+    the innermost paren and leave the outer commune name in place.
+    """
+    if not label.endswith(")"):
+        return label
+    depth = 0
+    for i in range(len(label) - 1, -1, -1):
+        ch = label[i]
+        if ch == ")":
+            depth += 1
+        elif ch == "(":
+            depth -= 1
+            if depth == 0:
+                # Outermost ( found; drop it plus the preceding space.
+                return label[: i - 1] if i > 0 and label[i - 1] == " " else label[:i]
+    return label
 
 
 @dataclass(frozen=True, kw_only=True)
