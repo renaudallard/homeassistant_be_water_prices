@@ -148,6 +148,24 @@ def test_invalid_postcodes_return_none() -> None:
     assert _resolve_postcode(None) is None
 
 
+def test_postcode_range_boundaries_are_inclusive() -> None:
+    # Pin the inclusive upper bounds of each Flemish range so an
+    # off-by-one regression in _resolve_single (e.g. `<= 1999` to
+    # `< 1999`) is caught: 1999 must stay DWG, 2999 must stay Pidpa,
+    # 9999 must stay Farys.
+    assert _resolve_postcode("1999") == "de_watergroep"
+    assert _resolve_postcode("3999") == "de_watergroep"
+    assert _resolve_postcode("2999") == "pidpa"
+    assert _resolve_postcode("9999") == "farys"
+    # Lower bounds of each range.
+    assert _resolve_postcode("1000") == "vivaqua"
+    assert _resolve_postcode("1300") == "inbw"
+    assert _resolve_postcode("1500") == "de_watergroep"
+    assert _resolve_postcode("2000") == "water_link"
+    assert _resolve_postcode("2100") == "pidpa"
+    assert _resolve_postcode("3000") == "de_watergroep"
+
+
 def test_dwg_only_after_farys_filter_includes_new_carve_outs() -> None:
     # Once Farys's phantom dropdown entries are filtered out, 8432
     # Leffinge and 9571 Hemelveerdegem become DWG-only and belong in
