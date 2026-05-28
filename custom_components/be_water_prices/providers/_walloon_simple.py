@@ -112,6 +112,15 @@ def warn_constant_drift(
     ``label`` should identify both the utility and the component, e.g.
     ``"SWDE CVA"`` or ``"CILE FSE"``. No-op when ``published`` is ``None``
     (the row was not present on the page).
+
+    Only SWDE, CILE, and inBW currently publish CVA / FSE values on
+    their pages and call this helper. The small Walloon extractors
+    (AIEC, AIEM, CIESAC, IDEN, IEG, INASEP) rely on the SPGE constants
+    directly because their pages do not break down CVA / FSE
+    separately; there is nothing to compare against, so the absence of
+    a drift check is intentional rather than an oversight. If a future
+    page redesign exposes these components, route the parser through
+    this helper.
     """
     if published is None:
         return
