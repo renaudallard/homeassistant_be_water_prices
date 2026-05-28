@@ -164,7 +164,7 @@ up fills in the values without an HA restart.
 | --- | --- |
 | `water_yearly_fee` | Vastrecht / redevance in EUR/year, ex-VAT, parsed from the utility's own publication. |
 | `water_basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
-| `water_comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. `unknown` outside Flanders. |
+| `water_comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
 | `water_sanering_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `water_all_in_basis` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 | `water_projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
@@ -197,14 +197,19 @@ manifest.
 ## Configuration
 
 The UI walks **two or three steps**, depending on whether your postcode
-auto-resolves and whether the chosen utility is Flemish.
+auto-resolves cleanly.
 
 1. **Postcode** — 4-digit Belgian postcode. Brussels (1000-1299),
    Brabant Wallon (1300-1499), Antwerp (2000-2999), most of Flanders
    (1500-1999 + 3000-3999) and most of Wallonia (4000-7999) auto-resolve
    to their dominant utility. Anything else falls through to step 2.
 2. **Utility** *(only if step 1 didn't resolve)* — pick from the dropdown
-   of registered utilities.
+   of registered utilities. For the eight postcodes genuinely split
+   between two or three operators at street level (1770 Liedekerke,
+   8020 Oostkamp, 8400 Oostende, 8450 Bredene, 8490 Jabbeke, 9080
+   Lochristi, 9550 Herzele, 9570 Lierde), the picker is pre-narrowed
+   to just the candidate operators so you only see the choices that
+   actually serve your address.
 3. **Options** — annual consumption (m³/yr, default 80). Flemish
    utilities additionally ask:
    - **Gedomicilieerd_persons** *(1-5)* — drives the basisvolume
