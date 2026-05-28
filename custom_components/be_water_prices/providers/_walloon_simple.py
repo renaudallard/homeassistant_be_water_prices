@@ -83,12 +83,18 @@ _ACTUAL_CVD_RE = re.compile(
 )
 # Plausibility window for residential Walloon CVDs. As of 2026 the
 # smallest distributor publishes ~2.30 EUR/m³ and the largest ~3.60
-# EUR/m³. The lower bound is set looser than the observed minimum so
-# a future regulatory cut (e.g. a CWaPE-mandated reduction to ~1.4 or
-# a subsidised sub-region) does not flip a correctly-published value
-# into UpdateFailed. Example/formula figures we want to filter out are
-# typically <= 0.5 (e.g. "0,5 x CVD") so 1.0 still excludes them.
-_MIN_PLAUSIBLE_CVD = 1.0
+# EUR/m³. The lower bound MUST exclude AIEM's documented example
+# value "0,5 x CVD (soit 1,435€)" -- the figure shown in that formula
+# (1.435) is exactly the trap the example-context filter has to
+# catch. 1.5 is the tightest floor that achieves that.
+#
+# Trade-off: a future regulatory cut to ~1.4 (CWaPE-mandated, a
+# subsidised sub-region) would flip a correctly-published value into
+# UpdateFailed until this bound is widened. That visible failure is
+# preferable to silently emitting the example figure -- the Repairs
+# UI surfaces it and a maintainer can adjust the bound for the
+# affected utility once the new minimum is known.
+_MIN_PLAUSIBLE_CVD = 1.5
 _MAX_PLAUSIBLE_CVD = 6.0
 
 
