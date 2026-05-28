@@ -325,7 +325,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         share the postcode at street level (e.g. 8400 Oostende, where
         DWG serves Stene and Farys serves Mariakerke).
         """
-        assert self._candidates
+        if not self._candidates:
+            return self.async_abort(reason="invalid_flow_state")
         if user_input is not None:
             self._utility = user_input[CONF_UTILITY]
             return await self.async_step_options()
@@ -340,7 +341,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     async def async_step_options(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        assert self._utility is not None
+        if self._utility is None:
+            return self.async_abort(reason="invalid_flow_state")
         await self.async_set_unique_id(f"{DOMAIN}_{self._utility}")
         self._abort_if_unique_id_configured()
 
@@ -437,7 +439,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Operator chooser for the reconfigure flow's postcode path."""
-        assert self._candidates
+        if not self._candidates:
+            return self.async_abort(reason="invalid_flow_state")
         if user_input is not None:
             self._utility = user_input[CONF_UTILITY]
             if get(self._utility).supports_communes:
@@ -478,7 +481,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         operator-wide default and the user can pick a commune later via
         OptionsFlow.
         """
-        assert self._utility is not None
+        if self._utility is None:
+            return self.async_abort(reason="invalid_flow_state")
         communes = await self._async_communes_cached(self._utility)
         if not communes:
             return await self._async_finish_reconfigure()
@@ -543,7 +547,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         in the manual flow (``async_step_reconfigure_commune``), layer
         it on top.
         """
-        assert self._utility is not None
+        if self._utility is None:
+            return self.async_abort(reason="invalid_flow_state")
         entry = self._get_reconfigure_entry()
         new_utility = self._utility
         old_utility = entry.data[CONF_UTILITY]

@@ -71,7 +71,8 @@
       }
     },
     "abort": {
-      "already_configured": "Dieser Wasserversorger ist bereits konfiguriert."
+      "already_configured": "Dieser Wasserversorger ist bereits konfiguriert.",
+      "invalid_flow_state": "Die Konfiguration wurde unterbrochen; bitte von vorne beginnen."
     }
   },
   "options": {

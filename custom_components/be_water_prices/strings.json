@@ -71,7 +71,8 @@
       }
     },
     "abort": {
-      "already_configured": "This water utility is already configured."
+      "already_configured": "This water utility is already configured.",
+      "invalid_flow_state": "Configuration was interrupted; please start over from the beginning."
     }
   },
   "options": {
