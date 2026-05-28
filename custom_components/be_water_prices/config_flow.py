@@ -332,7 +332,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             if self._postcode is not None:
                 final[CONF_POSTCODE] = self._postcode
             chosen = final.get(CONF_COMMUNE)
-            if chosen:
+            if chosen is not None:
                 # Resolve the opaque commune id to its display label so the
                 # very first publication_label / diagnostics dump shows
                 # "Gent" rather than the bare GUID; the OptionsFlow does
@@ -449,7 +449,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return await self._async_finish_reconfigure()
         if user_input is not None:
             chosen = user_input.get(CONF_COMMUNE)
-            if chosen:
+            if chosen is not None:
                 self._reconfigure_commune = chosen
                 for option in communes:
                     if option.id == chosen:
@@ -560,7 +560,7 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         if user_input is not None:
             final = dict(user_input)
             chosen = final.get(CONF_COMMUNE)
-            if chosen:
+            if chosen is not None:
                 # Resolve the opaque commune id back to its display label so
                 # downstream surfaces (publication_label, diagnostics) show
                 # "Gent" rather than the bare "25071" or GUID.
