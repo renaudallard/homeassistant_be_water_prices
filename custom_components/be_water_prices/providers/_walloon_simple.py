@@ -135,7 +135,13 @@ def parse_cvd(html: str) -> float:
 
     explicit = _ACTUAL_CVD_RE.search(text)
     if explicit is not None:
-        return to_float(explicit.group(1))
+        candidate = to_float(explicit.group(1))
+        # Keep the explicit match only when it lands in the plausibility
+        # window. If a page ever surfaces "actuelle du CVD" in an
+        # example / historic context (0,5 €, etc.), the fallback
+        # _CVD_RE branch has a better shot at finding the real value.
+        if _MIN_PLAUSIBLE_CVD <= candidate <= _MAX_PLAUSIBLE_CVD:
+            return candidate
 
     matches = [to_float(m) for m in _CVD_RE.findall(text)]
     if not matches:
