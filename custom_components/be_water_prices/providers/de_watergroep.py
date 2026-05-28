@@ -96,22 +96,43 @@ _BASIS_NEWS_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Per-commune endpoint rows (after stripping HTML to whitespace text):
-#   "Basistarief per m³ Waterverbruik drinkwater € 2,9251 (incl. ...)
-#    Afvoer van afvalwater € 1,9572 (incl. ...) Zuivering van
-#    afvalwater € 1,7019 (incl. ...)"
-_BASIS_DRINKWATER_RE = re.compile(
-    r"Basistarief\s+per\s+m³.*?Waterverbruik\s+drinkwater\s*€\s*([\d]+,\d{3,5})",
-    re.IGNORECASE | re.DOTALL,
+# Rows inside the "Basistarief per m³" block. After
+# _basis_per_m3_block() trims the surrounding sections out, these
+# regexes match against just that block -- so a missing Basistarief
+# Afvoer row cannot silently bleed into the Comforttarief Afvoer row
+# (DOTALL + non-greedy used to walk past the empty basis label and
+# match the comfort one, returning ~2x the correct rate).
+_DRINKWATER_RE = re.compile(
+    r"Waterverbruik\s+drinkwater\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE,
 )
-_BASIS_AFVOER_RE = re.compile(
-    r"Basistarief\s+per\s+m³.*?Afvoer\s+van\s+afvalwater\s*€\s*([\d]+,\d{3,5})",
-    re.IGNORECASE | re.DOTALL,
+_AFVOER_RE = re.compile(
+    r"Afvoer\s+van\s+afvalwater\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE,
 )
-_BASIS_ZUIVERING_RE = re.compile(
-    r"Basistarief\s+per\s+m³.*?Zuivering\s+van\s+afvalwater\s*€\s*([\d]+,\d{3,5})",
-    re.IGNORECASE | re.DOTALL,
+_ZUIVERING_RE = re.compile(
+    r"Zuivering\s+van\s+afvalwater\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE,
 )
+
+
+def _basis_per_m3_block(text: str) -> str | None:
+    """Return the slice of ``text`` belonging to the Basistarief per m³ table.
+
+    Bounded on the right by the next section marker (Basistarief per
+    liter, Comforttarief, ...) so the row regexes can't reach into the
+    Comforttarief block and silently match its Afvoer / Zuivering rows
+    when the Basistarief block has an empty row.
+    """
+    start = text.find("Basistarief per m³")
+    if start < 0:
+        return None
+    next_markers = (
+        text.find("Basistarief per liter", start + 1),
+        text.find("Comforttarief", start + 1),
+    )
+    end = min((m for m in next_markers if m > 0), default=len(text))
+    return text[start:end]
 
 
 def parse_news_tariff(html: str, year: int) -> WaterTariff:
@@ -161,13 +182,16 @@ def parse_commune_tariff(
     """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)
+    block = _basis_per_m3_block(text)
+    if block is None:
+        raise ExtractorError("could not locate De Watergroep 'Basistarief per m³' section")
 
-    drinkwater = _BASIS_DRINKWATER_RE.search(text)
+    drinkwater = _DRINKWATER_RE.search(block)
     if drinkwater is None:
         raise ExtractorError("could not parse De Watergroep per-commune drinkwater basistarief")
     basis = to_float(drinkwater.group(1))
-    afvoer = _BASIS_AFVOER_RE.search(text)
-    zuivering = _BASIS_ZUIVERING_RE.search(text)
+    afvoer = _AFVOER_RE.search(block)
+    zuivering = _ZUIVERING_RE.search(block)
     san_gem = to_float(afvoer.group(1)) if afvoer is not None else 0.0
     san_bov = to_float(zuivering.group(1)) if zuivering is not None else 0.0
 
