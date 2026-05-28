@@ -226,22 +226,22 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
 )
 
 
-def _is_applicable(desc: WaterSensorDescription, *, region: str, has_meter: bool) -> bool:
+def _is_applicable(desc: WaterSensorDescription, *, region: str) -> bool:
     """Filter sensors that don't apply to this entry's utility/options.
 
     Comfort tarief is a Flemish-only construct -- creating the entity
     for Brussels or Wallonia entries leaves it permanently ``unknown``,
     which is just noise on the device card.
 
-    The YTD pair (current_year_cost + ytd_consumption) requires a
-    configured water meter sensor to produce values; without one they
-    would also stay ``unknown`` forever. Adding a meter via the
-    OptionsFlow triggers ``hass.config_entries.async_reload``, which
-    re-runs ``async_setup_entry`` and creates the entities for real.
+    The YTD pair (current_year_cost + ytd_consumption) is always
+    created: even without a configured water meter the entities show
+    as ``unavailable`` until the user wires one up via the OptionsFlow
+    OR via the Energy dashboard. Adding the meter via the OptionsFlow
+    triggers a reload; adding it via the Energy dashboard now also
+    surfaces values on the next coordinator tick without requiring an
+    HA restart, because the entity is already there waiting.
     """
-    if desc.key == "comfort_rate" and region != REGION_FLANDERS:
-        return False
-    return not (desc.key in ("current_year_cost", "ytd_consumption") and not has_meter)
+    return not (desc.key == "comfort_rate" and region != REGION_FLANDERS)
 
 
 async def async_setup_entry(
@@ -251,16 +251,8 @@ async def async_setup_entry(
 ) -> None:
     coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
     region = get(entry.data[CONF_UTILITY]).region
-    # Resolve the meter entity once at setup time: explicit override or
-    # the Energy dashboard's water_consumption source. Reload-on-options
-    # in __init__.py re-runs setup so a freshly-configured meter shows up
-    # without a HA restart.
-    meter_entity = await coordinator.async_resolve_meter_entity()
-    has_meter = meter_entity is not None
     async_add_entities(
-        WaterSensor(coordinator, desc)
-        for desc in SENSORS
-        if _is_applicable(desc, region=region, has_meter=has_meter)
+        WaterSensor(coordinator, desc) for desc in SENSORS if _is_applicable(desc, region=region)
     )
 
 
