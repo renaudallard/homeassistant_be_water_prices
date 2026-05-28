@@ -77,6 +77,20 @@ def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
     assert t.yearly_fixed_fee_per_resident_discount == 20.0  # full VMM 10+6+4
 
 
+def test_dwg_per_commune_handles_missing_afvoer_row() -> None:
+    # Sinaai (postcode 9112) has no gemeentelijke saneringsbijdrage:
+    # DWG renders the "Afvoer van afvalwater" header with no euro
+    # amount. A missing row must be parsed as 0.0 (drinkwater alone is
+    # mandatory) so the integration still loads for these communes
+    # instead of crashing at setup with "could not parse ... rows".
+    t = parse_dwg_commune(
+        fixture_html("dewatergroep_sinaai_2026.html"), year=2026, commune_label="Sinaai"
+    )
+    assert t.basis_eur_per_m3 == 2.9251
+    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+
+
 def test_dwg_news_fallback_keeps_drinkwater_leg_only_semantics() -> None:
     # Sanity check: the no-commune fallback must NOT pretend to know
     # sanering -- it must keep it at 0 and use the drinkwater-only
