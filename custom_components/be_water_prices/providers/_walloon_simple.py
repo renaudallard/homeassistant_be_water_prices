@@ -149,7 +149,14 @@ def parse_cvd(html: str) -> float:
     plausible = [v for v in matches if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD]
     if plausible:
         return max(plausible)
-    return matches[0]
+    # Every match fell outside the plausibility window. Surface the
+    # failure rather than silently emitting whichever value happened
+    # to come first; a stale/cached/garbage page would otherwise let
+    # an example-only figure ride into pricing and downstream sensors.
+    raise ExtractorError(
+        f"no plausible CVD on the page (matches outside [{_MIN_PLAUSIBLE_CVD}, "
+        f"{_MAX_PLAUSIBLE_CVD}]: {matches!r})"
+    )
 
 
 def build_tariff(
