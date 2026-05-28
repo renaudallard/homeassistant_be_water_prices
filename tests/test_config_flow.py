@@ -109,13 +109,32 @@ def test_aquaduin_westkust_postcodes_resolve_to_aquaduin() -> None:
 
 
 def test_west_oost_vlaanderen_postcodes_resolve_to_farys() -> None:
-    # Farys covers most of 8000-9999; AGSO Knokke and Aquaduin carve-outs win first.
+    # Farys covers most of 8000-9999; AGSO Knokke, Aquaduin and DWG
+    # carve-outs win first. Postcodes below are unambiguously Farys
+    # (not on DWG's commune list).
     assert _resolve_postcode("9000") == "farys"  # Gent
-    assert _resolve_postcode("8500") == "farys"
-    assert _resolve_postcode("8000") == "farys"
+    assert _resolve_postcode("8000") == "farys"  # Brugge
+    assert _resolve_postcode("9300") == "farys"  # Aalst
     # Carve-out: 8300 stays AGSO, 8670 stays Aquaduin (tested separately above).
     assert _resolve_postcode("8300") == "agso_knokke"
     assert _resolve_postcode("8670") == "aquaduin"
+
+
+def test_dwg_carveout_in_west_oost_vlaanderen_resolves_to_de_watergroep() -> None:
+    # 119 DWG-served postcodes scattered inside the otherwise-Farys
+    # 8000-9999 block. Spot-check a few major ones spanning the
+    # geographic range.
+    assert _resolve_postcode("8500") == "de_watergroep"  # Kortrijk
+    assert _resolve_postcode("8530") == "de_watergroep"  # Harelbeke
+    assert _resolve_postcode("8800") == "de_watergroep"  # Roeselare
+    assert _resolve_postcode("8790") == "de_watergroep"  # Waregem
+    assert _resolve_postcode("8900") == "de_watergroep"  # Dikkebus (Ieper)
+    assert _resolve_postcode("9100") == "de_watergroep"  # Nieuwkerken-Waas
+    assert _resolve_postcode("9112") == "de_watergroep"  # Sinaai
+    assert _resolve_postcode("9120") == "de_watergroep"  # Beveren
+    assert _resolve_postcode("9160") == "de_watergroep"  # Lokeren
+    assert _resolve_postcode("9900") == "de_watergroep"  # Eeklo
+    assert _resolve_postcode("9990") == "de_watergroep"  # Maldegem
 
 
 def test_invalid_postcodes_return_none() -> None:

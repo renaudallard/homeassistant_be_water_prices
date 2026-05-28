@@ -26,35 +26,44 @@
 
 """One-shot postcode → utility map refresher.
 
-For Wallonia (postcodes 4000-7999) the script:
+Two outputs, both printed to stdout one after the other (paste each
+block into ``custom_components/be_water_prices/providers/_postcodes.py``):
 
-  1. Downloads the Opendatasoft Belgian postcode polygon set
-     (georef-belgium-postal-codes; ~1231 polygons, one per former
-     commune carrying a (postcode, centroid) pair).
-  2. For every Walloon polygon, point-in-polygon-queries the
-     Géoportail Wallonie ZDE ArcGIS layer with the centroid to
-     learn which DISTRIBUTEUR serves it.
-  3. Maps DISTRIBUTEUR strings (SWDE, INASEP, INBW, …) to our own
-     utility ids; drops postcodes whose distributor is the régies
-     long tail (BOUILLON, VRESSE, …) since we don't ship an
-     extractor for them.
+  1. The Walloon ``_PER_POSTCODE`` dict (4000-7999):
+     - Downloads the Opendatasoft Belgian postcode polygon set
+       (georef-belgium-postal-codes; ~1231 polygons, one per former
+       commune carrying a (postcode, centroid) pair).
+     - For every Walloon polygon, point-in-polygon-queries the
+       Géoportail Wallonie ZDE ArcGIS layer with the centroid to
+       learn which DISTRIBUTEUR serves it.
+     - Maps DISTRIBUTEUR strings (SWDE, INASEP, INBW, …) to our own
+       utility ids; drops postcodes whose distributor is the régies
+       long tail (BOUILLON, VRESSE, …) since we don't ship an
+       extractor for them.
 
-The result is a single static dict literal printed to stdout (write
-it into ``custom_components/be_water_prices/providers/_postcodes.py``
-inside the ``_PER_POSTCODE`` mapping). Re-run annually -- the
-underlying data is updated continuously by the distributors via
-ZDEOnMap.
+  2. The ``_DWG_POSTCODES_FLANDERS`` frozenset (DWG-served pockets
+     scattered inside the otherwise-Farys 8000-9999 block):
+     - Scrapes DWG's commune dropdown at /nl-be/drinkwater/tarieven
+       and Farys's commune dropdown at /tarieven/woonklant.
+     - Keeps postcodes that DWG lists but Farys does not (so the
+       resolver flips them from "farys" to "de_watergroep");
+     - Drops postcodes that both operators list (street-level split;
+       resolver keeps "farys" as the dominant default, user can
+       manual-override on reconfigure).
 
-Flanders is intentionally not refreshed here. The VMM Waterloket
-form-based lookup would require browser-style POST simulation per
-postcode for ~2000 entries; the existing range-based rules in
-``_postcodes.py`` cover Flanders correctly today and the carve-outs
-for Aquaduin / AGSO Knokke / Water-link / Farys are hand-curated.
+Re-run the script annually -- the Walloon ZDE is updated by the
+distributors via ZDEOnMap, and DWG's commune coverage shifts when
+intercommunales merge.
+
+The remaining Flemish range rules (Brussels, Brabant Wallon, Antwerp
+core, AGSO Knokke-Heist, Aquaduin Westkust) are hand-curated and
+stable enough not to need scraping.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 import urllib.parse
@@ -167,10 +176,73 @@ def render_dict(mapping: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+DWG_DROPDOWN_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
+FARYS_DROPDOWN_URL = "https://www.farys.be/nl/watertarieven"
+# Captures "<postcode> - <commune> (<gemeente>)" from a <option> label
+# in either operator's dropdown.
+_POSTCODE_FROM_LABEL_RE = re.compile(r"^\s*(\d{4})\b")
+# Matches "<option ... value=...>label</option>". Used for both DWG
+# (GUID values) and Farys (numeric values); we only care about the label.
+_OPTION_LABEL_RE = re.compile(
+    r"<option[^>]*>\s*([^<]+?)\s*</option>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _fetch(url: str) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "be_water_prices refresh_postcodes"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def _scrape_postcodes(html: str) -> set[str]:
+    out: set[str] = set()
+    for match in _OPTION_LABEL_RE.finditer(html):
+        m = _POSTCODE_FROM_LABEL_RE.match(match.group(1))
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def build_dwg_flanders_carveout() -> list[str]:
+    """DWG-served postcodes in 8000-9999 that Farys does not serve.
+
+    These are the postcodes the range-based Flemish resolver would
+    otherwise mis-route to Farys. Postcodes both operators list (a
+    street-level split) are intentionally dropped: the resolver keeps
+    Farys as the dominant default and users in the DWG half can manual-
+    override on reconfigure.
+    """
+    print("scraping DWG commune dropdown …", file=sys.stderr)
+    dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
+    print(f"  {len(dwg_pc)} DWG postcodes", file=sys.stderr)
+    print("scraping Farys commune dropdown …", file=sys.stderr)
+    farys_pc = _scrape_postcodes(_fetch(FARYS_DROPDOWN_URL))
+    print(f"  {len(farys_pc)} Farys postcodes", file=sys.stderr)
+    carve = sorted(pc for pc in dwg_pc if 8000 <= int(pc) <= 9999 and pc not in farys_pc)
+    print(f"unambiguous DWG carve-outs in 8000-9999: {len(carve)}", file=sys.stderr)
+    return carve
+
+
+def render_dwg_frozenset(postcodes: list[str]) -> str:
+    lines = ["_DWG_POSTCODES_FLANDERS: frozenset[int] = frozenset("]
+    lines.append("    {")
+    for pc in postcodes:
+        lines.append(f"        {pc},")
+    lines.append("    }")
+    lines.append(")")
+    return "\n".join(lines)
+
+
 def main() -> int:
     features = fetch_postcodes()
     mapping = build_wallonia_map(features)
+    carve = build_dwg_flanders_carveout()
+    print("# === Walloon _PER_POSTCODE ===")
     print(render_dict(mapping))
+    print()
+    print("# === Flemish _DWG_POSTCODES_FLANDERS ===")
+    print(render_dwg_frozenset(carve))
     return 0
 
 
