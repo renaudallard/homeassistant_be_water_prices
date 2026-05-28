@@ -317,6 +317,18 @@ def async_register_services(hass: HomeAssistant) -> None:
         entries_data: dict[str, Any] = hass.data.get(DOMAIN, {})
 
         target_id = call.data.get(ATTR_ENTRY_ID)
+        clear = bool(call.data.get(ATTR_CLEAR, False))
+        # clear=True wipes the long-term-statistics rows for every
+        # backfill key on every targeted entry. Without an explicit
+        # entry_id the operation cascades across the user's entire
+        # be_water_prices install -- a footgun that's irreversible.
+        # Refuse the blanket combination loudly so the user has to
+        # opt in per-entry.
+        if clear and not target_id:
+            raise vol.Invalid(
+                "backfill_prices: clear=true requires an explicit entry_id"
+                " (refuses to wipe long-term-statistics for every loaded entry)"
+            )
         if target_id:
             target_ids = [target_id] if target_id in entries_data else []
             if not target_ids:
@@ -334,7 +346,6 @@ def async_register_services(hass: HomeAssistant) -> None:
             )
         else:
             start_dt = _jan_1_local()
-        clear = bool(call.data.get(ATTR_CLEAR, False))
 
         for entry_id in target_ids:
             entry = hass.config_entries.async_get_entry(entry_id)
