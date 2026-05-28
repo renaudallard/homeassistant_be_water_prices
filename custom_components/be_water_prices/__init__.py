@@ -60,13 +60,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     async_register_services(hass)
     # Auto-once price-history backfill so the History/Energy graphs are
-    # not empty before the first natural day of recording. Gated on
-    # entry.data["backfill_year"] -- runs once per calendar year.
+    # not empty before the first natural day of recording. The gate is
+    # stored in ``entry.data`` and updated via ``async_update_entry``,
+    # which fires every registered update listener. Register the
+    # OptionsFlow reload listener *after* the backfill so the gate
+    # write doesn't trigger an immediate full unload + re-setup cycle
+    # on every fresh install / operator-change reconfigure.
     await async_maybe_backfill_once(hass, entry)
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
