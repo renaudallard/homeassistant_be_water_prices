@@ -391,6 +391,17 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
           (useful when the postcode resolves to the wrong operator,
           e.g. a Pidpa ring commune actually served by Water-link).
         """
+        # Reset every cross-step instance var so a user backing out of
+        # a previous reconfigure attempt and re-entering does not see
+        # a leftover commune choice / stale-drop flag from the prior
+        # attempt. HA reuses the same flow instance until the menu
+        # step is re-entered, so this is the natural reset point.
+        self._utility = None
+        self._postcode = None
+        self._candidates = ()
+        self._reconfigure_commune = None
+        self._reconfigure_commune_label = None
+        self._drop_stale_reconfigure_commune = False
         return self.async_show_menu(
             step_id="reconfigure",
             menu_options=["reconfigure_postcode", "reconfigure_manual"],
