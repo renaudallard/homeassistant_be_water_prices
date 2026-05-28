@@ -227,23 +227,30 @@ async def async_backfill_prices(
 
 
 async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Run the auto-once backfill, gated by ``entry.data[DATA_BACKFILL_YEAR]``.
+    """Run the auto-once backfill, gated by ``(year, utility)``.
 
-    The flag stores the calendar year the entry was last backfilled.
-    When the year rolls over the gate trips again and the next setup
-    extends the flat line through the new year without manual nudging.
+    The flag records the calendar year the entry was last backfilled
+    AND the utility it was backfilled for. When the year rolls over OR
+    the user reconfigures to a different operator (postcode-resolver
+    move, manual override, split-postcode choice), the gate trips
+    again and the new operator's flat line replaces the old one rather
+    than mixing rates inside the same calendar year.
     """
+    from .const import CONF_UTILITY
+
     current_year = dt_util.now().year
-    if entry.data.get(DATA_BACKFILL_YEAR) == current_year:
+    current_utility = entry.data.get(CONF_UTILITY)
+    current_gate = f"{current_year}:{current_utility}"
+    if entry.data.get(DATA_BACKFILL_YEAR) == current_gate:
         return
 
-    rows = await async_backfill_prices(hass, entry, start=_jan_1_local(), clear=False)
+    rows = await async_backfill_prices(hass, entry, start=_jan_1_local(), clear=True)
     if rows <= 0:
         return
 
     hass.config_entries.async_update_entry(
         entry,
-        data={**entry.data, DATA_BACKFILL_YEAR: current_year},
+        data={**entry.data, DATA_BACKFILL_YEAR: current_gate},
     )
 
 
