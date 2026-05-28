@@ -414,6 +414,44 @@ async def test_reconfigure_flow_falls_through_to_manual_picker(
 
 
 @pytest.mark.asyncio
+async def test_options_flow_caches_commune_list_across_render_and_submit(
+    hass: HomeAssistant,
+) -> None:
+    """The OptionsFlow has its own commune-list cache (parallel to the
+    ConfigFlow cache). Pin call_count == 1 across render+submit so a
+    future refactor that drops the cache (or moves the dict scope)
+    surfaces in CI rather than silently re-introducing the transient-
+    failure silent-drop on options edits.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False},
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ) as mock:
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                CONF_CONSUMPTION_M3_PER_YEAR: 90,
+                CONF_PERSONS: 2,
+                CONF_SOCIAL_TARIFF: False,
+                CONF_COMMUNE: "25071",
+            },
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert mock.call_count == 1, f"expected 1 _async_communes call, got {mock.call_count}"
+
+
+@pytest.mark.asyncio
 async def test_initial_flow_caches_commune_list_across_render_and_submit(
     hass: HomeAssistant,
 ) -> None:
