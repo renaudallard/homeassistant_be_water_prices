@@ -228,7 +228,11 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
     """Clear LTS rows for backfill keys the *current* operator's tariff
     does not produce (orphan rows left over by the previous operator).
     """
-    from homeassistant.components.recorder import get_instance
+    # mypy --strict flags get_instance because the recorder module does
+    # not re-export it via __all__; same pattern as async_backfill_prices.
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
     from homeassistant.helpers.recorder import DATA_INSTANCE
 
     from .sensor import SENSORS  # local import: sensor.py imports from coordinator
