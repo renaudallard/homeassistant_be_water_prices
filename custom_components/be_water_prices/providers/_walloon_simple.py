@@ -81,10 +81,14 @@ _ACTUAL_CVD_RE = re.compile(
     r"actuelle\s+du\s+CVD[^\d]{0,40}(\d+,\d{1,5})\s*€?",
     re.IGNORECASE,
 )
-# Plausibility window for residential Walloon CVDs (smallest distributor
-# ~2.30 EUR/m³, largest ~3.60 EUR/m³ in 2026). Filters out example
-# values like 0.5·CVD that show up in formula descriptions.
-_MIN_PLAUSIBLE_CVD = 1.5
+# Plausibility window for residential Walloon CVDs. As of 2026 the
+# smallest distributor publishes ~2.30 EUR/m³ and the largest ~3.60
+# EUR/m³. The lower bound is set looser than the observed minimum so
+# a future regulatory cut (e.g. a CWaPE-mandated reduction to ~1.4 or
+# a subsidised sub-region) does not flip a correctly-published value
+# into UpdateFailed. Example/formula figures we want to filter out are
+# typically <= 0.5 (e.g. "0,5 x CVD") so 1.0 still excludes them.
+_MIN_PLAUSIBLE_CVD = 1.0
 _MAX_PLAUSIBLE_CVD = 6.0
 
 
