@@ -175,9 +175,22 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    # inBW does not send the GoDaddy intermediate cert; verify_ssl=False
-    # is the documented workaround. See module docstring for risk note.
-    html = await fetch_html(session, SOURCE_URL, verify_ssl=False)
+    # Try with TLS verification first so a future server-side fix
+    # (inBW shipping the GoDaddy intermediate, or migrating to a CA
+    # whose chain is complete) is detectable -- and so a MitM at least
+    # leaves a WARNING line in the log instead of being silently
+    # accepted. Fall back to verify_ssl=False only on a fetch failure,
+    # since fetch_text wraps aiohttp.ClientError (including the
+    # certificate-chain ClientConnectorCertificateError) in
+    # ExtractorError.
+    try:
+        html = await fetch_html(session, SOURCE_URL)
+    except ExtractorError as err:
+        _LOGGER.warning(
+            "inBW TLS-verified fetch failed (%s); falling back to verify_ssl=False",
+            err,
+        )
+        html = await fetch_html(session, SOURCE_URL, verify_ssl=False)
     return parse_tariff(html)
 
 
