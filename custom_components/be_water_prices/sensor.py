@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,6 +56,17 @@ from .providers import get
 
 EUR_PER_M3 = f"{CURRENCY_EURO}/{UnitOfVolume.CUBIC_METERS}"
 EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
+
+# Strips the trailing "(Commune)" suffix from publication labels so
+# the sensor's extra_state_attributes don't expose the user's commune
+# in screenshots, the recorder, or HA exports. Mirrors the redaction
+# applied by diagnostics.py to CONF_COMMUNE_LABEL.
+_PUBLICATION_LABEL_COMMUNE_SUFFIX = re.compile(r"\s*\([^()]+\)\s*$")
+
+
+def _publication_label_without_commune(label: str) -> str:
+    """Return ``label`` with the trailing ``(commune)`` suffix removed."""
+    return _PUBLICATION_LABEL_COMMUNE_SUFFIX.sub("", label).strip()
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -287,7 +299,7 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
             "region": t.region,
             "valid_from": t.valid_from.isoformat(),
             "valid_until": t.valid_until.isoformat() if t.valid_until else None,
-            "publication_label": t.publication_label,
+            "publication_label": _publication_label_without_commune(t.publication_label),
             "source_url": t.source_url,
             "snapshot_age_hours": round(self.coordinator.data.snapshot_age_hours, 2),
             "snapshot_stale": self.coordinator.data.snapshot_stale,
