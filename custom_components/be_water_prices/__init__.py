@@ -50,6 +50,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_register_services,
     )
 
+    # Drop any phantom commune id the runtime list_communes filter
+    # blocks. Runs on every setup (not only v1->v2 migration) so a
+    # future blocklist addition catches users who installed at v2
+    # with what later became a phantom.
+    _drop_phantom_commune_if_blocked(hass, entry)
+
     coordinator = WaterCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -99,24 +105,14 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Migrate v1 entries to v2.
+def _drop_phantom_commune_if_blocked(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop a saved CONF_COMMUNE that matches a known phantom blocklist.
 
-    Two concerns motivate the v2 schema:
-
-      1. Some pre-v2 entries carry a ``CONF_COMMUNE`` that the operator
-         silently does not service (Farys phantom dropdown entries at
-         split postcodes; Pidpa's ``antwerpen`` slug -- Water-link
-         territory). The runtime ``list_communes`` now filters those
-         out, but existing entries still hand the stale id to
-         ``fetch_for_commune`` and crash on every coordinator tick.
-         The migration drops ``CONF_COMMUNE`` / ``CONF_COMMUNE_LABEL``
-         when the saved id matches a known phantom blocklist.
-
-      2. v2 entries store the user-entered postcode in
-         ``CONF_POSTCODE`` so future resolver-coverage changes can be
-         auto-applied. v1 entries don't carry one and stay as-is until
-         the user reconfigures.
+    Runs on every entry load (not only on v1 schema migration) so a
+    future addition to the Farys / Pidpa phantom blocklists catches
+    already-v2 entries that picked the commune before the operator's
+    page was flagged. Cheap dict lookup; no-op for the vast majority
+    of entries.
     """
     from ._phantom_blocklists import (
         FARYS_UNSERVABLE_IDS as _farys_phantom_ids,
@@ -126,18 +122,36 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     from .const import CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_UTILITY
 
+    utility = entry.data.get(CONF_UTILITY, "")
+    commune = entry.options.get(CONF_COMMUNE)
+    if commune is None:
+        return
+    phantom_by_utility: dict[str, frozenset[str]] = {
+        "farys": _farys_phantom_ids,
+        "pidpa": _pidpa_phantom_slugs,
+    }
+    if commune not in phantom_by_utility.get(utility, frozenset()):
+        return
+    new_options = dict(entry.options)
+    new_options.pop(CONF_COMMUNE, None)
+    new_options.pop(CONF_COMMUNE_LABEL, None)
+    hass.config_entries.async_update_entry(entry, options=new_options)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate v1 entries to v2.
+
+    v2 entries store the user-entered postcode in ``CONF_POSTCODE`` so
+    future resolver-coverage changes can be auto-applied. v1 entries
+    don't carry one and stay as-is until the user reconfigures.
+
+    Phantom-commune dropping is deliberately NOT gated on the v1
+    schema check; it lives in :func:`_drop_phantom_commune_if_blocked`
+    and runs on every entry load so a blocklist addition shipped in a
+    future patch release catches already-v2 entries too.
+    """
     if entry.version > 2:
         return False
     if entry.version == 1:
-        utility = entry.data.get(CONF_UTILITY, "")
-        commune = entry.options.get(CONF_COMMUNE)
-        phantom_by_utility: dict[str, frozenset[str]] = {
-            "farys": _farys_phantom_ids,
-            "pidpa": _pidpa_phantom_slugs,
-        }
-        new_options = dict(entry.options)
-        if commune is not None and commune in phantom_by_utility.get(utility, frozenset()):
-            new_options.pop(CONF_COMMUNE, None)
-            new_options.pop(CONF_COMMUNE_LABEL, None)
-        hass.config_entries.async_update_entry(entry, options=new_options, version=2)
+        hass.config_entries.async_update_entry(entry, version=2)
     return True

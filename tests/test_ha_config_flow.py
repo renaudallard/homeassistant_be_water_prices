@@ -492,7 +492,10 @@ async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant)
     commune dropped, so the integration loads on Farys's
     operator-wide default until the user reconfigures.
     """
-    from custom_components.be_water_prices import async_migrate_entry
+    from custom_components.be_water_prices import (
+        _drop_phantom_commune_if_blocked,
+        async_migrate_entry,
+    )
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -509,6 +512,7 @@ async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant)
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry) is True
+    _drop_phantom_commune_if_blocked(hass, entry)
     assert entry.version == 2
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
@@ -517,11 +521,41 @@ async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_phantom_sweep_runs_on_v2_entries_too(hass: HomeAssistant) -> None:
+    """A v2 entry that picked a commune before it was flagged as a
+    phantom (later blocklist addition) must still get cleaned on
+    subsequent loads -- the sweep is not gated on the schema version.
+    """
+    from custom_components.be_water_prices import _drop_phantom_commune_if_blocked
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "25126",  # phantom (1500 - Halle)
+            CONF_COMMUNE_LABEL: "1500 - Halle (Halle)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    _drop_phantom_commune_if_blocked(hass, entry)
+    assert entry.version == 2  # untouched
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options
+
+
+@pytest.mark.asyncio
 async def test_migrate_v1_entry_leaves_valid_commune_alone(hass: HomeAssistant) -> None:
     """A v1 entry whose saved commune is real (not on the phantom
     blocklist) must be migrated to v2 with no option changes.
     """
-    from custom_components.be_water_prices import async_migrate_entry
+    from custom_components.be_water_prices import (
+        async_migrate_entry,
+    )
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -554,7 +588,9 @@ async def test_migrate_v1_entry_with_de_watergroep_commune_carries_over(
     adding a DWG-specific check) is an explicit, tested change rather
     than a silent regression for every existing DWG user.
     """
-    from custom_components.be_water_prices import async_migrate_entry
+    from custom_components.be_water_prices import (
+        async_migrate_entry,
+    )
 
     dwg_commune_guid = "{B16A143A-49E6-4CE5-A241-1AA09BFC406A}"  # Halle, default
     entry = MockConfigEntry(
@@ -585,7 +621,9 @@ async def test_migrate_v1_entry_without_commune_succeeds(hass: HomeAssistant) ->
     case so a refactor of the guard expression can't silently change
     behaviour for entries without a commune.
     """
-    from custom_components.be_water_prices import async_migrate_entry
+    from custom_components.be_water_prices import (
+        async_migrate_entry,
+    )
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -609,7 +647,10 @@ async def test_migrate_v1_entry_drops_phantom_pidpa_antwerpen(hass: HomeAssistan
     tariff page (Water-link territory). v1 entries on that slug get
     cleaned up on migration.
     """
-    from custom_components.be_water_prices import async_migrate_entry
+    from custom_components.be_water_prices import (
+        _drop_phantom_commune_if_blocked,
+        async_migrate_entry,
+    )
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -622,6 +663,7 @@ async def test_migrate_v1_entry_drops_phantom_pidpa_antwerpen(hass: HomeAssistan
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry) is True
+    _drop_phantom_commune_if_blocked(hass, entry)
     assert entry.version == 2
     assert CONF_COMMUNE not in entry.options
 
