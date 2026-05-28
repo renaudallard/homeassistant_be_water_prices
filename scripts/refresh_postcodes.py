@@ -68,6 +68,22 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+# Pull the runtime Farys phantom blocklist so the carve-out we compute
+# here matches what the integration's list_communes() actually surfaces
+# at runtime. Without this the script silently regresses DWG carve-out
+# postcodes (8432 Leffinge, 9571 Hemelveerdegem, ...) on every refresh
+# because Farys's raw dropdown still carries the phantom entry while
+# the runtime drops it.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from custom_components.be_water_prices.providers._postcodes import (
+    _AQUADUIN_POSTCODES,
+    _SPLIT_POSTCODES,
+)
+from custom_components.be_water_prices.providers.farys import (
+    _UNSERVABLE_COMMUNE_LABELS as _FARYS_PHANTOM_LABELS,
+)
 
 # Single-source-of-truth mapping from the geoportail's DISTRIBUTEUR
 # strings to our extractor utility ids. Operators not in this map are
@@ -204,6 +220,27 @@ def _scrape_postcodes(html: str) -> set[str]:
     return out
 
 
+def _scrape_farys_postcodes_filtered(html: str) -> set[str]:
+    """Farys postcodes excluding the phantom-label entries.
+
+    A Farys dropdown option is a phantom when the AJAX endpoint returns
+    no insert command for its commune id; the runtime list_communes
+    drops those via _UNSERVABLE_COMMUNE_LABELS. The script applies the
+    same filter so a postcode whose only Farys entries are phantoms
+    (e.g. 8432 Leffinge, 9571 Hemelveerdegem) is treated as DWG-only
+    here too.
+    """
+    out: set[str] = set()
+    for match in _OPTION_LABEL_RE.finditer(html):
+        label = match.group(1).strip()
+        if label in _FARYS_PHANTOM_LABELS:
+            continue
+        m = _POSTCODE_FROM_LABEL_RE.match(label)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
 def build_dwg_flanders_carveout() -> list[str]:
     """DWG-served postcodes in 8000-9999 that Farys does not serve.
 
@@ -212,14 +249,28 @@ def build_dwg_flanders_carveout() -> list[str]:
     street-level split) are intentionally dropped: the resolver keeps
     Farys as the dominant default and users in the DWG half can manual-
     override on reconfigure.
+
+    Farys's raw dropdown carries 23 phantom entries the runtime filters
+    out; we apply the same filter so postcodes whose only Farys entries
+    are phantoms (Leffinge, Hemelveerdegem, ...) are correctly treated
+    as DWG-only.
     """
     print("scraping DWG commune dropdown …", file=sys.stderr)
     dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
     print(f"  {len(dwg_pc)} DWG postcodes", file=sys.stderr)
-    print("scraping Farys commune dropdown …", file=sys.stderr)
-    farys_pc = _scrape_postcodes(_fetch(FARYS_DROPDOWN_URL))
-    print(f"  {len(farys_pc)} Farys postcodes", file=sys.stderr)
-    carve = sorted(pc for pc in dwg_pc if 8000 <= int(pc) <= 9999 and pc not in farys_pc)
+    print("scraping Farys commune dropdown (filtered) …", file=sys.stderr)
+    farys_pc = _scrape_farys_postcodes_filtered(_fetch(FARYS_DROPDOWN_URL))
+    print(f"  {len(farys_pc)} Farys postcodes (post-phantom-filter)", file=sys.stderr)
+    aquaduin_pc = {str(pc) for pc in _AQUADUIN_POSTCODES}
+    split_pc = set(_SPLIT_POSTCODES.keys())
+    carve = sorted(
+        pc
+        for pc in dwg_pc
+        if 8000 <= int(pc) <= 9999
+        and pc not in farys_pc
+        and pc not in aquaduin_pc
+        and pc not in split_pc
+    )
     print(f"unambiguous DWG carve-outs in 8000-9999: {len(carve)}", file=sys.stderr)
     return carve
 
