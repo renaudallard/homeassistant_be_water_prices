@@ -229,8 +229,17 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
     does not produce (orphan rows left over by the previous operator).
     """
     from homeassistant.components.recorder import get_instance
+    from homeassistant.helpers.recorder import DATA_INSTANCE
 
     from .sensor import SENSORS  # local import: sensor.py imports from coordinator
+
+    # Same guard pattern async_backfill_prices uses: skip cleanly when
+    # the recorder is not yet up (cold-boot, test harness without the
+    # recorder fixture). Without this the get_instance() call below
+    # raises KeyError mid-setup, escaping async_setup_entry and
+    # leaving the OptionsFlow reload listener unregistered.
+    if DATA_INSTANCE not in hass.data:
+        return
 
     coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if coordinator is None or coordinator.data is None:
