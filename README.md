@@ -68,7 +68,7 @@ publication and how to parse it.
 | **CIESAC** | Wallonia (Clavier / Durbuy / Ouffet / Tinlot) | 4 communes | [`providers/ciesac.py`](./custom_components/be_water_prices/providers/ciesac.py) — same Callmepower path; `ciesac.be` is intermittently unreachable and doesn't publish structured rates |
 | **CILE** | Wallonia (Liège region) | 24 communes (~560 k) | [`providers/cile.py`](./custom_components/be_water_prices/providers/cile.py) — clean 4-row HTML table on [cile.be/facturation/le-prix-de-leau](https://www.cile.be/facturation/le-prix-de-leau). Same pattern as SWDE / inBW: CVD parsed live, CVA / FSE cross-checked against the SPGE constants |
 | **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — full integrale waterprijs out of the box, exact per-commune numbers when a commune is configured | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — two ingestion paths: the cookie-driven `/Tarief/UpdateDetailTariefJaar/<year>` endpoint with `dwg_l=<GUID>` (default GUID = Halle / 1500 if no commune is configured, otherwise the user-picked one) returns the full per-commune bill (drinkwater + gemeentelijke + bovengemeentelijke saneringsbijdragen). Falls back to the news-article `over-de-watergroep/nieuws/tarieven-<year>` (drinkwater leg only) if the cookie endpoint fails |
-| **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Pick a different commune in the OptionsFlow to switch (290+ options) |
+| **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Pick a different commune in the OptionsFlow to switch (~265 options; 23 phantom entries that Farys lists but doesn't actually serve are filtered out so users can't pick a crashing option) |
 | **IDEN** | Wallonia (Nandrin / Tinlot / Modave) | 3 communes | [`providers/iden.py`](./custom_components/be_water_prices/providers/iden.py) — same Callmepower path; the operator's own site (`iden-eau.be`) carries CVD/CVA explainers but no numbers |
 | **IEG** | Wallonia (Mouscron) | ~50 k | [`providers/ieg.py`](./custom_components/be_water_prices/providers/ieg.py) — operator's own page at `ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/`. Uses the shared CWaPE residential tier math via [`_walloon_simple.py`](./custom_components/be_water_prices/providers/_walloon_simple.py) |
 | **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP lists the CVD on the *Prix de l'eau et évolution* page under the heading "Coût-Vérité Distribution (CVD) = N,NNNN €/m³". Parser anchors on that heading (tolerating accent-stripped variants) |
@@ -153,10 +153,12 @@ can surface "your water costs you X EUR per cubic metre" at a glance.
 ## Sensors
 
 All sensors share one device per config entry. Up to eight entities
-per entry: `water_comfort_rate` only appears for Flemish utilities, and
-`water_current_year_cost` + `water_ytd_consumption` only appear when a
-water meter is configured (explicit override in the OptionsFlow, or
-auto-discovered from the Energy dashboard).
+per entry: `water_comfort_rate` only appears for Flemish utilities;
+`water_current_year_cost` and `water_ytd_consumption` are always
+created and report `unknown` until a water meter is wired up
+(explicit override in the OptionsFlow, or auto-discovered from the
+Energy dashboard). The next coordinator tick after the meter shows
+up fills in the values without an HA restart.
 
 | Sensor | Description |
 | --- | --- |
@@ -233,11 +235,9 @@ auto-resolves and whether the chosen utility is Flemish.
      consumption); set it only when you want a different sensor than
      what the Energy dashboard sees. The
      `water_current_year_cost` and `water_ytd_consumption` entities
-     are only created when *either* an override is set *or* the
-     Energy dashboard has a water source -- otherwise they stay out
-     of the device card entirely. Adding a meter via the OptionsFlow
-     reloads the entry so the new entities appear without an HA
-     restart.
+     are always created -- they report `unknown` until a meter is
+     wired up through either path, and the next coordinator tick
+     after that fills them in without an HA restart.
 
 ### Reconfiguring later
 
@@ -324,9 +324,12 @@ data:
 
 `clear: true` first calls the recorder's `async_clear_statistics`
 on the targeted entities, then re-imports — useful for cleanly
-overwriting a wrong value. Default is gap-fill (the importer
-upserts on `(statistic_id, start)`, so a no-clear re-run is safely
-idempotent).
+overwriting a wrong value. `clear: true` **requires** an explicit
+`entry_id`; the service rejects the blanket combination
+(`clear: true` without `entry_id`) to keep one careless call from
+wiping long-term statistics across every loaded entry. Default is
+gap-fill (the importer upserts on `(statistic_id, start)`, so a
+no-clear re-run is safely idempotent).
 
 ### Diagnostics
 
