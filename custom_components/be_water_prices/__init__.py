@@ -71,9 +71,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         from .statistics import async_unregister_services
 
-        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
-        if not hass.data[DOMAIN]:
+        # ``hass.data[DOMAIN]`` is populated only AFTER the coordinator
+        # first refresh succeeds. If async_setup_entry raised before
+        # that point (transient first-fetch failure, ImportError, etc.)
+        # the bucket is missing and a naive pop crashes the unload --
+        # blocking the user from removing the entry without an HA
+        # restart. Tolerate both the missing bucket and the missing
+        # entry_id.
+        domain_data = hass.data.get(DOMAIN, {})
+        coordinator = domain_data.pop(entry.entry_id, None)
+        if coordinator is not None:
+            ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
+        if not domain_data:
             async_unregister_services(hass)
     return unloaded
 
