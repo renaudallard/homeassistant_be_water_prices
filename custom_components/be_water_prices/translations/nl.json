@@ -16,6 +16,14 @@
         }
       },
       "reconfigure": {
+        "title": "Watermaatschappij opnieuw instellen",
+        "description": "Kies hoe je deze invoer wil bijwerken. Na een verhuis is opnieuw koppelen via postcode meestal de juiste keuze; kies de maatschappij rechtstreeks als de postcode-koppeling de verkeerde maatschappij heeft gekozen.",
+        "menu_options": {
+          "reconfigure_postcode": "Postcode bijwerken en maatschappij opnieuw koppelen",
+          "reconfigure_manual": "Maatschappij rechtstreeks kiezen"
+        }
+      },
+      "reconfigure_postcode": {
         "title": "Postcode bijwerken",
         "description": "Voer de nieuwe postcode in voor deze invoer. We koppelen opnieuw aan een maatschappij en herladen de integratie. Jaarverbruik, gedomicilieerde personen, sociaal tarief en de watermetersensor blijven behouden; de opgeslagen gemeente wordt gewist als de gekoppelde maatschappij verandert (de nieuwe maatschappij gebruikt andere gemeente-IDs).",
         "data": {
@@ -24,9 +32,16 @@
       },
       "reconfigure_manual": {
         "title": "Kies je watermaatschappij",
-        "description": "We konden geen maatschappij koppelen aan die postcode. Kies hieronder de jouwe.",
+        "description": "Kies de maatschappij die jou bedient. Jaarverbruik, gedomicilieerde personen, sociaal tarief en de watermetersensor blijven behouden; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest (gemeente-IDs zijn niet uitwisselbaar tussen maatschappijen). Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) vragen daarna nog je gemeente.",
         "data": {
           "utility": "Maatschappij"
+        }
+      },
+      "reconfigure_commune": {
+        "title": "Kies je gemeente",
+        "description": "Kies de gemeente waar dit adres ligt. Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) rekenen lichtjes verschillende tarieven per gemeente; laat leeg om de standaard van de maatschappij te gebruiken en kies later via de opties van de invoer.",
+        "data": {
+          "commune": "Gemeente"
         }
       },
       "options": {

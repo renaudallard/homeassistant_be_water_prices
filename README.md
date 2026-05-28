@@ -244,12 +244,26 @@ tariff, commune, water meter sensor).
 
 To switch utility (you moved house, or the postcode auto-resolver
 picked the wrong default the first time), open the entry's three-dot
-menu and pick **Reconfigure**: it re-prompts the postcode, re-runs
-the resolver, and reloads the integration in place. Annual
-consumption, registered residents, social tariff and the water-meter
-sensor carry over; the saved commune is cleared when the resolved
-utility changes (the new operator uses different commune IDs, so a
-stale value would silently fail at fetch time).
+menu and pick **Reconfigure**. You get a menu with two options:
+
+- **Update postcode** re-prompts the postcode and re-runs the resolver
+  -- the right choice after a move.
+- **Pick the utility directly** jumps straight to the operator
+  dropdown, bypassing the resolver -- the right choice when your
+  postcode resolves to the wrong operator (e.g. a Pidpa ring commune
+  actually served by Water-link).
+
+If either path lands on a per-commune operator (De Watergroep / Farys
+/ Pidpa / Water-link), a commune dropdown follows so you can pick the
+exact commune in the same flow. When the postcode resolves to the
+same operator you already have, the dropdown is pre-filled with your
+current commune so you can submit as-is to just refresh.
+
+Either path reloads the integration in place. Annual consumption,
+registered residents, social tariff and the water-meter sensor carry
+over; the saved commune is cleared when the utility changes (the new
+operator uses different commune IDs, so a stale value would silently
+fail at fetch time).
 
 ## Daily operation
 

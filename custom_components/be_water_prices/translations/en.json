@@ -16,6 +16,14 @@
         }
       },
       "reconfigure": {
+        "title": "Reconfigure water utility",
+        "description": "Pick how you want to update this entry. Re-resolving by postcode is the right call after a move; choose the utility directly if the postcode resolver picked the wrong operator for you.",
+        "menu_options": {
+          "reconfigure_postcode": "Update postcode and re-resolve the utility",
+          "reconfigure_manual": "Pick the utility directly"
+        }
+      },
+      "reconfigure_postcode": {
         "title": "Update your postcode",
         "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption, registered residents, social tariff and the water meter sensor are kept; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs).",
         "data": {
@@ -24,9 +32,16 @@
       },
       "reconfigure_manual": {
         "title": "Pick your water utility",
-        "description": "We could not resolve a utility for that postcode. Pick yours below.",
+        "description": "Pick the utility that serves you. Annual consumption, registered residents, social tariff and the water meter sensor are kept; the saved commune is cleared if you pick a different operator (their commune IDs are not interchangeable). Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) ask for the commune next.",
         "data": {
           "utility": "Utility"
+        }
+      },
+      "reconfigure_commune": {
+        "title": "Pick your commune",
+        "description": "Pick the commune this address belongs to. Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) charge slightly different rates per commune; leave blank to use the operator's default and revisit the choice later via the entry's options.",
+        "data": {
+          "commune": "Commune"
         }
       },
       "options": {
