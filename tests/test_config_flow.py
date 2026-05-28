@@ -166,6 +166,28 @@ def test_postcode_range_boundaries_are_inclusive() -> None:
     assert _resolve_postcode("3000") == "de_watergroep"
 
 
+def test_internal_range_edges_are_pinned_against_shadowing_regressions() -> None:
+    # Pinning user-facing ranges only catches regressions on edges that
+    # are NOT shadowed by a higher-priority range above. Internal
+    # boundaries -- e.g. extending DWG's 1500-1999 to 2000 -- would be
+    # silently masked by the water_link 2000-2070 branch firing first
+    # under the same `_resolve_postcode` call. Pin the internal edges
+    # explicitly so a range-extension regression surfaces.
+    # Water-link / Pidpa split inside the Antwerp province (2000-2070
+    # vs 2100-2999):
+    assert _resolve_postcode("2070") == "water_link"
+    assert _resolve_postcode("2071") in {"pidpa", None}  # gap in 2071-2099 is allowed
+    # Walloon table coverage cliff (postcodes outside the table return
+    # None so the manual picker fires):
+    assert _resolve_postcode("6830") is None  # Bouillon régie -- not shipped
+    # AGSO Knokke carve-outs sit inside the Farys 8000-9999 range:
+    assert _resolve_postcode("8300") == "agso_knokke"
+    assert _resolve_postcode("8301") == "agso_knokke"
+    # Aquaduin carve-out neighbours:
+    assert _resolve_postcode("8430") == "aquaduin"
+    assert _resolve_postcode("8431") == "farys"
+
+
 def test_dwg_only_after_farys_filter_includes_new_carve_outs() -> None:
     # Once Farys's phantom dropdown entries are filtered out, 8432
     # Leffinge and 9571 Hemelveerdegem become DWG-only and belong in
