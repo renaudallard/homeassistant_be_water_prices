@@ -185,23 +185,25 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     # and an on-path attacker just needs to nudge the first request
     # toward any non-cert failure to trigger the no-verify retry).
     #
-    # TLS issues can surface at three layers under aiohttp:
+    # TLS issues can surface at two layers under aiohttp:
     #   - handshake-time:  ClientConnectorCertificateError, ClientSSLError
-    #   - read-time:       ClientPayloadError if the server resets the
-    #                      connection mid-body (e.g. TLS renegotiation
-    #                      failure)
     #   - underlying:      ssl.SSLError raised from the asyncio layer
     #                      and surfaced via __cause__ chains
+    #
+    # ClientPayloadError is deliberately NOT in this set: it covers
+    # any mid-body interruption (decompression failures, malformed
+    # Transfer-Encoding, server reset for whatever reason) and only
+    # rarely is a TLS signal. Treating it as TLS would let any
+    # payload-layer failure trigger the verify_ssl=False retry, which
+    # is exactly the on-path-attacker hint the 'verify first'
+    # invariant exists to prevent.
     try:
         html = await fetch_html(session, SOURCE_URL)
     except ExtractorError as err:
         cause = err.__cause__
         is_tls = isinstance(
             cause,
-            aiohttp.ClientConnectorCertificateError
-            | aiohttp.ClientSSLError
-            | aiohttp.ClientPayloadError
-            | ssl.SSLError,
+            aiohttp.ClientConnectorCertificateError | aiohttp.ClientSSLError | ssl.SSLError,
         )
         if not is_tls:
             raise
