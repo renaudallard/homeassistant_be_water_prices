@@ -30,11 +30,23 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import (
+    CONF_COMMUNE,
+    CONF_COMMUNE_LABEL,
+    CONF_POSTCODE,
+    CONF_WATER_METER_SENSOR,
+    DOMAIN,
+)
 from .coordinator import WaterCoordinator
+
+# Fields that uniquely or near-uniquely identify the household; the
+# diagnostics file ends up attached to GitHub issues so anything that
+# could narrow down to a specific address has to be redacted.
+_REDACT_KEYS = {CONF_POSTCODE, CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_WATER_METER_SENSOR}
 
 
 async def async_get_config_entry_diagnostics(
@@ -44,8 +56,8 @@ async def async_get_config_entry_diagnostics(
     data = coordinator.data
     return {
         "entry": {
-            "data": dict(entry.data),
-            "options": dict(entry.options),
+            "data": async_redact_data(dict(entry.data), _REDACT_KEYS),
+            "options": async_redact_data(dict(entry.options), _REDACT_KEYS),
         },
         "snapshot": (
             {
