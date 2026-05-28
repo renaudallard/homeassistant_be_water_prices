@@ -242,7 +242,13 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     if entry.data.get(DATA_BACKFILL_YEAR) == current_gate:
         return
 
-    rows = await async_backfill_prices(hass, entry, start=_jan_1_local(), clear=True)
+    # ``clear=False`` is sufficient: async_import_statistics overwrites
+    # rows at matching (statistic_id, bucket_start) timestamps, so
+    # re-running for the same year just replaces the old operator's
+    # flat-line for Jan 1..now without wiping older historical rows
+    # (prior years, manual annotations). The flatline replacement is
+    # what we actually want on an operator switch.
+    rows = await async_backfill_prices(hass, entry, start=_jan_1_local(), clear=False)
     if rows <= 0:
         return
 
