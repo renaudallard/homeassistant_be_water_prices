@@ -414,6 +414,39 @@ async def test_reconfigure_flow_falls_through_to_manual_picker(
 
 
 @pytest.mark.asyncio
+async def test_initial_flow_caches_commune_list_across_render_and_submit(
+    hass: HomeAssistant,
+) -> None:
+    """The commune list is fetched once per flow instance, not on every
+    step entry. Without the cache, _async_communes is called both on
+    form-render and form-submit; a transient failure on the second call
+    silently drops the user's commune pick.
+    """
+    fake_communes = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ) as mock:
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_CONSUMPTION_M3_PER_YEAR: 100,
+                CONF_PERSONS: 2,
+                CONF_SOCIAL_TARIFF: False,
+                CONF_COMMUNE: "25071",
+            },
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert mock.call_count == 1, f"expected 1 _async_communes call, got {mock.call_count}"
+
+
+@pytest.mark.asyncio
 async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant) -> None:
     """A v1 entry that picked one of the 23 phantom Farys commune ids
     (Farys lists them but doesn't actually serve them; coordinator

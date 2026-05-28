@@ -274,6 +274,17 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # options when the user picked a per-commune operator.
         self._reconfigure_commune: str | None = None
         self._reconfigure_commune_label: str | None = None
+        # Cache the live commune list across form-render / form-submit
+        # within one flow instance. Without this each step makes two
+        # HTTP calls to the operator's dropdown page, and a transient
+        # second-call failure silently drops the user's commune pick.
+        self._communes_cache: dict[str, tuple[CommuneOption, ...]] = {}
+
+    async def _async_communes_cached(self, utility_id: str) -> tuple[CommuneOption, ...]:
+        """``_async_communes`` memoised per flow instance + utility."""
+        if utility_id not in self._communes_cache:
+            self._communes_cache[utility_id] = await _async_communes(self.hass, utility_id)
+        return self._communes_cache[utility_id]
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -315,7 +326,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         await self.async_set_unique_id(f"{DOMAIN}_{self._utility}")
         self._abort_if_unique_id_configured()
 
-        communes = await _async_communes(self.hass, self._utility)
+        communes = await self._async_communes_cached(self._utility)
         if user_input is not None:
             final = dict(user_input)
             if self._postcode is not None:
@@ -433,7 +444,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         OptionsFlow.
         """
         assert self._utility is not None
-        communes = await _async_communes(self.hass, self._utility)
+        communes = await self._async_communes_cached(self._utility)
         if not communes:
             return await self._async_finish_reconfigure()
         if user_input is not None:
@@ -530,9 +541,22 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
     # class; assigning to it from __init__ raises in modern HA. Inherit the
     # default no-arg constructor and use ``self.config_entry`` directly.
 
+    def __init__(self) -> None:
+        # Cache the live commune list across form-render / form-submit
+        # within one options flow. Same rationale as the ConfigFlow's
+        # cache: HA calls async_step_init twice per user click-through
+        # and a transient second-call failure silently drops the user's
+        # selection.
+        self._communes_cache: dict[str, tuple[CommuneOption, ...]] = {}
+
+    async def _async_communes_cached(self, utility_id: str) -> tuple[CommuneOption, ...]:
+        if utility_id not in self._communes_cache:
+            self._communes_cache[utility_id] = await _async_communes(self.hass, utility_id)
+        return self._communes_cache[utility_id]
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         utility_id = self.config_entry.data[CONF_UTILITY]
-        communes = await _async_communes(self.hass, utility_id)
+        communes = await self._async_communes_cached(utility_id)
         if user_input is not None:
             final = dict(user_input)
             chosen = final.get(CONF_COMMUNE)
