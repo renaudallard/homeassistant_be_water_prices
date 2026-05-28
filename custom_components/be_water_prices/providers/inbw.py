@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import logging
 import re
+import ssl
 from datetime import date
 
 import aiohttp
@@ -183,13 +184,26 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     # connection (otherwise the whole 'verify first' point evaporates
     # and an on-path attacker just needs to nudge the first request
     # toward any non-cert failure to trigger the no-verify retry).
+    #
+    # TLS issues can surface at three layers under aiohttp:
+    #   - handshake-time:  ClientConnectorCertificateError, ClientSSLError
+    #   - read-time:       ClientPayloadError if the server resets the
+    #                      connection mid-body (e.g. TLS renegotiation
+    #                      failure)
+    #   - underlying:      ssl.SSLError raised from the asyncio layer
+    #                      and surfaced via __cause__ chains
     try:
         html = await fetch_html(session, SOURCE_URL)
     except ExtractorError as err:
-        if not isinstance(
-            err.__cause__,
-            aiohttp.ClientConnectorCertificateError | aiohttp.ClientSSLError,
-        ):
+        cause = err.__cause__
+        is_tls = isinstance(
+            cause,
+            aiohttp.ClientConnectorCertificateError
+            | aiohttp.ClientSSLError
+            | aiohttp.ClientPayloadError
+            | ssl.SSLError,
+        )
+        if not is_tls:
             raise
         _LOGGER.warning(
             "inBW TLS verification failed (%s); falling back to verify_ssl=False",
