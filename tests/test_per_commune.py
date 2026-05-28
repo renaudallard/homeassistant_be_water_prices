@@ -91,6 +91,34 @@ def test_dwg_per_commune_handles_missing_afvoer_row() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
 
 
+def test_dwg_per_commune_does_not_bleed_into_comforttarief_block() -> None:
+    # Regression: an earlier version anchored the Afvoer/Zuivering
+    # regexes on the single 'Basistarief per m³' phrase and used
+    # re.DOTALL + .*? -- if the Basistarief Afvoer row had no euro
+    # amount (zero-afvoer commune), the regex skipped past it and
+    # silently matched the Comforttarief Afvoer (~2x the basistarief),
+    # silently doubling san_gem instead of returning 0. Build a minimal
+    # HTML where basis Afvoer is empty but comfort Afvoer carries an
+    # amount and assert san_gem stays 0.0.
+    html = (
+        "<html><body>"
+        "Basistarief per m&#179; "
+        "Waterverbruik drinkwater &euro; 2,9251 "
+        "Afvoer van afvalwater "  # empty (zero-afvoer commune)
+        "Zuivering van afvalwater &euro; 1,7019 "
+        "Basistarief per liter Waterverbruik drinkwater 0,002925 "
+        "Comforttarief per m&#179; "
+        "Waterverbruik drinkwater &euro; 5,8502 "
+        "Afvoer van afvalwater &euro; 3,9144 "  # would bleed if scope is wrong
+        "Zuivering van afvalwater &euro; 3,4038 "
+        "</body></html>"
+    )
+    t = parse_dwg_commune(html, year=2026, commune_label="synthetic")
+    assert t.basis_eur_per_m3 == 2.9251
+    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0  # NOT 3.9144
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+
+
 def test_dwg_news_fallback_keeps_drinkwater_leg_only_semantics() -> None:
     # Sanity check: the no-commune fallback must NOT pretend to know
     # sanering -- it must keep it at 0 and use the drinkwater-only
