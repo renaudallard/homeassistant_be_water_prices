@@ -32,9 +32,12 @@ when the integration runs in HA proper).
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -72,17 +75,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Register the OptionsFlow reload listener BEFORE the backfill so
+    # any backfill failure (recorder not ready, parser exception,
+    # future code addition that raises) does not leave the listener
+    # unregistered -- if it did, the user would see a 'loaded' entry
+    # whose OptionsFlow changes silently fail to trigger a reload,
+    # with no recovery short of an HA restart. The cost is one extra
+    # async_reload cycle when the backfill writes the gate -- a
+    # one-shot annoyance on first install / operator switch.
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     async_register_services(hass)
-    # Auto-once price-history backfill so the History/Energy graphs are
-    # not empty before the first natural day of recording. The gate is
-    # stored in ``entry.data`` and updated via ``async_update_entry``,
-    # which fires every registered update listener. Register the
-    # OptionsFlow reload listener *after* the backfill so the gate
-    # write doesn't trigger an immediate full unload + re-setup cycle
-    # on every fresh install / operator-change reconfigure.
-    await async_maybe_backfill_once(hass, entry)
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    # Auto-once price-history backfill so the History/Energy graphs
+    # are not empty before the first natural day of recording. Wrapped
+    # in a broad except so a backfill failure logs loudly without
+    # tearing down the rest of setup.
+    try:
+        await async_maybe_backfill_once(hass, entry)
+    except Exception:
+        _LOGGER.exception("price-history backfill failed; entry continues without it")
     return True
 
 
