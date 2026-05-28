@@ -343,6 +343,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             final = dict(user_input)
             if self._postcode is not None:
                 final[CONF_POSTCODE] = self._postcode
+            # An empty-string commune id can only come from a UI / API
+            # path that fed back an unset SelectSelector default; treat
+            # it as "no selection" before label resolution so we don't
+            # persist "" and later crash fetch_for_commune("").
+            if final.get(CONF_COMMUNE) == "":
+                final.pop(CONF_COMMUNE, None)
             chosen = final.get(CONF_COMMUNE)
             if chosen is not None:
                 # Resolve the opaque commune id to its display label so the
@@ -461,6 +467,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return await self._async_finish_reconfigure()
         if user_input is not None:
             chosen = user_input.get(CONF_COMMUNE)
+            # Treat empty-string commune as "no selection" (defensive
+            # against UI / API paths that surface an unset SelectSelector
+            # default as ""); without this we'd persist "" into the
+            # entry options and later crash fetch_for_commune.
+            if chosen == "":
+                chosen = None
             if chosen is not None:
                 self._reconfigure_commune = chosen
                 for option in communes:
@@ -575,6 +587,11 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         communes = await self._async_communes_cached(utility_id)
         if user_input is not None:
             final = dict(user_input)
+            # Empty-string commune id -> treat as "no selection" before
+            # label resolution so we don't persist "" and later crash
+            # fetch_for_commune("").
+            if final.get(CONF_COMMUNE) == "":
+                final.pop(CONF_COMMUNE, None)
             chosen = final.get(CONF_COMMUNE)
             if chosen is not None:
                 # Resolve the opaque commune id back to its display label so
