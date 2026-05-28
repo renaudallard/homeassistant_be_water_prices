@@ -177,17 +177,22 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     # Try with TLS verification first so a future server-side fix
     # (inBW shipping the GoDaddy intermediate, or migrating to a CA
-    # whose chain is complete) is detectable -- and so a MitM at least
-    # leaves a WARNING line in the log instead of being silently
-    # accepted. Fall back to verify_ssl=False only on a fetch failure,
-    # since fetch_text wraps aiohttp.ClientError (including the
-    # certificate-chain ClientConnectorCertificateError) in
-    # ExtractorError.
+    # whose chain is complete) is detectable. Fall back to
+    # verify_ssl=False ONLY on a TLS-specific failure -- a transient
+    # 5xx, DNS blip or timeout must not silently downgrade the
+    # connection (otherwise the whole 'verify first' point evaporates
+    # and an on-path attacker just needs to nudge the first request
+    # toward any non-cert failure to trigger the no-verify retry).
     try:
         html = await fetch_html(session, SOURCE_URL)
     except ExtractorError as err:
+        if not isinstance(
+            err.__cause__,
+            aiohttp.ClientConnectorCertificateError | aiohttp.ClientSSLError,
+        ):
+            raise
         _LOGGER.warning(
-            "inBW TLS-verified fetch failed (%s); falling back to verify_ssl=False",
+            "inBW TLS verification failed (%s); falling back to verify_ssl=False",
             err,
         )
         html = await fetch_html(session, SOURCE_URL, verify_ssl=False)
