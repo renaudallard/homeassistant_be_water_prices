@@ -1,6 +1,11 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# Default per-test timeout (pytest-timeout is already a dev dep). A
+# resolver/parser regression that drops a loop's ``pos += 1`` step
+# would otherwise hang CI silently instead of failing the offending
+# test; 30s is generous enough not to flake on slow CI runners.
+timeout = 30
 
 [tool.ruff]
 line-length = 100
