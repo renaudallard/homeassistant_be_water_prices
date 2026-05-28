@@ -52,3 +52,51 @@ def test_raises_when_response_is_not_json() -> None:
 def test_raises_when_no_insert_command_present() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff('[{"command":"settings","settings":{}}]')
+
+
+def test_unservable_labels_dropped_from_list_communes() -> None:
+    # Farys's dropdown carries 23 "phantom" commune options at split
+    # postcodes where DWG is the actual operator; picking one crashes
+    # because the AJAX endpoint returns no tariff data. list_communes
+    # must drop them so the dropdown never offers a crashing option.
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers.farys import (
+        _UNSERVABLE_COMMUNE_LABELS,
+        list_communes,
+    )
+
+    # Build a synthetic dropdown that contains one phantom, one valid.
+    phantom = next(iter(_UNSERVABLE_COMMUNE_LABELS))
+    fake_html = (
+        '<select name="municipality">'
+        f'<option value="1">{phantom}</option>'
+        '<option value="2">9000 - Gent (Gent)</option>'
+        "</select>"
+    )
+    with patch(
+        "custom_components.be_water_prices.providers.farys.fetch_text",
+        new=AsyncMock(return_value=fake_html),
+    ):
+        out = asyncio.run(list_communes(session=None))  # type: ignore[arg-type]
+    labels = {c.label for c in out}
+    assert phantom not in labels
+    assert "9000 - Gent (Gent)" in labels
+
+
+def test_unservable_labels_blocklist_holds_known_phantoms() -> None:
+    # Pin the floor: the blocklist must keep these specific entries
+    # that the smoke test against the live Farys AJAX endpoint flagged
+    # as "no insert command with tariff data".
+    from custom_components.be_water_prices.providers.farys import _UNSERVABLE_COMMUNE_LABELS
+
+    must_include = {
+        "1500 - Halle (Halle)",
+        "8020 - Hertsberge (Oostkamp)",
+        "8450 - Bredene (Bredene)",
+        "9080 - Beervelde (Lochristi)",
+        "9550 - Sint-Antelinks (Herzele)",
+    }
+    missing = must_include - _UNSERVABLE_COMMUNE_LABELS
+    assert not missing, f"blocklist regression: {missing} disappeared"

@@ -189,15 +189,61 @@ _OPTION_RE = re.compile(
 )
 
 
+# Phantom entries in Farys's dropdown -- the AJAX endpoint returns a
+# response without an "insert" command for these, so picking them
+# crashes with "no insert command with tariff data". These are split
+# postcodes where DWG is the actual operator for that street/parish;
+# the entry is left in Farys's UI but the back-end has no data.
+# Drop them from list_communes so users can't pick them; the resolver
+# falls back to Farys for the postcode (the dominant operator on the
+# Farys-served half), and users in the DWG half manual-override on
+# reconfigure.
+#
+# Keyed by exact "<postcode> - <commune> (<gemeente>)" label so we are
+# resilient to Farys re-numbering the option ids. Refresh if the smoke
+# test in scripts/live_check.py grows a new "no insert command" error.
+_UNSERVABLE_COMMUNE_LABELS: frozenset[str] = frozenset(
+    {
+        "1500 - Halle (Halle)",
+        "1700 - Dilbeek (Dilbeek)",
+        "1701 - Itterbeek (Dilbeek)",
+        "1702 - Groot-Bijgaarden (Dilbeek)",
+        "1703 - Schepdaal (Dilbeek)",
+        "1740 - Ternat (Ternat)",
+        "1741 - Wambeek (Ternat)",
+        "8020 - Hertsberge (Oostkamp)",
+        "8020 - Ruddervoorde (Oostkamp)",
+        "8020 - Waardamme (Oostkamp)",
+        "8432 - Leffinge (Middelkerke)",
+        "8450 - Bredene (Bredene)",
+        "8490 - Snellegem (Jabbeke)",
+        "8490 - Zerkegem (Jabbeke)",
+        "9080 - Beervelde (Lochristi)",
+        "9080 - Zaffelare (Lochristi)",
+        "9080 - Zeveneken (Lochristi)",
+        "9550 - Sint-Antelinks (Herzele)",
+        "9550 - Sint-Lievens-Esse (Herzele)",
+        "9550 - Steenhuize-Wijnhuize (Herzele)",
+        "9550 - Woubrechtegem (Herzele)",
+        "9570 - Deftinge (Lierde)",
+        "9571 - Hemelveerdegem (Lierde)",
+    }
+)
+
+
 async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
-    """Discover all 290+ Farys communes by scraping the watertarieven dropdown."""
+    """Discover all 290+ Farys communes by scraping the watertarieven dropdown.
+
+    Drops the 23 phantom entries Farys's UI lists without backing tariff
+    data (see ``_UNSERVABLE_COMMUNE_LABELS``).
+    """
     html = await fetch_text(session, PAGE_URL)
     communes: list[CommuneOption] = []
     seen: set[str] = set()
     for match in _OPTION_RE.finditer(html):
         commune_id = match.group(1)
         label = match.group(2).strip()
-        if not label or commune_id in seen:
+        if not label or commune_id in seen or label in _UNSERVABLE_COMMUNE_LABELS:
             continue
         seen.add(commune_id)
         communes.append(CommuneOption(id=commune_id, label=label))
