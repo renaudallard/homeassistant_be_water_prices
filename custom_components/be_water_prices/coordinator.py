@@ -185,11 +185,20 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     @staticmethod
     def _age_hours(fetched_at: datetime) -> float:
-        return (datetime.now(UTC) - fetched_at).total_seconds() / 3600.0
+        # Clamp at 0 so a future-dated fetched_at (NTP misconfig, clock
+        # jump, container restored from a future-dated snapshot) does
+        # not surface a negative age on the sensor attribute or bypass
+        # the stale check in _is_stale.
+        return max(0.0, (datetime.now(UTC) - fetched_at).total_seconds() / 3600.0)
 
     @staticmethod
     def _is_stale(tariff: WaterTariff, fetched_at: datetime) -> bool:
-        age_days = (datetime.now(UTC) - fetched_at).days
+        # max(0, ...) guards against fetched_at landing in the future
+        # (clock skew): timedelta.days truncates toward negative
+        # infinity, so a negative age would otherwise compare False
+        # against the threshold and the cache would be treated as
+        # 'fresh forever'.
+        age_days = max(0, (datetime.now(UTC) - fetched_at).days)
         if age_days > SNAPSHOT_STALE_AFTER_DAYS:
             return True
         return tariff.valid_until is not None and tariff.valid_until < dt_util.now().date()
