@@ -275,6 +275,45 @@ async def test_options_flow_clears_commune_when_user_explicitly_deselects(
 
 
 @pytest.mark.asyncio
+async def test_reconfigure_drops_social_tariff_on_flemish_to_brussels_swap(
+    hass: HomeAssistant,
+) -> None:
+    """social_tariff is a Flanders-only 80% reduction; the OptionsFlow
+    hides the field for Brussels / Wallonia entries. A stale True
+    carried over from a previous Flemish operator would be silently
+    ignored by pricing.py while still appearing in entry.options --
+    misleading users into believing the discount is applied. The
+    reconfigure must strip it when the new utility isn't Flemish.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: True,
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_POSTCODE: "1000"}
+    )  # Brussels -> VIVAQUA
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "vivaqua"
+    # social_tariff is gone (silently ignored on Brussels anyway).
+    assert CONF_SOCIAL_TARIFF not in entry.options
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
+
+
+@pytest.mark.asyncio
 async def test_reconfigure_flow_swaps_utility_and_clears_commune(
     hass: HomeAssistant,
 ) -> None:
@@ -320,10 +359,13 @@ async def test_reconfigure_flow_swaps_utility_and_clears_commune(
     assert entry.title == "VIVAQUA"
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
-    # Non-commune options preserved verbatim.
+    # social_tariff is Flemish-only; pricing.py drops it on Brussels
+    # entries, so the reconfigure scrubs it too rather than persist a
+    # silently-ignored option.
+    assert CONF_SOCIAL_TARIFF not in entry.options
+    # Non-commune, non-Flemish-only options preserved verbatim.
     assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
     assert entry.options[CONF_PERSONS] == 2
-    assert entry.options[CONF_SOCIAL_TARIFF] is False
 
 
 @pytest.mark.asyncio

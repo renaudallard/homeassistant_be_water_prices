@@ -546,6 +546,14 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         if new_utility != old_utility or self._drop_stale_reconfigure_commune:
             new_options.pop(CONF_COMMUNE, None)
             new_options.pop(CONF_COMMUNE_LABEL, None)
+        if new_utility != old_utility and not _is_flanders(new_utility):
+            # ``social_tariff`` is a VMM 80% reduction that only the
+            # Flanders pricing branch applies. The OptionsFlow no
+            # longer shows the field for Brussels / Wallonia entries,
+            # so a stale True from a previous Flemish operator would
+            # silently linger -- the user would believe the discount
+            # is honoured while pricing.py drops it. Strip it.
+            new_options.pop(CONF_SOCIAL_TARIFF, None)
         if self._reconfigure_commune is not None:
             new_options[CONF_COMMUNE] = self._reconfigure_commune
             if self._reconfigure_commune_label is not None:
