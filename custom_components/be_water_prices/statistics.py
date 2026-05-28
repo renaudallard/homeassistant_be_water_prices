@@ -182,13 +182,11 @@ async def async_backfill_prices(
             continue
 
         if clear:
-            # async_clear_statistics lives in the same module but is not
-            # in __all__; the attr-defined ignore matches coordinator.py.
-            from homeassistant.components.recorder.statistics import (  # type: ignore[attr-defined]
-                async_clear_statistics,
-            )
-
-            async_clear_statistics(get_instance(hass), [entity_id])
+            # ``async_clear_statistics`` is an instance method on the
+            # Recorder (not exported from ``recorder.statistics``); call
+            # it through get_instance(hass). Schedules the delete on the
+            # recorder executor so we do not block the event loop.
+            get_instance(hass).async_clear_statistics([entity_id])
             cleared_done = True
 
         bucket = start_utc
