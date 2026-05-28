@@ -26,65 +26,80 @@
 """Water-utility extractor registry.
 
 Each utility module exposes a top-level ``EXTRACTOR``. Adding a new
-utility means writing a new module and registering it below.
+utility means appending its module name to ``_MODULE_NAMES`` below.
+
+The registry is built lazily on first call so importing a sibling
+sub-module (e.g. ``_postcodes``) from a stdlib-only refresh script
+does not pull in aiohttp / BeautifulSoup / pdfplumber via every
+extractor module at package init time.
 """
 
 from __future__ import annotations
 
-from .agso_knokke import EXTRACTOR as _AGSO_KNOKKE
-from .aiec import EXTRACTOR as _AIEC
-from .aiem import EXTRACTOR as _AIEM
-from .aquaduin import EXTRACTOR as _AQUADUIN
+from importlib import import_module
+
 from .base import (
     ExtractorError,
     WaterExtractor,
     WaterTariff,
 )
-from .ciesac import EXTRACTOR as _CIESAC
-from .cile import EXTRACTOR as _CILE
-from .de_watergroep import EXTRACTOR as _DE_WATERGROEP
-from .farys import EXTRACTOR as _FARYS
-from .iden import EXTRACTOR as _IDEN
-from .ieg import EXTRACTOR as _IEG
-from .inasep import EXTRACTOR as _INASEP
-from .inbw import EXTRACTOR as _INBW
-from .pidpa import EXTRACTOR as _PIDPA
-from .swde import EXTRACTOR as _SWDE
-from .vivaqua import EXTRACTOR as _VIVAQUA
-from .water_link import EXTRACTOR as _WATER_LINK
 
-EXTRACTORS: dict[str, WaterExtractor] = {
-    _VIVAQUA.id: _VIVAQUA,
-    _DE_WATERGROEP.id: _DE_WATERGROEP,
-    _PIDPA.id: _PIDPA,
-    _AQUADUIN.id: _AQUADUIN,
-    _AGSO_KNOKKE.id: _AGSO_KNOKKE,
-    _WATER_LINK.id: _WATER_LINK,
-    _FARYS.id: _FARYS,
-    _SWDE.id: _SWDE,
-    _INBW.id: _INBW,
-    _CILE.id: _CILE,
-    _INASEP.id: _INASEP,
-    _IEG.id: _IEG,
-    _AIEM.id: _AIEM,
-    _AIEC.id: _AIEC,
-    _CIESAC.id: _CIESAC,
-    _IDEN.id: _IDEN,
+# Insertion order is the user-facing order in the manual-picker
+# dropdown. Brussels / DWG / Pidpa / Aquaduin / AGSO / Water-link /
+# Farys are the seven Flemish operators; the rest are Walloon.
+_MODULE_NAMES: tuple[str, ...] = (
+    "vivaqua",
+    "de_watergroep",
+    "pidpa",
+    "aquaduin",
+    "agso_knokke",
+    "water_link",
+    "farys",
+    "swde",
+    "inbw",
+    "cile",
+    "inasep",
+    "ieg",
+    "aiem",
+    "aiec",
+    "ciesac",
+    "iden",
     # Still deferred:
     #   - ~30 régies communales: no central publication channel found yet;
     #     deferred indefinitely on dev-hours / customer ratio.
-}
+)
+
+_REGISTRY: dict[str, WaterExtractor] | None = None
+
+
+def _build_registry() -> dict[str, WaterExtractor]:
+    global _REGISTRY
+    if _REGISTRY is None:
+        out: dict[str, WaterExtractor] = {}
+        for name in _MODULE_NAMES:
+            mod = import_module(f".{name}", __package__)
+            out[mod.EXTRACTOR.id] = mod.EXTRACTOR
+        _REGISTRY = out
+    return _REGISTRY
 
 
 def get(utility_id: str) -> WaterExtractor:
     try:
-        return EXTRACTORS[utility_id]
+        return _build_registry()[utility_id]
     except KeyError as err:
         raise ExtractorError(f"no extractor registered for utility {utility_id!r}") from err
 
 
 def all_extractors() -> tuple[WaterExtractor, ...]:
-    return tuple(EXTRACTORS.values())
+    return tuple(_build_registry().values())
+
+
+def __getattr__(name: str) -> dict[str, WaterExtractor]:
+    # Back-compat alias for callers that imported ``EXTRACTORS`` (the
+    # dict) directly. Building lazily keeps the import side-effect-free.
+    if name == "EXTRACTORS":
+        return _build_registry()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

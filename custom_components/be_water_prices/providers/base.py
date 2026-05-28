@@ -46,9 +46,10 @@ import dataclasses
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-import aiohttp
+if TYPE_CHECKING:
+    import aiohttp
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -87,9 +88,10 @@ class WaterTariff:
     vat_rate: float = 0.06
 
 
-WaterTariffFetcher = Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]]
-CommuneFetcher = Callable[[aiohttp.ClientSession, str], Awaitable[WaterTariff]]
-CommuneLister = Callable[[aiohttp.ClientSession], Awaitable[tuple["CommuneOption", ...]]]
+if TYPE_CHECKING:
+    WaterTariffFetcher = Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]]
+    CommuneFetcher = Callable[[aiohttp.ClientSession, str], Awaitable[WaterTariff]]
+    CommuneLister = Callable[[aiohttp.ClientSession], Awaitable[tuple["CommuneOption", ...]]]
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -96,6 +96,7 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
+from .._phantom_blocklists import PIDPA_UNSERVABLE_SLUGS as _UNSERVABLE_COMMUNE_SLUGS
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_html
@@ -103,6 +104,10 @@ from ._pdf import fetch_pdf_text_layout, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
+
+# Re-exported under the existing name so ``async_migrate_entry`` and
+# the test suite stay decoupled from the leaf module.
+__all__ = ("EXTRACTOR", "_UNSERVABLE_COMMUNE_SLUGS")
 
 UTILITY_ID = "pidpa"
 LABEL = "Pidpa"
@@ -337,8 +342,8 @@ def _slug_to_label(slug: str) -> str:
 # is not actually served by Pidpa (Antwerpen is Water-link territory;
 # Pidpa lists it for marketing reach). Picking these crashes with
 # "could not locate Pidpa huishoudelijk <year> table". Drop them from
-# the dropdown so users can't pick them.
-_UNSERVABLE_COMMUNE_SLUGS: frozenset[str] = frozenset({"antwerpen"})
+# the dropdown so users can't pick them. The data lives in
+# ``_phantom_blocklists`` (imported at the top of this module).
 
 
 async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
