@@ -193,3 +193,25 @@ def test_resolve_candidates_empty_for_invalid() -> None:
     assert _resolve_candidates("") == ()
     assert _resolve_candidates(None) == ()
     assert _resolve_candidates("6830") == ()  # Bouillon (régie, unsupported)
+
+
+def test_split_postcodes_first_candidate_matches_legacy_resolution() -> None:
+    """The first entry in every _SPLIT_POSTCODES tuple is documented
+    as the operator the legacy range-rule resolver would have picked
+    -- i.e., what _resolve_single returns for that postcode. The two
+    tables are hand-maintained; without this assertion a future
+    refresh that moves a postcode into _DWG_POSTCODES_FLANDERS could
+    silently flip _resolve_single's answer while _SPLIT_POSTCODES
+    still hard-codes the old dominant operator.
+    """
+    from custom_components.be_water_prices.providers._postcodes import (
+        _SPLIT_POSTCODES,
+        _resolve_single,
+    )
+
+    for pc, candidates in _SPLIT_POSTCODES.items():
+        legacy = _resolve_single(int(pc))
+        assert candidates[0] == legacy, (
+            f"_SPLIT_POSTCODES[{pc!r}][0] is {candidates[0]!r} "
+            f"but _resolve_single({pc}) returns {legacy!r}"
+        )
