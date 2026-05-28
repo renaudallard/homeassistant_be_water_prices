@@ -224,6 +224,33 @@ async def async_backfill_prices(
     return rows_total
 
 
+async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clear LTS rows for backfill keys the *current* operator's tariff
+    does not produce (orphan rows left over by the previous operator).
+    """
+    from homeassistant.components.recorder import get_instance
+
+    from .sensor import SENSORS  # local import: sensor.py imports from coordinator
+
+    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is None or coordinator.data is None:
+        return
+    ent_reg = er.async_get(hass)
+    recorder = get_instance(hass)
+    for desc in SENSORS:
+        if desc.key not in _BACKFILL_KEYS:
+            continue
+        # Current operator's tariff doesn't produce this metric ->
+        # any LTS rows are orphans from the previous operator.
+        if desc.value_fn(coordinator.data) is not None:
+            continue
+        unique_id = f"{entry.entry_id}_{desc.key}"
+        entity_id = ent_reg.async_get_entity_id("sensor", DOMAIN, unique_id)
+        if entity_id is None:
+            continue
+        recorder.async_clear_statistics([entity_id])
+
+
 async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Run the auto-once backfill, gated by ``(year, utility)``.
 
@@ -239,8 +266,21 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     current_year = dt_util.now().year
     current_utility = entry.data.get(CONF_UTILITY)
     current_gate = f"{current_year}:{current_utility}"
-    if entry.data.get(DATA_BACKFILL_YEAR) == current_gate:
+    previous_gate = entry.data.get(DATA_BACKFILL_YEAR)
+    if previous_gate == current_gate:
         return
+
+    # On operator change, any LTS rows the previous operator wrote for
+    # sensor keys that the new operator does not produce (e.g.
+    # comfort_rate after Flanders -> Wallonia) become orphans: the
+    # entity may be removed from the registry but its historical rows
+    # persist forever because the new backfill loop skips them. Detect
+    # the orphans by checking each backfill key's value_fn against the
+    # current tariff and clear the stale rows.
+    if isinstance(previous_gate, str) and ":" in previous_gate:
+        previous_utility = previous_gate.split(":", 1)[1]
+        if previous_utility != str(current_utility):
+            await _async_clear_orphan_backfill_keys(hass, entry)
 
     # ``clear=False`` is sufficient: async_import_statistics overwrites
     # rows at matching (statistic_id, bucket_start) timestamps, so
