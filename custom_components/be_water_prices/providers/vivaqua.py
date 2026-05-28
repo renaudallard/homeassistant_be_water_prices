@@ -172,7 +172,14 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
             target,
             target - 1,
         )
-        return fallback
+        # Push valid_until forward to March 31 of the target year so
+        # the coordinator's snapshot_stale check does not fire on Jan 1
+        # of the target year just because Brugel is a few weeks late
+        # with the new card. After March 31 the integration will
+        # legitimately flag staleness.
+        from dataclasses import replace
+
+        return replace(fallback, valid_until=date(target, 3, 31))
     raise ExtractorError(f"could not locate a VIVAQUA tariff table for {target} or {target - 1}")
 
 

@@ -147,14 +147,28 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
         return text, target - 1
 
 
+def _maybe_extend_valid_until(tariff: WaterTariff, parsed_year: int) -> WaterTariff:
+    """Push valid_until forward to March 31 of the *current* year when
+    we fell back to last year's PDF, so the snapshot_stale Repair does
+    not fire on Jan 1 just because Water-link is a few weeks late with
+    the new card.
+    """
+    from dataclasses import replace
+
+    current = date.today().year
+    if parsed_year >= current:
+        return tariff
+    return replace(tariff, valid_until=date(current, 3, 31))
+
+
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     text, year = await _fetch_pdf_text(session)
-    return parse_tariff(text, year=year)
+    return _maybe_extend_valid_until(parse_tariff(text, year=year), year)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     text, year = await _fetch_pdf_text(session)
-    return parse_tariff(text, year=year, commune=commune)
+    return _maybe_extend_valid_until(parse_tariff(text, year=year, commune=commune), year)
 
 
 # Anchored on the start-of-line: each commune row in the PDF starts at
