@@ -123,16 +123,27 @@ def _basis_per_m3_block(text: str) -> str | None:
     liter, Comforttarief, ...) so the row regexes can't reach into the
     Comforttarief block and silently match its Afvoer / Zuivering rows
     when the Basistarief block has an empty row.
+
+    If the anchor appears more than once on the page (e.g. DWG ever
+    inlines an explainer / comparison heading above the live table),
+    the first occurrence whose slice contains the data row
+    "Waterverbruik drinkwater" wins. A pure-heading first hit no
+    longer truncates the parser to navigation text.
     """
-    start = text.find("Basistarief per m³")
-    if start < 0:
-        return None
-    next_markers = (
-        text.find("Basistarief per liter", start + 1),
-        text.find("Comforttarief", start + 1),
-    )
-    end = min((m for m in next_markers if m > 0), default=len(text))
-    return text[start:end]
+    pos = 0
+    while True:
+        start = text.find("Basistarief per m³", pos)
+        if start < 0:
+            return None
+        next_markers = (
+            text.find("Basistarief per liter", start + 1),
+            text.find("Comforttarief", start + 1),
+        )
+        end = min((m for m in next_markers if m > 0), default=len(text))
+        block = text[start:end]
+        if "Waterverbruik drinkwater" in block:
+            return block
+        pos = start + 1
 
 
 def parse_news_tariff(html: str, year: int) -> WaterTariff:
