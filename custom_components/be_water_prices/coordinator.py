@@ -193,20 +193,23 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     @staticmethod
     def _age_hours(fetched_at: datetime) -> float:
-        # Clamp at 0 so a future-dated fetched_at (NTP misconfig, clock
-        # jump, container restored from a future-dated snapshot) does
-        # not surface a negative age on the sensor attribute or bypass
-        # the stale check in _is_stale.
-        return max(0.0, (datetime.now(UTC) - fetched_at).total_seconds() / 3600.0)
+        # Use abs() so a future-dated fetched_at (clock skew, container
+        # restored from a future-dated snapshot) surfaces a positive
+        # age on the sensor attribute -- masking it with a 0 clamp
+        # would hide the symptom while _is_stale fired the Repair.
+        return abs((datetime.now(UTC) - fetched_at).total_seconds()) / 3600.0
 
     @staticmethod
     def _is_stale(tariff: WaterTariff, fetched_at: datetime) -> bool:
-        # max(0, ...) guards against fetched_at landing in the future
-        # (clock skew): timedelta.days truncates toward negative
-        # infinity, so a negative age would otherwise compare False
-        # against the threshold and the cache would be treated as
-        # 'fresh forever'.
-        age_days = max(0, (datetime.now(UTC) - fetched_at).days)
+        delta = datetime.now(UTC) - fetched_at
+        # Future-dated cache is always stale: a snapshot 'from the
+        # future' is suspect by definition (clock skew, NTP jump,
+        # container restored). Surfacing it as stale lets the
+        # snapshot_stale Repair fire on day one instead of waiting
+        # for real time to catch up over weeks / months.
+        if delta.total_seconds() < 0:
+            return True
+        age_days = delta.days
         if age_days > SNAPSHOT_STALE_AFTER_DAYS:
             return True
         return tariff.valid_until is not None and tariff.valid_until < dt_util.now().date()
