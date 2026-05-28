@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 import logging
 from dataclasses import dataclass
@@ -132,12 +133,25 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 )
             else:
                 tariff = await self._extractor.fetch(session)
-        except ExtractorError as err:
-            # On fetch failure keep serving the last good snapshot rather
-            # than blanking every sensor; snapshot_age_hours and last_error
-            # are surfaced as attributes so dashboards can flag the issue.
+        except Exception as err:
+            # Catch broader than ExtractorError so a future extractor
+            # that forgets to wrap (asyncio.TimeoutError, ssl.SSLError,
+            # KeyError on a malformed response) still falls through to
+            # the cached-snapshot path. asyncio.CancelledError is the
+            # one exception we must not swallow -- HA cancels tasks on
+            # shutdown / reload and that signal has to propagate.
+            if isinstance(err, asyncio.CancelledError):
+                raise
+            # On fetch failure keep serving the last good snapshot
+            # rather than blanking every sensor; snapshot_age_hours and
+            # last_error are surfaced as attributes so dashboards can
+            # flag the issue.
             if self._last_good is not None:
-                _LOGGER.warning("water tariff fetch failed, serving cached: %s", err)
+                _LOGGER.warning(
+                    "water tariff fetch failed (%s), serving cached: %s",
+                    type(err).__name__,
+                    err,
+                )
                 stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)
                 ytd_m3, ytd_cost = await self._compute_ytd(self._last_good.tariff)
                 cached = CoordinatorData(
