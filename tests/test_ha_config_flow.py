@@ -544,6 +544,66 @@ async def test_migrate_v1_entry_leaves_valid_commune_alone(hass: HomeAssistant) 
 
 
 @pytest.mark.asyncio
+async def test_migrate_v1_entry_with_de_watergroep_commune_carries_over(
+    hass: HomeAssistant,
+) -> None:
+    """A v1 DWG entry with a saved commune migrates to v2 untouched:
+    the phantom blocklist only covers Farys and Pidpa, so DWG entries
+    fall through phantom_by_utility.get(...) to the default empty
+    frozenset. Pin this so a future tightening of the migrator (e.g.
+    adding a DWG-specific check) is an explicit, tested change rather
+    than a silent regression for every existing DWG user.
+    """
+    from custom_components.be_water_prices import async_migrate_entry
+
+    dwg_commune_guid = "{B16A143A-49E6-4CE5-A241-1AA09BFC406A}"  # Halle, default
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="De Watergroep",
+        data={CONF_UTILITY: "de_watergroep"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: dwg_commune_guid,
+            CONF_COMMUNE_LABEL: "Halle (DWG-served default)",
+        },
+        unique_id=f"{DOMAIN}_de_watergroep",
+        version=1,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert entry.options[CONF_COMMUNE] == dwg_commune_guid
+    assert entry.options[CONF_COMMUNE_LABEL] == "Halle (DWG-served default)"
+
+
+@pytest.mark.asyncio
+async def test_migrate_v1_entry_without_commune_succeeds(hass: HomeAssistant) -> None:
+    """A v1 entry that never picked a commune must migrate to v2
+    cleanly: the `commune is not None` guard inside the migrator only
+    has the truthy branch exercised today; this pins the no-commune
+    case so a refactor of the guard expression can't silently change
+    behaviour for entries without a commune.
+    """
+    from custom_components.be_water_prices import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+        version=1,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert CONF_COMMUNE not in entry.options
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 80
+
+
+@pytest.mark.asyncio
 async def test_migrate_v1_entry_drops_phantom_pidpa_antwerpen(hass: HomeAssistant) -> None:
     """Pidpa's sitemap listed 'antwerpen' as a slug but it has no
     tariff page (Water-link territory). v1 entries on that slug get
