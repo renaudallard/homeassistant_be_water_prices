@@ -274,6 +274,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # options when the user picked a per-commune operator.
         self._reconfigure_commune: str | None = None
         self._reconfigure_commune_label: str | None = None
+        # Set by ``async_step_reconfigure_commune`` when the saved
+        # commune is no longer in the live list (phantom blocklist
+        # addition, operator renumber). Forces ``_async_finish_reconfigure``
+        # to drop the stale commune even if the user submits the form
+        # without picking a replacement.
+        self._drop_stale_reconfigure_commune: bool = False
         # Cache the live commune list across form-render / form-submit
         # within one flow instance. Without this each step makes two
         # HTTP calls to the operator's dropdown page, and a transient
@@ -481,11 +487,22 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
                         break
             return await self._async_finish_reconfigure()
         entry = self._get_reconfigure_entry()
+        live_ids = {c.id for c in communes}
+        saved = entry.options.get(CONF_COMMUNE)
+        # Only suggest the saved commune when it is still in the live
+        # list AND the resolved utility is unchanged. If a stored
+        # commune has been filtered out (phantom blocklist addition,
+        # operator renumber, etc.) we must NOT suggest it back -- a
+        # user submitting the form unchanged would otherwise propagate
+        # the stale id forward.
         suggested = (
-            entry.options.get(CONF_COMMUNE)
-            if entry.data.get(CONF_UTILITY) == self._utility
-            else None
+            saved if entry.data.get(CONF_UTILITY) == self._utility and saved in live_ids else None
         )
+        if saved is not None and saved not in live_ids:
+            # The form will load with no selection; explicitly tell
+            # _async_finish_reconfigure to drop the stale commune even
+            # if the user submits the form unchanged.
+            self._drop_stale_reconfigure_commune = True
         commune_field = (
             vol.Optional(CONF_COMMUNE, description={"suggested_value": suggested})
             if suggested
@@ -526,7 +543,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return self.async_abort(reason="already_configured")
 
         new_options = dict(entry.options)
-        if new_utility != old_utility:
+        if new_utility != old_utility or self._drop_stale_reconfigure_commune:
             new_options.pop(CONF_COMMUNE, None)
             new_options.pop(CONF_COMMUNE_LABEL, None)
         if self._reconfigure_commune is not None:
