@@ -98,6 +98,43 @@ def test_dwg_per_commune_handles_missing_afvoer_row() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
 
 
+def test_basis_per_m3_block_returns_none_when_section_absent() -> None:
+    # The slice helper is the load-bearing front of the parser; if the
+    # page reshape ever drops the 'Basistarief per m³' anchor the
+    # function must return None so parse_commune_tariff raises rather
+    # than scanning unrelated text.
+    from custom_components.be_water_prices.providers.de_watergroep import _basis_per_m3_block
+
+    assert _basis_per_m3_block("nothing to see here") is None
+    assert _basis_per_m3_block("Comforttarief only € 5,8502") is None
+
+
+def test_basis_per_m3_block_picks_data_bearing_occurrence() -> None:
+    # Defensive: if DWG ever inlines a navigation heading / FAQ /
+    # comparison block that mentions 'Basistarief per m³' above the
+    # real data table, the slice helper must keep walking forward and
+    # return the slice that contains the data anchor ('Waterverbruik
+    # drinkwater'). Without this, the row regexes would scan a header-
+    # only slice and either return zeros or raise.
+    from custom_components.be_water_prices.providers.de_watergroep import _basis_per_m3_block
+
+    text = (
+        "intro Basistarief per m³ (uitleg over de berekening) "
+        "geen cijfers hier "
+        "Comforttarief per m³ - voorbeeld "
+        "live data: Basistarief per m³ "
+        "Waterverbruik drinkwater € 2,9251 "
+        "Afvoer van afvalwater € 1,9572 "
+        "Zuivering van afvalwater € 1,7019 "
+        "Comforttarief per m³"
+    )
+    block = _basis_per_m3_block(text)
+    assert block is not None
+    assert "Waterverbruik drinkwater € 2,9251" in block
+    # The header-only first occurrence must NOT be the chosen block.
+    assert "uitleg over de berekening" not in block
+
+
 def test_dwg_per_commune_does_not_bleed_into_comforttarief_block() -> None:
     # Regression: an earlier version anchored the Afvoer/Zuivering
     # regexes on the single 'Basistarief per m³' phrase and used
