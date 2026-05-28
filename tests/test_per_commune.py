@@ -75,6 +75,13 @@ def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
     assert t.yearly_fixed_fee == 100.0  # full VMM 50+30+20
     assert t.yearly_fixed_fee_per_resident_discount == 20.0  # full VMM 10+6+4
+    # Explicit non-zero guard: the parser tolerates missing afvoer /
+    # zuivering rows (Sinaai-style) by defaulting to 0.0. For a
+    # normally-billed commune like Halle, a future regex regression
+    # that silently returns 0,0 would otherwise cause a ~50%
+    # under-bill with no error surface; pin both rates strictly > 0.
+    assert t.sanering_gemeentelijk_eur_per_m3 > 0
+    assert t.sanering_bovengemeentelijk_eur_per_m3 > 0
 
 
 def test_dwg_per_commune_handles_missing_afvoer_row() -> None:
