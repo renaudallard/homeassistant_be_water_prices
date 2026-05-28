@@ -18,6 +18,13 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 # in numeric literals (see _pdf._NUMERIC_SEPARATORS, test_pdf).
 ignore = ["E501", "RUF001", "RUF002", "RUF003"]
 
+[tool.mypy]
+# Match CI's invocation (`mypy --strict custom_components/be_water_prices`)
+# so local runs surface the same strict-mode complaints (recorder
+# helpers not in __all__, untyped defs in third-party shims, etc.)
+# instead of slipping through and breaking the workflow's Type check.
+strict = true
+
 [[tool.mypy.overrides]]
 module = [
     "pypdf",
