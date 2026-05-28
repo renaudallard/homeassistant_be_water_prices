@@ -44,6 +44,8 @@ PLATFORMS = ["sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    from homeassistant.exceptions import ConfigEntryNotReady
+
     from .coordinator import WaterCoordinator
     from .statistics import (
         async_maybe_backfill_once,
@@ -53,11 +55,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Drop any phantom commune id the runtime list_communes filter
     # blocks. Runs on every setup (not only v1->v2 migration) so a
     # future blocklist addition catches users who installed at v2
-    # with what later became a phantom.
+    # with what later became a phantom. Stash the pre-strip options so
+    # a transient first-fetch failure (ConfigEntryNotReady) does not
+    # leave the entry permanently stripped of a commune that could
+    # come back into the blocklist's good graces later.
+    original_options = dict(entry.options)
     _drop_phantom_commune_if_blocked(hass, entry)
+    options_changed = entry.options != original_options
 
     coordinator = WaterCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except ConfigEntryNotReady:
+        if options_changed:
+            hass.config_entries.async_update_entry(entry, options=original_options)
+        raise
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
