@@ -88,3 +88,43 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     a full reload triggers.
     """
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate v1 entries to v2.
+
+    Two concerns motivate the v2 schema:
+
+      1. Some pre-v2 entries carry a ``CONF_COMMUNE`` that the operator
+         silently does not service (Farys phantom dropdown entries at
+         split postcodes; Pidpa's ``antwerpen`` slug -- Water-link
+         territory). The runtime ``list_communes`` now filters those
+         out, but existing entries still hand the stale id to
+         ``fetch_for_commune`` and crash on every coordinator tick.
+         The migration drops ``CONF_COMMUNE`` / ``CONF_COMMUNE_LABEL``
+         when the saved id matches a known phantom blocklist.
+
+      2. v2 entries store the user-entered postcode in
+         ``CONF_POSTCODE`` so future resolver-coverage changes can be
+         auto-applied. v1 entries don't carry one and stay as-is until
+         the user reconfigures.
+    """
+    from .const import CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_UTILITY
+    from .providers.farys import _UNSERVABLE_COMMUNE_IDS as _farys_phantom_ids
+    from .providers.pidpa import _UNSERVABLE_COMMUNE_SLUGS as _pidpa_phantom_slugs
+
+    if entry.version > 2:
+        return False
+    if entry.version == 1:
+        utility = entry.data.get(CONF_UTILITY, "")
+        commune = entry.options.get(CONF_COMMUNE)
+        phantom_by_utility: dict[str, frozenset[str]] = {
+            "farys": _farys_phantom_ids,
+            "pidpa": _pidpa_phantom_slugs,
+        }
+        new_options = dict(entry.options)
+        if commune is not None and commune in phantom_by_utility.get(utility, frozenset()):
+            new_options.pop(CONF_COMMUNE, None)
+            new_options.pop(CONF_COMMUNE_LABEL, None)
+        hass.config_entries.async_update_entry(entry, options=new_options, version=2)
+    return True

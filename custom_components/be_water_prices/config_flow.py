@@ -255,10 +255,14 @@ async def _async_communes(hass: HomeAssistant, utility_id: str) -> tuple[Commune
 
 
 class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg, unused-ignore]
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         self._utility: str | None = None
+        # The postcode the user entered (when they came through the
+        # postcode path). Carried into the entry's options so future
+        # migrations can re-route on resolver changes.
+        self._postcode: str | None = None
         # Candidate operators for a postcode that resolves to multiple
         # utilities (street-level splits). Populated in
         # ``async_step_user`` / ``async_step_reconfigure_postcode`` when
@@ -274,6 +278,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             postcode = user_input[CONF_POSTCODE].strip()
+            self._postcode = postcode
             candidates = _resolve_candidates(postcode)
             if len(candidates) == 1:
                 self._utility = candidates[0]
@@ -313,6 +318,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         communes = await _async_communes(self.hass, self._utility)
         if user_input is not None:
             final = dict(user_input)
+            if self._postcode is not None:
+                final[CONF_POSTCODE] = self._postcode
             chosen = final.get(CONF_COMMUNE)
             if chosen:
                 # Resolve the opaque commune id to its display label so the
@@ -367,6 +374,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         """
         if user_input is not None:
             postcode = user_input[CONF_POSTCODE].strip()
+            self._postcode = postcode
             candidates = _resolve_candidates(postcode)
             if len(candidates) == 1:
                 self._utility = candidates[0]
@@ -490,6 +498,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             new_options[CONF_COMMUNE] = self._reconfigure_commune
             if self._reconfigure_commune_label is not None:
                 new_options[CONF_COMMUNE_LABEL] = self._reconfigure_commune_label
+        if self._postcode is not None:
+            new_options[CONF_POSTCODE] = self._postcode
 
         if new_utility == old_utility and new_options == dict(entry.options):
             # No-op rewrite (postcode resolved to the same utility we

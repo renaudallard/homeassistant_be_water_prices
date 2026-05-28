@@ -74,7 +74,9 @@ async def test_postcode_resolves_to_vivaqua_for_brussels(hass: HomeAssistant) ->
     assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
     assert result["title"] == "VIVAQUA"
     assert result["data"] == {CONF_UTILITY: "vivaqua"}
-    assert result["options"] == {CONF_CONSUMPTION_M3_PER_YEAR: 100}
+    # Postcode is persisted into options so future resolver-coverage
+    # migrations can auto-correct the utility (v2 schema).
+    assert result["options"] == {CONF_CONSUMPTION_M3_PER_YEAR: 100, CONF_POSTCODE: "1000"}
 
 
 @pytest.mark.asyncio
@@ -409,6 +411,88 @@ async def test_reconfigure_flow_falls_through_to_manual_picker(
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "swde"
+
+
+@pytest.mark.asyncio
+async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant) -> None:
+    """A v1 entry that picked one of the 23 phantom Farys commune ids
+    (Farys lists them but doesn't actually serve them; coordinator
+    crashed every refresh) must be migrated to v2 with the bad
+    commune dropped, so the integration loads on Farys's
+    operator-wide default until the user reconfigures.
+    """
+    from custom_components.be_water_prices import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "25126",  # 1500 - Halle (Halle) -- phantom
+            CONF_COMMUNE_LABEL: "1500 - Halle (Halle)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=1,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options
+    # Non-commune options carry over.
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
+
+
+@pytest.mark.asyncio
+async def test_migrate_v1_entry_leaves_valid_commune_alone(hass: HomeAssistant) -> None:
+    """A v1 entry whose saved commune is real (not on the phantom
+    blocklist) must be migrated to v2 with no option changes.
+    """
+    from custom_components.be_water_prices import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "25071",  # 9000 - Gent (Centrum) -- valid
+            CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=1,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert entry.options[CONF_COMMUNE] == "25071"
+    assert entry.options[CONF_COMMUNE_LABEL] == "9000 - Gent (Centrum)"
+
+
+@pytest.mark.asyncio
+async def test_migrate_v1_entry_drops_phantom_pidpa_antwerpen(hass: HomeAssistant) -> None:
+    """Pidpa's sitemap listed 'antwerpen' as a slug but it has no
+    tariff page (Water-link territory). v1 entries on that slug get
+    cleaned up on migration.
+    """
+    from custom_components.be_water_prices import async_migrate_entry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 90, CONF_COMMUNE: "antwerpen"},
+        unique_id=f"{DOMAIN}_pidpa",
+        version=1,
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert CONF_COMMUNE not in entry.options
 
 
 @pytest.mark.asyncio
