@@ -332,13 +332,30 @@ def _slug_to_label(slug: str) -> str:
     return "-".join(token.capitalize() for token in slug.split("-"))
 
 
+# Phantom slugs in Pidpa's sitemap -- the /ons-aanbod/je-gemeente/<slug>
+# page exists but has no huishoudelijk tariff table because the commune
+# is not actually served by Pidpa (Antwerpen is Water-link territory;
+# Pidpa lists it for marketing reach). Picking these crashes with
+# "could not locate Pidpa huishoudelijk <year> table". Drop them from
+# the dropdown so users can't pick them.
+_UNSERVABLE_COMMUNE_SLUGS: frozenset[str] = frozenset({"antwerpen"})
+
+
 async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
-    """Discover the Pidpa-served communes from the public sitemap."""
+    """Discover the Pidpa-served communes from the public sitemap.
+
+    Drops slugs that resolve to a page without a tariff table (see
+    ``_UNSERVABLE_COMMUNE_SLUGS``).
+    """
     sitemap = await fetch_html(session, SITEMAP_URL)
     slugs = sorted(set(_COMMUNE_SLUG_RE.findall(sitemap)))
     if not slugs:
         raise ExtractorError("Pidpa sitemap returned no commune slugs")
-    return tuple(CommuneOption(id=s, label=_slug_to_label(s)) for s in slugs)
+    return tuple(
+        CommuneOption(id=s, label=_slug_to_label(s))
+        for s in slugs
+        if s not in _UNSERVABLE_COMMUNE_SLUGS
+    )
 
 
 EXTRACTOR = WaterExtractor(

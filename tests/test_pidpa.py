@@ -118,3 +118,13 @@ def test_extractor_advertises_per_commune_support() -> None:
     assert EXTRACTOR.fetch_for_commune is not None
     assert EXTRACTOR.list_communes is not None
     assert EXTRACTOR.supports_communes
+
+
+def test_unservable_slugs_blocklist_includes_antwerpen() -> None:
+    # Pidpa's sitemap lists "antwerpen" but the corresponding tariff
+    # page has no huishoudelijk table (Water-link's territory). The
+    # blocklist must keep dropping it from list_communes() so users
+    # can't pick a crashing option.
+    from custom_components.be_water_prices.providers.pidpa import _UNSERVABLE_COMMUNE_SLUGS
+
+    assert "antwerpen" in _UNSERVABLE_COMMUNE_SLUGS
