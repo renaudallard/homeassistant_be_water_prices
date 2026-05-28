@@ -382,4 +382,11 @@ async def _recorder_ytd_m3(
             continue
         total += float(delta)
         seen = True
-    return total if seen else None
+    if not seen:
+        return None
+    # Replacing a water meter mid-year (cumulative sensor state drops
+    # back to 0) produces a single large negative delta in the swap
+    # bucket. Without a floor we'd surface a nonsensical -50 m³ as the
+    # year-to-date consumption; floor at 0 so the sensor degrades to
+    # "no consumption since meter swap" rather than negative numbers.
+    return max(0.0, total)
