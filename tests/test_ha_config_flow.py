@@ -275,8 +275,14 @@ async def test_reconfigure_flow_swaps_utility_and_clears_commune(
     entry.add_to_hass(hass)
 
     result = await entry.start_reconfigure_flow(hass)
-    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["type"] == data_entry_flow.FlowResultType.MENU
     assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reconfigure_postcode"
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -319,11 +325,28 @@ async def test_reconfigure_flow_keeps_commune_when_utility_unchanged(
     )
     entry.add_to_hass(hass)
 
-    result = await entry.start_reconfigure_flow(hass)
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {CONF_POSTCODE: "9000"},  # also Farys
+    fake_communes = (
+        CommuneOption(id="25071", label="9000 - Gent (Centrum)"),
+        CommuneOption(id="44021", label="9000 - Gent (Mariakerke)"),
     )
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_POSTCODE: "9000"},  # also Farys (per-commune)
+        )
+        # Per-commune resolution chains into the commune step.
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure_commune"
+
+        # Submit without picking -> existing commune is preserved.
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
 
@@ -349,6 +372,9 @@ async def test_reconfigure_flow_falls_through_to_manual_picker(
     entry.add_to_hass(hass)
 
     result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+    )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_POSTCODE: "99999"}
     )
@@ -390,6 +416,9 @@ async def test_reconfigure_flow_aborts_when_target_utility_already_configured(
 
     result = await farys.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+    )
+    result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {CONF_POSTCODE: "1000"},  # already-configured VIVAQUA
     )
@@ -397,3 +426,213 @@ async def test_reconfigure_flow_aborts_when_target_utility_already_configured(
     assert result["reason"] == "already_configured"
     # Original Farys entry untouched.
     assert farys.data[CONF_UTILITY] == "farys"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_postcode_swap_to_per_commune_chains_into_commune_step(
+    hass: HomeAssistant,
+) -> None:
+    """Postcode resolves to a different per-commune utility -> commune
+    step shows. Commune-tied options are cleared before the new commune
+    is layered on, so the entry lands on a fresh commune-precise tariff.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 90},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (
+        CommuneOption(id="25071", label="9000 - Gent (Centrum)"),
+        CommuneOption(id="44021", label="9000 - Gent (Mariakerke)"),
+    )
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_POSTCODE: "9000"},  # Farys (per-commune)
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure_commune"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "44021"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "farys"
+    assert entry.options[CONF_COMMUNE] == "44021"
+    assert entry.options[CONF_COMMUNE_LABEL] == "9000 - Gent (Mariakerke)"
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_manual_picker_per_commune_chains_into_commune_step(
+    hass: HomeAssistant,
+) -> None:
+    """Per-commune manual pick (Water-link / DWG / Farys / Pidpa) chains
+    into a commune dropdown so the user lands on a commune-precise
+    tariff without needing a follow-up OptionsFlow.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "boechout",
+            CONF_COMMUNE_LABEL: "Boechout",
+        },
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (
+        CommuneOption(id="antwerpen", label="Antwerpen"),
+        CommuneOption(id="mortsel", label="Mortsel"),
+    )
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        assert result["type"] == data_entry_flow.FlowResultType.MENU
+        assert result["step_id"] == "reconfigure"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_manual"}
+        )
+        assert result["step_id"] == "reconfigure_manual"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "water_link"}
+        )
+        # Per-commune utility -> commune step, not abort.
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure_commune"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "mortsel"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    assert entry.data[CONF_UTILITY] == "water_link"
+    assert entry.unique_id == f"{DOMAIN}_water_link"
+    assert entry.options[CONF_COMMUNE] == "mortsel"
+    assert entry.options[CONF_COMMUNE_LABEL] == "Mortsel"
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_manual_picker_non_per_commune_skips_commune_step(
+    hass: HomeAssistant,
+) -> None:
+    """Picking a non-per-commune operator (VIVAQUA / SWDE / Aquaduin /
+    AGSO / Walloons) finishes immediately -- no commune step.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 90},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_UTILITY: "vivaqua"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "vivaqua"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_manual_picker_skips_commune_step_when_list_unavailable(
+    hass: HomeAssistant,
+) -> None:
+    """When the live commune list cannot be fetched (transient network /
+    parser failure), the commune step is silently skipped and the entry
+    loads on the operator-wide default. User can pick a commune later
+    via OptionsFlow.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 90},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=(),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_manual"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "water_link"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "water_link"
+    assert CONF_COMMUNE not in entry.options
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_manual_picker_per_commune_blank_commune(
+    hass: HomeAssistant,
+) -> None:
+    """User submits the commune step without picking -- entry loads on
+    the operator-wide default rather than the old utility's commune.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "boechout",
+            CONF_COMMUNE_LABEL: "Boechout",
+        },
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (CommuneOption(id="antwerpen", label="Antwerpen"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_manual"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "water_link"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {},  # no CONF_COMMUNE -> use default
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert entry.data[CONF_UTILITY] == "water_link"
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options

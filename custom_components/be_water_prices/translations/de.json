@@ -16,6 +16,14 @@
         }
       },
       "reconfigure": {
+        "title": "Wasserversorger neu einrichten",
+        "description": "Wählen Sie, wie Sie diesen Eintrag aktualisieren möchten. Nach einem Umzug ist die erneute Postleitzahl-Zuordnung die richtige Wahl; wählen Sie den Versorger direkt, wenn die Postleitzahl den falschen Versorger ausgewählt hat.",
+        "menu_options": {
+          "reconfigure_postcode": "Postleitzahl aktualisieren und Versorger neu zuordnen",
+          "reconfigure_manual": "Versorger direkt auswählen"
+        }
+      },
+      "reconfigure_postcode": {
         "title": "Postleitzahl aktualisieren",
         "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch, gemeldete Bewohner, Sozialtarif und der Wasserzähler-Sensor bleiben erhalten; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs).",
         "data": {
@@ -24,9 +32,16 @@
       },
       "reconfigure_manual": {
         "title": "Wasserversorger wählen",
-        "description": "Für diese Postleitzahl konnte kein Versorger ermittelt werden. Bitte unten auswählen.",
+        "description": "Wählen Sie den Versorger, der Sie beliefert. Jahresverbrauch, gemeldete Bewohner, Sozialtarif und der Wasserzähler-Sensor bleiben erhalten; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen (Gemeinde-IDs sind zwischen Versorgern nicht austauschbar). Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) fragen anschließend die Gemeinde ab.",
         "data": {
           "utility": "Versorger"
+        }
+      },
+      "reconfigure_commune": {
+        "title": "Gemeinde wählen",
+        "description": "Wählen Sie die Gemeinde dieser Adresse. Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) berechnen leicht unterschiedliche Tarife je Gemeinde; leer lassen, um den Standardtarif des Versorgers zu verwenden und später über die Optionen des Eintrags zu wählen.",
+        "data": {
+          "commune": "Gemeinde"
         }
       },
       "options": {

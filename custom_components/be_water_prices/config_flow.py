@@ -42,10 +42,21 @@ Initial setup walks three steps:
                      reduction post-calc.
 
 A ``reconfigure`` flow (Settings → Devices & services → entry → ⋯ →
-Reconfigure) re-prompts only the postcode and rewrites the entry's
-utility in place; commune-tied options are dropped on a utility change
-because operator A's commune IDs mean nothing to operator B. Annual
-consumption / persons / social tariff / meter carry over.
+Reconfigure) opens a menu offering two paths: re-prompt the postcode
+(``reconfigure_postcode``) or pick the operator directly from the
+dropdown (``reconfigure_manual``). The manual path is the escape hatch
+for users whose postcode resolves to the wrong operator -- e.g. a
+Pidpa ring commune that defaults to Pidpa but is actually served by
+Water-link. If either path resolves to a per-commune operator (DWG /
+Farys / Pidpa / Water-link), a third step (``reconfigure_commune``)
+shows the commune dropdown so the user can pick their commune in the
+same flow rather than needing a follow-up OptionsFlow. The dropdown
+pre-fills with the saved commune when the resolved utility matches
+the entry's current utility. Every path runs through
+``_async_finish_reconfigure``, which rewrites the entry in place;
+commune-tied options are dropped on a utility change because operator
+A's commune IDs mean nothing to operator B. Annual consumption /
+persons / social tariff / meter carry over.
 """
 
 from __future__ import annotations
@@ -230,6 +241,11 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
 
     def __init__(self) -> None:
         self._utility: str | None = None
+        # Carry a manual-picker reconfigure commune choice across steps so
+        # ``_async_finish_reconfigure`` can layer it on top of the trimmed
+        # options when the user picked a per-commune operator.
+        self._reconfigure_commune: str | None = None
+        self._reconfigure_commune_label: str | None = None
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -282,33 +298,109 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Re-prompt for the postcode on an existing entry.
+        """Reconfigure entry point: offer postcode re-resolve or manual pick.
 
         Surfaced as Settings → Devices & services → entry → ⋯ →
-        Reconfigure. Useful when the user moved house or the original
-        postcode picked the wrong default. Falls through to a manual
-        utility picker if the new postcode does not resolve. Annual
-        consumption / persons / meter remain in the entry's options
-        and are unchanged; only the underlying utility (and the
-        commune-tied options that depend on it) get rewritten.
+        Reconfigure. Two paths:
+
+        * ``reconfigure_postcode`` re-prompts the postcode and re-runs
+          the resolver (useful after a move).
+        * ``reconfigure_manual`` jumps straight to the utility dropdown
+          (useful when the postcode resolves to the wrong operator,
+          e.g. a Pidpa ring commune actually served by Water-link).
+        """
+        return self.async_show_menu(
+            step_id="reconfigure",
+            menu_options=["reconfigure_postcode", "reconfigure_manual"],
+        )
+
+    async def async_step_reconfigure_postcode(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Re-prompt for the postcode and re-run the utility resolver.
+
+        Per-commune resolutions chain into ``reconfigure_commune`` so
+        the user can confirm or re-pick the commune in the same flow
+        (the commune dropdown is pre-filled with the current commune
+        when the resolved utility matches the saved one).
         """
         if user_input is not None:
             postcode = user_input[CONF_POSTCODE].strip()
             resolved = _resolve_postcode(postcode)
             if resolved is not None:
                 self._utility = resolved
+                if get(self._utility).supports_communes:
+                    return await self.async_step_reconfigure_commune()
                 return await self._async_finish_reconfigure()
             return await self.async_step_reconfigure_manual()
-        return self.async_show_form(step_id="reconfigure", data_schema=_USER_SCHEMA)
+        return self.async_show_form(step_id="reconfigure_postcode", data_schema=_USER_SCHEMA)
 
     async def async_step_reconfigure_manual(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manual utility picker for the reconfigure flow."""
+        """Manual utility picker for the reconfigure flow.
+
+        Per-commune operators (DWG / Farys / Pidpa / Water-link) chain
+        into ``reconfigure_commune`` so the user can pick their commune
+        in the same flow instead of needing a follow-up OptionsFlow.
+        """
         if user_input is not None:
             self._utility = user_input[CONF_UTILITY]
+            if get(self._utility).supports_communes:
+                return await self.async_step_reconfigure_commune()
             return await self._async_finish_reconfigure()
         return self.async_show_form(step_id="reconfigure_manual", data_schema=_manual_schema())
+
+    async def async_step_reconfigure_commune(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Commune picker shown after the manual or postcode pick.
+
+        Pre-fills the dropdown with the saved commune when the resolved
+        utility matches the entry's current utility, so the user can
+        submit as-is to keep their commune (typical for a postcode
+        refresh after a move within the same operator's territory).
+
+        Skips itself when the commune list cannot be fetched (transient
+        network / parser failure); the entry then loads on the
+        operator-wide default and the user can pick a commune later via
+        OptionsFlow.
+        """
+        assert self._utility is not None
+        communes = await _async_communes(self.hass, self._utility)
+        if not communes:
+            return await self._async_finish_reconfigure()
+        if user_input is not None:
+            chosen = user_input.get(CONF_COMMUNE)
+            if chosen:
+                self._reconfigure_commune = chosen
+                for option in communes:
+                    if option.id == chosen:
+                        self._reconfigure_commune_label = option.label
+                        break
+            return await self._async_finish_reconfigure()
+        entry = self._get_reconfigure_entry()
+        suggested = (
+            entry.options.get(CONF_COMMUNE)
+            if entry.data.get(CONF_UTILITY) == self._utility
+            else None
+        )
+        commune_field = (
+            vol.Optional(CONF_COMMUNE, description={"suggested_value": suggested})
+            if suggested
+            else vol.Optional(CONF_COMMUNE)
+        )
+        schema = vol.Schema(
+            {
+                commune_field: SelectSelector(
+                    SelectSelectorConfig(
+                        options=[SelectOptionDict(value=c.id, label=c.label) for c in communes],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="reconfigure_commune", data_schema=schema)
 
     async def _async_finish_reconfigure(self) -> ConfigFlowResult:
         """Apply the reconfigure to the existing entry and reload it.
@@ -318,8 +410,9 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         carry an opaque, operator-specific identifier (DWG GUID, Farys
         numeric, Pidpa slug, Water-link name) that means nothing to a
         different operator. The other options (consumption, persons,
-        social tariff, meter) carry over. The user can re-pick a
-        commune from the new operator's dropdown via OptionsFlow.
+        social tariff, meter) carry over. If the user picked a commune
+        in the manual flow (``async_step_reconfigure_commune``), layer
+        it on top.
         """
         assert self._utility is not None
         entry = self._get_reconfigure_entry()
@@ -331,16 +424,25 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         if existing is not None and existing.entry_id != entry.entry_id:
             return self.async_abort(reason="already_configured")
 
-        if new_utility == old_utility:
-            # No-op rewrite: postcode resolved to the same utility we
-            # already have. Reload the entry anyway so the user sees a
-            # fresh fetch on the next sensor tick rather than the stale
-            # cached snapshot.
+        new_options = dict(entry.options)
+        if new_utility != old_utility:
+            new_options.pop(CONF_COMMUNE, None)
+            new_options.pop(CONF_COMMUNE_LABEL, None)
+        if self._reconfigure_commune is not None:
+            new_options[CONF_COMMUNE] = self._reconfigure_commune
+            if self._reconfigure_commune_label is not None:
+                new_options[CONF_COMMUNE_LABEL] = self._reconfigure_commune_label
+
+        if new_utility == old_utility and new_options == dict(entry.options):
+            # No-op rewrite (postcode resolved to the same utility we
+            # already have, no commune change). Reload the entry anyway
+            # so the user sees a fresh fetch on the next sensor tick.
             return self.async_update_reload_and_abort(entry)
 
-        new_options = {
-            k: v for k, v in entry.options.items() if k not in (CONF_COMMUNE, CONF_COMMUNE_LABEL)
-        }
+        if new_utility == old_utility:
+            # Same utility but commune changed via the manual flow.
+            return self.async_update_reload_and_abort(entry, options=new_options)
+
         return self.async_update_reload_and_abort(
             entry,
             unique_id=new_unique_id,
