@@ -137,10 +137,18 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # Catch broader than ExtractorError so a future extractor
             # that forgets to wrap (asyncio.TimeoutError, ssl.SSLError,
             # KeyError on a malformed response) still falls through to
-            # the cached-snapshot path. asyncio.CancelledError is the
-            # one exception we must not swallow -- HA cancels tasks on
-            # shutdown / reload and that signal has to propagate.
-            if isinstance(err, asyncio.CancelledError):
+            # the cached-snapshot path. Two exception families must
+            # still propagate:
+            #   - asyncio.CancelledError: HA cancels coordinator tasks
+            #     on shutdown / reload, that signal has to reach the
+            #     event loop unchanged.
+            #   - ConfigEntryAuthFailed / ConfigEntryError: HA's
+            #     DataUpdateCoordinator runs the reauth flow on these,
+            #     swallowing them here would silently break future
+            #     credentialed-tariff extractors.
+            from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryError
+
+            if isinstance(err, asyncio.CancelledError | ConfigEntryAuthFailed | ConfigEntryError):
                 raise
             # On fetch failure keep serving the last good snapshot
             # rather than blanking every sensor; snapshot_age_hours and
