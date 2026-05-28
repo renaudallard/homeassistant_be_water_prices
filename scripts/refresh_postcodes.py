@@ -77,12 +77,12 @@ from pathlib import Path
 # because Farys's raw dropdown still carries the phantom entry while
 # the runtime drops it.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from custom_components.be_water_prices._phantom_blocklists import (
+    FARYS_UNSERVABLE_LABELS as _FARYS_PHANTOM_LABELS,
+)
 from custom_components.be_water_prices.providers._postcodes import (
     _AQUADUIN_POSTCODES,
     _SPLIT_POSTCODES,
-)
-from custom_components.be_water_prices.providers.farys import (
-    _UNSERVABLE_COMMUNE_LABELS as _FARYS_PHANTOM_LABELS,
 )
 
 # Single-source-of-truth mapping from the geoportail's DISTRIBUTEUR

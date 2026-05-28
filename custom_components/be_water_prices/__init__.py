@@ -109,9 +109,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
          auto-applied. v1 entries don't carry one and stay as-is until
          the user reconfigures.
     """
+    from ._phantom_blocklists import (
+        FARYS_UNSERVABLE_IDS as _farys_phantom_ids,
+    )
+    from ._phantom_blocklists import (
+        PIDPA_UNSERVABLE_SLUGS as _pidpa_phantom_slugs,
+    )
     from .const import CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_UTILITY
-    from .providers.farys import _UNSERVABLE_COMMUNE_IDS as _farys_phantom_ids
-    from .providers.pidpa import _UNSERVABLE_COMMUNE_SLUGS as _pidpa_phantom_slugs
 
     if entry.version > 2:
         return False

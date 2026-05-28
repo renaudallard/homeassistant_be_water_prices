@@ -56,10 +56,21 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup
 
+from .._phantom_blocklists import (
+    FARYS_UNSERVABLE_IDS as _UNSERVABLE_COMMUNE_IDS,
+)
+from .._phantom_blocklists import (
+    FARYS_UNSERVABLE_LABELS as _UNSERVABLE_COMMUNE_LABELS,
+)
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._pdf import USER_AGENT, fetch_text, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
+
+# Re-exported so ``async_migrate_entry`` and the test suite can read
+# them under their existing names without knowing about the dep-free
+# leaf module.
+__all__ = ("EXTRACTOR", "_UNSERVABLE_COMMUNE_IDS", "_UNSERVABLE_COMMUNE_LABELS")
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -197,73 +208,9 @@ _OPTION_RE = re.compile(
 # Drop them from list_communes so users can't pick them; the resolver
 # falls back to Farys for the postcode (the dominant operator on the
 # Farys-served half), and users in the DWG half manual-override on
-# reconfigure.
-#
-# Keyed by exact "<postcode> - <commune> (<gemeente>)" label so we are
-# resilient to Farys re-numbering the option ids. Refresh if the smoke
-# test in scripts/live_check.py grows a new "no insert command" error.
-_UNSERVABLE_COMMUNE_LABELS: frozenset[str] = frozenset(
-    {
-        "1500 - Halle (Halle)",
-        "1700 - Dilbeek (Dilbeek)",
-        "1701 - Itterbeek (Dilbeek)",
-        "1702 - Groot-Bijgaarden (Dilbeek)",
-        "1703 - Schepdaal (Dilbeek)",
-        "1740 - Ternat (Ternat)",
-        "1741 - Wambeek (Ternat)",
-        "8020 - Hertsberge (Oostkamp)",
-        "8020 - Ruddervoorde (Oostkamp)",
-        "8020 - Waardamme (Oostkamp)",
-        "8432 - Leffinge (Middelkerke)",
-        "8450 - Bredene (Bredene)",
-        "8490 - Snellegem (Jabbeke)",
-        "8490 - Zerkegem (Jabbeke)",
-        "9080 - Beervelde (Lochristi)",
-        "9080 - Zaffelare (Lochristi)",
-        "9080 - Zeveneken (Lochristi)",
-        "9550 - Sint-Antelinks (Herzele)",
-        "9550 - Sint-Lievens-Esse (Herzele)",
-        "9550 - Steenhuize-Wijnhuize (Herzele)",
-        "9550 - Woubrechtegem (Herzele)",
-        "9570 - Deftinge (Lierde)",
-        "9571 - Hemelveerdegem (Lierde)",
-    }
-)
-
-
-# Same set as ``_UNSERVABLE_COMMUNE_LABELS`` but keyed by the numeric
-# option id Farys assigned at the time of the v0.5.x install. Used by
-# ``async_migrate_entry`` to recognise and drop already-saved phantom
-# commune ids from existing config entries when the user upgrades.
-# Refresh by re-scraping Farys's dropdown via the live smoke probe in
-# scripts/live_check.py.
-_UNSERVABLE_COMMUNE_IDS: frozenset[str] = frozenset(
-    {
-        "25126",  # 1500 - Halle (Halle)
-        "24956",  # 1700 - Dilbeek (Dilbeek)
-        "24966",  # 1701 - Itterbeek (Dilbeek)
-        "24961",  # 1702 - Groot-Bijgaarden (Dilbeek)
-        "24971",  # 1703 - Schepdaal (Dilbeek)
-        "25661",  # 1740 - Ternat (Ternat)
-        "25666",  # 1741 - Wambeek (Ternat)
-        "25521",  # 8020 - Hertsberge (Oostkamp)
-        "25531",  # 8020 - Ruddervoorde (Oostkamp)
-        "25536",  # 8020 - Waardamme (Oostkamp)
-        "25411",  # 8432 - Leffinge (Middelkerke)
-        "27251",  # 8450 - Bredene (Bredene)
-        "25201",  # 8490 - Snellegem (Jabbeke)
-        "25216",  # 8490 - Zerkegem (Jabbeke)
-        "25316",  # 9080 - Beervelde (Lochristi)
-        "25326",  # 9080 - Zaffelare (Lochristi)
-        "25331",  # 9080 - Zeveneken (Lochristi)
-        "25161",  # 9550 - Sint-Antelinks (Herzele)
-        "25166",  # 9550 - Sint-Lievens-Esse (Herzele)
-        "25171",  # 9550 - Steenhuize-Wijnhuize (Herzele)
-        "25176",  # 9550 - Woubrechtegem (Herzele)
-        "25291",  # 9570 - Deftinge (Lierde)
-        "25301",  # 9571 - Hemelveerdegem (Lierde)
-    }
-)
+# reconfigure. The data lives in ``_phantom_blocklists`` (imported at
+# the top of this module) so the maintenance script can read it
+# without pulling the providers package in.
 
 
 async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
