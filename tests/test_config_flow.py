@@ -176,7 +176,12 @@ def test_internal_range_edges_are_pinned_against_shadowing_regressions() -> None
     # Water-link / Pidpa split inside the Antwerp province (2000-2070
     # vs 2100-2999):
     assert _resolve_postcode("2070") == "water_link"
-    assert _resolve_postcode("2071") in {"pidpa", None}  # gap in 2071-2099 is allowed
+    # 2071 is the first non-water_link postcode in the Antwerp
+    # province; it must deterministically resolve to Pidpa via the
+    # 2000-2999 fallthrough. Allowing None here would defeat the
+    # shadowing-regression detection -- a range narrowing that drops
+    # 2071-2099 from Pidpa coverage would silently pass.
+    assert _resolve_postcode("2071") == "pidpa"
     # Walloon table coverage cliff (postcodes outside the table return
     # None so the manual picker fires):
     assert _resolve_postcode("6830") is None  # Bouillon régie -- not shipped
