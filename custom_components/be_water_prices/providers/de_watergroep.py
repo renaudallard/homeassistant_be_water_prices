@@ -150,22 +150,26 @@ def parse_commune_tariff(
     year: int,
     commune_label: str,
 ) -> WaterTariff:
-    """Parse the per-commune AJAX response (full integrale waterprijs)."""
+    """Parse the per-commune AJAX response (full integrale waterprijs).
+
+    Some communes don't levy a gemeentelijke or bovengemeentelijke
+    saneringsbijdrage (Sinaai is the canonical example: DWG renders the
+    "Afvoer van afvalwater" / "Zuivering van afvalwater" labels with
+    no euro amount). Treat a missing row as 0 instead of raising so
+    these communes still produce a tariff. Drinkwater stays required:
+    without it there's no tariff at all.
+    """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)
 
     drinkwater = _BASIS_DRINKWATER_RE.search(text)
+    if drinkwater is None:
+        raise ExtractorError("could not parse De Watergroep per-commune drinkwater basistarief")
+    basis = to_float(drinkwater.group(1))
     afvoer = _BASIS_AFVOER_RE.search(text)
     zuivering = _BASIS_ZUIVERING_RE.search(text)
-    if drinkwater is None or afvoer is None or zuivering is None:
-        raise ExtractorError(
-            "could not parse De Watergroep per-commune basis rows "
-            f"(drinkwater={drinkwater is not None}, "
-            f"afvoer={afvoer is not None}, zuivering={zuivering is not None})"
-        )
-    basis = to_float(drinkwater.group(1))
-    san_gem = to_float(afvoer.group(1))
-    san_bov = to_float(zuivering.group(1))
+    san_gem = to_float(afvoer.group(1)) if afvoer is not None else 0.0
+    san_bov = to_float(zuivering.group(1)) if zuivering is not None else 0.0
 
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
