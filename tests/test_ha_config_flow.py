@@ -521,6 +521,56 @@ async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_reconfigure_commune_drops_stale_saved_when_no_longer_in_list(
+    hass: HomeAssistant,
+) -> None:
+    """A v2 entry whose saved commune has been filtered out of the
+    live list (phantom blocklist addition, operator renumber) must
+    drop the stale id on the next reconfigure -- even when the user
+    submits the form without picking a replacement. Otherwise the
+    suggested-value preservation path keeps writing the bad commune
+    forward and the coordinator keeps crashing.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "999999",  # not in the fresh fake_communes
+            CONF_COMMUNE_LABEL: "9999 - Stale (Old)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    # Live list does NOT contain "999999" -- simulates phantom blocklist
+    # addition after the entry was created.
+    fake_communes = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_POSTCODE: "9000"},  # resolves to Farys
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        # User submits unchanged.
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    # Stale commune is dropped, not preserved.
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options
+
+
+@pytest.mark.asyncio
 async def test_phantom_sweep_runs_on_v2_entries_too(hass: HomeAssistant) -> None:
     """A v2 entry that picked a commune before it was flagged as a
     phantom (later blocklist addition) must still get cleaned on
