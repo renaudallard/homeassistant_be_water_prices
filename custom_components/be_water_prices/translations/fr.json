@@ -71,7 +71,8 @@
       }
     },
     "abort": {
-      "already_configured": "Cette compagnie est déjà configurée."
+      "already_configured": "Cette compagnie est déjà configurée.",
+      "invalid_flow_state": "La configuration a été interrompue ; recommencez depuis le début."
     }
   },
   "options": {
