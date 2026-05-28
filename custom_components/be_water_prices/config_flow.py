@@ -281,10 +281,22 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         self._communes_cache: dict[str, tuple[CommuneOption, ...]] = {}
 
     async def _async_communes_cached(self, utility_id: str) -> tuple[CommuneOption, ...]:
-        """``_async_communes`` memoised per flow instance + utility."""
-        if utility_id not in self._communes_cache:
-            self._communes_cache[utility_id] = await _async_communes(self.hass, utility_id)
-        return self._communes_cache[utility_id]
+        """``_async_communes`` memoised per flow instance + utility.
+
+        Only caches non-empty results. A transient network / parser
+        failure inside ``_async_communes`` collapses to an empty tuple;
+        caching that would lock the flow into an empty dropdown for
+        its entire lifetime even though a follow-up retry might
+        succeed. Non-per-commune operators also return ``()`` quickly
+        without a network call so re-checking them is cheap.
+        """
+        cached = self._communes_cache.get(utility_id)
+        if cached:
+            return cached
+        fresh = await _async_communes(self.hass, utility_id)
+        if fresh:
+            self._communes_cache[utility_id] = fresh
+        return fresh
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -550,9 +562,13 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         self._communes_cache: dict[str, tuple[CommuneOption, ...]] = {}
 
     async def _async_communes_cached(self, utility_id: str) -> tuple[CommuneOption, ...]:
-        if utility_id not in self._communes_cache:
-            self._communes_cache[utility_id] = await _async_communes(self.hass, utility_id)
-        return self._communes_cache[utility_id]
+        cached = self._communes_cache.get(utility_id)
+        if cached:
+            return cached
+        fresh = await _async_communes(self.hass, utility_id)
+        if fresh:
+            self._communes_cache[utility_id] = fresh
+        return fresh
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         utility_id = self.config_entry.data[CONF_UTILITY]
