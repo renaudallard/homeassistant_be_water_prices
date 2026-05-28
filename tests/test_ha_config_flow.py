@@ -78,6 +78,28 @@ async def test_postcode_resolves_to_vivaqua_for_brussels(hass: HomeAssistant) ->
 
 
 @pytest.mark.asyncio
+async def test_split_postcode_lands_on_choose_step(hass: HomeAssistant) -> None:
+    """A street-level split (e.g. 8400 Oostende) cannot be resolved
+    from postcode alone. The flow shows a small chooser with just the
+    candidate operators rather than the full 16-utility dropdown.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_POSTCODE: "8400"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "choose"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_UTILITY: "de_watergroep"}
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "options"
+
+
+@pytest.mark.asyncio
 async def test_unknown_postcode_falls_through_to_manual(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -594,6 +616,55 @@ async def test_reconfigure_flow_manual_picker_skips_commune_step_when_list_unava
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "water_link"
     assert CONF_COMMUNE not in entry.options
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_postcode_split_lands_on_choose_step(
+    hass: HomeAssistant,
+) -> None:
+    """The reconfigure flow's postcode path lands on the chooser when
+    the new postcode is a split. Pick one of the candidates and the
+    entry is rewritten in place.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 90},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_POSTCODE: "8400"},  # split between DWG and Farys
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reconfigure_choose"
+
+    # Picking a non-per-commune option short-circuits the commune step.
+    # Use Farys (per-commune) to confirm the chain still routes correctly:
+    # split chooser -> commune picker -> finish.
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=(CommuneOption(id="x", label="8400 - Mariakerke (Oostende)"),),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "farys"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure_commune"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "x"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "farys"
 
 
 @pytest.mark.asyncio

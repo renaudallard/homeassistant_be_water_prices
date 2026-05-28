@@ -15,6 +15,13 @@
           "utility": "Maatschappij"
         }
       },
+      "choose": {
+        "title": "Kies je watermaatschappij",
+        "description": "Je postcode wordt door meerdere maatschappijen bediend -- elk verzorgt andere straten in je buurt. Kies wie jou factureert (kijk je laatste waterfactuur na als je twijfelt).",
+        "data": {
+          "utility": "Maatschappij"
+        }
+      },
       "reconfigure": {
         "title": "Watermaatschappij opnieuw instellen",
         "description": "Kies hoe je deze invoer wil bijwerken. Na een verhuis is opnieuw koppelen via postcode meestal de juiste keuze; kies de maatschappij rechtstreeks als de postcode-koppeling de verkeerde maatschappij heeft gekozen.",
@@ -33,6 +40,13 @@
       "reconfigure_manual": {
         "title": "Kies je watermaatschappij",
         "description": "Kies de maatschappij die jou bedient. Jaarverbruik, gedomicilieerde personen, sociaal tarief en de watermetersensor blijven behouden; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest (gemeente-IDs zijn niet uitwisselbaar tussen maatschappijen). Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) vragen daarna nog je gemeente.",
+        "data": {
+          "utility": "Maatschappij"
+        }
+      },
+      "reconfigure_choose": {
+        "title": "Kies je watermaatschappij",
+        "description": "Je postcode wordt door meerdere maatschappijen bediend -- elk verzorgt andere straten in je buurt. Kies wie jou factureert. Jaarverbruik, gedomicilieerde personen, sociaal tarief en de watermetersensor blijven behouden; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest.",
         "data": {
           "utility": "Maatschappij"
         }

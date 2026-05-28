@@ -33,7 +33,12 @@ of config-flow logic that has to be right before HA hands us a session.
 
 from __future__ import annotations
 
-from custom_components.be_water_prices.providers._postcodes import resolve as _resolve_postcode
+from custom_components.be_water_prices.providers._postcodes import (
+    resolve as _resolve_postcode,
+)
+from custom_components.be_water_prices.providers._postcodes import (
+    resolve_candidates as _resolve_candidates,
+)
 
 
 def test_brussels_postcodes_resolve_to_vivaqua() -> None:
@@ -141,3 +146,50 @@ def test_invalid_postcodes_return_none() -> None:
     assert _resolve_postcode("abcd") is None
     assert _resolve_postcode("") is None
     assert _resolve_postcode(None) is None
+
+
+def test_dwg_only_after_farys_filter_includes_new_carve_outs() -> None:
+    # Once Farys's phantom dropdown entries are filtered out, 8432
+    # Leffinge and 9571 Hemelveerdegem become DWG-only and belong in
+    # the carve-out (Farys's old "we list it" claim was a mirage).
+    assert _resolve_postcode("8432") == "de_watergroep"
+    assert _resolve_postcode("9571") == "de_watergroep"
+
+
+def test_resolve_candidates_returns_single_for_unambiguous() -> None:
+    # Bulk of postcodes are unambiguous -- one operator serves them.
+    assert _resolve_candidates("1000") == ("vivaqua",)
+    assert _resolve_candidates("9000") == ("farys",)
+    assert _resolve_candidates("9112") == ("de_watergroep",)
+    assert _resolve_candidates("4000") == ("cile",)
+
+
+def test_resolve_candidates_returns_multiple_for_split_postcodes() -> None:
+    # The 8 real splits are postcodes where two or three operators
+    # genuinely share the postcode at street level; the config flow
+    # asks the user to pick.
+    assert _resolve_candidates("1770") == ("de_watergroep", "farys")  # Liedekerke
+    assert _resolve_candidates("8020") == ("farys", "de_watergroep")  # Oostkamp
+    assert _resolve_candidates("8400") == ("farys", "de_watergroep")  # Oostende
+    assert _resolve_candidates("8450") == ("aquaduin", "de_watergroep")  # Bredene
+    assert _resolve_candidates("8490") == ("farys", "de_watergroep")  # Jabbeke
+    assert _resolve_candidates("9080") == ("farys", "de_watergroep")  # Lochristi
+    assert _resolve_candidates("9550") == ("farys", "de_watergroep")  # Herzele
+    assert _resolve_candidates("9570") == ("farys", "de_watergroep")  # Lierde
+
+
+def test_resolve_returns_dominant_candidate_for_splits() -> None:
+    # ``resolve`` is the legacy single-operator wrapper; for split
+    # postcodes it returns the first candidate (preserves the
+    # range-based default so old callers still get the operator the
+    # resolver would have picked before split-awareness landed).
+    assert _resolve_postcode("1770") == "de_watergroep"
+    assert _resolve_postcode("8020") == "farys"
+    assert _resolve_postcode("8450") == "aquaduin"
+
+
+def test_resolve_candidates_empty_for_invalid() -> None:
+    assert _resolve_candidates("abcd") == ()
+    assert _resolve_candidates("") == ()
+    assert _resolve_candidates(None) == ()
+    assert _resolve_candidates("6830") == ()  # Bouillon (régie, unsupported)
