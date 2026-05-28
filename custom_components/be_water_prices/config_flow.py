@@ -106,7 +106,7 @@ from .const import (
     REGION_FLANDERS,
 )
 from .providers import all_extractors, get
-from .providers._postcodes import resolve as _resolve_postcode
+from .providers._postcodes import resolve_candidates as _resolve_candidates
 from .providers.base import CommuneOption
 
 _LOGGER = logging.getLogger(__name__)
@@ -129,6 +129,24 @@ def _manual_schema() -> vol.Schema:
             vol.Required(CONF_UTILITY): SelectSelector(
                 SelectSelectorConfig(
                     options=_utility_options(),
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+    )
+
+
+def _choose_schema(candidates: tuple[str, ...]) -> vol.Schema:
+    """Operator picker limited to a curated candidate list.
+
+    Used when ``resolve_candidates`` returns more than one operator
+    because the postcode is genuinely split at street level.
+    """
+    return vol.Schema(
+        {
+            vol.Required(CONF_UTILITY): SelectSelector(
+                SelectSelectorConfig(
+                    options=[SelectOptionDict(value=c, label=get(c).label) for c in candidates],
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
@@ -241,6 +259,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
 
     def __init__(self) -> None:
         self._utility: str | None = None
+        # Candidate operators for a postcode that resolves to multiple
+        # utilities (street-level splits). Populated in
+        # ``async_step_user`` / ``async_step_reconfigure_postcode`` when
+        # the resolver returns >1 candidate; consumed by
+        # ``async_step_choose`` / ``async_step_reconfigure_choose``.
+        self._candidates: tuple[str, ...] = ()
         # Carry a manual-picker reconfigure commune choice across steps so
         # ``_async_finish_reconfigure`` can layer it on top of the trimmed
         # options when the user picked a per-commune operator.
@@ -250,12 +274,28 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             postcode = user_input[CONF_POSTCODE].strip()
-            resolved = _resolve_postcode(postcode)
-            if resolved is not None:
-                self._utility = resolved
+            candidates = _resolve_candidates(postcode)
+            if len(candidates) == 1:
+                self._utility = candidates[0]
                 return await self.async_step_options()
+            if len(candidates) > 1:
+                self._candidates = candidates
+                return await self.async_step_choose()
             return await self.async_step_manual()
         return self.async_show_form(step_id="user", data_schema=_USER_SCHEMA)
+
+    async def async_step_choose(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Operator chooser shown when the postcode is split.
+
+        The user picks one of two or three operators that genuinely
+        share the postcode at street level (e.g. 8400 Oostende, where
+        DWG serves Stene and Farys serves Mariakerke).
+        """
+        assert self._candidates
+        if user_input is not None:
+            self._utility = user_input[CONF_UTILITY]
+            return await self.async_step_options()
+        return self.async_show_form(step_id="choose", data_schema=_choose_schema(self._candidates))
 
     async def async_step_manual(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -322,18 +362,36 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         Per-commune resolutions chain into ``reconfigure_commune`` so
         the user can confirm or re-pick the commune in the same flow
         (the commune dropdown is pre-filled with the current commune
-        when the resolved utility matches the saved one).
+        when the resolved utility matches the saved one). Split
+        postcodes chain into ``reconfigure_choose`` instead.
         """
         if user_input is not None:
             postcode = user_input[CONF_POSTCODE].strip()
-            resolved = _resolve_postcode(postcode)
-            if resolved is not None:
-                self._utility = resolved
+            candidates = _resolve_candidates(postcode)
+            if len(candidates) == 1:
+                self._utility = candidates[0]
                 if get(self._utility).supports_communes:
                     return await self.async_step_reconfigure_commune()
                 return await self._async_finish_reconfigure()
+            if len(candidates) > 1:
+                self._candidates = candidates
+                return await self.async_step_reconfigure_choose()
             return await self.async_step_reconfigure_manual()
         return self.async_show_form(step_id="reconfigure_postcode", data_schema=_USER_SCHEMA)
+
+    async def async_step_reconfigure_choose(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Operator chooser for the reconfigure flow's postcode path."""
+        assert self._candidates
+        if user_input is not None:
+            self._utility = user_input[CONF_UTILITY]
+            if get(self._utility).supports_communes:
+                return await self.async_step_reconfigure_commune()
+            return await self._async_finish_reconfigure()
+        return self.async_show_form(
+            step_id="reconfigure_choose", data_schema=_choose_schema(self._candidates)
+        )
 
     async def async_step_reconfigure_manual(
         self, user_input: dict[str, Any] | None = None
