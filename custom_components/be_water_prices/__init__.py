@@ -50,6 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.exceptions import ConfigEntryNotReady
 
     from .coordinator import WaterCoordinator
+    from .providers import async_load as async_load_providers
     from .statistics import (
         async_maybe_backfill_once,
         async_register_services,
@@ -66,6 +67,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _drop_phantom_commune_if_blocked(hass, entry)
     options_changed = entry.options != original_options
 
+    # Build the extractor registry off the event loop: importing the
+    # provider modules pulls in pdfplumber / BeautifulSoup / aiohttp and
+    # reads manifest.json, blocking work HA forbids on the loop. The
+    # synchronous get() inside WaterCoordinator then hits the cache.
+    await async_load_providers(hass)
     coordinator = WaterCoordinator(hass, entry)
     try:
         await coordinator.async_config_entry_first_refresh()

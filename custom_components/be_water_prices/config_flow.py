@@ -105,7 +105,7 @@ from .const import (
     MIN_PERSONS,
     REGION_FLANDERS,
 )
-from .providers import all_extractors, get
+from .providers import all_extractors, async_load, get
 from .providers._postcodes import resolve_candidates as _resolve_candidates
 from .providers.base import CommuneOption
 
@@ -306,6 +306,10 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
+            # Warm the extractor registry off-loop before the chained
+            # steps call get() / all_extractors(); importing the provider
+            # modules is blocking work HA forbids on the loop.
+            await async_load(self.hass)
             postcode = user_input[CONF_POSTCODE].strip()
             self._postcode = postcode
             candidates = _resolve_candidates(postcode)
@@ -393,6 +397,11 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
           (useful when the postcode resolves to the wrong operator,
           e.g. a Pidpa ring commune actually served by Water-link).
         """
+        # Warm the extractor registry off-loop: the reconfigure sub-steps
+        # call get() / all_extractors(), and importing the provider modules
+        # is blocking work HA forbids on the loop. The build is cached, so
+        # warming once here covers every sub-step in this flow.
+        await async_load(self.hass)
         # Reset every cross-step instance var so a user backing out of
         # a previous reconfigure attempt and re-entering does not see
         # a leftover commune choice / stale-drop flag from the prior
@@ -624,6 +633,10 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         return fresh
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        # Warm the extractor registry off-loop before _is_flanders() /
+        # get() run; importing the provider modules is blocking work HA
+        # forbids on the loop.
+        await async_load(self.hass)
         utility_id = self.config_entry.data[CONF_UTILITY]
         communes = await self._async_communes_cached(utility_id)
         if user_input is not None:
