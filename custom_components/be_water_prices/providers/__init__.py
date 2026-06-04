@@ -37,12 +37,16 @@ extractor module at package init time.
 from __future__ import annotations
 
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 from .base import (
     ExtractorError,
     WaterExtractor,
     WaterTariff,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 # Insertion order is the user-facing order in the manual-picker
 # dropdown. Brussels / DWG / Pidpa / Aquaduin / AGSO / Water-link /
@@ -94,6 +98,18 @@ def all_extractors() -> tuple[WaterExtractor, ...]:
     return tuple(_build_registry().values())
 
 
+async def async_load(hass: HomeAssistant) -> None:
+    """Build the registry off the event loop.
+
+    Importing the extractor modules pulls in pdfplumber / BeautifulSoup /
+    aiohttp and reads manifest.json for the User-Agent string -- blocking
+    work Home Assistant forbids on the loop thread. Async callers run this
+    once so the later synchronous ``get`` / ``all_extractors`` lookups hit
+    the cached registry instead of importing on the loop.
+    """
+    await hass.async_add_executor_job(_build_registry)
+
+
 def __getattr__(name: str) -> dict[str, WaterExtractor]:
     # Back-compat alias for callers that imported ``EXTRACTORS`` (the
     # dict) directly. Building lazily keeps the import side-effect-free.
@@ -108,5 +124,6 @@ __all__ = [
     "WaterExtractor",
     "WaterTariff",
     "all_extractors",
+    "async_load",
     "get",
 ]
