@@ -137,6 +137,19 @@ class ExtractorError(Exception):
     """Raised when a utility's source cannot be fetched or parsed."""
 
 
+class TransientFetchError(ExtractorError):
+    """A fetch failed for an infrastructure reason rather than a content one.
+
+    Network timeouts, connection resets, and HTTP 5xx / 429 responses are
+    upstream hiccups that usually clear on a retry; they do not mean the
+    parser or the published page has changed. The live-check classifies
+    these separately so a brief outage does not open a false GitHub issue
+    (see ``scripts/live_check.py``). It subclasses :class:`ExtractorError`
+    so existing ``except ExtractorError`` callers keep treating it as a
+    fetch failure.
+    """
+
+
 def relabel_with_human_commune(
     tariff: WaterTariff, *, commune_id: str, commune_label: str | None
 ) -> WaterTariff:

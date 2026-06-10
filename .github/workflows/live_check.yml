@@ -38,7 +38,10 @@ jobs:
             rc=$?
             cat report.md
             echo "::endgroup::"
-            if [ $((rc & 1)) -eq 0 ]; then
+            # Stop once fully green. Retry on any failure, bit 1 (real)
+            # or bit 2 (transient), so an upstream hiccup gets its
+            # retries to recover before we judge the final state.
+            if [ $((rc & 3)) -eq 0 ]; then
               break
             fi
             if [ "$i" -lt "$attempts" ]; then
@@ -49,11 +52,18 @@ jobs:
             fi
           done
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # Only a real failure (bit 1) opens an issue; a transient-only
+          # result (bit 2) is an upstream hiccup, not a regression.
+          if [ $((rc & 1)) -ne 0 ]; then
+            echo "real_fail=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "real_fail=0" >> "$GITHUB_OUTPUT"
+          fi
           # Exit 0 here so subsequent issue-creation steps run regardless.
           exit 0
 
       - name: Open or update extractor-broken issue
-        if: steps.check.outputs.rc == '1'
+        if: steps.check.outputs.real_fail == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
