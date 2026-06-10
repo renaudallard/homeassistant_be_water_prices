@@ -402,7 +402,11 @@ Two cron workflows guard against silent regressions:
   publication URL, retries up to five times with exponential
   backoff, and opens / updates a GitHub issue titled
   `[live-check] water extractor broken …` on persistent parser
-  failure.
+  failure. Transient upstream hiccups (timeout, connection reset,
+  HTTP 5xx / 429) are reported as a `TRANSIENT` row and retried but
+  never open an issue — only a real regression (parse / shape error,
+  HTTP 4xx) does, so a brief outage at a utility is not mistaken for a
+  broken extractor.
 - [`.github/workflows/fixture_drift.yml`](./.github/workflows/fixture_drift.yml)
   runs weekly, parses each utility's live publication and diffs
   the result against the parser's output on the committed test

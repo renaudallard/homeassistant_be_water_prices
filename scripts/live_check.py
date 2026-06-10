@@ -35,12 +35,18 @@ non-zero on the first failure.
 Run by ``.github/workflows/live_check.yml`` daily; on persistent failure
 the workflow opens or updates a GitHub issue with this report attached.
 
-Exit code semantics (mirrors the sibling integration so the workflow
-script is shared, even though water never trips the bit-1 path today):
+Exit code semantics (a bitmask so the workflow can retry on any failure
+but only open an issue for a real one):
 
-    0 = all extractors green
-    1 = at least one extractor failed (parse error, network error, sanity
-        check missed) -- worth retrying in the workflow
+    0 = all reachable extractors green
+    1 = at least one extractor really failed (parse error, sanity check
+        missed, HTTP 4xx); worth retrying and opening an issue
+    2 = at least one extractor hit a transient infrastructure failure
+        (timeout, connection reset, HTTP 5xx / 429); worth retrying but
+        not worth an issue. A brief upstream hiccup is not a regression
+
+The two bits combine (3 = both). The workflow retries while either bit
+is set and opens the broken-extractor issue only when bit 1 is set.
 """
 
 from __future__ import annotations
@@ -64,7 +70,14 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterTariff,
     all_extractors,
 )
-from custom_components.be_water_prices.providers.base import ExtractorError  # noqa: E402
+from custom_components.be_water_prices.providers.base import (  # noqa: E402
+    ExtractorError,
+    TransientFetchError,
+)
+
+# Exit-code bits (see module docstring).
+EXIT_REAL_FAIL = 1
+EXIT_TRANSIENT = 2
 
 # Loose plausibility windows. Anything outside these almost certainly
 # means the parser misread a different number on the page.
@@ -92,7 +105,7 @@ class CheckResult:
     extractor_id: str
     label: str
     region: str
-    status: str  # "OK", "FAIL", or "SKIP"
+    status: str  # "OK", "FAIL", "TRANSIENT", or "SKIP"
     detail: str
 
 
@@ -135,6 +148,11 @@ async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) 
 
     try:
         tariff = await extractor.fetch(session)
+    except TransientFetchError as err:
+        # Upstream hiccup (timeout / connection reset / HTTP 5xx): not a
+        # regression, so it must not open an issue. Checked before the
+        # ExtractorError branch because it is a subclass of it.
+        return CheckResult(extractor.id, extractor.label, extractor.region, "TRANSIENT", str(err))
     except ExtractorError as err:
         return CheckResult(extractor.id, extractor.label, extractor.region, "FAIL", str(err))
     except Exception:  # top-level: report anything unexpected as a failure row
@@ -158,14 +176,27 @@ async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) 
     )
 
 
+def _exit_code(results: list[CheckResult]) -> int:
+    """Fold the per-extractor statuses into the exit bitmask.
+
+    SKIP rows do not flip any bit: a CI-unreachable utility is healthy
+    from a residential IP, so flagging it as broken would be a false
+    positive and quickly poison the workflow's signal. FAIL trips bit 1
+    (real regression -> open an issue); TRANSIENT trips bit 2 (upstream
+    hiccup -> retry but no issue).
+    """
+    rc = 0
+    if any(r.status == "FAIL" for r in results):
+        rc |= EXIT_REAL_FAIL
+    if any(r.status == "TRANSIENT" for r in results):
+        rc |= EXIT_TRANSIENT
+    return rc
+
+
 async def _run() -> tuple[list[CheckResult], int]:
     async with aiohttp.ClientSession() as session:
         results = [await _check_one(session, e) for e in all_extractors()]
-    # SKIP rows do not flip the exit code: a CI-unreachable utility
-    # is healthy from a residential IP, so flagging it as broken would
-    # be a false positive and quickly poison the workflow's signal.
-    rc = 0 if all(r.status != "FAIL" for r in results) else 1
-    return results, rc
+    return results, _exit_code(results)
 
 
 def _render(results: list[CheckResult]) -> str:
@@ -176,19 +207,26 @@ def _render(results: list[CheckResult]) -> str:
         detail = r.detail.replace("\n", "<br>").replace("|", "\\|")
         lines.append(f"| {r.label} | {r.region} | {r.status} | {detail} |")
     failed = [r for r in results if r.status == "FAIL"]
+    transient = [r for r in results if r.status == "TRANSIENT"]
     skipped = [r for r in results if r.status == "SKIP"]
+    ok = len(results) - len(failed) - len(transient) - len(skipped)
+    extras = []
+    if transient:
+        extras.append(f"{len(transient)} transient")
+    if skipped:
+        extras.append(f"{len(skipped)} skipped")
     lines.append("")
     if failed:
-        lines.append(
-            f"**{len(failed)} of {len(results)} extractors failed.**"
-            + (f" ({len(skipped)} skipped)" if skipped else "")
-        )
+        # The banner names the failures; the extras give the rest of the
+        # picture without burying the headline in an OK count.
+        suffix = f" ({', '.join(extras)})" if extras else ""
+        lines.append(f"**{len(failed)} of {len(results)} extractors failed.**" + suffix)
     else:
-        lines.append(
-            f"All reachable extractors green ({len(results) - len(skipped)} OK"
-            + (f", {len(skipped)} skipped" if skipped else "")
-            + ")."
-        )
+        counts = ", ".join([f"{ok} OK", *extras])
+        # A transient row is not "green", so say so plainly while
+        # making clear nothing actually regressed.
+        headline = "No regressions" if transient else "All reachable extractors green"
+        lines.append(f"{headline} ({counts}).")
     return "\n".join(lines)
 
 

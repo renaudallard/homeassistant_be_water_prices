@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING
 
 from .base import (
     ExtractorError,
+    TransientFetchError,
     WaterExtractor,
     WaterTariff,
 )
@@ -121,6 +122,7 @@ def __getattr__(name: str) -> dict[str, WaterExtractor]:
 __all__ = [
     "EXTRACTORS",
     "ExtractorError",
+    "TransientFetchError",
     "WaterExtractor",
     "WaterTariff",
     "all_extractors",

@@ -46,9 +46,22 @@ from pathlib import Path
 import aiohttp
 import pypdf
 
-from .base import ExtractorError
+from .base import ExtractorError, TransientFetchError
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _http_error(url: str, status: int) -> ExtractorError:
+    """Map an HTTP status to the right error class.
+
+    5xx (server error) and 429 (rate limited) are transient upstream
+    conditions; 4xx (moved / forbidden / gone) usually means the page
+    changed and is a real failure worth reporting.
+    """
+    message = f"HTTP {status} fetching {url}"
+    if status >= 500 or status == 429:
+        return TransientFetchError(message)
+    return ExtractorError(message)
 
 
 def _read_version() -> str:
@@ -81,10 +94,10 @@ async def fetch_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
             if resp.status >= 400:
-                raise ExtractorError(f"HTTP {resp.status} fetching {url}")
+                raise _http_error(url, resp.status)
             payload = await resp.read()
-    except aiohttp.ClientError as err:
-        raise ExtractorError(f"network error fetching {url}: {err}") from err
+    except (aiohttp.ClientError, TimeoutError) as err:
+        raise TransientFetchError(f"network error fetching {url}: {err}") from err
 
     if not _is_pdf_payload(payload):
         snippet = payload[:80]
@@ -134,10 +147,10 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
             if resp.status >= 400:
-                raise ExtractorError(f"HTTP {resp.status} fetching {url}")
+                raise _http_error(url, resp.status)
             payload = await resp.read()
-    except aiohttp.ClientError as err:
-        raise ExtractorError(f"network error fetching {url}: {err}") from err
+    except (aiohttp.ClientError, TimeoutError) as err:
+        raise TransientFetchError(f"network error fetching {url}: {err}") from err
     if not _is_pdf_payload(payload):
         raise ExtractorError(f"expected a PDF at {url}, payload starts with {payload[:80]!r}")
     return await asyncio.to_thread(extract_pdf_text_layout, payload)
@@ -167,10 +180,10 @@ async def fetch_text(
             kwargs["ssl"] = False
         async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
             if resp.status >= 400:
-                raise ExtractorError(f"HTTP {resp.status} fetching {url}")
+                raise _http_error(url, resp.status)
             return await resp.text()
-    except aiohttp.ClientError as err:
-        raise ExtractorError(f"network error fetching {url}: {err}") from err
+    except (aiohttp.ClientError, TimeoutError) as err:
+        raise TransientFetchError(f"network error fetching {url}: {err}") from err
 
 
 _NUMERIC_SEPARATORS = (
