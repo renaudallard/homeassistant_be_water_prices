@@ -30,15 +30,17 @@ from __future__ import annotations
 import asyncio
 import calendar
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -113,6 +115,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         utility_id = entry.data[CONF_UTILITY]
         self._extractor: WaterExtractor = get(utility_id)
         self._last_good: CoordinatorData | None = None
+        # Resolved meter entity and the meter's reading back at Jan 1,
+        # captured on each daily tick so meter state-change events can
+        # recompute YTD live without re-querying the recorder.
+        self._meter_entity_id: str | None = None
+        self._ytd_baseline_m3: float | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -286,24 +293,109 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         Returns ``(ytd_m3, ytd_cost_eur)``. Both are ``None`` when no
         water meter is configured (neither explicitly nor via the
         Energy dashboard) or the recorder has no usable data.
+
+        Also captures ``_ytd_baseline_m3`` -- the meter's cumulative
+        reading back at Jan 1, derived as ``live_state - recorder_ytd``.
+        :meth:`_recompute_live_ytd` then turns each later meter state
+        change into a fresh YTD figure (``live - baseline``) without
+        another recorder query, so the cost / consumption sensors track
+        water draws as they happen instead of stepping once a day.
         """
         meter = await self.async_resolve_meter_entity()
+        self._meter_entity_id = meter
         if not meter:
+            self._ytd_baseline_m3 = None
             return None, None
         today = dt_util.now().date()
         jan1 = date(today.year, 1, 1)
         ytd_m3 = await _recorder_ytd_m3(self.hass, meter, jan1, today)
         if ytd_m3 is None:
+            self._ytd_baseline_m3 = None
             return None, None
 
+        # baseline == reading at Jan 1. Anchoring live updates to the
+        # recorder figure keeps them consistent with the daily total, and
+        # re-anchoring every tick lets a meter swap (the recorder sum
+        # floors its negative delta) self-correct within a day.
+        live = _numeric_state(self.hass.states.get(meter))
+        self._ytd_baseline_m3 = (live - ytd_m3) if live is not None else None
+
+        return ytd_m3, self._ytd_cost_from_m3(tariff, ytd_m3)
+
+    def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float) -> float | None:
+        """Apply the pro-rated YTD bill math to a year-to-date m³ figure.
+
+        Shared by the daily recorder path (:meth:`_compute_ytd`) and the
+        live meter-event path (:meth:`_recompute_live_ytd`) so both use
+        identical fee pro-rating and regional math.
+        """
+        today = dt_util.now().date()
+        jan1 = date(today.year, 1, 1)
         elapsed = (today - jan1).days + 1  # include today
         days_in_year = 366 if calendar.isleap(today.year) else 365
         fraction = elapsed / days_in_year
-
         persons = int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS))
         social = bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False))
-        cost = compute_ytd_cost(tariff, ytd_m3, persons, fraction, social_tariff=social)
-        return ytd_m3, cost
+        return compute_ytd_cost(tariff, ytd_m3, persons, fraction, social_tariff=social)
+
+    @callback
+    def async_setup_live_tracking(self) -> None:
+        """Subscribe to the configured meter so YTD sensors update on each draw.
+
+        Called once after the first refresh has resolved the meter. The
+        unsub is registered on the config entry, so an options-change
+        reload (which may point at a different meter) re-subscribes
+        cleanly and an unload tears it down -- no leaked listener.
+        """
+        if self._meter_entity_id is None:
+            return
+        self.entry.async_on_unload(
+            async_track_state_change_event(
+                self.hass, [self._meter_entity_id], self._async_meter_state_event
+            )
+        )
+
+    @callback
+    def _async_meter_state_event(self, event: Event[EventStateChangedData]) -> None:
+        self._recompute_live_ytd(event.data["new_state"])
+
+    @callback
+    def _recompute_live_ytd(self, state: State | None) -> None:
+        """Push a fresh YTD figure from the meter's live state.
+
+        Pure in-memory arithmetic (no recorder / network call), so it is
+        safe to run on every meter update. No-ops until the daily tick
+        has anchored a baseline, or when the meter reads
+        unavailable / unknown / non-numeric -- the last good value stays.
+        """
+        if self.data is None or self._ytd_baseline_m3 is None:
+            return
+        live = _numeric_state(state)
+        if live is None:
+            return
+        ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
+        self.async_set_updated_data(
+            replace(
+                self.data,
+                snapshot_age_hours=self._age_hours(self.data.fetched_at),
+                ytd_consumption_m3=ytd_m3,
+                current_year_cost_eur=self._ytd_cost_from_m3(self.data.tariff, ytd_m3),
+            )
+        )
+
+
+def _numeric_state(state: State | None) -> float | None:
+    """Return ``state``'s numeric value, or ``None`` if not usable.
+
+    Filters the unavailable / unknown sentinels and any non-numeric
+    payload so a flapping meter never pushes a garbage YTD figure.
+    """
+    if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+        return None
+    try:
+        return float(state.state)
+    except (TypeError, ValueError):
+        return None
 
 
 async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:

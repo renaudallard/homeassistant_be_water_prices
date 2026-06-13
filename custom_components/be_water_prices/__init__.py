@@ -81,6 +81,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Update the running-cost / YTD sensors live on each meter reading,
+    # not just on the daily tick. Subscribes to the resolved meter entity;
+    # the unsub is auto-registered on the entry for reload / unload.
+    coordinator.async_setup_live_tracking()
     # Register the OptionsFlow reload listener BEFORE the backfill so
     # any backfill failure (recorder not ready, parser exception,
     # future code addition that raises) does not leave the listener
