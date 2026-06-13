@@ -127,6 +127,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # recompute YTD live without re-querying the recorder.
         self._meter_entity_id: str | None = None
         self._ytd_baseline_m3: float | None = None
+        # Calendar year the baseline belongs to, so a live meter event
+        # that fires after the Jan 1 rollover (but before the next daily
+        # tick re-anchors) does not report the stale prior-year baseline.
+        self._ytd_baseline_year: int | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -312,12 +316,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._meter_entity_id = meter
         if not meter:
             self._ytd_baseline_m3 = None
+            self._ytd_baseline_year = None
             return None, None
         today = dt_util.now().date()
         jan1 = date(today.year, 1, 1)
         ytd_m3 = await _recorder_ytd_m3(self.hass, meter, jan1, today)
         if ytd_m3 is None:
             self._ytd_baseline_m3 = None
+            self._ytd_baseline_year = None
             return None, None
 
         # baseline == reading at Jan 1. Anchoring live updates to the
@@ -326,6 +332,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # floors its negative delta) self-correct within a day.
         live = _state_volume_m3(self.hass.states.get(meter))
         self._ytd_baseline_m3 = (live - ytd_m3) if live is not None else None
+        self._ytd_baseline_year = today.year if self._ytd_baseline_m3 is not None else None
 
         return ytd_m3, self._ytd_cost_from_m3(tariff, ytd_m3)
 
@@ -381,6 +388,15 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         live = _state_volume_m3(state)
         if live is None:
             return
+        # The daily tick re-anchors the baseline to the meter's Jan 1
+        # reading, but it only runs once every 24h. If the year has
+        # rolled over since that tick, the prior-year baseline would
+        # report nearly a full extra year of consumption. Re-anchor to
+        # the current reading so YTD resets to ~0 at the new year; the
+        # next daily tick refines it from the recorder.
+        if self._ytd_baseline_year != dt_util.now().year:
+            self._ytd_baseline_m3 = live
+            self._ytd_baseline_year = dt_util.now().year
         ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
         self.async_set_updated_data(
             replace(

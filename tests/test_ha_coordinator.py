@@ -39,6 +39,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
@@ -309,6 +310,53 @@ async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
         hass.states.async_set("sensor.water_meter", "105000", {"unit_of_measurement": "L"})
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 25.0
+
+
+@pytest.mark.asyncio
+async def test_live_ytd_reanchors_on_year_rollover(hass: HomeAssistant) -> None:
+    """A meter event after Jan 1 must not report the stale prior-year baseline.
+
+    Until the next daily tick re-anchors, a live event would otherwise
+    compute ``live - last_year_baseline`` -- nearly a full extra year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # Pretend the baseline was anchored last year and never re-ticked.
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+
+        # A draw to 130 m³ would naively read 130 - 80 == 50 m³ YTD; the
+        # rollover guard re-anchors to 130, so YTD resets to ~0 instead.
+        hass.states.async_set("sensor.water_meter", "130")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 0.0
+        assert coordinator._ytd_baseline_year == dt_util.now().year
 
 
 @pytest.mark.asyncio
