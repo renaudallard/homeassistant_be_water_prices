@@ -425,6 +425,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._ytd_baseline_m3 = live
             self._ytd_baseline_year = dt_util.now().year
         ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
+        if ytd_m3 == self.data.ytd_consumption_m3:
+            # No change in the year-to-date figure -- a same-value meter
+            # re-report or an attribute-only state event. Skip the update
+            # so a frequently-reporting meter does not write a redundant
+            # recorder row for every sensor on each event.
+            return
         self.async_set_updated_data(
             replace(
                 self.data,
