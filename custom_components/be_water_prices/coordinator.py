@@ -131,6 +131,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # that fires after the Jan 1 rollover (but before the next daily
         # tick re-anchors) does not report the stale prior-year baseline.
         self._ytd_baseline_year: int | None = None
+        # Calendar year the last recorder YTD figure belongs to. Lets the
+        # meter-recovery branch tell a current-year figure from a stale
+        # prior-year one when the meter was down across the rollover.
+        self._ytd_recorder_year: int | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -317,6 +321,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if not meter:
             self._ytd_baseline_m3 = None
             self._ytd_baseline_year = None
+            self._ytd_recorder_year = None
             return None, None
         today = dt_util.now().date()
         jan1 = date(today.year, 1, 1)
@@ -324,7 +329,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if ytd_m3 is None:
             self._ytd_baseline_m3 = None
             self._ytd_baseline_year = None
+            self._ytd_recorder_year = None
             return None, None
+        # The recorder figure is for this year (jan1 == Jan 1 of today's
+        # year); remember that even when the meter is unavailable now so
+        # the live-recovery path can detect a stale prior-year figure.
+        self._ytd_recorder_year = today.year
 
         # baseline == reading at Jan 1. Anchoring live updates to the
         # recorder figure keeps them consistent with the daily total, and
@@ -397,7 +407,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             recorder_ytd = self.data.ytd_consumption_m3
             if recorder_ytd is None:
                 return
-            self._ytd_baseline_m3 = live - recorder_ytd
+            if self._ytd_recorder_year != dt_util.now().year:
+                # The meter was down across the Jan 1 rollover, so the
+                # recorder figure is last year's. Start the new year at ~0
+                # rather than reconstructing a stale prior-year baseline.
+                self._ytd_baseline_m3 = live
+            else:
+                self._ytd_baseline_m3 = live - recorder_ytd
             self._ytd_baseline_year = dt_util.now().year
         elif self._ytd_baseline_year != dt_util.now().year:
             # The daily tick re-anchors the baseline to the meter's Jan 1

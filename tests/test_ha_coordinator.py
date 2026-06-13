@@ -413,6 +413,57 @@ async def test_live_ytd_recovers_after_meter_unavailable_at_tick(hass: HomeAssis
 
 
 @pytest.mark.asyncio
+async def test_live_ytd_recovery_resets_when_meter_down_across_year_boundary(
+    hass: HomeAssistant,
+) -> None:
+    """Meter down at the year-N tick, recovering in year N+1, must reset to ~0.
+
+    The recovery branch must not reconstruct from the stale prior-year
+    recorder figure, which would report nearly a full extra year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_baseline_m3 is None
+        # Pretend the recorder figure (20) was captured in the prior year.
+        coordinator._ytd_recorder_year = dt_util.now().year - 1
+
+        # Meter returns at 100 in the new year: a same-year recovery would
+        # anchor 100-20=80 and report 20; the cross-year guard anchors to
+        # 100 so YTD resets to ~0 instead.
+        hass.states.async_set("sensor.water_meter", "100")
+        await hass.async_block_till_done()
+        assert coordinator._ytd_baseline_m3 == 100.0
+        assert coordinator.data.ytd_consumption_m3 == 0.0
+
+
+@pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
 
