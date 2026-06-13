@@ -235,9 +235,11 @@ auto-resolves cleanly.
 
    All entries can additionally point at:
    - **Water meter sensor** *(optional override)* — any
-     `device_class=water` cumulative-m³ sensor (e.g. from the
+     `device_class=water` cumulative-volume sensor (e.g. from the
      [`watermeter`](https://github.com/Olen/homeassistant-watermeter)
      custom component, a P1 reader integration, or a Pulse counter).
+     Meters reporting litres, gallons or ft³ are converted to m³, so
+     the unit your meter uses does not matter.
      **Leave blank** to auto-pick the meter you already configured in
      HA's Energy dashboard (Settings → Dashboards → Energy → Water
      consumption); set it only when you want a different sensor than

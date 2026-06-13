@@ -35,14 +35,21 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    UnitOfVolume,
+)
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import VolumeConverter
 
 from .const import (
     CONF_COMMUNE,
@@ -317,7 +324,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # recorder figure keeps them consistent with the daily total, and
         # re-anchoring every tick lets a meter swap (the recorder sum
         # floors its negative delta) self-correct within a day.
-        live = _numeric_state(self.hass.states.get(meter))
+        live = _state_volume_m3(self.hass.states.get(meter))
         self._ytd_baseline_m3 = (live - ytd_m3) if live is not None else None
 
         return ytd_m3, self._ytd_cost_from_m3(tariff, ytd_m3)
@@ -365,12 +372,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         Pure in-memory arithmetic (no recorder / network call), so it is
         safe to run on every meter update. No-ops until the daily tick
-        has anchored a baseline, or when the meter reads
-        unavailable / unknown / non-numeric -- the last good value stays.
+        has anchored a baseline, or when the meter reads unavailable /
+        unknown / non-numeric / a non-convertible unit -- the last good
+        value stays.
         """
         if self.data is None or self._ytd_baseline_m3 is None:
             return
-        live = _numeric_state(state)
+        live = _state_volume_m3(state)
         if live is None:
             return
         ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
@@ -395,6 +403,31 @@ def _numeric_state(state: State | None) -> float | None:
     try:
         return float(state.state)
     except (TypeError, ValueError):
+        return None
+
+
+def _state_volume_m3(state: State | None) -> float | None:
+    """Return ``state``'s reading converted to cubic metres, or ``None``.
+
+    The YTD / running-cost math works in m³, but HA permits a
+    ``water`` sensor (the explicit override and the Energy-dashboard
+    auto-pick alike) to report litres, gallons, ft³, etc. Read the
+    meter's own ``unit_of_measurement`` and convert so a non-m³ meter
+    is not silently billed ~1000× too high. A reading with no unit is
+    assumed to already be m³ (the common case); a unit we cannot
+    convert to a volume is rejected so the YTD sensors stay unknown
+    rather than publish a garbage figure.
+    """
+    value = _numeric_state(state)
+    if value is None or state is None:
+        return None
+    unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+    if unit in (None, UnitOfVolume.CUBIC_METERS):
+        return value
+    try:
+        return VolumeConverter.convert(value, unit, UnitOfVolume.CUBIC_METERS)
+    except HomeAssistantError:
+        _LOGGER.debug("meter unit %r is not a convertible volume; ignoring reading", unit)
         return None
 
 
@@ -476,7 +509,12 @@ async def _recorder_ytd_m3(
             end_dt,
             {entity_id},
             "day",
-            None,
+            # Normalise the change deltas to m³ regardless of the meter's
+            # own unit (HA permits water sensors in L / gal / ft³ / CCF as
+            # well as m³); the recorder converts via the statistic's unit
+            # class. Without this a litre-reporting meter would be summed
+            # as if it were already cubic metres -- ~1000× too high.
+            {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS},
             {"change"},
         )
     except Exception as err:

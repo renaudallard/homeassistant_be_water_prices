@@ -265,6 +265,53 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
+    """A meter reporting litres is converted to m³ before the YTD math.
+
+    Without unit normalisation a litre reading would be billed as if it
+    were already cubic metres (~1000× too high).
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    # 100 000 L == 100 m³, seeded before setup so _compute_ytd anchors it.
+    hass.states.async_set("sensor.water_meter", "100000", {"unit_of_measurement": "L"})
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # live 100 m³ - recorder_ytd 20 m³ == reading at Jan 1.
+        assert coordinator._ytd_baseline_m3 == 80.0
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # Draw 5 m³ == 5000 L: 100 000 -> 105 000 L. YTD jumps 20 -> 25 m³.
+        hass.states.async_set("sensor.water_meter", "105000", {"unit_of_measurement": "L"})
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+
+@pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
 
