@@ -54,26 +54,54 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
     data = coordinator.data
+    snapshot = (
+        {
+            "tariff": _serialise(asdict(data.tariff)),
+            "fetched_at": data.fetched_at.isoformat(),
+            "snapshot_age_hours": data.snapshot_age_hours,
+            "snapshot_stale": data.snapshot_stale,
+            "projected_annual_cost_eur": data.projected_annual_cost_eur,
+            "current_year_cost_eur": data.current_year_cost_eur,
+            "ytd_consumption_m3": data.ytd_consumption_m3,
+            "last_error": data.last_error,
+        }
+        if data is not None
+        else None
+    )
     return {
         "entry": {
             "data": async_redact_data(dict(entry.data), _REDACT_KEYS),
             "options": async_redact_data(dict(entry.options), _REDACT_KEYS),
         },
-        "snapshot": (
-            {
-                "tariff": _serialise(asdict(data.tariff)),
-                "fetched_at": data.fetched_at.isoformat(),
-                "snapshot_age_hours": data.snapshot_age_hours,
-                "snapshot_stale": data.snapshot_stale,
-                "projected_annual_cost_eur": data.projected_annual_cost_eur,
-                "current_year_cost_eur": data.current_year_cost_eur,
-                "ytd_consumption_m3": data.ytd_consumption_m3,
-                "last_error": data.last_error,
-            }
-            if data is not None
-            else None
-        ),
+        # The tariff's source_url / publication_label and any last_error can
+        # embed the configured commune slug or label verbatim, bypassing the
+        # key-based redaction above; scrub those values out of the snapshot.
+        "snapshot": _scrub_tokens(snapshot, _sensitive_tokens(entry)),
     }
+
+
+def _sensitive_tokens(entry: ConfigEntry) -> list[str]:
+    """Commune / postcode strings that must not survive into the snapshot."""
+    tokens: set[str] = set()
+    for src in (entry.data, entry.options):
+        for key in (CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_POSTCODE):
+            value = src.get(key)
+            if isinstance(value, str) and value:
+                tokens.add(value)
+    # Longest first so a label that contains the slug is replaced whole.
+    return sorted(tokens, key=len, reverse=True)
+
+
+def _scrub_tokens(value: Any, tokens: list[str]) -> Any:
+    if isinstance(value, str):
+        for token in tokens:
+            value = value.replace(token, "**REDACTED**")
+        return value
+    if isinstance(value, dict):
+        return {k: _scrub_tokens(v, tokens) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_scrub_tokens(v, tokens) for v in value]
+    return value
 
 
 def _serialise(value: Any) -> Any:
