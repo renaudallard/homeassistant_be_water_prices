@@ -167,6 +167,12 @@ def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
         lon = float(centroid["lon"])  # type: ignore[index]
         lat = float(centroid["lat"])  # type: ignore[index]
         distributor = query_zde_for_centroid(lon, lat)
+        # Throttle and report progress once per network call, before the
+        # early continues -- otherwise no-hit / unsupported centroids (the
+        # long tail of Walloon regies) issue back-to-back unspaced requests.
+        time.sleep(0.05)  # politely throttle the ArcGIS endpoint
+        if (i + 1) % 50 == 0:
+            print(f"  …{i + 1}/{len(walloon)} processed", file=sys.stderr)
         if distributor is None:
             no_zde_hit += 1
             continue
@@ -175,9 +181,6 @@ def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
             skipped_distributors[distributor] = skipped_distributors.get(distributor, 0) + 1
             continue
         out[postcode] = utility
-        if (i + 1) % 50 == 0:
-            print(f"  …{i + 1}/{len(walloon)} processed", file=sys.stderr)
-        time.sleep(0.05)  # politely throttle the ArcGIS endpoint
     print(f"resolved {len(out)} postcodes", file=sys.stderr)
     if no_zde_hit:
         print(f"skipped {no_zde_hit} postcodes with no ZDE hit", file=sys.stderr)
