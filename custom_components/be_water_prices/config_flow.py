@@ -624,12 +624,16 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         self._communes_cache: dict[str, tuple[CommuneOption, ...]] = {}
 
     async def _async_communes_cached(self, utility_id: str) -> tuple[CommuneOption, ...]:
-        cached = self._communes_cache.get(utility_id)
-        if cached:
-            return cached
+        # Cache by key presence -- including an empty / failed result --
+        # so the form-render and form-submit calls within one flow see the
+        # same list. Caching only successes meant a render-time fetch
+        # failure (empty -> no commune field) followed by a submit-time
+        # success would treat the absent field as an explicit deselect and
+        # wipe the saved commune.
+        if utility_id in self._communes_cache:
+            return self._communes_cache[utility_id]
         fresh = await _async_communes(self.hass, utility_id)
-        if fresh:
-            self._communes_cache[utility_id] = fresh
+        self._communes_cache[utility_id] = fresh
         return fresh
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

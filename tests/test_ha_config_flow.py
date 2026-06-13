@@ -259,6 +259,52 @@ async def test_options_flow_preserves_commune_when_list_fetch_fails(hass: HomeAs
 
 
 @pytest.mark.asyncio
+async def test_options_flow_preserves_commune_on_render_fail_then_submit_success(
+    hass: HomeAssistant,
+) -> None:
+    """A commune list that fails at render but would succeed at submit must
+    not let the absent field read as a deselect that wipes the commune.
+
+    The flow reuses the render-time (empty) result for the whole flow, so
+    ``_async_communes`` is consulted once and the second (success) result
+    is never reached.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_COMMUNE: "25071",
+            CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        side_effect=[(), fake_communes],
+    ):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                CONF_CONSUMPTION_M3_PER_YEAR: 90,
+                CONF_PERSONS: 2,
+                CONF_SOCIAL_TARIFF: False,
+            },
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_COMMUNE] == "25071"
+    assert entry.options[CONF_COMMUNE_LABEL] == "9000 - Gent (Centrum)"
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
+
+
+@pytest.mark.asyncio
 async def test_options_flow_clears_commune_when_user_explicitly_deselects(
     hass: HomeAssistant,
 ) -> None:
