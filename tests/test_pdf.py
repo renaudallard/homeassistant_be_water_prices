@@ -52,9 +52,12 @@ class _FakeContent:
 
 
 class _FakeResp:
-    def __init__(self, chunks: list[bytes], content_length: int | None) -> None:
+    def __init__(
+        self, chunks: list[bytes], content_length: int | None, charset: str | None = None
+    ) -> None:
         self.content = _FakeContent(chunks)
         self.content_length = content_length
+        self.charset = charset
 
 
 def test_to_float_handles_belgian_comma() -> None:
@@ -106,3 +109,17 @@ async def test_read_capped_rejects_oversized_body(monkeypatch: Any) -> None:
 async def test_read_capped_returns_small_body() -> None:
     resp = _FakeResp([b"%PDF", b"-1.7 rest"], content_length=13)
     assert await _pdf._read_capped(resp, "u") == b"%PDF-1.7 rest"  # type: ignore[arg-type]
+
+
+async def test_read_text_capped_decodes_leniently() -> None:
+    # 0xE9 is Latin-1 'é'; a body mislabelled as UTF-8 must not raise.
+    resp = _FakeResp([b"caf\xe9 75,00 euro"], content_length=14, charset="utf-8")
+    text = await _pdf._read_text_capped(resp, "u")  # type: ignore[arg-type]
+    # ASCII content survives; the bad byte is replaced, not fatal.
+    assert "75,00 euro" in text
+
+
+async def test_read_text_capped_uses_declared_charset() -> None:
+    resp = _FakeResp(["café".encode("latin-1")], content_length=4, charset="latin-1")
+    text = await _pdf._read_text_capped(resp, "u")  # type: ignore[arg-type]
+    assert text == "café"
