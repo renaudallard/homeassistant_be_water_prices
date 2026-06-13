@@ -58,7 +58,7 @@ from ..const import (
     WALLONIA_CVA_EUR_PER_M3,
     WALLONIA_FSE_EUR_PER_M3,
 )
-from ._html import fetch_html
+from ._html import fetch_and_parse
 from ._pdf import to_float
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
@@ -237,9 +237,10 @@ async def fetch_tariff(
     label_prefix: str,
 ) -> WaterTariff:
     """Async fetch + parse for a small-Walloon utility."""
-    html = await fetch_html(session, source_url)
-    return parse_tariff(
-        html,
+    return await fetch_and_parse(
+        session,
+        source_url,
+        parse_tariff,
         utility_id=utility_id,
         source_url=source_url,
         label_prefix=label_prefix,

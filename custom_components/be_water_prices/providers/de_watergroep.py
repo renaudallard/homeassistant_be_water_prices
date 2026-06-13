@@ -53,6 +53,7 @@ materialise it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import date
@@ -67,7 +68,7 @@ from ..const import (
     REGION_FLANDERS,
 )
 from ._flanders import build_flanders_tariff
-from ._html import fetch_html
+from ._html import fetch_and_parse, fetch_html
 from ._pdf import USER_AGENT, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
@@ -235,21 +236,25 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     target = date.today().year
     try:
         text, year = await _fetch_commune_ajax(session, _DEFAULT_COMMUNE_GUID)
-        return parse_commune_tariff(text, year=year, commune_label=_DEFAULT_COMMUNE_LABEL)
+        return await asyncio.to_thread(
+            parse_commune_tariff, text, year=year, commune_label=_DEFAULT_COMMUNE_LABEL
+        )
     except ExtractorError as default_err:
         _LOGGER.info(
             "De Watergroep default-commune fetch failed (%s); falling back to news article",
             default_err,
         )
         try:
-            html = await fetch_html(session, NEWS_URL_FMT.format(year=target))
-            return parse_news_tariff(html, year=target)
+            return await fetch_and_parse(
+                session, NEWS_URL_FMT.format(year=target), parse_news_tariff, year=target
+            )
         except ExtractorError as err:
             _LOGGER.info(
                 "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1
             )
-            html = await fetch_html(session, NEWS_URL_FMT.format(year=target - 1))
-            return parse_news_tariff(html, year=target - 1)
+            return await fetch_and_parse(
+                session, NEWS_URL_FMT.format(year=target - 1), parse_news_tariff, year=target - 1
+            )
 
 
 async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> tuple[str, int]:
@@ -287,7 +292,7 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint."""
     text, year = await _fetch_commune_ajax(session, commune)
-    return parse_commune_tariff(text, year=year, commune_label=commune)
+    return await asyncio.to_thread(parse_commune_tariff, text, year=year, commune_label=commune)
 
 
 _OPTION_RE = re.compile(

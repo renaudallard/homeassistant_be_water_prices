@@ -99,7 +99,7 @@ from bs4 import BeautifulSoup, Tag
 from .._phantom_blocklists import PIDPA_UNSERVABLE_SLUGS as _UNSERVABLE_COMMUNE_SLUGS
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._html import fetch_html
+from ._html import fetch_and_parse, fetch_html
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
 
@@ -326,8 +326,12 @@ def parse_commune_tariff(html: str, *, commune_slug: str, year: int | None = Non
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
-    html = await fetch_html(session, COMMUNE_URL_FMT.format(slug=commune))
-    return parse_commune_tariff(html, commune_slug=commune)
+    return await fetch_and_parse(
+        session,
+        COMMUNE_URL_FMT.format(slug=commune),
+        parse_commune_tariff,
+        commune_slug=commune,
+    )
 
 
 def _slug_to_label(slug: str) -> str:

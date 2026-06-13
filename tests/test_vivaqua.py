@@ -27,9 +27,11 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
-from custom_components.be_water_prices.providers import ExtractorError
+from custom_components.be_water_prices.providers import ExtractorError, _html, vivaqua
 from custom_components.be_water_prices.providers.vivaqua import parse_tariff
 from tests import fixture_html
 
@@ -65,3 +67,16 @@ def test_falls_back_to_previous_year_when_target_missing() -> None:
 def test_raises_when_no_year_table_present() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>", year=2026)
+
+
+async def test_fetch_parses_off_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """fetch() routes the bs4 parse through fetch_and_parse (off the loop).
+
+    Patches the network read and checks the tariff still parses, covering
+    the fetch_and_parse wiring shared by every HTML extractor.
+    """
+    html = fixture_html("vivaqua_linear_2026.html")
+    monkeypatch.setattr(_html, "fetch_html", AsyncMock(return_value=html))
+    tariff = await vivaqua.fetch(session=None)  # type: ignore[arg-type]
+    assert tariff.utility == "vivaqua"
+    assert round(tariff.linear_eur_per_m3 * 1.06, 2) == 2.62

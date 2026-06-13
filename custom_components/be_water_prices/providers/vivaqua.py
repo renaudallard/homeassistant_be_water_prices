@@ -60,7 +60,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from ..const import DEFAULT_VAT_RATE, REGION_BRUSSELS
-from ._html import extract_amounts, fetch_html, find_table
+from ._html import extract_amounts, fetch_and_parse, find_table
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -184,8 +184,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    html = await fetch_html(session, SOURCE_URL)
-    return parse_tariff(html)
+    return await fetch_and_parse(session, SOURCE_URL, parse_tariff)
 
 
 EXTRACTOR = WaterExtractor(
