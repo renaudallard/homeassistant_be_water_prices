@@ -48,6 +48,7 @@ commune dropdown.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -183,12 +184,12 @@ async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     text = await _post_for_commune(session, DEFAULT_MUNICIPALITY_ID)
-    return parse_tariff(text)
+    return await asyncio.to_thread(parse_tariff, text)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     text = await _post_for_commune(session, commune)
-    return parse_tariff(text, municipality_label=commune)
+    return await asyncio.to_thread(parse_tariff, text, municipality_label=commune)
 
 
 # Each <option> is "<postcode> - <commune> (<gemeente>)" with value =

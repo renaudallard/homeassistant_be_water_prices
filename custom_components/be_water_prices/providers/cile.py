@@ -61,7 +61,7 @@ from ..const import (
     WALLONIA_CVA_EUR_PER_M3,
     WALLONIA_FSE_EUR_PER_M3,
 )
-from ._html import extract_amounts, fetch_html
+from ._html import extract_amounts, fetch_and_parse
 from ._walloon_simple import build_tariff, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
@@ -121,8 +121,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    html = await fetch_html(session, SOURCE_URL)
-    return parse_tariff(html)
+    return await fetch_and_parse(session, SOURCE_URL, parse_tariff)
 
 
 EXTRACTOR = WaterExtractor(

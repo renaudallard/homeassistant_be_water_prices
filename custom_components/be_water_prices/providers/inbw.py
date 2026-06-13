@@ -46,6 +46,7 @@ Tariff structure is the standard Wallonia residential model; see
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import ssl
@@ -212,7 +213,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             err,
         )
         html = await fetch_html(session, SOURCE_URL, verify_ssl=False)
-    return parse_tariff(html)
+    return await asyncio.to_thread(parse_tariff, html)
 
 
 EXTRACTOR = WaterExtractor(

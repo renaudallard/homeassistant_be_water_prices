@@ -44,8 +44,12 @@ plain HTML page, often in a ``<table>``. This module provides:
 
 from __future__ import annotations
 
+import asyncio
 import re
+from collections.abc import Callable
+from typing import Any
 
+import aiohttp
 from bs4 import BeautifulSoup, Tag
 
 from ._pdf import fetch_text, fold_accents, to_float
@@ -55,11 +59,32 @@ fetch_html = fetch_text
 __all__ = [
     "BeautifulSoup",
     "extract_amounts",
+    "fetch_and_parse",
     "fetch_html",
     "find_table",
     "parse_simple_table",
     "to_float",
 ]
+
+
+async def fetch_and_parse[T](
+    session: aiohttp.ClientSession,
+    url: str,
+    parser: Callable[..., T],
+    *args: Any,
+    verify_ssl: bool = True,
+    **kwargs: Any,
+) -> T:
+    """GET ``url`` then run ``parser`` on the body off the event loop.
+
+    HTML parsing (BeautifulSoup, or a heavy regex over a large page) is
+    pure-CPU work. Running it inline after the ``await`` would block the
+    asyncio loop for tens of milliseconds on a real tariff page, which
+    HA's blocking-I/O guard cannot detect. Hand it to a worker thread,
+    mirroring the PDF helpers, which already offload extraction.
+    """
+    html = await fetch_html(session, url, verify_ssl=verify_ssl)
+    return await asyncio.to_thread(parser, html, *args, **kwargs)
 
 
 _AMOUNT_BEFORE_EURO = re.compile(r"€\s*([0-9]+(?:[.,][0-9]+)?)")

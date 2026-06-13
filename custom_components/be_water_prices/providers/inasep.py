@@ -53,7 +53,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from ..const import REGION_WALLONIA
-from ._html import fetch_html
+from ._html import fetch_and_parse
 from ._pdf import to_float
 from ._walloon_simple import build_tariff
 from .base import ExtractorError, WaterExtractor, WaterTariff
@@ -96,8 +96,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    html = await fetch_html(session, SOURCE_URL)
-    return parse_tariff(html)
+    return await fetch_and_parse(session, SOURCE_URL, parse_tariff)
 
 
 EXTRACTOR = WaterExtractor(
