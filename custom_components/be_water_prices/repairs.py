@@ -41,6 +41,7 @@ from typing import Any
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
 
@@ -53,7 +54,16 @@ class SnapshotStaleRepairFlow(RepairsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is None:
-            return self.async_show_form(step_id="init")
+            # Forward the issue's placeholders so the form's title and
+            # description render {utility}/{age_days}/{valid_until}/
+            # {last_error} instead of literal braces. HA does not auto-
+            # forward issue placeholders to fix-flow steps (see
+            # ConfirmRepairFlow); mirror that lookup here.
+            issue_registry = ir.async_get(self.hass)
+            placeholders = None
+            if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
+                placeholders = issue.translation_placeholders
+            return self.async_show_form(step_id="init", description_placeholders=placeholders)
         coordinator = self.hass.data.get(DOMAIN, {}).get(self._entry_id)
         if coordinator is not None:
             await coordinator.async_refresh()

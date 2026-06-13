@@ -197,8 +197,14 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
     # Walk the fix flow: open it, then submit the confirmation step.
     flow = await async_create_fix_flow(hass, coordinator.stale_issue_id, issue.data)
     flow.hass = hass
+    # The RepairsFlowManager sets these before the first step in production.
+    flow.handler = DOMAIN
+    flow.issue_id = coordinator.stale_issue_id
     result = await flow.async_step_init()
     assert result["type"] == "form"
+    # The form forwards the issue's placeholders so {utility} etc. render
+    # instead of literal braces.
+    assert result["description_placeholders"]["utility"] == "VIVAQUA"
     result = await flow.async_step_init({})
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
