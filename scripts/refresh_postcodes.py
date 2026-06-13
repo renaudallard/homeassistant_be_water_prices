@@ -148,7 +148,8 @@ def query_zde_for_centroid(lon: float, lat: float) -> str | None:
 def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
     """Walloon postcode → utility_id mapping derived from the ZDE."""
     out: dict[str, str] = {}
-    skipped: dict[str, int] = {}
+    skipped_distributors: dict[str, int] = {}
+    no_zde_hit = 0
     seen_postcodes: set[str] = set()
     walloon = [
         f
@@ -167,19 +168,21 @@ def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
         lat = float(centroid["lat"])  # type: ignore[index]
         distributor = query_zde_for_centroid(lon, lat)
         if distributor is None:
-            skipped[postcode] = 1
+            no_zde_hit += 1
             continue
         utility = _DISTRIBUTEUR_TO_UTILITY.get(distributor)
         if utility is None:
-            skipped[distributor] = skipped.get(distributor, 0) + 1
+            skipped_distributors[distributor] = skipped_distributors.get(distributor, 0) + 1
             continue
         out[postcode] = utility
         if (i + 1) % 50 == 0:
             print(f"  …{i + 1}/{len(walloon)} processed", file=sys.stderr)
         time.sleep(0.05)  # politely throttle the ArcGIS endpoint
     print(f"resolved {len(out)} postcodes", file=sys.stderr)
-    if skipped:
-        print(f"skipped (unsupported distributor / no ZDE hit): {skipped}", file=sys.stderr)
+    if no_zde_hit:
+        print(f"skipped {no_zde_hit} postcodes with no ZDE hit", file=sys.stderr)
+    if skipped_distributors:
+        print(f"skipped (unsupported distributor): {skipped_distributors}", file=sys.stderr)
     return out
 
 
