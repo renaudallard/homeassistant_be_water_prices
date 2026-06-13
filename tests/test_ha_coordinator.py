@@ -259,6 +259,14 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
         assert coordinator.data.ytd_consumption_m3 == 25.0
         assert coordinator.data.current_year_cost_eur > cost_before
 
+        # A same-value re-report (here an attribute-only state event) must
+        # not republish: the data object is left untouched, so no redundant
+        # recorder row is written for every sensor.
+        unchanged = coordinator.data
+        hass.states.async_set("sensor.water_meter", "105", {"updated": 1})
+        await hass.async_block_till_done()
+        assert coordinator.data is unchanged
+
         # A flapping meter (unavailable) must not blank the running total.
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
