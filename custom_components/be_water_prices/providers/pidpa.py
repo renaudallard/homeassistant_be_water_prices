@@ -281,11 +281,55 @@ def _find_year_table(soup: BeautifulSoup, *, year: int) -> Tag | None:
     return None
 
 
+_YEAR_TAB_RE = re.compile(r"-tab-(\d{4})$")
+
+
+def _find_latest_year_table(soup: BeautifulSoup) -> tuple[Tag, int] | None:
+    """Return the (table, year) of the highest huishoudelijk year tab present.
+
+    Used as a Jan 1 rollover fallback, mirroring the multi-year PDF path,
+    so a per-commune install does not go blank before Pidpa publishes the
+    new-year tab.
+    """
+    best: tuple[Tag, int] | None = None
+    for div in soup.find_all("div", class_="tariff-tab-content"):
+        match = _YEAR_TAB_RE.search(str(div.get("id") or ""))
+        if match is None:
+            continue
+        year = int(match.group(1))
+        if best is not None and year <= best[1]:
+            continue
+        if not _is_huishoudelijk_year_tab(div, year=year):
+            continue
+        for table in div.find_all("table"):
+            if "Integrale waterprijs" in table.get_text(" ", strip=True):
+                best = (table, year)
+                break
+    return best
+
+
 def parse_commune_tariff(html: str, *, commune_slug: str, year: int | None = None) -> WaterTariff:
     """Parse a captured Pidpa per-commune page for ``year``."""
     target = year or date.today().year
     soup = BeautifulSoup(html, "html.parser")
     table = _find_year_table(soup, year=target)
+    if table is None and year is None:
+        # Production path (year not pinned): the page tops out at the
+        # current year, so in the Jan 1 window before Pidpa publishes the
+        # new-year tab, fall back to the latest tab present and serve the
+        # still-in-force prior-year rates -- mirroring the PDF path -- so a
+        # fresh per-commune install does not go blank. An explicitly
+        # requested year that is absent stays an error.
+        fallback = _find_latest_year_table(soup)
+        if fallback is not None:
+            table, fallback_year = fallback
+            _LOGGER.warning(
+                "Pidpa per-commune page for %r does not list %d; falling back to %d",
+                commune_slug,
+                target,
+                fallback_year,
+            )
+            target = fallback_year
     if table is None:
         raise ExtractorError(
             f"could not locate Pidpa huishoudelijk {target} table for commune {commune_slug!r}"

@@ -110,8 +110,32 @@ def test_per_commune_uses_standard_flemish_vastrecht_structure() -> None:
 def test_per_commune_raises_when_year_tab_missing() -> None:
     html = fixture_html("pidpa_geel_2026.html")
     with pytest.raises(ExtractorError):
-        # The fixture inlines 2018-2026; 2099 is not a tab.
+        # The fixture inlines 2018-2026; 2099 is not a tab. An explicitly
+        # requested missing year stays a hard error (no silent fallback).
         parse_commune_tariff(html, commune_slug="geel", year=2099)
+
+
+def test_per_commune_falls_back_to_latest_year_on_rollover(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Production path (year not pinned): in the Jan 1 window before Pidpa
+    # publishes the new-year tab, fall back to the latest tab present
+    # rather than going blank, mirroring the PDF path.
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import pidpa
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2099, 1, 1)
+
+    monkeypatch.setattr(pidpa, "date", _FakeDate)
+    html = fixture_html("pidpa_geel_2026.html")
+    t = parse_commune_tariff(html, commune_slug="geel")  # year=None -> 2099
+    # Fixture tops out at 2026, so the still-in-force 2026 column is served.
+    assert "2026" in t.publication_label
+    assert t.valid_from.year == 2026
 
 
 def test_extractor_advertises_per_commune_support() -> None:
