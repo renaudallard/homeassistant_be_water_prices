@@ -383,18 +383,29 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         unknown / non-numeric / a non-convertible unit -- the last good
         value stays.
         """
-        if self.data is None or self._ytd_baseline_m3 is None:
+        if self.data is None:
             return
         live = _state_volume_m3(state)
         if live is None:
             return
-        # The daily tick re-anchors the baseline to the meter's Jan 1
-        # reading, but it only runs once every 24h. If the year has
-        # rolled over since that tick, the prior-year baseline would
-        # report nearly a full extra year of consumption. Re-anchor to
-        # the current reading so YTD resets to ~0 at the new year; the
-        # next daily tick refines it from the recorder.
-        if self._ytd_baseline_year != dt_util.now().year:
+        if self._ytd_baseline_m3 is None:
+            # The daily tick could not anchor a baseline because the meter
+            # was unavailable at tick time. Reconstruct it from the last
+            # recorder YTD figure on the first usable reading so live
+            # tracking resumes now instead of staying frozen until the
+            # next daily tick (~24h).
+            recorder_ytd = self.data.ytd_consumption_m3
+            if recorder_ytd is None:
+                return
+            self._ytd_baseline_m3 = live - recorder_ytd
+            self._ytd_baseline_year = dt_util.now().year
+        elif self._ytd_baseline_year != dt_util.now().year:
+            # The daily tick re-anchors the baseline to the meter's Jan 1
+            # reading, but it only runs once every 24h. If the year has
+            # rolled over since that tick, the prior-year baseline would
+            # report nearly a full extra year of consumption. Re-anchor to
+            # the current reading so YTD resets to ~0 at the new year; the
+            # next daily tick refines it from the recorder.
             self._ytd_baseline_m3 = live
             self._ytd_baseline_year = dt_util.now().year
         ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
