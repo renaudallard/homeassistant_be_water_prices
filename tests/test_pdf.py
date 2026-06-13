@@ -123,3 +123,11 @@ async def test_read_text_capped_uses_declared_charset() -> None:
     resp = _FakeResp(["café".encode("latin-1")], content_length=4, charset="latin-1")
     text = await _pdf._read_text_capped(resp, "u")  # type: ignore[arg-type]
     assert text == "café"
+
+
+async def test_read_text_capped_falls_back_on_unknown_charset() -> None:
+    # An unrecognized charset label (vendor token / typo) must not raise a
+    # LookupError; fall back to UTF-8 rather than escaping unclassified.
+    resp = _FakeResp([b"75,00 euro"], content_length=10, charset="utf8mb4")
+    text = await _pdf._read_text_capped(resp, "u")  # type: ignore[arg-type]
+    assert "75,00 euro" in text
