@@ -360,6 +360,59 @@ async def test_live_ytd_reanchors_on_year_rollover(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_live_ytd_recovers_after_meter_unavailable_at_tick(hass: HomeAssistant) -> None:
+    """A meter dropout at the daily tick must not freeze live YTD all day.
+
+    The recorder figure still surfaces, and once the meter returns the
+    baseline is reconstructed so live tracking resumes immediately.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    # Meter is unavailable at the moment of the setup (daily) tick.
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # No baseline could be captured, but the recorder YTD still shows.
+        assert coordinator._ytd_baseline_m3 is None
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # Meter returns at 100 m³: baseline reconstructed as 100 - 20 = 80.
+        hass.states.async_set("sensor.water_meter", "100")
+        await hass.async_block_till_done()
+        assert coordinator._ytd_baseline_m3 == 80.0
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # A further draw now tracks live: 105 -> 25 m³.
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+
+@pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
 
