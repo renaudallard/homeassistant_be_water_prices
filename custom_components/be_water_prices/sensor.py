@@ -46,6 +46,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_COMMUNE,
     CONF_UTILITY,
     DOMAIN,
     REGION_FLANDERS,
@@ -83,6 +84,20 @@ def _publication_label_without_commune(label: str) -> str:
                 # Outermost ( found; drop it plus the preceding space.
                 return label[: i - 1] if i > 0 and label[i - 1] == " " else label[:i]
     return label
+
+
+def _source_url_without_commune(source_url: str, commune: str | None) -> str:
+    """Redact a per-commune slug from the tariff source URL.
+
+    The Pidpa per-commune URL ends in the commune slug (the town name),
+    so the source_url attribute would otherwise leak the household
+    location into the recorder / screenshots just like the publication
+    label. Other per-commune utilities do not carry the commune in the
+    URL, so the substring check leaves them untouched.
+    """
+    if commune and commune in source_url:
+        return source_url.replace(commune, "**redacted**")
+    return source_url
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -341,7 +356,9 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
             "valid_from": t.valid_from.isoformat(),
             "valid_until": t.valid_until.isoformat() if t.valid_until else None,
             "publication_label": _publication_label_without_commune(t.publication_label),
-            "source_url": t.source_url,
+            "source_url": _source_url_without_commune(
+                t.source_url, self.coordinator.entry.options.get(CONF_COMMUNE)
+            ),
             "snapshot_age_hours": round(self.coordinator.data.snapshot_age_hours, 2),
             "snapshot_stale": self.coordinator.data.snapshot_stale,
             "last_error": self.coordinator.data.last_error,

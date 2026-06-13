@@ -28,7 +28,12 @@
 from __future__ import annotations
 
 from custom_components.be_water_prices.const import CONF_UTILITY
-from custom_components.be_water_prices.sensor import SENSORS, WaterSensor, _jan_1_local
+from custom_components.be_water_prices.sensor import (
+    SENSORS,
+    WaterSensor,
+    _jan_1_local,
+    _source_url_without_commune,
+)
 
 
 class _StubEntry:
@@ -71,3 +76,13 @@ def test_last_reset_none_for_non_total_sensor() -> None:
     sensor._note_value(5.0)
     sensor._note_value(1.0)  # a drop, but no last_reset_fn -> untracked
     assert sensor.last_reset is None
+
+
+def test_source_url_redacts_commune_slug() -> None:
+    url = "https://www.pidpa.be/ons-aanbod/je-gemeente/geel"
+    # Per-commune Pidpa URL embeds the town slug -> redacted.
+    assert "geel" not in _source_url_without_commune(url, "geel")
+    # No commune configured, or a commune id not present in the URL
+    # (e.g. Farys numeric id), leaves the URL untouched.
+    assert _source_url_without_commune(url, None) == url
+    assert _source_url_without_commune(url, "25071") == url
