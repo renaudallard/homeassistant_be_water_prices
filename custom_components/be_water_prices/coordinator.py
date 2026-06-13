@@ -425,18 +425,21 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._ytd_baseline_m3 = live
             self._ytd_baseline_year = dt_util.now().year
         ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
-        if ytd_m3 == self.data.ytd_consumption_m3:
-            # No change in the year-to-date figure -- a same-value meter
-            # re-report or an attribute-only state event. Skip the update
-            # so a frequently-reporting meter does not write a redundant
-            # recorder row for every sensor on each event.
+        ytd_cost = self._ytd_cost_from_m3(self.data.tariff, ytd_m3)
+        if ytd_m3 == self.data.ytd_consumption_m3 and ytd_cost == self.data.current_year_cost_eur:
+            # Nothing changed -- a same-value meter re-report or an
+            # attribute-only state event. Skip so a frequently-reporting
+            # meter does not write a redundant recorder row for every
+            # sensor. The cost is part of the check so a year rollover (or
+            # the midnight fee-proration step) still republishes even when
+            # the volume figure is unchanged at ~0.
             return
         self.async_set_updated_data(
             replace(
                 self.data,
                 snapshot_age_hours=self._age_hours(self.data.fetched_at),
                 ytd_consumption_m3=ytd_m3,
-                current_year_cost_eur=self._ytd_cost_from_m3(self.data.tariff, ytd_m3),
+                current_year_cost_eur=ytd_cost,
             )
         )
 
