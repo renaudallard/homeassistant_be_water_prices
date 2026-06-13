@@ -529,6 +529,46 @@ async def test_reconfigure_flow_falls_through_to_manual_picker(
 
 
 @pytest.mark.asyncio
+async def test_options_flow_drops_stale_commune_not_in_live_list(hass: HomeAssistant) -> None:
+    """A saved commune no longer offered by the operator must not be
+    prefilled as an unselectable value, and is dropped on save.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_COMMUNE: "99999",
+            CONF_COMMUNE_LABEL: "Old Town (gone)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        # The stale commune must NOT be suggested as the dropdown default.
+        commune_keys = [k for k in result["data_schema"].schema if k == CONF_COMMUNE]
+        assert commune_keys
+        assert (commune_keys[0].description or {}).get("suggested_value") != "99999"
+        # Submitting without re-selecting drops the stale commune.
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {CONF_CONSUMPTION_M3_PER_YEAR: 90, CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options
+
+
+@pytest.mark.asyncio
 async def test_options_flow_caches_commune_list_across_render_and_submit(
     hass: HomeAssistant,
 ) -> None:
