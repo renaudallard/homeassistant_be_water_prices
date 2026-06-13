@@ -678,10 +678,20 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
             if CONF_POSTCODE not in final and self.config_entry.options.get(CONF_POSTCODE):
                 final[CONF_POSTCODE] = self.config_entry.options[CONF_POSTCODE]
             return self.async_create_entry(title="", data=final)
+        current = dict(self.config_entry.options)
+        saved_commune = current.get(CONF_COMMUNE)
+        if communes and saved_commune is not None and saved_commune not in {c.id for c in communes}:
+            # A saved commune no longer in the live list (phantom blocklist
+            # addition, operator renumber) must not be prefilled as an
+            # unselectable value -- submitting it unchanged would raise a
+            # form error or silently drop. Strip it from the defaults so the
+            # user re-picks, mirroring the reconfigure flow's stale drop.
+            current.pop(CONF_COMMUNE, None)
+            current.pop(CONF_COMMUNE_LABEL, None)
         return self.async_show_form(
             step_id="init",
             data_schema=_options_schema(
-                dict(self.config_entry.options),
+                current,
                 flanders=_is_flanders(utility_id),
                 communes=communes,
             ),
