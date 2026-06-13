@@ -115,7 +115,15 @@ async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
     string instead of raising an uncaught ``UnicodeDecodeError``.
     """
     payload = await _read_capped(resp, url)
-    return payload.decode(resp.charset or "utf-8", errors="replace")
+    charset = resp.charset or "utf-8"
+    try:
+        return payload.decode(charset, errors="replace")
+    except LookupError:
+        # An unknown charset label (a typo, or a vendor token like
+        # "utf8mb4"): errors="replace" only covers malformed bytes, not an
+        # unknown codec name, so decode() raises LookupError before
+        # decoding. Fall back to UTF-8, mirroring aiohttp's get_encoding.
+        return payload.decode("utf-8", errors="replace")
 
 
 def _is_pdf_payload(payload: bytes) -> bool:
