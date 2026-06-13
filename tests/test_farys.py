@@ -108,3 +108,65 @@ def test_unservable_labels_blocklist_holds_known_phantoms() -> None:
     }
     missing = must_include - _UNSERVABLE_COMMUNE_LABELS
     assert not missing, f"blocklist regression: {missing} disappeared"
+
+
+class _FakeResp:
+    def __init__(self, status: int) -> None:
+        self.status = status
+
+    async def text(self) -> str:
+        return ""
+
+
+class _FakeAjaxCtx:
+    def __init__(self, *, status: int | None = None, exc: BaseException | None = None) -> None:
+        self._status = status
+        self._exc = exc
+
+    async def __aenter__(self) -> _FakeResp:
+        if self._exc is not None:
+            raise self._exc
+        assert self._status is not None
+        return _FakeResp(self._status)
+
+    async def __aexit__(self, *_a: object) -> bool:
+        return False
+
+
+class _FakePostSession:
+    def __init__(self, *, status: int | None = None, exc: BaseException | None = None) -> None:
+        self._status = status
+        self._exc = exc
+
+    def post(self, *_a: object, **_k: object) -> _FakeAjaxCtx:
+        return _FakeAjaxCtx(status=self._status, exc=self._exc)
+
+
+async def test_post_for_commune_maps_5xx_to_transient() -> None:
+    from custom_components.be_water_prices.providers import farys
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with pytest.raises(TransientFetchError):
+        await farys._post_for_commune(_FakePostSession(status=503), "x")  # type: ignore[arg-type]
+
+
+async def test_post_for_commune_maps_timeout_to_transient() -> None:
+    from custom_components.be_water_prices.providers import farys
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with pytest.raises(TransientFetchError):
+        await farys._post_for_commune(  # type: ignore[arg-type]
+            _FakePostSession(exc=TimeoutError()), "x"
+        )
+
+
+async def test_post_for_commune_4xx_stays_permanent() -> None:
+    from custom_components.be_water_prices.providers import farys
+    from custom_components.be_water_prices.providers.base import (
+        ExtractorError,
+        TransientFetchError,
+    )
+
+    with pytest.raises(ExtractorError) as exc:
+        await farys._post_for_commune(_FakePostSession(status=404), "x")  # type: ignore[arg-type]
+    assert not isinstance(exc.value, TransientFetchError)
