@@ -65,8 +65,8 @@ from .._phantom_blocklists import (
 )
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._pdf import USER_AGENT, fetch_text, to_float
-from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
+from ._pdf import USER_AGENT, _http_error, fetch_text, to_float
+from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 # Re-exported so ``async_migrate_entry`` and the test suite can read
 # them under their existing names without knowing about the dep-free
@@ -182,10 +182,10 @@ async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> 
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
             if resp.status >= 400:
-                raise ExtractorError(f"HTTP {resp.status} fetching {ENDPOINT_URL}")
+                raise _http_error(ENDPOINT_URL, resp.status)
             return await resp.text()
-    except aiohttp.ClientError as err:
-        raise ExtractorError(f"network error fetching Farys AJAX endpoint: {err}") from err
+    except (aiohttp.ClientError, TimeoutError) as err:
+        raise TransientFetchError(f"network error fetching Farys AJAX endpoint: {err}") from err
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
