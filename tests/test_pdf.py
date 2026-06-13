@@ -27,13 +27,34 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import date
+from typing import Any
 
+import pytest
+
+from custom_components.be_water_prices.providers import _pdf
 from custom_components.be_water_prices.providers._pdf import (
     fold_accents,
     parse_valid_until,
     to_float,
 )
+from custom_components.be_water_prices.providers.base import ExtractorError
+
+
+class _FakeContent:
+    def __init__(self, chunks: list[bytes]) -> None:
+        self._chunks = chunks
+
+    async def iter_chunked(self, _n: int) -> AsyncIterator[bytes]:
+        for chunk in self._chunks:
+            yield chunk
+
+
+class _FakeResp:
+    def __init__(self, chunks: list[bytes], content_length: int | None) -> None:
+        self.content = _FakeContent(chunks)
+        self.content_length = content_length
 
 
 def test_to_float_handles_belgian_comma() -> None:
@@ -61,3 +82,27 @@ def test_parse_valid_until_numeric_french() -> None:
 
 def test_parse_valid_until_returns_none_without_keyword() -> None:
     assert parse_valid_until("Random date 30 april 2026 unrelated") is None
+
+
+def test_guard_content_length_rejects_declared_oversize() -> None:
+    resp = _FakeResp([], content_length=_pdf.MAX_RESPONSE_BYTES + 1)
+    with pytest.raises(ExtractorError):
+        _pdf._guard_content_length(resp, "https://example.test")  # type: ignore[arg-type]
+
+
+def test_guard_content_length_allows_unknown_or_small() -> None:
+    _pdf._guard_content_length(_FakeResp([], content_length=None), "u")  # type: ignore[arg-type]
+    _pdf._guard_content_length(_FakeResp([], content_length=1024), "u")  # type: ignore[arg-type]
+
+
+async def test_read_capped_rejects_oversized_body(monkeypatch: Any) -> None:
+    # A lying / absent Content-Length must still be caught on the bytes read.
+    monkeypatch.setattr(_pdf, "MAX_RESPONSE_BYTES", 10)
+    resp = _FakeResp([b"x" * 6, b"y" * 6], content_length=None)
+    with pytest.raises(ExtractorError):
+        await _pdf._read_capped(resp, "https://example.test")  # type: ignore[arg-type]
+
+
+async def test_read_capped_returns_small_body() -> None:
+    resp = _FakeResp([b"%PDF", b"-1.7 rest"], content_length=13)
+    assert await _pdf._read_capped(resp, "u") == b"%PDF-1.7 rest"  # type: ignore[arg-type]

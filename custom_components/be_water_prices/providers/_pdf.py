@@ -74,6 +74,36 @@ def _read_version() -> str:
 
 USER_AGENT = f"Home Assistant be_water_prices/{_read_version()}"
 
+# Hard ceiling on a fetched response body. Real tariff PDFs and HTML
+# pages are well under a megabyte; this only bounds memory if an upstream
+# server -- or a MitM -- returns an arbitrarily large body.
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+
+
+def _guard_content_length(resp: aiohttp.ClientResponse, url: str) -> None:
+    """Reject a response whose declared length is over the cap."""
+    length = resp.content_length
+    if length is not None and length > MAX_RESPONSE_BYTES:
+        raise ExtractorError(
+            f"response from {url} declares {length} bytes, over the {MAX_RESPONSE_BYTES}-byte limit"
+        )
+
+
+async def _read_capped(resp: aiohttp.ClientResponse, url: str) -> bytes:
+    """Read the body, refusing anything past ``MAX_RESPONSE_BYTES``.
+
+    Content-Length is only a hint (absent on a chunked response, and a
+    hostile server can lie), so the cap is also enforced on the bytes
+    actually read.
+    """
+    _guard_content_length(resp, url)
+    payload = bytearray()
+    async for chunk in resp.content.iter_chunked(65536):
+        payload.extend(chunk)
+        if len(payload) > MAX_RESPONSE_BYTES:
+            raise ExtractorError(f"response from {url} exceeded {MAX_RESPONSE_BYTES} bytes")
+    return bytes(payload)
+
 
 def _is_pdf_payload(payload: bytes) -> bool:
     """Return True if the bytes look like a PDF.
@@ -95,7 +125,7 @@ async def fetch_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
         ) as resp:
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
-            payload = await resp.read()
+            payload = await _read_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {err}") from err
 
@@ -148,7 +178,7 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
         ) as resp:
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
-            payload = await resp.read()
+            payload = await _read_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {err}") from err
     if not _is_pdf_payload(payload):
@@ -181,6 +211,7 @@ async def fetch_text(
         async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
+            _guard_content_length(resp, url)
             return await resp.text()
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {err}") from err
