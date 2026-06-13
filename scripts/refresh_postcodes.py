@@ -120,8 +120,22 @@ def fetch_postcodes() -> list[dict[str, object]]:
     return list(data["features"])
 
 
+class ZdeQueryError(Exception):
+    """The ZDE endpoint could not be queried (network / HTTP failure).
+
+    Distinct from a successful query that returns no polygon hit, so the
+    caller never mistakes a transient outage for genuine no-coverage and
+    silently commits an incomplete map.
+    """
+
+
 def query_zde_for_centroid(lon: float, lat: float) -> str | None:
-    """Return the DISTRIBUTEUR name covering ``(lon, lat)`` or None."""
+    """Return the DISTRIBUTEUR name covering ``(lon, lat)``, or None.
+
+    ``None`` means the point falls outside every ZDE polygon (genuine
+    no-coverage). A network / HTTP failure raises :class:`ZdeQueryError`
+    instead, so it is never conflated with no-coverage.
+    """
     params = {
         "geometry": json.dumps({"x": lon, "y": lat, "spatialReference": {"wkid": 4326}}),
         "geometryType": "esriGeometryPoint",
@@ -137,8 +151,7 @@ def query_zde_for_centroid(lon: float, lat: float) -> str | None:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.load(resp)
     except Exception as err:
-        print(f"  ZDE query failed: {err}", file=sys.stderr)
-        return None
+        raise ZdeQueryError(f"ZDE query failed: {err}") from err
     features = data.get("features", [])
     if not features:
         return None
@@ -293,7 +306,13 @@ def render_dwg_frozenset(postcodes: list[str]) -> str:
 
 def main() -> int:
     features = fetch_postcodes()
-    mapping = build_wallonia_map(features)
+    try:
+        mapping = build_wallonia_map(features)
+    except ZdeQueryError as err:
+        # Abort rather than print (and let the maintainer commit) a map left
+        # incomplete by a transient ZDE outage. Rerun once the endpoint is back.
+        print(f"aborting: {err}", file=sys.stderr)
+        return 1
     carve = build_dwg_flanders_carveout()
     print("# === Walloon _PER_POSTCODE ===")
     print(render_dict(mapping))
