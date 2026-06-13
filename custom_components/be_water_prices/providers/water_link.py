@@ -69,7 +69,7 @@ import aiohttp
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._pdf import fetch_pdf_text_layout, to_float
-from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
+from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -142,6 +142,11 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
     try:
         return await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target)), target
     except ExtractorError as err:
+        if isinstance(err, TransientFetchError):
+            # A transient blip (5xx / 429 / timeout) on this year's URL must
+            # propagate so live_check classifies it as TRANSIENT instead of
+            # being masked by silently serving last year's prices.
+            raise
         _LOGGER.info("Water-link %d PDF unavailable (%s); trying %d", target, err, target - 1)
         text = await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target - 1))
         return text, target - 1
