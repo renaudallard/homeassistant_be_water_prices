@@ -40,7 +40,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO, UnitOfVolume
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -285,6 +285,31 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
         self._attr_device_info = utility_device_info(coordinator)
+        # Timestamp of the last mid-cycle decrease for a TOTAL sensor. See
+        # _handle_coordinator_update. In-memory only: it is rebuilt from
+        # the running value after a restart, so the (rare) combination of a
+        # mid-year drop and a restart before the next Jan 1 may shift one
+        # statistics delta.
+        self._reset_at: datetime | None = None
+        self._last_native: float | None = None
+
+    def _note_value(self, value: float | None) -> None:
+        # A TOTAL sensor (current_year_cost / ytd_consumption) can legitimately
+        # decrease mid-cycle without crossing Jan 1: a meter swap floors YTD to
+        # ~0, or a tariff refresh lowers the running cost. HA only treats a drop
+        # as a reset for TOTAL_INCREASING; for plain TOTAL it records the drop as
+        # a negative long-term-statistics delta unless last_reset advances. Move
+        # last_reset to now on a decrease so HA opens a fresh cycle instead.
+        if self.entity_description.last_reset_fn is None:
+            return
+        if value is not None and self._last_native is not None and value < self._last_native:
+            self._reset_at = dt_util.now()
+        self._last_native = value
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._note_value(self.native_value)
+        super()._handle_coordinator_update()
 
     @property
     def native_value(self) -> float | None:
@@ -295,7 +320,15 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
     @property
     def last_reset(self) -> datetime | None:
         fn = self.entity_description.last_reset_fn
-        return fn() if fn is not None else None
+        if fn is None:
+            return None
+        # The later of the calendar-year start and the last mid-cycle drop.
+        # On the Jan 1 rollover fn() returns the new year start, which
+        # supersedes a stale prior-year drop timestamp.
+        base = fn()
+        if self._reset_at is not None and self._reset_at > base:
+            return self._reset_at
+        return base
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
