@@ -88,7 +88,10 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
 from custom_components.be_water_prices.providers._pdf import (  # noqa: E402
     extract_pdf_text_layout,
 )
-from custom_components.be_water_prices.providers.base import ExtractorError  # noqa: E402
+from custom_components.be_water_prices.providers.base import (  # noqa: E402
+    ExtractorError,
+    TransientFetchError,
+)
 
 FIXTURES = ROOT / "tests" / "fixtures"
 
@@ -312,6 +315,12 @@ async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> Drift
 
     try:
         live_t = await chk.fetch_live(session)
+    except TransientFetchError as err:
+        # A transient upstream blip (5xx / 429 / timeout) is not drift and
+        # must not flip the exit code, or the weekly workflow would open a
+        # false "fixtures need refresh" issue. Record it as a skip, like
+        # live_check classifies its TRANSIENT results.
+        return DriftResult(chk, [], error=None, skipped=f"transient upstream failure: {err}")
     except ExtractorError as err:
         return DriftResult(chk, [], error=f"live fetch failed: {err}")
     except Exception:
