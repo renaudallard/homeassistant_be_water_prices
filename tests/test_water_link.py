@@ -86,4 +86,37 @@ def test_parse_tariff_with_specific_commune_returns_ring_sanering() -> None:
     assert edegem.sanering_gemeentelijk_eur_per_m3 == 1.9572  # ring rate
 
 
-# Imports needed for the new tests above.
+async def test_transient_error_propagates_not_masked() -> None:
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import water_link
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with (
+        patch.object(
+            water_link,
+            "fetch_pdf_text_layout",
+            new=AsyncMock(side_effect=TransientFetchError("HTTP 503")),
+        ) as mock,
+        pytest.raises(TransientFetchError),
+    ):
+        await water_link._fetch_pdf_text(session=None)  # type: ignore[arg-type]
+    # Must not have masked it by falling back to last year's PDF.
+    assert mock.await_count == 1
+
+
+async def test_hard_error_falls_back_to_prior_year() -> None:
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import water_link
+
+    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    with patch.object(
+        water_link,
+        "fetch_pdf_text_layout",
+        new=AsyncMock(side_effect=[ExtractorError("HTTP 404"), text]),
+    ) as mock:
+        _out, year = await water_link._fetch_pdf_text(session=None)  # type: ignore[arg-type]
+    assert mock.await_count == 2
+    assert year == date.today().year - 1
