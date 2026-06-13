@@ -81,10 +81,19 @@ async def async_get_config_entry_diagnostics(
 
 
 def _sensitive_tokens(entry: ConfigEntry) -> list[str]:
-    """Commune / postcode strings that must not survive into the snapshot."""
+    """Commune strings that must not survive into the snapshot.
+
+    Only the commune id and label leak into the snapshot (the tariff's
+    source_url / publication_label and any last_error). The postcode is
+    deliberately excluded: it is already redacted in the entry block and
+    does not appear in the snapshot on its own, while a bare 4-digit
+    postcode would match years / ISO dates (e.g. valid_until or a label's
+    publication year) and corrupt the dump. A postcode embedded in a
+    commune label is still scrubbed via the label token.
+    """
     tokens: set[str] = set()
     for src in (entry.data, entry.options):
-        for key in (CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_POSTCODE):
+        for key in (CONF_COMMUNE, CONF_COMMUNE_LABEL):
             value = src.get(key)
             if isinstance(value, str) and value:
                 tokens.add(value)

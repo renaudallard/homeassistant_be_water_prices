@@ -41,15 +41,25 @@ class _Entry:
         self.options = options
 
 
-def test_sensitive_tokens_collects_commune_and_postcode() -> None:
+def test_sensitive_tokens_are_commune_only_not_postcode() -> None:
     entry = _Entry(
-        data={CONF_POSTCODE: "2440"},
+        data={CONF_POSTCODE: "2030"},
         options={CONF_COMMUNE: "geel", CONF_COMMUNE_LABEL: "Geel"},
     )
     tokens = _sensitive_tokens(entry)  # type: ignore[arg-type]
-    assert set(tokens) == {"2440", "geel", "Geel"}
+    # Commune id + label only. The postcode is excluded: as a bare 4-digit
+    # token it would match years / dates in the snapshot and corrupt them.
+    assert set(tokens) == {"geel", "Geel"}
+    assert "2030" not in tokens
     # Longest first so a label containing the slug is replaced whole.
     assert tokens == sorted(tokens, key=len, reverse=True)
+
+
+def test_postcode_like_year_is_not_scrubbed_from_snapshot() -> None:
+    entry = _Entry(data={CONF_POSTCODE: "2030"}, options={})
+    snapshot = {"tariff": {"valid_until": "2030-12-31"}}
+    scrubbed = _scrub_tokens(snapshot, _sensitive_tokens(entry))  # type: ignore[arg-type]
+    assert scrubbed["tariff"]["valid_until"] == "2030-12-31"
 
 
 def test_scrub_tokens_removes_commune_from_snapshot() -> None:
