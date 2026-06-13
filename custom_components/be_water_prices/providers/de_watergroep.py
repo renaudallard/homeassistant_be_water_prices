@@ -91,9 +91,12 @@ COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJ
 _DEFAULT_COMMUNE_GUID = "{B16A143A-49E6-4CE5-A241-1AA09BFC406A}"
 _DEFAULT_COMMUNE_LABEL = "Halle (DWG-served default)"
 
-# News article wording: "2,9521 euro voor 1.000 liter".
+# News article wording: "2,9521 euro voor 1.000 liter". The integer part
+# is bounded (a price never has more than a few leading digits) so a long
+# run of digits without the trailing "euro voor 1.000 liter" cannot make
+# the unbounded "+" backtrack quadratically over attacker-sized input.
 _BASIS_NEWS_RE = re.compile(
-    r"([\d]+,\s*\d{3,5})\s*euro\s+voor\s+1[.,]?000\s+liter",
+    r"(\d{1,7},\s*\d{3,5})\s*euro\s+voor\s+1[.,]?000\s+liter",
     re.IGNORECASE,
 )
 

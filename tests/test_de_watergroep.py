@@ -30,8 +30,21 @@ from __future__ import annotations
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.de_watergroep import parse_tariff
+from custom_components.be_water_prices.providers.de_watergroep import _BASIS_NEWS_RE, parse_tariff
 from tests import fixture_html
+
+
+def test_news_regex_matches_published_wording() -> None:
+    match = _BASIS_NEWS_RE.search("Dat kost 2,9521 euro voor 1.000 liter water.")
+    assert match is not None
+    assert match.group(1) == "2,9521"
+
+
+def test_news_regex_does_not_backtrack_on_long_digit_run() -> None:
+    # A long unbroken digit run without the required tail used to make the
+    # unbounded integer part backtrack quadratically; the bounded form
+    # returns immediately (the 30s pytest-timeout guards against regression).
+    assert _BASIS_NEWS_RE.search("9" * 200_000) is None
 
 
 def test_parses_2026_basistarief() -> None:
