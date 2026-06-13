@@ -54,6 +54,14 @@ def test_raises_when_no_insert_command_present() -> None:
         parse_tariff('[{"command":"settings","settings":{}}]')
 
 
+@pytest.mark.parametrize("body", ['{"error": "nope"}', "42", '"a bare string"'])
+def test_raises_when_response_is_not_a_command_list(body: str) -> None:
+    # Valid JSON that is not a list of command dicts must surface as
+    # ExtractorError, not a raw AttributeError / TypeError.
+    with pytest.raises(ExtractorError):
+        parse_tariff(body)
+
+
 def test_unservable_labels_dropped_from_list_communes() -> None:
     # Farys's dropdown carries 23 "phantom" commune options at split
     # postcodes where DWG is the actual operator; picking one crashes
