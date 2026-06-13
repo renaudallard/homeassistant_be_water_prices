@@ -667,6 +667,12 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
                     final[CONF_COMMUNE] = existing[CONF_COMMUNE]
                 if existing.get(CONF_COMMUNE_LABEL):
                     final[CONF_COMMUNE_LABEL] = existing[CONF_COMMUNE_LABEL]
+            # CONF_POSTCODE is not surfaced in the options schema, so it
+            # cannot ride in via user_input. Reattach the stored value;
+            # otherwise every options save would wipe the postcode that
+            # the initial and reconfigure flows persist.
+            if CONF_POSTCODE not in final and self.config_entry.options.get(CONF_POSTCODE):
+                final[CONF_POSTCODE] = self.config_entry.options[CONF_POSTCODE]
             return self.async_create_entry(title="", data=final)
         return self.async_show_form(
             step_id="init",

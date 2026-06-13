@@ -191,6 +191,33 @@ async def test_options_flow_persists_commune_label_alongside_id(hass: HomeAssist
 
 
 @pytest.mark.asyncio
+async def test_options_flow_preserves_stored_postcode(hass: HomeAssistant) -> None:
+    """An options save must not wipe the postcode persisted at setup.
+
+    CONF_POSTCODE is not part of the options form, so it has to be
+    reattached explicitly or it is lost on the first save.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "1000"},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == data_entry_flow.FlowResultType.FORM
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_CONSUMPTION_M3_PER_YEAR: 120},
+    )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 120
+    assert entry.options[CONF_POSTCODE] == "1000"
+
+
+@pytest.mark.asyncio
 async def test_options_flow_preserves_commune_when_list_fetch_fails(hass: HomeAssistant) -> None:
     """Round-3 F4: a transient commune-list fetch failure must not silently
     wipe the user's previously-saved commune.
