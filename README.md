@@ -123,7 +123,10 @@ enough to catch the 1 January re-pricing within hours, and the rest of
 the year is mostly a "did the page change shape" canary. There is no
 spot-style hourly fetch, no separate probe path, and no shared cache
 across entries — water utilities don't overlap, so a single HA instance
-has at most one entry per address.
+has at most one entry per address. This daily cadence governs only the
+network fetch; the meter-derived running-cost and YTD-consumption
+sensors update live from your local water meter (see
+[Refresh cadence](#refresh-cadence)).
 
 ## What the integration computes
 
@@ -168,8 +171,8 @@ up fills in the values without an HA restart.
 | `water_sanering_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `water_all_in_basis` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 | `water_projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
-| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Reads YTD m³ from the configured water meter sensor via HA's recorder daily statistics, applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. Returns `unknown` until a water meter is configured in the options step. |
-| `water_ytd_consumption` | Cumulative m³ consumed since 1 January, summed from the configured water meter sensor's daily deltas. Companion to `water_current_year_cost`. |
+| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors a year-to-date baseline from HA's recorder daily statistics, then tracks the configured water meter sensor **live** — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. Returns `unknown` until a water meter is configured in the options step. |
+| `water_ytd_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading). Companion to `water_current_year_cost`. |
 
 Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
 `source_url`, `snapshot_age_hours`, `snapshot_stale`, and `last_error`
@@ -282,6 +285,13 @@ fail at fetch time).
 - **Projected cost** — recomputed every coordinator tick **and**
   immediately when you save new options, so changing your consumption
   or household size shows up without waiting for the next refresh.
+- **Running cost / consumption** — `water_current_year_cost` and
+  `water_ytd_consumption` update **live**: each time your configured
+  water-meter sensor reports new usage, the running bill and YTD volume
+  recompute immediately (in-memory, no extra recorder or network call).
+  The daily tick re-anchors the year-to-date baseline to the recorder's
+  authoritative figure. Responsiveness is bounded by how often your
+  meter entity itself pushes a new state.
 
 ### Failure mode
 

@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -44,6 +44,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_UTILITY,
+    CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
 from custom_components.be_water_prices.providers.base import (
@@ -206,6 +207,61 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
     assert coordinator.data is not None
     assert coordinator.data.snapshot_stale is False
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
+
+
+@pytest.mark.asyncio
+async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
+    """A water draw (meter state change) updates YTD cost/consumption live.
+
+    The daily recorder query is stubbed to anchor a Jan 1 baseline; from
+    there the running total must track the meter without another query.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    # Seed the meter before setup so _compute_ytd captures the baseline.
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # baseline = live(100) - recorder_ytd(20) == reading at Jan 1.
+        assert coordinator._ytd_baseline_m3 == 80.0
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+        cost_before = coordinator.data.current_year_cost_eur
+        assert cost_before is not None
+
+        # Draw 5 m³: 100 -> 105. YTD jumps 20 -> 25 with no recorder call.
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+        assert coordinator.data.current_year_cost_eur > cost_before
+
+        # A flapping meter (unavailable) must not blank the running total.
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
 
 
 @pytest.mark.asyncio
