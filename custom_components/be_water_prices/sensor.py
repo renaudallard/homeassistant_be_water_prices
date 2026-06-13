@@ -220,8 +220,13 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
         key="projected_annual_cost",
         translation_key="projected_annual_cost",
         native_unit_of_measurement=EUR_PER_YEAR,
-        device_class=SensorDeviceClass.MONETARY,
-        state_class=SensorStateClass.TOTAL,
+        # A projection (a level that moves with the tariff and the user's
+        # consumption / persons options), not an accumulator. MONETARY +
+        # TOTAL with no last_reset would make the long-term-statistics sum
+        # accumulate net change since the first record -- meaningless for a
+        # projection. MEASUREMENT records min/mean/max level statistics
+        # instead; the EUR/year unit still conveys the monetary nature.
+        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
         value_fn=_projected_cost,
     ),
