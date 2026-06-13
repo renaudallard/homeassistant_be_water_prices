@@ -106,8 +106,14 @@ def _extract_html_payload(ajax_response_text: str) -> str:
         commands = json.loads(ajax_response_text)
     except json.JSONDecodeError as err:
         raise ExtractorError(f"Farys AJAX response is not JSON: {err}") from err
+    # A Drupal AJAX response is a list of command dicts. A well-formed
+    # JSON value that is not that shape (an error envelope, a bare string
+    # or number) would otherwise raise a raw AttributeError / TypeError;
+    # report it as a parse failure instead.
+    if not isinstance(commands, list):
+        raise ExtractorError("Farys AJAX response was not a command list")
     for cmd in commands:
-        if cmd.get("command") == "insert":
+        if isinstance(cmd, dict) and cmd.get("command") == "insert":
             data = cmd.get("data")
             if isinstance(data, str) and "Basistarief" in data:
                 return data
