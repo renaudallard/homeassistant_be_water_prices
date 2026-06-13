@@ -69,7 +69,7 @@ from ..const import (
 )
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, fetch_html
-from ._pdf import USER_AGENT, _http_error, to_float
+from ._pdf import USER_AGENT, _http_error, _read_text_capped, to_float
 from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -287,7 +287,7 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
         ) as resp:
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
-            text = await resp.text()
+            text = await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(
             f"network error fetching De Watergroep AJAX endpoint: {err}"

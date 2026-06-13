@@ -65,7 +65,7 @@ from .._phantom_blocklists import (
 )
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._pdf import USER_AGENT, _http_error, fetch_text, to_float
+from ._pdf import USER_AGENT, _http_error, _read_text_capped, fetch_text, to_float
 from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 # Re-exported so ``async_migrate_entry`` and the test suite can read
@@ -183,7 +183,7 @@ async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> 
         ) as resp:
             if resp.status >= 400:
                 raise _http_error(ENDPOINT_URL, resp.status)
-            return await resp.text()
+            return await _read_text_capped(resp, ENDPOINT_URL)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching Farys AJAX endpoint: {err}") from err
 

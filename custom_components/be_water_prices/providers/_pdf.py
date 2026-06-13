@@ -105,6 +105,19 @@ async def _read_capped(resp: aiohttp.ClientResponse, url: str) -> bytes:
     return bytes(payload)
 
 
+async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
+    """Read a text body under the size cap, decoding leniently.
+
+    Streams via :func:`_read_capped` so a chunked or Content-Length-less
+    body cannot blow past the cap (``resp.text()`` reads unbounded), and
+    decodes with the declared charset, falling back to UTF-8 with
+    ``errors="replace"`` so a charset-mislabelled page yields a parseable
+    string instead of raising an uncaught ``UnicodeDecodeError``.
+    """
+    payload = await _read_capped(resp, url)
+    return payload.decode(resp.charset or "utf-8", errors="replace")
+
+
 def _is_pdf_payload(payload: bytes) -> bool:
     """Return True if the bytes look like a PDF.
 
@@ -211,8 +224,7 @@ async def fetch_text(
         async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
-            _guard_content_length(resp, url)
-            return await resp.text()
+            return await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {err}") from err
 
