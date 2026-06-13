@@ -67,3 +67,65 @@ def test_uses_drinkwater_only_vastrecht() -> None:
 def test_raises_on_missing_basistarief_phrase() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>", year=2026)
+
+
+class _FakeResp:
+    def __init__(self, status: int) -> None:
+        self.status = status
+
+    async def text(self) -> str:
+        return ""
+
+
+class _FakeAjaxCtx:
+    def __init__(self, *, status: int | None = None, exc: BaseException | None = None) -> None:
+        self._status = status
+        self._exc = exc
+
+    async def __aenter__(self) -> _FakeResp:
+        if self._exc is not None:
+            raise self._exc
+        assert self._status is not None
+        return _FakeResp(self._status)
+
+    async def __aexit__(self, *_a: object) -> bool:
+        return False
+
+
+class _FakeGetSession:
+    def __init__(self, *, status: int | None = None, exc: BaseException | None = None) -> None:
+        self._status = status
+        self._exc = exc
+
+    def get(self, *_a: object, **_k: object) -> _FakeAjaxCtx:
+        return _FakeAjaxCtx(status=self._status, exc=self._exc)
+
+
+async def test_fetch_commune_ajax_maps_5xx_to_transient() -> None:
+    from custom_components.be_water_prices.providers import de_watergroep
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with pytest.raises(TransientFetchError):
+        await de_watergroep._fetch_commune_ajax(  # type: ignore[arg-type]
+            _FakeGetSession(status=503), "{guid}"
+        )
+
+
+async def test_fetch_reraises_transient_instead_of_news_fallback() -> None:
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import de_watergroep
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with (
+        patch.object(
+            de_watergroep,
+            "_fetch_commune_ajax",
+            new=AsyncMock(side_effect=TransientFetchError("HTTP 503")),
+        ),
+        patch.object(de_watergroep, "fetch_html", new=AsyncMock()) as news,
+        pytest.raises(TransientFetchError),
+    ):
+        await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
+    # The drinkwater-only news fallback must NOT run on a transient blip.
+    news.assert_not_awaited()

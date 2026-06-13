@@ -69,8 +69,8 @@ from ..const import (
 )
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, fetch_html
-from ._pdf import USER_AGENT, to_float
-from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
+from ._pdf import USER_AGENT, _http_error, to_float
+from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -243,6 +243,12 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             parse_commune_tariff, text, year=year, commune_label=_DEFAULT_COMMUNE_LABEL
         )
     except ExtractorError as default_err:
+        if isinstance(default_err, TransientFetchError):
+            # A transient blip (5xx / 429 / timeout) must propagate so
+            # live_check / fixture_drift classify it as TRANSIENT, rather
+            # than silently degrading to the drinkwater-only news article
+            # (a ~200 EUR/year under-estimate).
+            raise
         _LOGGER.info(
             "De Watergroep default-commune fetch failed (%s); falling back to news article",
             default_err,
@@ -280,10 +286,12 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
             if resp.status >= 400:
-                raise ExtractorError(f"HTTP {resp.status} fetching {url}")
+                raise _http_error(url, resp.status)
             text = await resp.text()
-    except aiohttp.ClientError as err:
-        raise ExtractorError(f"network error fetching De Watergroep AJAX endpoint: {err}") from err
+    except (aiohttp.ClientError, TimeoutError) as err:
+        raise TransientFetchError(
+            f"network error fetching De Watergroep AJAX endpoint: {err}"
+        ) from err
     if not text.strip() or "Basistarief" not in text:
         raise ExtractorError(
             f"De Watergroep returned an empty body for commune {commune!r} "
