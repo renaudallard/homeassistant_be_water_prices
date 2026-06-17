@@ -47,6 +47,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import VolumeConverter
@@ -70,6 +71,9 @@ from .providers import ExtractorError, WaterTariff, get
 from .providers.base import WaterExtractor, relabel_with_human_commune
 
 _LOGGER = logging.getLogger(__name__)
+
+# Bumped only if the persisted YTD cycle dict changes shape incompatibly.
+_YTD_STORE_VERSION = 1
 
 
 def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
@@ -126,15 +130,33 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # captured on each daily tick so meter state-change events can
         # recompute YTD live without re-querying the recorder.
         self._meter_entity_id: str | None = None
+        # The year-to-date cycle anchor, persisted across restarts via
+        # _store. ``_ytd_baseline_m3`` is the meter's cumulative reading at
+        # the cycle start (Jan 1, or the moment of a meter swap); YTD is
+        # ``live - baseline`` from there on. Restoring it means an HA
+        # restart / reload no longer re-derives the baseline from the
+        # trailing recorder figure, which used to snap the published YTD
+        # downward.
         self._ytd_baseline_m3: float | None = None
         # Calendar year the baseline belongs to, so a live meter event
         # that fires after the Jan 1 rollover (but before the next daily
         # tick re-anchors) does not report the stale prior-year baseline.
         self._ytd_baseline_year: int | None = None
+        # Meter the persisted cycle belongs to: if the user repoints the
+        # water-meter option at a different entity, the stored baseline is
+        # meaningless and must be re-bootstrapped from the recorder.
+        self._ytd_meter_id: str | None = None
         # Calendar year the last recorder YTD figure belongs to. Lets the
         # meter-recovery branch tell a current-year figure from a stale
         # prior-year one when the meter was down across the rollover.
         self._ytd_recorder_year: int | None = None
+        # Set when the cycle anchor changes; _compute_ytd flushes it to the
+        # Store. The live meter-event path only marks it -- the next daily
+        # tick persists, and a swap / rollover self-heals on restart anyway.
+        self._cycle_dirty = False
+        self._store: Store[dict[str, Any]] = Store(
+            hass, _YTD_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.ytd"
+        )
         super().__init__(
             hass,
             _LOGGER,
@@ -302,49 +324,104 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return str(explicit)
         return await _discover_energy_water_meter(self.hass)
 
+    async def async_load_ytd_state(self) -> None:
+        """Restore the persisted YTD cycle anchor before the first refresh.
+
+        Restoring the Jan 1 baseline across restarts is what keeps the
+        running cost monotonic: without it every restart re-derived the
+        baseline from the recorder's trailing daily total and snapped the
+        published YTD downward.
+        """
+        data = await self._store.async_load()
+        if not data:
+            return
+        self._ytd_meter_id = data.get("meter")
+        self._ytd_baseline_year = data.get("year")
+        self._ytd_baseline_m3 = data.get("baseline_m3")
+
+    def _cycle_state(self) -> dict[str, Any]:
+        return {
+            "meter": self._ytd_meter_id,
+            "year": self._ytd_baseline_year,
+            "baseline_m3": self._ytd_baseline_m3,
+        }
+
+    def _reset_cycle(self) -> None:
+        self._ytd_baseline_m3 = None
+        self._ytd_baseline_year = None
+
+    def _set_cycle(self, year: int, baseline: float) -> None:
+        self._ytd_baseline_year = year
+        self._ytd_baseline_m3 = baseline
+        self._cycle_dirty = True
+
+    def _apply_cycle(self, live: float) -> float:
+        """Return YTD m³ for ``live`` and re-anchor the cycle on a reset.
+
+        Monotonic within a cycle: YTD is ``max(0, live - baseline)`` and the
+        baseline only re-anchors (YTD -> ~0) on a genuine reset -- the Jan 1
+        rollover, or a meter swap where the cumulative reading drops below
+        its own cycle anchor (a working meter never reads below its past).
+        """
+        now_year = dt_util.now().year
+        if self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year:
+            self._set_cycle(now_year, live)
+            return 0.0
+        if live < self._ytd_baseline_m3:
+            self._set_cycle(now_year, live)
+            return 0.0
+        return max(0.0, live - self._ytd_baseline_m3)
+
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
-        """Read YTD m³ from the recorder and apply the bill math.
+        """Compute YTD m³ and cost, anchoring the cycle baseline.
 
-        Returns ``(ytd_m3, ytd_cost_eur)``. Both are ``None`` when no
-        water meter is configured (neither explicitly nor via the
-        Energy dashboard) or the recorder has no usable data.
+        The baseline is restored from the Store across restarts, so this no
+        longer re-derives it from the recorder on every tick. The recorder
+        is consulted only to *bootstrap* the baseline the first time (or
+        after a year rollover / meter change), placing the Jan 1 reading as
+        ``live - recorder_ytd``. From there YTD tracks the live meter via
+        :meth:`_apply_cycle`, which keeps it monotonic.
 
-        Also captures ``_ytd_baseline_m3`` -- the meter's cumulative
-        reading back at Jan 1, derived as ``live_state - recorder_ytd``.
-        :meth:`_recompute_live_ytd` then turns each later meter state
-        change into a fresh YTD figure (``live - baseline``) without
-        another recorder query, so the cost / consumption sensors track
-        water draws as they happen instead of stepping once a day.
+        Returns ``(ytd_m3, ytd_cost_eur)``; both ``None`` when no meter is
+        configured or there is no usable reading to anchor or serve.
         """
         meter = await self.async_resolve_meter_entity()
         self._meter_entity_id = meter
         if not meter:
-            self._ytd_baseline_m3 = None
-            self._ytd_baseline_year = None
-            self._ytd_recorder_year = None
             return None, None
-        today = dt_util.now().date()
-        jan1 = date(today.year, 1, 1)
-        ytd_m3 = await _recorder_ytd_m3(self.hass, meter, jan1, today)
-        if ytd_m3 is None:
-            self._ytd_baseline_m3 = None
-            self._ytd_baseline_year = None
-            self._ytd_recorder_year = None
-            return None, None
-        # The recorder figure is for this year (jan1 == Jan 1 of today's
-        # year); remember that even when the meter is unavailable now so
-        # the live-recovery path can detect a stale prior-year figure.
-        self._ytd_recorder_year = today.year
-
-        # baseline == reading at Jan 1. Anchoring live updates to the
-        # recorder figure keeps them consistent with the daily total, and
-        # re-anchoring every tick lets a meter swap (the recorder sum
-        # floors its negative delta) self-correct within a day.
+        if self._ytd_meter_id != meter:
+            # Option repointed at a different meter -> the stored baseline
+            # belongs to the old one; drop it and re-bootstrap.
+            self._reset_cycle()
+            self._ytd_meter_id = meter
+            self._cycle_dirty = True
+        now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
-        self._ytd_baseline_m3 = (live - ytd_m3) if live is not None else None
-        self._ytd_baseline_year = today.year if self._ytd_baseline_m3 is not None else None
-
-        return ytd_m3, self._ytd_cost_from_m3(tariff, ytd_m3)
+        need_bootstrap = self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year
+        recorder_ytd: float | None = None
+        if need_bootstrap or live is None:
+            today = dt_util.now().date()
+            jan1 = date(now_year, 1, 1)
+            recorder_ytd = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+            if recorder_ytd is not None:
+                self._ytd_recorder_year = now_year
+        if live is not None and need_bootstrap:
+            # baseline == reading at Jan 1, reconstructed from the recorder's
+            # "consumption since Jan 1"; fall back to the current reading
+            # (YTD ~0) when the recorder has nothing to place it.
+            baseline = (live - recorder_ytd) if recorder_ytd is not None else live
+            self._set_cycle(now_year, baseline)
+        if self._ytd_baseline_m3 is not None and live is not None:
+            ytd_m3 = self._apply_cycle(live)
+            if self._cycle_dirty:
+                self._cycle_dirty = False
+                await self._store.async_save(self._cycle_state())
+            return ytd_m3, self._ytd_cost_from_m3(tariff, ytd_m3)
+        # Meter unavailable right now: serve the recorder's daily figure
+        # read-only (no anchoring) so the sensor is not blanked for a day.
+        if recorder_ytd is not None:
+            return recorder_ytd, self._ytd_cost_from_m3(tariff, recorder_ytd)
+        return None, None
 
     def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float) -> float | None:
         """Apply the pro-rated YTD bill math to a year-to-date m³ figure.
@@ -407,24 +484,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             recorder_ytd = self.data.ytd_consumption_m3
             if recorder_ytd is None:
                 return
-            if self._ytd_recorder_year != dt_util.now().year:
+            now_year = dt_util.now().year
+            if self._ytd_recorder_year != now_year:
                 # The meter was down across the Jan 1 rollover, so the
                 # recorder figure is last year's. Start the new year at ~0
                 # rather than reconstructing a stale prior-year baseline.
-                self._ytd_baseline_m3 = live
+                self._set_cycle(now_year, live)
             else:
-                self._ytd_baseline_m3 = live - recorder_ytd
-            self._ytd_baseline_year = dt_util.now().year
-        elif self._ytd_baseline_year != dt_util.now().year:
-            # The daily tick re-anchors the baseline to the meter's Jan 1
-            # reading, but it only runs once every 24h. If the year has
-            # rolled over since that tick, the prior-year baseline would
-            # report nearly a full extra year of consumption. Re-anchor to
-            # the current reading so YTD resets to ~0 at the new year; the
-            # next daily tick refines it from the recorder.
-            self._ytd_baseline_m3 = live
-            self._ytd_baseline_year = dt_util.now().year
-        ytd_m3 = max(0.0, live - self._ytd_baseline_m3)
+                self._set_cycle(now_year, live - recorder_ytd)
+        # _apply_cycle handles the Jan 1 rollover and meter-swap re-anchors
+        # and keeps the figure monotonic; the daily tick later persists it.
+        ytd_m3 = self._apply_cycle(live)
         ytd_cost = self._ytd_cost_from_m3(self.data.tariff, ytd_m3)
         if ytd_m3 == self.data.ytd_consumption_m3 and ytd_cost == self.data.current_year_cost_eur:
             # Nothing changed -- a same-value meter re-report or an

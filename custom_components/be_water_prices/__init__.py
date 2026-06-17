@@ -73,6 +73,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # synchronous get() inside WaterCoordinator then hits the cache.
     await async_load_providers(hass)
     coordinator = WaterCoordinator(hass, entry)
+    # Restore the persisted YTD baseline before the first refresh so a
+    # restart does not re-anchor the running cost down to the recorder's
+    # trailing daily total.
+    await coordinator.async_load_ytd_state()
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryNotReady:

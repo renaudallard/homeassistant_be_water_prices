@@ -528,6 +528,64 @@ async def test_live_ytd_republishes_when_only_cost_changes(hass: HomeAssistant) 
 
 
 @pytest.mark.asyncio
+async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
+    """A restart must not snap the running cost down to the recorder total.
+
+    The Jan 1 baseline is persisted, so after a restart YTD stays
+    ``live - baseline`` instead of re-deriving from the recorder's
+    trailing daily figure (which lags the live meter and used to pull the
+    published cost downward on every restart / reload).
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # baseline = live(100) - recorder_ytd(20) == reading at Jan 1.
+        assert coordinator._ytd_baseline_m3 == 80.0
+
+        # Draw 30 m³ live: 100 -> 130, YTD 20 -> 50.
+        hass.states.async_set("sensor.water_meter", "130")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 50.0
+
+        # Restart: unload, the recorder now trails the live meter (45 < the
+        # true 50 because its daily statistics lag), then set up again.
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        recorder.return_value = 45.0
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator2 = hass.data[DOMAIN][entry.entry_id]
+        # Baseline restored from the Store (80), not re-derived to 130-45=85.
+        assert coordinator2._ytd_baseline_m3 == 80.0
+        # YTD stays live-baseline (50), no downward snap to the recorder's 45.
+        assert coordinator2.data.ytd_consumption_m3 == 50.0
+
+
+@pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
 
