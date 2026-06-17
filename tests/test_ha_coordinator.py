@@ -586,6 +586,61 @@ async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_live_ytd_ignores_meter_glitch_down(hass: HomeAssistant) -> None:
+    """A momentary lower meter reading must not drop the running YTD.
+
+    A year-to-date figure is monotonic within the year, so a glitch or a
+    down-rounded cumulative reading is clamped to the cycle high-water
+    mark rather than published as a decrease.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # Draw to 105 m³: YTD 20 -> 25.
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+        cost_peak = coordinator.data.current_year_cost_eur
+
+        # Meter glitches 1 m³ backward (104): YTD must hold at 25, not drop.
+        hass.states.async_set("sensor.water_meter", "104")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+        assert coordinator.data.current_year_cost_eur == cost_peak
+
+        # A real draw past the mark (106) resumes climbing: 25 -> 26.
+        hass.states.async_set("sensor.water_meter", "106")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 26.0
+
+
+@pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
 
