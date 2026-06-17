@@ -138,6 +138,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # trailing recorder figure, which used to snap the published YTD
         # downward.
         self._ytd_baseline_m3: float | None = None
+        # High-water mark of the meter reading this cycle. YTD is reported
+        # as ``hwm - baseline`` so a momentary low / down-rounded meter
+        # reading cannot pull the running cost below where it already was --
+        # a year-to-date figure only ever climbs until a genuine reset.
+        self._ytd_live_hwm_m3: float | None = None
         # Calendar year the baseline belongs to, so a live meter event
         # that fires after the Jan 1 rollover (but before the next daily
         # tick re-anchors) does not report the stale prior-year baseline.
@@ -338,39 +343,47 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_meter_id = data.get("meter")
         self._ytd_baseline_year = data.get("year")
         self._ytd_baseline_m3 = data.get("baseline_m3")
+        self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
 
     def _cycle_state(self) -> dict[str, Any]:
         return {
             "meter": self._ytd_meter_id,
             "year": self._ytd_baseline_year,
             "baseline_m3": self._ytd_baseline_m3,
+            "live_hwm_m3": self._ytd_live_hwm_m3,
         }
 
     def _reset_cycle(self) -> None:
         self._ytd_baseline_m3 = None
         self._ytd_baseline_year = None
+        self._ytd_live_hwm_m3 = None
 
-    def _set_cycle(self, year: int, baseline: float) -> None:
+    def _set_cycle(self, year: int, baseline: float, hwm: float) -> None:
         self._ytd_baseline_year = year
         self._ytd_baseline_m3 = baseline
+        self._ytd_live_hwm_m3 = hwm
         self._cycle_dirty = True
 
     def _apply_cycle(self, live: float) -> float:
         """Return YTD m³ for ``live`` and re-anchor the cycle on a reset.
 
-        Monotonic within a cycle: YTD is ``max(0, live - baseline)`` and the
-        baseline only re-anchors (YTD -> ~0) on a genuine reset -- the Jan 1
-        rollover, or a meter swap where the cumulative reading drops below
-        its own cycle anchor (a working meter never reads below its past).
+        Monotonic within a cycle: YTD is ``hwm - baseline`` where ``hwm`` is
+        the highest reading seen this cycle, so a momentary low / down-rounded
+        meter reading cannot lower the figure. The baseline only re-anchors
+        (YTD -> ~0) on a genuine reset -- the Jan 1 rollover, or a meter swap
+        where the cumulative reading drops below its own cycle anchor (a
+        working meter never reads below its past).
         """
         now_year = dt_util.now().year
         if self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year:
-            self._set_cycle(now_year, live)
+            self._set_cycle(now_year, live, live)
             return 0.0
         if live < self._ytd_baseline_m3:
-            self._set_cycle(now_year, live)
+            self._set_cycle(now_year, live, live)
             return 0.0
-        return max(0.0, live - self._ytd_baseline_m3)
+        if self._ytd_live_hwm_m3 is None or live > self._ytd_live_hwm_m3:
+            self._ytd_live_hwm_m3 = live
+        return max(0.0, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
         """Compute YTD m³ and cost, anchoring the cycle baseline.
@@ -410,7 +423,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # "consumption since Jan 1"; fall back to the current reading
             # (YTD ~0) when the recorder has nothing to place it.
             baseline = (live - recorder_ytd) if recorder_ytd is not None else live
-            self._set_cycle(now_year, baseline)
+            self._set_cycle(now_year, baseline, live)
         if self._ytd_baseline_m3 is not None and live is not None:
             ytd_m3 = self._apply_cycle(live)
             if self._cycle_dirty:
@@ -489,9 +502,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # The meter was down across the Jan 1 rollover, so the
                 # recorder figure is last year's. Start the new year at ~0
                 # rather than reconstructing a stale prior-year baseline.
-                self._set_cycle(now_year, live)
+                self._set_cycle(now_year, live, live)
             else:
-                self._set_cycle(now_year, live - recorder_ytd)
+                self._set_cycle(now_year, live - recorder_ytd, live)
         # _apply_cycle handles the Jan 1 rollover and meter-swap re-anchors
         # and keeps the figure monotonic; the daily tick later persists it.
         ytd_m3 = self._apply_cycle(live)

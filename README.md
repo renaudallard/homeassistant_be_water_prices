@@ -171,8 +171,8 @@ up fills in the values without an HA restart.
 | `water_sanering_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `water_all_in_basis` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 | `water_projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
-| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. Returns `unknown` until a water meter is configured in the options step. |
-| `water_ytd_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading). Companion to `water_current_year_cost`. |
+| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure is **monotonic within the year**: a momentary low / down-rounded meter reading is clamped to the year's high-water mark and never published as a decrease. Returns `unknown` until a water meter is configured in the options step. |
+| `water_ytd_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark so it never decreases mid-year. Companion to `water_current_year_cost`. |
 
 Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
 `source_url`, `snapshot_age_hours`, `snapshot_stale`, and `last_error`
@@ -294,7 +294,9 @@ fail at fetch time).
   The January 1 meter reading is anchored once from the recorder and
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the
-  recorder's lagging daily total on every restart or reload. The
+  recorder's lagging daily total on every restart or reload. The figure
+  is **monotonic within the year** — a momentary low or down-rounded
+  meter reading is clamped to the year's high-water mark — and the
   baseline only re-anchors on a genuine reset (Jan 1, or a meter swap
   where the reading drops below its own anchor). Responsiveness is
   bounded by how often your meter entity itself pushes a new state.
