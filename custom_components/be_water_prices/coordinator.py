@@ -143,6 +143,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # reading cannot pull the running cost below where it already was --
         # a year-to-date figure only ever climbs until a genuine reset.
         self._ytd_live_hwm_m3: float | None = None
+        # High-water mark of the published cost this cycle. The m3 figure
+        # above is monotonic, but the EUR cost is recomputed every tick from
+        # the daily-fetched tariff and the elapsed-day fraction, so a
+        # momentarily lower tariff fetch or a backward wall-clock step could
+        # otherwise drop the running bill even while consumption is flat.
+        # Clamping to this mark gives the cost the same never-decreases
+        # guarantee; it restarts (None) only when the cycle re-anchors.
+        self._ytd_cost_hwm: float | None = None
         # Calendar year the baseline belongs to, so a live meter event
         # that fires after the Jan 1 rollover (but before the next daily
         # tick re-anchors) does not report the stale prior-year baseline.
@@ -344,6 +352,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_baseline_year = data.get("year")
         self._ytd_baseline_m3 = data.get("baseline_m3")
         self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
+        self._ytd_cost_hwm = data.get("cost_hwm")
 
     def _cycle_state(self) -> dict[str, Any]:
         return {
@@ -351,17 +360,22 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "year": self._ytd_baseline_year,
             "baseline_m3": self._ytd_baseline_m3,
             "live_hwm_m3": self._ytd_live_hwm_m3,
+            "cost_hwm": self._ytd_cost_hwm,
         }
 
     def _reset_cycle(self) -> None:
         self._ytd_baseline_m3 = None
         self._ytd_baseline_year = None
         self._ytd_live_hwm_m3 = None
+        self._ytd_cost_hwm = None
 
     def _set_cycle(self, year: int, baseline: float, hwm: float) -> None:
         self._ytd_baseline_year = year
         self._ytd_baseline_m3 = baseline
         self._ytd_live_hwm_m3 = hwm
+        # A fresh cycle (Jan 1 rollover or a confirmed meter swap) restarts
+        # the cost floor so the running bill is allowed to drop to ~0 here.
+        self._ytd_cost_hwm = None
         self._cycle_dirty = True
 
     def _apply_cycle(self, live: float) -> float:
@@ -426,15 +440,38 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._set_cycle(now_year, baseline, live)
         if self._ytd_baseline_m3 is not None and live is not None:
             ytd_m3 = self._apply_cycle(live)
+            # Floor the cost before the save so a cost high-water-mark bump
+            # is persisted in the same write as the m3 anchor it came from.
+            ytd_cost = self._floor_cost(self._ytd_cost_from_m3(tariff, ytd_m3))
             if self._cycle_dirty:
                 self._cycle_dirty = False
                 await self._store.async_save(self._cycle_state())
-            return ytd_m3, self._ytd_cost_from_m3(tariff, ytd_m3)
+            return ytd_m3, ytd_cost
         # Meter unavailable right now: serve the recorder's daily figure
         # read-only (no anchoring) so the sensor is not blanked for a day.
         if recorder_ytd is not None:
-            return recorder_ytd, self._ytd_cost_from_m3(tariff, recorder_ytd)
+            return recorder_ytd, self._floor_cost(self._ytd_cost_from_m3(tariff, recorder_ytd))
         return None, None
+
+    def _floor_cost(self, cost: float | None) -> float | None:
+        """Clamp the published YTD cost to this cycle's high-water mark.
+
+        :meth:`_apply_cycle` already keeps the m3 figure monotonic; this
+        gives the EUR cost the same guarantee so a momentarily lower tariff
+        fetch, a backward wall-clock step, or an un-clamped recorder fallback
+        cannot publish a running bill below where it already stood this
+        cycle. The mark restarts (``None``) whenever the cycle re-anchors via
+        :meth:`_set_cycle` -- the Jan 1 rollover or a confirmed meter swap --
+        so the bill is still allowed to drop to ~0 there.
+        """
+        if cost is None:
+            return None
+        if self._ytd_cost_hwm is not None and cost < self._ytd_cost_hwm:
+            return self._ytd_cost_hwm
+        if self._ytd_cost_hwm is None or cost > self._ytd_cost_hwm:
+            self._ytd_cost_hwm = cost
+            self._cycle_dirty = True
+        return cost
 
     def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float) -> float | None:
         """Apply the pro-rated YTD bill math to a year-to-date m³ figure.
@@ -508,7 +545,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # _apply_cycle handles the Jan 1 rollover and meter-swap re-anchors
         # and keeps the figure monotonic; the daily tick later persists it.
         ytd_m3 = self._apply_cycle(live)
-        ytd_cost = self._ytd_cost_from_m3(self.data.tariff, ytd_m3)
+        ytd_cost = self._floor_cost(self._ytd_cost_from_m3(self.data.tariff, ytd_m3))
         if ytd_m3 == self.data.ytd_consumption_m3 and ytd_cost == self.data.current_year_cost_eur:
             # Nothing changed -- a same-value meter re-report or an
             # attribute-only state event. Skip so a frequently-reporting

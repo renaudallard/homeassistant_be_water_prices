@@ -640,6 +640,126 @@ async def test_live_ytd_ignores_meter_glitch_down(hass: HomeAssistant) -> None:
         assert coordinator.data.ytd_consumption_m3 == 26.0
 
 
+def _brussels_tariff(linear_incl_vat: float) -> WaterTariff:
+    """A Brussels tariff whose linear rate is tunable to force a cost change."""
+    return WaterTariff(
+        utility="vivaqua",
+        region="brussels",
+        valid_from=date(2026, 1, 1),
+        valid_until=date(2030, 12, 31),
+        publication_label="VIVAQUA test 2026",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=40.23 / 1.06,
+        linear_eur_per_m3=linear_incl_vat / 1.06,
+        sanering_gemeentelijk_eur_per_m3=2.73 / 1.06,
+    )
+
+
+@pytest.mark.asyncio
+async def test_live_ytd_cost_held_when_tariff_drops(hass: HomeAssistant) -> None:
+    """A later fetch with a lower tariff must not drop the running cost.
+
+    Consumption is monotonic (the m³ high-water mark), but the EUR cost is
+    recomputed each tick from the fetched tariff. A transient lower-but-valid
+    tariff (an extractor mis-parse, or a genuine downward correction) is
+    clamped to the cycle cost high-water mark so the running bill never
+    decreases while consumption stays flat.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    # First fetch (setup) is the normal rate; every later fetch returns a
+    # strictly lower linear rate, so the un-clamped cost would drop.
+    calls = {"n": 0}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        calls["n"] += 1
+        return _brussels_tariff(2.62) if calls["n"] == 1 else _brussels_tariff(1.50)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        cost_peak = coordinator.data.current_year_cost_eur
+        assert cost_peak is not None
+
+        # Daily tick fetches the lower tariff; the meter has not moved.
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        # m³ is flat and the new tariff is cheaper, so the un-clamped cost
+        # would fall; the floor holds it at the peak.
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+        assert coordinator.data.current_year_cost_eur == cost_peak
+
+
+@pytest.mark.asyncio
+async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
+    """The cost high-water mark is persisted, so a lower tariff after a
+    restart is still clamped to the pre-restart peak."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    rate = {"linear": 2.62}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _brussels_tariff(rate["linear"])
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        cost_peak = coordinator.data.current_year_cost_eur
+        assert cost_peak is not None
+
+        # Restart with a cheaper tariff in place.
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        rate["linear"] = 1.50
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator2 = hass.data[DOMAIN][entry.entry_id]
+        # cost_hwm restored from the Store clamps the cheaper recomputed cost.
+        assert coordinator2._ytd_cost_hwm == cost_peak
+        assert coordinator2.data.current_year_cost_eur == cost_peak
+
+
 @pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
