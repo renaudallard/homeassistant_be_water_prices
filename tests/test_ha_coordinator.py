@@ -761,6 +761,65 @@ async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant) -> None:
+    """The climbing high-water mark is persisted across a restart.
+
+    A live draw advances the mark between daily ticks. Without persisting
+    that climb, a restart reverted the mark to the bootstrap reading, and
+    the first low-but-valid reading after the restart was published as a
+    decrease. The mark must survive so the glitch is still clamped.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_baseline_m3 == 80.0
+
+        # Live draw to 130 between daily ticks: mark climbs, YTD 20 -> 50.
+        hass.states.async_set("sensor.water_meter", "130")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 50.0
+
+        # Restart, then the meter momentarily reports 120 at setup time -- a
+        # glitch below the climbed mark but above the Jan 1 baseline (80).
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        hass.states.async_set("sensor.water_meter", "120")
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator2 = hass.data[DOMAIN][entry.entry_id]
+        # The persisted mark (130) clamps the glitch: YTD holds at 50, not
+        # the un-clamped 120 - 80 = 40.
+        assert coordinator2._ytd_live_hwm_m3 == 130.0
+        assert coordinator2.data.ytd_consumption_m3 == 50.0
+
+
+@pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)
 
