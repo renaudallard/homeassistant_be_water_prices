@@ -761,6 +761,62 @@ async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAssistant) -> None:
+    """A meter offline across Jan 1 must still drop the cost to the new year.
+
+    The cost floor is reset when the persisted cycle is from a prior year, so
+    the recorder-fallback path (meter unavailable) serves the small new-year
+    figure rather than clamping it up to last year's peak.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+        cost_peak = coordinator.data.current_year_cost_eur
+        assert cost_peak is not None
+
+        # Meter goes offline and stays down across the Jan 1 rollover: the
+        # persisted cycle is from last year, the meter reads unavailable, and
+        # the recorder reports a small new-year figure.
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        recorder.return_value = 2.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        # Recorder fallback serves the new-year consumption, and the cost drops
+        # with it instead of being pinned to last year's peak.
+        assert coordinator.data.ytd_consumption_m3 == 2.0
+        cost_now = coordinator.data.current_year_cost_eur
+        assert cost_now is not None
+        assert cost_now < cost_peak
+
+
+@pytest.mark.asyncio
 async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant) -> None:
     """The climbing high-water mark is persisted across a restart.
 
