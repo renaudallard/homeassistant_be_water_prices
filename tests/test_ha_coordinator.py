@@ -819,6 +819,84 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
         assert coordinator2.data.ytd_consumption_m3 == 50.0
 
 
+async def _setup_metered_entry(hass: HomeAssistant) -> Any:
+    """Set up a Brussels entry with a meter at 100 m³ and a Jan 1 baseline of 80."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_baseline_m3 == 80.0
+        # Draw to 105 m³ so the cycle has a high-water mark to hold: YTD 25.
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+        return coordinator
+
+
+@pytest.mark.asyncio
+async def test_live_ytd_single_subbaseline_reading_is_held(hass: HomeAssistant) -> None:
+    """A single reading below the baseline is a glitch, not a meter swap.
+
+    A rebooting meter that momentarily reports a value below the Jan 1 anchor
+    must not floor the year-to-date figure to ~0; it is held until a swap is
+    confirmed by repeated low readings.
+    """
+    coordinator = await _setup_metered_entry(hass)
+
+    # One reading well below the baseline (80): held at 25, not floored to 0.
+    hass.states.async_set("sensor.water_meter", "50")
+    await hass.async_block_till_done()
+    assert coordinator.data.ytd_consumption_m3 == 25.0
+
+    # A reading back above the baseline clears the run and resumes climbing.
+    hass.states.async_set("sensor.water_meter", "106")
+    await hass.async_block_till_done()
+    assert coordinator.data.ytd_consumption_m3 == 26.0
+
+
+@pytest.mark.asyncio
+async def test_live_ytd_sustained_subbaseline_reanchors(hass: HomeAssistant) -> None:
+    """Several consecutive sub-baseline readings are a genuine meter swap.
+
+    The new meter climbs from ~0, so once enough consecutive readings sit
+    below the old anchor the cycle re-anchors and YTD restarts at ~0.
+    """
+    coordinator = await _setup_metered_entry(hass)
+
+    # New meter climbing from ~10 -- three distinct sub-baseline readings.
+    for reading in ("10", "11", "12"):
+        hass.states.async_set("sensor.water_meter", reading)
+        await hass.async_block_till_done()
+
+    # The third consecutive sub-baseline reading confirms the swap.
+    assert coordinator._ytd_baseline_m3 == 12.0
+    assert coordinator.data.ytd_consumption_m3 == 0.0
+
+
 @pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
     yesterday = date.today() - timedelta(days=1)

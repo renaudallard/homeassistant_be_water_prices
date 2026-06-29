@@ -78,6 +78,10 @@ _YTD_STORE_VERSION = 1
 # tick and a clean unload save authoritatively; this only bounds how much of
 # the climbing high-water mark a hard crash between ticks can lose.
 _YTD_SAVE_DELAY_S = 30
+# Consecutive sub-baseline readings required before treating the meter as
+# swapped (re-anchoring YTD to ~0). A single low value is held as a glitch so
+# a rebooting meter reporting 0 does not floor the running figure.
+_SWAP_CONFIRM_READINGS = 3
 
 
 def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
@@ -167,6 +171,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # meter-recovery branch tell a current-year figure from a stale
         # prior-year one when the meter was down across the rollover.
         self._ytd_recorder_year: int | None = None
+        # Run length of consecutive readings below the cycle baseline. A
+        # single one is held as a glitch; only a sustained run re-anchors the
+        # cycle as a genuine meter swap. In-memory only -- a real swap
+        # re-accumulates the run after a restart.
+        self._ytd_below_baseline_count = 0
         # Set when the cycle anchor OR a high-water mark changes. The daily
         # tick and a clean unload flush it to the Store authoritatively; the
         # live meter-event path additionally schedules a debounced save so a
@@ -386,6 +395,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_baseline_year = None
         self._ytd_live_hwm_m3 = None
         self._ytd_cost_hwm = None
+        self._ytd_below_baseline_count = 0
 
     def _set_cycle(self, year: int, baseline: float, hwm: float) -> None:
         self._ytd_baseline_year = year
@@ -394,6 +404,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # A fresh cycle (Jan 1 rollover or a confirmed meter swap) restarts
         # the cost floor so the running bill is allowed to drop to ~0 here.
         self._ytd_cost_hwm = None
+        self._ytd_below_baseline_count = 0
         self._cycle_dirty = True
 
     def _apply_cycle(self, live: float) -> float:
@@ -403,16 +414,29 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         the highest reading seen this cycle, so a momentary low / down-rounded
         meter reading cannot lower the figure. The baseline only re-anchors
         (YTD -> ~0) on a genuine reset -- the Jan 1 rollover, or a meter swap
-        where the cumulative reading drops below its own cycle anchor (a
-        working meter never reads below its past).
+        confirmed by several consecutive readings below the cycle anchor (a
+        single sub-baseline reading is held as a glitch, not a swap).
         """
         now_year = dt_util.now().year
         if self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year:
             self._set_cycle(now_year, live, live)
             return 0.0
         if live < self._ytd_baseline_m3:
-            self._set_cycle(now_year, live, live)
-            return 0.0
+            # Below the anchor is either a transient glitch (a rebooting
+            # meter reporting 0, a dropout) or a genuine meter swap.
+            # Distinguish by persistence: only re-anchor after several
+            # consecutive sub-baseline readings, so a single spurious low
+            # value is held rather than flooring the year-to-date figure.
+            self._ytd_below_baseline_count += 1
+            if self._ytd_below_baseline_count >= _SWAP_CONFIRM_READINGS:
+                self._set_cycle(now_year, live, live)
+                return 0.0
+            held = self._ytd_live_hwm_m3
+            if held is None:
+                held = self._ytd_baseline_m3
+            return max(0.0, held - self._ytd_baseline_m3)
+        # A reading at or above the anchor clears any pending swap run.
+        self._ytd_below_baseline_count = 0
         if self._ytd_live_hwm_m3 is None or live > self._ytd_live_hwm_m3:
             # Mark dirty so the climbing mark is persisted. Without this the
             # Store kept only the bootstrap value, so after a restart the
