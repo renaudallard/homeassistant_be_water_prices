@@ -472,6 +472,16 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         need_bootstrap = self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year
+        if self._ytd_baseline_year is not None and self._ytd_baseline_year != now_year:
+            # The persisted cycle is from a prior year. Drop its cost floor now,
+            # not only when a live reading re-anchors via _set_cycle, so a meter
+            # offline across the Jan 1 rollover does not clamp the new year's
+            # recorder-fallback cost to last year's peak. The same-year fallback
+            # (year matches) keeps its floor, so a mid-year meter dropout is
+            # still protected.
+            self._ytd_cost_hwm = None
+            self._ytd_below_baseline_count = 0
+            self._cycle_dirty = True
         recorder_ytd: float | None = None
         if need_bootstrap or live is None:
             today = dt_util.now().date()
