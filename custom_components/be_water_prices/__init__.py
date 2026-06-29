@@ -128,6 +128,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         domain_data = hass.data.get(DOMAIN, {})
         coordinator = domain_data.pop(entry.entry_id, None)
         if coordinator is not None:
+            # Persist a pending YTD cycle change before the coordinator is
+            # dropped so a reload / restart keeps the climbing high-water
+            # mark instead of reverting to the last daily-tick value.
+            await coordinator.async_save_ytd_state()
             ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
         if not domain_data:
             async_unregister_services(hass)

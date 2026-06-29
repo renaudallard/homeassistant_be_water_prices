@@ -74,6 +74,10 @@ _LOGGER = logging.getLogger(__name__)
 
 # Bumped only if the persisted YTD cycle dict changes shape incompatibly.
 _YTD_STORE_VERSION = 1
+# Debounce window for the live path's best-effort Store flush. The daily
+# tick and a clean unload save authoritatively; this only bounds how much of
+# the climbing high-water mark a hard crash between ticks can lose.
+_YTD_SAVE_DELAY_S = 30
 
 
 def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
@@ -163,9 +167,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # meter-recovery branch tell a current-year figure from a stale
         # prior-year one when the meter was down across the rollover.
         self._ytd_recorder_year: int | None = None
-        # Set when the cycle anchor changes; _compute_ytd flushes it to the
-        # Store. The live meter-event path only marks it -- the next daily
-        # tick persists, and a swap / rollover self-heals on restart anyway.
+        # Set when the cycle anchor OR a high-water mark changes. The daily
+        # tick and a clean unload flush it to the Store authoritatively; the
+        # live meter-event path additionally schedules a debounced save so a
+        # hard crash between ticks keeps the climbing mark.
         self._cycle_dirty = False
         self._store: Store[dict[str, Any]] = Store(
             hass, _YTD_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.ytd"
@@ -354,6 +359,19 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
         self._ytd_cost_hwm = data.get("cost_hwm")
 
+    async def async_save_ytd_state(self) -> None:
+        """Flush a pending cycle change to the Store on a clean unload / reload.
+
+        The daily tick persists on each anchor change and the live path
+        schedules a debounced save, but a reload can land between those, so
+        flush here too -- otherwise the climbing high-water mark would revert
+        to its last persisted value and a glitch right after the restart
+        would no longer be clamped.
+        """
+        if self._cycle_dirty:
+            self._cycle_dirty = False
+            await self._store.async_save(self._cycle_state())
+
     def _cycle_state(self) -> dict[str, Any]:
         return {
             "meter": self._ytd_meter_id,
@@ -396,7 +414,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._set_cycle(now_year, live, live)
             return 0.0
         if self._ytd_live_hwm_m3 is None or live > self._ytd_live_hwm_m3:
+            # Mark dirty so the climbing mark is persisted. Without this the
+            # Store kept only the bootstrap value, so after a restart the
+            # high-water mark reverted and a glitch could no longer be
+            # clamped -- defeating the across-restart guard it provides.
             self._ytd_live_hwm_m3 = live
+            self._cycle_dirty = True
         return max(0.0, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
@@ -543,7 +566,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             else:
                 self._set_cycle(now_year, live - recorder_ytd, live)
         # _apply_cycle handles the Jan 1 rollover and meter-swap re-anchors
-        # and keeps the figure monotonic; the daily tick later persists it.
+        # and keeps the figure monotonic; the save below persists the mark.
         ytd_m3 = self._apply_cycle(live)
         ytd_cost = self._floor_cost(self._ytd_cost_from_m3(self.data.tariff, ytd_m3))
         if ytd_m3 == self.data.ytd_consumption_m3 and ytd_cost == self.data.current_year_cost_eur:
@@ -554,6 +577,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # the midnight fee-proration step) still republishes even when
             # the volume figure is unchanged at ~0.
             return
+        if self._cycle_dirty:
+            # The high-water mark advanced. Schedule a debounced flush (the
+            # daily tick / unload save authoritatively; this just bounds the
+            # mark a hard crash between ticks can lose). _cycle_dirty stays
+            # set so the next authoritative save still writes and clears it.
+            self._store.async_delay_save(self._cycle_state, _YTD_SAVE_DELAY_S)
         self.async_set_updated_data(
             replace(
                 self.data,
