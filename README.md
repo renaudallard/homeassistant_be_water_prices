@@ -295,11 +295,21 @@ fail at fetch time).
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the
   recorder's lagging daily total on every restart or reload. The figure
-  is **monotonic within the year** — a momentary low or down-rounded
-  meter reading is clamped to the year's high-water mark — and the
-  baseline only re-anchors on a genuine reset (Jan 1, or a meter swap
-  where the reading drops below its own anchor). Responsiveness is
-  bounded by how often your meter entity itself pushes a new state.
+  is **monotonic within the year**: both the consumption and the EUR
+  cost are clamped to their year-to-date high-water mark, so a momentary
+  low meter reading, a transiently lower tariff fetch, or a mid-year
+  options change that would lower the bill is never published as a
+  decrease. The baseline only re-anchors on a genuine reset: the Jan 1
+  rollover, or a meter swap confirmed by several consecutive readings
+  below the anchor (a single low reading is held as a glitch).
+  Responsiveness is bounded by how often your meter entity itself pushes
+  a new state.
+
+  Because the running cost is a high-water mark, a mid-year change that
+  *lowers* your bill — enabling the social tariff, reducing the
+  household size, or switching to a cheaper commune — is **not**
+  reflected in `water_current_year_cost` until the next January 1; the
+  `water_projected_annual_cost` sensor reflects it immediately.
 
 ### Failure mode
 
