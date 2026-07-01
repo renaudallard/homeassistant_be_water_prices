@@ -25,7 +25,9 @@
 
 """Aquaduin (ex-IWVA) -- 6 communes Westkust (~80 k year-round residents).
 
-Source: https://www.aquaduin.be/drinkwater/tarieven/overzicht-tarieven-<year>.pdf
+Source: https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-<year>
+(the tariff-card PDF link is scraped from that page; Aquaduin's CMS
+serves the PDF under an opaque /volumes/... path that changes over time)
 
 Aquaduin publishes a clean numeric tariff card PDF -- the gold-standard
 example among Belgian water utilities. The PDF lays out the residential
@@ -54,11 +56,13 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
+from urllib.parse import urljoin
 
 import aiohttp
 
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
+from ._html import fetch_and_parse
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
@@ -66,7 +70,13 @@ _LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "aquaduin"
 LABEL = "Aquaduin"
-SOURCE_URL_FMT = "https://www.aquaduin.be/drinkwater/tarieven/overzicht-tarieven-{year}.pdf"
+# Human-facing tariff page for a given year: our citation, and the page we
+# scrape the PDF link from. Aquaduin rebuilt its site in 2026 and now serves
+# the tariff card under an opaque, CMS-generated /volumes/... path (plus a
+# ?v= cache-buster) that changes whenever the file is re-uploaded, so the
+# directory cannot be hardcoded. The page URL and the "overzicht-tarieven-
+# <year>.pdf" filename are the stable parts, so we discover the href here.
+SOURCE_URL_FMT = "https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-{year}"
 
 # Anchored on the PDF's exact wording -- "Basistarief 30 m³ + 30 m³ per
 # gedomicilieerde persoon  N,NNNN euro/m³". The intervening "+ 30 m³ per
@@ -85,6 +95,31 @@ _COMFORT_RE = re.compile(
     r"comforttarief\s*>?\s*basisverbruik.*?([\d]+,\d{3,5})\s*euro/m³",
     re.IGNORECASE | re.DOTALL,
 )
+
+
+def _find_pdf_href(html: str, year: int) -> str:
+    """Pull the ``overzicht-tarieven-<year>.pdf`` link out of a year page.
+
+    Anchored on the stable filename; tolerant of the quote style and of a
+    trailing ``?v=`` cache-buster. Raises when the page carries no PDF (the
+    prior-year pages keep the numbers as inline HTML only), which lets the
+    caller fall back a year or surface a real failure.
+    """
+    m = re.search(
+        rf'href=["\']?([^"\'>\s]*overzicht-tarieven-{year}\.pdf[^"\'>\s]*)',
+        html,
+        re.IGNORECASE,
+    )
+    if m is None:
+        raise ExtractorError(f"no {year} tariff PDF link on Aquaduin year page")
+    return m.group(1)
+
+
+async def _discover_pdf_url(session: aiohttp.ClientSession, year: int) -> str:
+    """Return the absolute URL of the ``year`` tariff-card PDF."""
+    page_url = SOURCE_URL_FMT.format(year=year)
+    href = await fetch_and_parse(session, page_url, _find_pdf_href, year)
+    return urljoin(page_url, href)
 
 
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
@@ -118,16 +153,18 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
 
     target = date.today().year
     try:
-        text = await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target))
+        pdf_url = await _discover_pdf_url(session, target)
+        text = await fetch_pdf_text_layout(session, pdf_url)
         return parse_tariff(text, year=target)
     except ExtractorError as err:
         if isinstance(err, TransientFetchError):
-            # A transient blip (5xx / 429 / timeout) on this year's URL must
-            # propagate so live_check classifies it as TRANSIENT instead of
-            # being masked by silently serving last year's prices.
+            # A transient blip (5xx / 429 / timeout) fetching this year's
+            # page or PDF must propagate so live_check classifies it as
+            # TRANSIENT instead of being masked by serving last year's prices.
             raise
-        _LOGGER.info("Aquaduin %d PDF unavailable (%s); trying %d", target, err, target - 1)
-        text = await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target - 1))
+        _LOGGER.info("Aquaduin %d tariff unavailable (%s); trying %d", target, err, target - 1)
+        pdf_url = await _discover_pdf_url(session, target - 1)
+        text = await fetch_pdf_text_layout(session, pdf_url)
         # Extend valid_until to March 31 of the target year so the
         # snapshot_stale Repair does not fire immediately on Jan 1
         # for Aquaduin's typical mid-Q1 publication delay.
