@@ -55,6 +55,24 @@ def test_raises_when_pdf_text_is_garbage() -> None:
         parse_tariff("nothing here", year=2026)
 
 
+def test_find_pdf_href_extracts_versioned_link() -> None:
+    from custom_components.be_water_prices.providers.aquaduin import _find_pdf_href
+
+    html = (
+        '<a href="https://www.aquaduin.be/volumes/general/Paginas/Zelf-regelen/'
+        'Tarieven/overzicht-tarieven-2026.pdf?v=1774021955">tarieven</a>'
+    )
+    assert _find_pdf_href(html, 2026).endswith("overzicht-tarieven-2026.pdf?v=1774021955")
+
+
+def test_find_pdf_href_raises_when_page_has_no_pdf() -> None:
+    from custom_components.be_water_prices.providers.aquaduin import _find_pdf_href
+
+    # Prior-year pages keep the numbers as an inline HTML table, no PDF link.
+    with pytest.raises(ExtractorError):
+        _find_pdf_href("<p>tarieven als tabel, geen pdf</p>", 2026)
+
+
 async def test_transient_error_propagates_not_masked() -> None:
     from unittest.mock import AsyncMock, patch
 
@@ -62,6 +80,7 @@ async def test_transient_error_propagates_not_masked() -> None:
     from custom_components.be_water_prices.providers.base import TransientFetchError
 
     with (
+        patch.object(aquaduin, "_discover_pdf_url", new=AsyncMock(return_value="http://x/y.pdf")),
         patch.object(
             aquaduin,
             "fetch_pdf_text_layout",
@@ -81,11 +100,14 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
     from custom_components.be_water_prices.providers import aquaduin
 
     text = extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
-    with patch.object(
-        aquaduin,
-        "fetch_pdf_text_layout",
-        new=AsyncMock(side_effect=[ExtractorError("HTTP 404"), text]),
-    ) as mock:
+    with (
+        patch.object(aquaduin, "_discover_pdf_url", new=AsyncMock(return_value="http://x/y.pdf")),
+        patch.object(
+            aquaduin,
+            "fetch_pdf_text_layout",
+            new=AsyncMock(side_effect=[ExtractorError("HTTP 404"), text]),
+        ) as mock,
+    ):
         tariff = await aquaduin.fetch(session=None)  # type: ignore[arg-type]
     assert mock.await_count == 2
     # Prior-year fallback pushes valid_until to March 31 of the target year.
