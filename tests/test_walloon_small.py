@@ -73,6 +73,22 @@ def test_aiem_parser_skips_the_example_value_in_the_formula_text() -> None:
     assert t.cvd_eur_per_m3 != 1.435
 
 
+def test_callmepower_parser_ignores_the_summary_card_cva_value() -> None:
+    # Callmepower's 2026 redesign leads with a summary-card grid whose
+    # cards render the value before the label, and the CVA card (2,748 €)
+    # follows the "CVD (distribution)" label. A naive forward scan grabs
+    # the CVA; for AIEC (CVD 2,46 < CVA 2,748) that inflated the rate. The
+    # parser anchors on the prose "distribution (CVD) : N €" so the real
+    # CVD wins on every Callmepower page, whichever side of the CVA it sits.
+    aiec = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
+    assert aiec.cvd_eur_per_m3 == 2.46
+    assert aiec.cvd_eur_per_m3 != 2.748  # the CVA card value, not the CVD
+    assert (
+        parse_ciesac(fixture_html("ciesac_callmepower_2026.html"), year=2026).cvd_eur_per_m3 == 2.9
+    )
+    assert parse_iden(fixture_html("iden_callmepower_2026.html"), year=2026).cvd_eur_per_m3 == 3.555
+
+
 def test_parse_cvd_raises_on_garbage() -> None:
     with pytest.raises(ExtractorError):
         parse_cvd("<html><body>nothing about water here</body></html>")
