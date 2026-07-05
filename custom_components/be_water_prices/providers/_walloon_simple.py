@@ -81,6 +81,20 @@ _ACTUAL_CVD_RE = re.compile(
     r"actuelle\s+du\s+CVD[^\d]{0,40}(\d+,\d{1,5})\s*€?",
     re.IGNORECASE,
 )
+# Callmepower's mid-2026 redesign leads with a summary-card grid that
+# renders each value BEFORE its label ("2,460 €/m³" then "CVD
+# (distribution)"), with the CVA card immediately after. The generic
+# forward-looking _CVD_RE reads the label "CVD (distribution)" and grabs
+# the next card's number -- the CVA -- so for AIEC (CVD 2,46 < CVA 2,748)
+# it silently returned the CVA. Anchor instead on the authoritative prose
+# "Coût vérité distribution (CVD) : N €", where the value FOLLOWS the
+# "distribution (CVD)" label; the reversed card text cannot match it.
+# IEG and AIEM sit on operator sites without this phrasing, so they fall
+# through to the anchors below unchanged.
+_LABELED_DIST_CVD_RE = re.compile(
+    r"distribution\s*\(\s*CVD\s*\)\s*:?\s*(\d+,\d{1,5})\s*€",
+    re.IGNORECASE,
+)
 # Plausibility window for residential Walloon CVDs. As of 2026 the
 # smallest distributor publishes ~2.30 EUR/m³ and the largest ~3.60
 # EUR/m³. The lower bound MUST exclude AIEM's documented example
@@ -138,11 +152,15 @@ def parse_cvd(html: str) -> float:
 
     Tries in order:
       1. ``actuelle du CVD : N,NNN €`` (the AIEM "current value" phrasing).
-      2. The largest CVD reference whose value falls inside the
+      2. ``distribution (CVD) : N,NNN €`` -- the Callmepower prose label,
+         where the value FOLLOWS the "distribution (CVD)" text. This wins
+         on Callmepower's redesigned summary-card pages, whose cards place
+         "CVD (distribution)" just before the CVA card's number and would
+         otherwise mislead the forward scan below.
+      3. The largest CVD reference whose value falls inside the
          plausibility window. Picking the largest rather than the first
          protects against pages that quote a historic value before the
          current one (CVDs only index up).
-      3. The first CVD reference, plausible or not.
 
     Raises :class:`ExtractorError` when no ``CVD … N,NNN €`` string is
     found inside the rendered text.
@@ -159,6 +177,14 @@ def parse_cvd(html: str) -> float:
         # window. If a page ever surfaces "actuelle du CVD" in an
         # example / historic context (0,5 €, etc.), the fallback
         # _CVD_RE branch has a better shot at finding the real value.
+        if _MIN_PLAUSIBLE_CVD <= candidate <= _MAX_PLAUSIBLE_CVD:
+            return candidate
+
+    labeled = _LABELED_DIST_CVD_RE.search(text)
+    if labeled is not None:
+        candidate = to_float(labeled.group(1))
+        # Same plausibility gate: a labeled but out-of-window value falls
+        # through to the generic scan rather than riding straight out.
         if _MIN_PLAUSIBLE_CVD <= candidate <= _MAX_PLAUSIBLE_CVD:
             return candidate
 
