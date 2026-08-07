@@ -2057,3 +2057,52 @@ async def test_resuming_live_tracking_keeps_the_cost_floor(hass: HomeAssistant) 
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 20.0
         assert coordinator.data.current_year_cost_eur == peak
+
+
+@pytest.mark.asyncio
+async def test_recorder_hiccup_does_not_blank_a_known_figure(hass: HomeAssistant) -> None:
+    """A recorder failure must not blank sensors whose figure is known.
+
+    With the meter also down there is no live reading, but this year's
+    high-water mark is still in memory, so both sensors can keep reporting
+    it instead of going unknown for a whole day.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        hass.states.async_set("sensor.water_meter", "130")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 50.0
+
+        # Meter drops out and the recorder query fails on the same tick.
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        recorder.return_value = None
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 50.0
+        assert coordinator.data.current_year_cost_eur is not None
