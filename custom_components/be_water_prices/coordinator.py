@@ -448,14 +448,20 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_below_baseline_count = 0
         self._ytd_pending_high_m3 = None
 
-    def _set_cycle(self, year: int, baseline: float, hwm: float) -> None:
+    def _set_cycle(
+        self, year: int, baseline: float, hwm: float, *, keep_cost: bool = False
+    ) -> None:
         self._ytd_baseline_year = year
         self._ytd_baseline_m3 = baseline
         self._ytd_live_hwm_m3 = hwm
         # A fresh cycle (Jan 1 rollover or a confirmed meter swap) restarts
         # the cost floor so the running bill is allowed to drop to ~0 here.
-        self._ytd_cost_hwm = None
-        self._ytd_cost_year = None
+        # ``keep_cost`` marks the one caller that is resuming an existing
+        # cycle rather than starting a new one, where dropping the floor
+        # would publish a decrease inside the year.
+        if not keep_cost:
+            self._ytd_cost_hwm = None
+            self._ytd_cost_year = None
         self._ytd_below_baseline_count = 0
         self._ytd_pending_high_m3 = None
         self._cycle_dirty = True
@@ -742,7 +748,15 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # rather than reconstructing a stale prior-year baseline.
                 self._set_cycle(now_year, live, live)
             else:
-                self._set_cycle(now_year, live - recorder_ytd, live)
+                # A continuation, not a reset: _apply_cycle republishes
+                # exactly recorder_ytd below, so the running bill has not
+                # restarted and must keep the floor it already had.
+                self._set_cycle(
+                    now_year,
+                    live - recorder_ytd,
+                    live,
+                    keep_cost=self._ytd_cost_year == now_year,
+                )
         # _apply_cycle handles the Jan 1 rollover and meter-swap re-anchors
         # and keeps the figure monotonic; the save below persists the mark.
         ytd_m3 = self._apply_cycle(live)

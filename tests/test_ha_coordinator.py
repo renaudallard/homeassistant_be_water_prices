@@ -33,6 +33,7 @@ fresh fetch and on entry unload).
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -1998,3 +1999,61 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
         january_cost = coordinator.data.current_year_cost_eur
         assert january_cost is not None
         assert january_cost < december_cost
+
+
+@pytest.mark.asyncio
+async def test_resuming_live_tracking_keeps_the_cost_floor(hass: HomeAssistant) -> None:
+    """Picking live tracking back up is not a new cycle, so the bill holds.
+
+    The resume path reconstructs the baseline so the published m3 is
+    unchanged, but it went through the same helper a genuine reset uses,
+    which clears the cost mark. A tariff cut during the dropout would then
+    surface as a decrease in the running bill inside one year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    cheap = False
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        t = _fresh_tariff()
+        return replace(t, linear_eur_per_m3=1.20) if cheap else t
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_baseline_m3 is None  # never anchored, meter down
+        peak = coordinator.data.current_year_cost_eur
+        assert peak is not None
+
+        # The utility cuts its rate while the meter is still down; the
+        # floor holds the bill where it was.
+        cheap = True
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.current_year_cost_eur == peak
+
+        # The meter returns and live tracking resumes on the same year.
+        hass.states.async_set("sensor.water_meter", "500")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+        assert coordinator.data.current_year_cost_eur == peak
