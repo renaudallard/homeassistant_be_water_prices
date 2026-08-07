@@ -622,13 +622,22 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._absorb_served_m3(served, now_year)
             self._ytd_published_meter = meter
             return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
+        # No live reading and no recorder figure either. Rather than blank
+        # both sensors for a whole day over a recorder hiccup, serve what is
+        # known: this year's cycle mark, or, for a cycle that never anchors
+        # at all, the figure already on screen. Both are gated on the year,
+        # so a rollover still reports unknown until the new year has
+        # something of its own.
         if self._ytd_baseline_year == now_year and self._ytd_live_hwm_m3 is not None:
-            # No live reading and no recorder figure either, but this year's
-            # mark is still in memory. Serve that rather than blanking both
-            # sensors for a whole day over a recorder hiccup. The year gate
-            # keeps a prior-year mark out of it, so a rollover still reports
-            # unknown until the new year has something of its own.
             served = self._floor_ytd_m3(0.0, now_year)
+            self._ytd_published_meter = meter
+            return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
+        if (
+            self._ytd_recorder_year == now_year
+            and self.data is not None
+            and self.data.ytd_consumption_m3 is not None
+        ):
+            served = self.data.ytd_consumption_m3
             self._ytd_published_meter = meter
             return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
         return None, None
