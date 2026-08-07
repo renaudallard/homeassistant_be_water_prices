@@ -27,12 +27,12 @@
 
 from __future__ import annotations
 
+from custom_components.be_water_prices._redact import scrub_tokens, sensitive_tokens
 from custom_components.be_water_prices.const import (
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
     CONF_POSTCODE,
 )
-from custom_components.be_water_prices.diagnostics import _scrub_tokens, _sensitive_tokens
 
 
 class _Entry:
@@ -46,7 +46,7 @@ def test_sensitive_tokens_are_commune_only_not_postcode() -> None:
         data={CONF_POSTCODE: "2030"},
         options={CONF_COMMUNE: "geel", CONF_COMMUNE_LABEL: "Geel"},
     )
-    tokens = _sensitive_tokens(entry)  # type: ignore[arg-type]
+    tokens = sensitive_tokens(entry)  # type: ignore[arg-type]
     # Commune id + label only. The postcode is excluded: as a bare 4-digit
     # token it would match years / dates in the snapshot and corrupt them.
     assert set(tokens) == {"geel", "Geel"}
@@ -58,7 +58,7 @@ def test_sensitive_tokens_are_commune_only_not_postcode() -> None:
 def test_postcode_like_year_is_not_scrubbed_from_snapshot() -> None:
     entry = _Entry(data={CONF_POSTCODE: "2030"}, options={})
     snapshot = {"tariff": {"valid_until": "2030-12-31"}}
-    scrubbed = _scrub_tokens(snapshot, _sensitive_tokens(entry))  # type: ignore[arg-type]
+    scrubbed = scrub_tokens(snapshot, sensitive_tokens(entry))  # type: ignore[arg-type]
     assert scrubbed["tariff"]["valid_until"] == "2030-12-31"
 
 
@@ -71,7 +71,7 @@ def test_scrub_tokens_removes_commune_from_snapshot() -> None:
         },
         "last_error": "could not locate huishoudelijk 2026 table for commune 'geel'",
     }
-    scrubbed = _scrub_tokens(snapshot, ["geel"])
+    scrubbed = scrub_tokens(snapshot, ["geel"])
     assert "geel" not in scrubbed["tariff"]["source_url"]
     assert "geel" not in scrubbed["tariff"]["publication_label"]
     assert "geel" not in scrubbed["last_error"]
@@ -80,5 +80,5 @@ def test_scrub_tokens_removes_commune_from_snapshot() -> None:
 
 
 def test_scrub_tokens_passes_none_and_empty_through() -> None:
-    assert _scrub_tokens(None, ["geel"]) is None
-    assert _scrub_tokens("nothing sensitive", []) == "nothing sensitive"
+    assert scrub_tokens(None, ["geel"]) is None
+    assert scrub_tokens("nothing sensitive", []) == "nothing sensitive"

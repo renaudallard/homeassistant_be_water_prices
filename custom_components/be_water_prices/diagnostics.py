@@ -34,6 +34,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from ._redact import scrub_tokens, sensitive_tokens
 from .const import (
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
@@ -76,41 +77,8 @@ async def async_get_config_entry_diagnostics(
         # The tariff's source_url / publication_label and any last_error can
         # embed the configured commune slug or label verbatim, bypassing the
         # key-based redaction above; scrub those values out of the snapshot.
-        "snapshot": _scrub_tokens(snapshot, _sensitive_tokens(entry)),
+        "snapshot": scrub_tokens(snapshot, sensitive_tokens(entry)),
     }
-
-
-def _sensitive_tokens(entry: ConfigEntry) -> list[str]:
-    """Commune strings that must not survive into the snapshot.
-
-    Only the commune id and label leak into the snapshot (the tariff's
-    source_url / publication_label and any last_error). The postcode is
-    deliberately excluded: it is already redacted in the entry block and
-    does not appear in the snapshot on its own, while a bare 4-digit
-    postcode would match years / ISO dates (e.g. valid_until or a label's
-    publication year) and corrupt the dump. A postcode embedded in a
-    commune label is still scrubbed via the label token.
-    """
-    tokens: set[str] = set()
-    for src in (entry.data, entry.options):
-        for key in (CONF_COMMUNE, CONF_COMMUNE_LABEL):
-            value = src.get(key)
-            if isinstance(value, str) and value:
-                tokens.add(value)
-    # Longest first so a label that contains the slug is replaced whole.
-    return sorted(tokens, key=len, reverse=True)
-
-
-def _scrub_tokens(value: Any, tokens: list[str]) -> Any:
-    if isinstance(value, str):
-        for token in tokens:
-            value = value.replace(token, "**REDACTED**")
-        return value
-    if isinstance(value, dict):
-        return {k: _scrub_tokens(v, tokens) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_scrub_tokens(v, tokens) for v in value]
-    return value
 
 
 def _serialise(value: Any) -> Any:

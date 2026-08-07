@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from custom_components.be_water_prices.const import CONF_UTILITY
 from custom_components.be_water_prices.sensor import (
     SENSORS,
@@ -40,7 +42,8 @@ class _StubEntry:
     def __init__(self) -> None:
         self.entry_id = "e1"
         self.title = "VIVAQUA"
-        self.data = {CONF_UTILITY: "vivaqua"}
+        self.data: dict[str, str] = {CONF_UTILITY: "vivaqua"}
+        self.options: dict[str, str] = {}
 
 
 class _StubCoordinator:
@@ -50,8 +53,12 @@ class _StubCoordinator:
 
 
 def _sensor(key: str) -> WaterSensor:
+    return _sensor_with(key, _StubCoordinator())
+
+
+def _sensor_with(key: str, coordinator: _StubCoordinator) -> WaterSensor:
     desc = next(d for d in SENSORS if d.key == key)
-    return WaterSensor(_StubCoordinator(), desc)  # type: ignore[arg-type]
+    return WaterSensor(coordinator, desc)  # type: ignore[arg-type]
 
 
 def test_last_reset_advances_on_mid_cycle_drop() -> None:
@@ -86,3 +93,42 @@ def test_source_url_redacts_commune_slug() -> None:
     # (e.g. Farys numeric id), leaves the URL untouched.
     assert _source_url_without_commune(url, None) == url
     assert _source_url_without_commune(url, "25071") == url
+
+
+def test_last_error_is_scrubbed_of_the_commune() -> None:
+    """A fetch error quotes the URL it failed on, commune slug and all.
+
+    The neighbouring source_url and publication_label attributes are both
+    redacted, so publishing last_error raw put the household's location
+    back into the recorder through the side door.
+    """
+    from datetime import UTC, datetime
+
+    from custom_components.be_water_prices.const import CONF_COMMUNE, CONF_COMMUNE_LABEL
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    coordinator = _StubCoordinator()
+    coordinator.entry.data = {CONF_UTILITY: "pidpa", CONF_COMMUNE: "geel"}
+    coordinator.entry.options = {CONF_COMMUNE_LABEL: "Geel"}
+    coordinator.data = CoordinatorData(  # type: ignore[assignment]
+        tariff=WaterTariff(
+            utility="pidpa",
+            region="flanders",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="Pidpa tarieven 2026 (Geel)",
+            source_url="https://www.pidpa.be/tarieven/geel",
+            yearly_fixed_fee=50.0,
+            basis_eur_per_m3=2.0,
+            comfort_eur_per_m3=4.0,
+        ),
+        fetched_at=datetime(2026, 1, 2, tzinfo=UTC),
+        snapshot_age_hours=1.0,
+        snapshot_stale=False,
+        last_error="HTTP 404 fetching https://www.pidpa.be/tarieven/geel",
+    )
+
+    attrs = _sensor_with("basis_rate", coordinator).extra_state_attributes
+    assert "geel" not in attrs["last_error"].lower()
+    assert "404" in attrs["last_error"]

@@ -45,6 +45,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from ._redact import scrub_tokens, sensitive_tokens
 from .const import (
     CONF_COMMUNE,
     CONF_UTILITY,
@@ -366,5 +367,12 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
             ),
             "snapshot_age_hours": round(self.coordinator.data.snapshot_age_hours, 2),
             "snapshot_stale": self.coordinator.data.snapshot_stale,
-            "last_error": self.coordinator.data.last_error,
+            # Fetch errors quote the URL they failed on, and the per-commune
+            # URLs carry the commune, so this needs the same scrub as the
+            # two attributes above rather than being published raw.
+            "last_error": scrub_tokens(
+                self.coordinator.data.last_error,
+                sensitive_tokens(self.coordinator.entry),
+                placeholder="**redacted**",
+            ),
         }
