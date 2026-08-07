@@ -611,16 +611,19 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         live = _state_volume_m3(state)
         if live is None:
             return
-        if self._ytd_baseline_m3 is None:
+        now_year = dt_util.now().year
+        if self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year:
             # The daily tick could not anchor a baseline because the meter
             # was unavailable at tick time. Reconstruct it from the last
             # recorder YTD figure on the first usable reading so live
             # tracking resumes now instead of staying frozen until the
-            # next daily tick (~24h).
+            # next daily tick (~24h). A baseline left over from a prior year
+            # counts as unanchored too: the tick keeps it when the meter is
+            # down, and letting _apply_cycle re-anchor it instead would drop
+            # the recorder figure already published for this year to ~0.
             recorder_ytd = self.data.ytd_consumption_m3
             if recorder_ytd is None:
                 return
-            now_year = dt_util.now().year
             if self._ytd_recorder_year != now_year:
                 # The meter was down across the Jan 1 rollover, so the
                 # recorder figure is last year's. Start the new year at ~0
