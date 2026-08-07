@@ -1356,20 +1356,14 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
     The three decisions here all move money: reading "change" rather than
     the all-time "sum", asking for m3 so a litre meter is not summed a
     thousand times too high, and flooring a meter swap's negative delta.
-    Autospec makes the call signature part of the assertion, so an HA
-    signature change surfaces here instead of at a user's next tick.
+    Patched with autospec so the call signature is part of the assertion:
+    an HA signature change surfaces here instead of at a user's next tick.
     """
     from unittest.mock import MagicMock
 
     from homeassistant.util.unit_conversion import VolumeConverter
 
     from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
-
-    captured: dict[str, Any] = {}
-
-    def _stats(*args: Any) -> dict[str, list[dict[str, Any]]]:
-        captured["args"] = args
-        return {"sensor.wm": [{"change": 10.0}, {"change": 5.5}, {"change": None}]}
 
     instance = MagicMock()
 
@@ -1380,14 +1374,15 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
     with (
         patch(
             "homeassistant.components.recorder.statistics.statistics_during_period",
-            new=_stats,
-        ),
+            autospec=True,
+        ) as stats,
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
+        stats.return_value = {"sensor.wm": [{"change": 10.0}, {"change": 5.5}, {"change": None}]}
         total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
     assert total == 15.5
-    _hass, _start, _end, ids, period, units, types = captured["args"]
+    _hass, _start, _end, ids, period, units, types = stats.call_args.args
     assert ids == {"sensor.wm"}
     assert period == "day"
     assert types == {"change"}
