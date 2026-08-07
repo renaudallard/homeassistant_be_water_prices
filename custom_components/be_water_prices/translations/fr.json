@@ -146,6 +146,9 @@
             "title": "Réessayer la récupération du tarif {utility}",
             "description": "Le dernier tarif {utility} récupéré avec succès a {age_days} jours (valable jusqu'au {valid_until}). Dernière erreur : {last_error}.\n\nCliquez sur Soumettre pour déclencher un rafraîchissement immédiat. La carte Repair disparaît automatiquement si la prochaine récupération renvoie un nouveau snapshot ; sinon elle reste affichée pour réessayer ou investiguer la cause sous-jacente (consultez les issues GitHub ou le run quotidien de la workflow live-check)."
           }
+        },
+        "abort": {
+          "still_stale": "Le rafraîchissement a été effectué, mais le snapshot {utility} est toujours obsolète, la carte Repair reste donc affichée. Réessayez plus tard, ou consultez les issues GitHub et le run quotidien de la workflow live-check pour la cause sous-jacente."
         }
       }
     }

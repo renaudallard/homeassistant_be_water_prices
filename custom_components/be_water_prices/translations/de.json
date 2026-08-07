@@ -146,6 +146,9 @@
             "title": "{utility}-Tarifabruf erneut versuchen",
             "description": "Der letzte erfolgreich abgerufene {utility}-Tarif ist {age_days} Tage alt (gültig bis {valid_until}). Letzter Fehler: {last_error}.\n\nKlicken Sie auf Senden, um eine sofortige Aktualisierung auszulösen. Die Repair-Karte verschwindet automatisch, wenn der nächste Abruf einen neuen Snapshot liefert; andernfalls bleibt sie sichtbar, um es erneut zu versuchen oder die zugrundeliegende Ursache zu untersuchen (prüfen Sie die GitHub-Issues oder den täglichen live-check Workflow-Lauf)."
           }
+        },
+        "abort": {
+          "still_stale": "Die Aktualisierung wurde ausgeführt, aber der {utility}-Snapshot ist weiterhin veraltet, daher bleibt die Repair-Karte sichtbar. Versuchen Sie es später erneut, oder prüfen Sie die GitHub-Issues und den täglichen live-check Workflow-Lauf auf die zugrundeliegende Ursache."
         }
       }
     }

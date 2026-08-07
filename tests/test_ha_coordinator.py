@@ -217,6 +217,41 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssistant) -> None:
+    """A retry that did not help must leave the Repair card in place.
+
+    Completing the flow makes the Repairs manager delete the issue, so a
+    still-stale snapshot would silently lose its card until the next daily
+    tick recreated it, a day later.
+    """
+    yesterday = date.today() - timedelta(days=1)
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        # Every fetch stays stale, so the retry cannot clear the issue.
+        return _fresh_tariff(valid_until=yesterday)
+
+    entry = await _setup_entry(hass, _fetch)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    issue_reg = ir.async_get(hass)
+    issue = issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id)
+    assert issue is not None
+
+    flow = await async_create_fix_flow(hass, coordinator.stale_issue_id, issue.data)
+    flow.hass = hass
+    flow.handler = DOMAIN
+    flow.issue_id = coordinator.stale_issue_id
+    await flow.async_step_init()
+    result = await flow.async_step_init({})
+    await hass.async_block_till_done()
+
+    assert result["type"] == "abort"
+    assert result["reason"] == "still_stale"
+    assert coordinator.data is not None
+    assert coordinator.data.snapshot_stale is True
+    assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
+
+
+@pytest.mark.asyncio
 async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
     """A water draw (meter state change) updates YTD cost/consumption live.
 
