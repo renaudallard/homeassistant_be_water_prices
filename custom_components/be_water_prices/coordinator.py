@@ -409,7 +409,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_baseline_m3 = data.get("baseline_m3")
         self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
         self._ytd_cost_hwm = data.get("cost_hwm")
-        self._ytd_cost_year = data.get("cost_year")
+        # Entries written before this key existed carry a mark belonging to
+        # the cycle's own year, so fall back to that. Leaving it unstamped
+        # would stop the rollover reset from ever firing for them, which is
+        # exactly what keying the reset on this field was meant to fix.
+        self._ytd_cost_year = data.get("cost_year", self._ytd_baseline_year)
         self._ytd_recorder_year = data.get("recorder_year")
 
     async def async_save_ytd_state(self) -> None:

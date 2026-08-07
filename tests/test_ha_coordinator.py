@@ -2106,3 +2106,63 @@ async def test_recorder_hiccup_does_not_blank_a_known_figure(hass: HomeAssistant
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 50.0
         assert coordinator.data.current_year_cost_eur is not None
+
+
+@pytest.mark.asyncio
+async def test_cost_floor_from_an_older_store_still_drops_at_rollover(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """An anchor written before the cost year existed must still roll over.
+
+    The rollover reset is keyed on the year the cost mark belongs to. An
+    entry persisted by an earlier version has no such key, so without a
+    fallback the mark would look unstamped and the reset would never fire
+    for exactly the installs upgrading into it.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    # Exactly the shape the previous version wrote: no cost_year, no
+    # recorder_year, and a cost mark left over from last year.
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
+        "version": 1,
+        "data": {
+            "meter": "sensor.water_meter",
+            "year": dt_util.now().year - 1,
+            "baseline_m3": 4000.0,
+            "live_hwm_m3": 4100.0,
+            "cost_hwm": 999.0,
+        },
+    }
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=2.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    assert coordinator.data.ytd_consumption_m3 == 2.0
+    # Last year's EUR 999 floor must not clamp the new year's small bill.
+    assert coordinator.data.current_year_cost_eur is not None
+    assert coordinator.data.current_year_cost_eur < 999.0
