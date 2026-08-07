@@ -532,6 +532,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # belongs to the old one; drop it and re-bootstrap.
             self._reset_cycle()
             self._ytd_meter_id = meter
+            # The recorder year is not meter-scoped, so a new meter that has
+            # no statistics of its own would otherwise look like a year whose
+            # figure is merely missing, and never anchor at all.
+            self._ytd_recorder_year = None
             self._cycle_dirty = True
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
@@ -554,13 +558,23 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if recorder_ytd is not None and self._ytd_recorder_year != now_year:
                 self._ytd_recorder_year = now_year
                 self._cycle_dirty = True
-        if live is not None and need_bootstrap:
+        # A failed recorder query is not an empty one: this year does have
+        # statistics, we just could not read them. Anchoring anyway would
+        # publish ~0 and, because the baseline year would then match, no
+        # later tick would consult the recorder again. Skip the whole
+        # anchor-and-publish path and retry on the next tick.
+        defer_anchor = (
+            need_bootstrap and recorder_ytd is None and self._ytd_recorder_year == now_year
+        )
+        if defer_anchor:
+            _LOGGER.debug("recorder unavailable for %s; deferring the YTD anchor", meter)
+        elif live is not None and need_bootstrap:
             # baseline == reading at Jan 1, reconstructed from the recorder's
             # "consumption since Jan 1"; fall back to the current reading
             # (YTD ~0) when the recorder has nothing to place it.
             baseline = (live - recorder_ytd) if recorder_ytd is not None else live
             self._set_cycle(now_year, baseline, live)
-        if self._ytd_baseline_m3 is not None and live is not None:
+        if not defer_anchor and self._ytd_baseline_m3 is not None and live is not None:
             ytd_m3 = self._apply_cycle(live)
             # Floor the cost before the save so a cost high-water-mark bump
             # is persisted in the same write as the m3 anchor it came from.

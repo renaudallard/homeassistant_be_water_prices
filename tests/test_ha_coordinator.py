@@ -1869,3 +1869,66 @@ async def test_recorder_year_survives_a_restart(hass: HomeAssistant) -> None:
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 is None
         assert coordinator._ytd_baseline_year == dt_util.now().year - 1
+
+
+@pytest.mark.asyncio
+async def test_tick_defers_the_anchor_when_the_recorder_query_fails(
+    hass: HomeAssistant,
+) -> None:
+    """The daily tick must not reset the year on a failed recorder read.
+
+    Same trap as the live path: anchoring at the raw reading publishes ~0
+    and makes the baseline year match, so no later tick consults the
+    recorder again and the year's usage is lost for good.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=40.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+        coordinator._ytd_baseline_m3 = 4000.0
+        assert coordinator.data.ytd_consumption_m3 == 40.0
+
+        # The recorder starts failing, so the published figure goes away
+        # and the live path has nothing to reconstruct from either.
+        recorder.return_value = None
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 is None
+
+        # The meter comes back. The live path already declines to anchor
+        # here; this asserts the tick declines too rather than resetting.
+        hass.states.async_set("sensor.water_meter", "4520")
+        await hass.async_block_till_done()
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator._ytd_baseline_year == dt_util.now().year - 1
+
+        # The next healthy tick anchors properly and keeps the 40.
+        recorder.return_value = 40.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator._ytd_baseline_m3 == 4480.0
+        assert coordinator.data.ytd_consumption_m3 == 40.0
