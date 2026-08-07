@@ -868,9 +868,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # re-arms the update_interval timer, and a meter reports far more
         # often than once a day, so the daily tariff refresh would be pushed
         # forward on every draw and never come due.
+        # snapshot_age_hours is deliberately left alone: a meter draw says
+        # nothing about how old the tariff snapshot is, and refreshing it here
+        # changed an attribute on every entity on every reading, so all eight
+        # sensors wrote a recorder row per draw instead of the two that
+        # actually moved. It advances on the daily tick, as it already does on
+        # an install with no meter at all.
         self.data = replace(
             self.data,
-            snapshot_age_hours=self._age_hours(self.data.fetched_at),
             ytd_consumption_m3=ytd_m3,
             current_year_cost_eur=ytd_cost,
         )

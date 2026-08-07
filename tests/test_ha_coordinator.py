@@ -40,7 +40,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.const import UnitOfVolume
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -2537,3 +2537,68 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
 
         # 140 - 80 == 60; the tick must not republish the earlier 20.
         assert coordinator.data.ytd_consumption_m3 == 60.0
+
+
+@pytest.mark.asyncio
+async def test_meter_draw_does_not_churn_the_rate_sensors(hass: HomeAssistant) -> None:
+    """A draw must only move the two sensors it actually affects.
+
+    snapshot_age_hours says how old the tariff snapshot is, which a meter
+    reading cannot change. Recomputing it on every draw changed an
+    attribute on every entity, so all eight sensors wrote a recorder row
+    per reading rather than the two that moved.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        changed: list[str] = []
+
+        @callback
+        def _track(event: Any) -> None:
+            eid = event.data["entity_id"]
+            if eid.startswith("sensor.vivaqua_"):
+                changed.append(eid)
+
+        # Age the snapshot so a recompute would land on a different value:
+        # the attribute is rounded to 0.01 h, so within one test run only
+        # real elapsed time makes the difference visible, exactly as it does
+        # for a meter reporting every few minutes.
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator.data = replace(
+            coordinator.data, fetched_at=coordinator.data.fetched_at - timedelta(hours=2)
+        )
+
+        hass.bus.async_listen("state_changed", _track)
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+
+    # Only the two YTD sensors move; the rate sensors stay put.
+    assert set(changed) == {
+        "sensor.vivaqua_year_to_date_consumption",
+        "sensor.vivaqua_current_year_cost",
+    }
