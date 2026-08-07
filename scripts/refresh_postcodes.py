@@ -152,6 +152,12 @@ def query_zde_for_centroid(lon: float, lat: float) -> str | None:
             data = json.load(resp)
     except Exception as err:
         raise ZdeQueryError(f"ZDE query failed: {err}") from err
+    # ArcGIS reports a bad layer id, a renamed service or a failed query as
+    # HTTP 200 with an {"error": ...} body, which urlopen does not raise on.
+    # Without this it would read as an empty feature list, i.e. exactly the
+    # no-coverage answer this function promises never to conflate.
+    if isinstance(data, dict) and "error" in data:
+        raise ZdeQueryError(f"ZDE query returned an error payload: {data['error']}")
     features = data.get("features", [])
     if not features:
         return None
