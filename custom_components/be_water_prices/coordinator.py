@@ -89,6 +89,12 @@ _YTD_SAVE_DELAY_S = 30
 # swapped (re-anchoring YTD to ~0). A single low value is held as a glitch so
 # a rebooting meter reporting 0 does not floor the running figure.
 _SWAP_CONFIRM_READINGS = 3
+# A single meter report that climbs more than this many m3 is held for one
+# reading before it is allowed to advance the high-water mark. A household
+# uses roughly 80-100 m3 a year, so a step this size in one report is a
+# garbage value far more often than real usage; a genuine catch-up after a
+# long outage is confirmed by the very next reading and accepted then.
+_IMPLAUSIBLE_JUMP_M3 = 100.0
 
 
 def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
@@ -201,6 +207,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # cycle as a genuine meter swap. In-memory only -- a real swap
         # re-accumulates the run after a restart.
         self._ytd_below_baseline_count = 0
+        # A high reading held pending confirmation by the next one. In-memory
+        # only: a restart simply re-runs the hold on the next reading.
+        self._ytd_pending_high_m3: float | None = None
         # Set when the cycle anchor OR a high-water mark changes. The daily
         # tick and a clean unload flush it to the Store authoritatively; the
         # live meter-event path additionally schedules a debounced save so a
@@ -419,6 +428,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_live_hwm_m3 = None
         self._ytd_cost_hwm = None
         self._ytd_below_baseline_count = 0
+        self._ytd_pending_high_m3 = None
 
     def _set_cycle(self, year: int, baseline: float, hwm: float) -> None:
         self._ytd_baseline_year = year
@@ -428,6 +438,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # the cost floor so the running bill is allowed to drop to ~0 here.
         self._ytd_cost_hwm = None
         self._ytd_below_baseline_count = 0
+        self._ytd_pending_high_m3 = None
         self._cycle_dirty = True
 
     def _apply_cycle(self, live: float) -> float:
@@ -461,12 +472,28 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # A reading at or above the anchor clears any pending swap run.
         self._ytd_below_baseline_count = 0
         if self._ytd_live_hwm_m3 is None or live > self._ytd_live_hwm_m3:
+            if (
+                self._ytd_live_hwm_m3 is not None
+                and live - self._ytd_live_hwm_m3 > _IMPLAUSIBLE_JUMP_M3
+                and self._ytd_pending_high_m3 is None
+            ):
+                # A jump this large in one report is a garbage reading far
+                # more often than real usage. The mark only ever climbs, so
+                # accepting one would pin the year's figure to it until
+                # January. Hold it for one reading the same way a single
+                # sub-baseline value is held, and let the next reading
+                # decide: a meter really sitting there repeats the jump,
+                # while a spike is followed by normal values that leave the
+                # mark where it was.
+                self._ytd_pending_high_m3 = live
+                return max(0.0, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
             # Mark dirty so the climbing mark is persisted. Without this the
             # Store kept only the bootstrap value, so after a restart the
             # high-water mark reverted and a glitch could no longer be
             # clamped -- defeating the across-restart guard it provides.
             self._ytd_live_hwm_m3 = live
             self._cycle_dirty = True
+        self._ytd_pending_high_m3 = None
         return max(0.0, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
