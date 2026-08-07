@@ -126,9 +126,17 @@ def _parse_commune_row(
 
 
 def parse_tariff(
-    text: str, year: int | None = None, commune: str = _DEFAULT_COMMUNE
+    text: str,
+    year: int | None = None,
+    commune: str = _DEFAULT_COMMUNE,
+    source_url: str | None = None,
 ) -> WaterTariff:
-    """Parse a captured Water-link huishoudelijk PDF."""
+    """Parse a captured Water-link huishoudelijk PDF.
+
+    ``source_url`` cites the PDF actually read. It defaults to the
+    templated January path for callers that only have the text, such as
+    the fixture tests and the drift check.
+    """
     target = year or date.today().year
     basis = _parse_commune_row(text, commune, "BASISTARIEF")
     comfort = _parse_commune_row(text, commune, "COMFORTTARIEF")
@@ -148,7 +156,7 @@ def parse_tariff(
         utility_id=UTILITY_ID,
         year=target,
         publication_label=f"Water-link tarieven huishoudelijk {target} ({commune})",
-        source_url=SOURCE_URL_FMT.format(year=target),
+        source_url=source_url or SOURCE_URL_FMT.format(year=target),
         basis=water_basis,
         comfort=water_comfort,
         sanering_gemeentelijk=afvoer_basis,
@@ -190,11 +198,17 @@ async def _pdf_url_for(session: aiohttp.ClientSession, year: int) -> str:
     return url
 
 
-async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
-    """Fetch this year's PDF, falling back to last year. Returns (text, year)."""
+async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int, str]:
+    """Fetch this year's PDF, falling back to last year.
+
+    Returns ``(text, year, url)``; the URL is the one actually read, which
+    is not the templated path whenever the card was uploaded outside
+    January.
+    """
     target = date.today().year
     try:
-        return await fetch_pdf_text_layout(session, await _pdf_url_for(session, target)), target
+        url = await _pdf_url_for(session, target)
+        return await fetch_pdf_text_layout(session, url), target, url
     except ExtractorError as err:
         if isinstance(err, TransientFetchError):
             # A transient blip (5xx / 429 / timeout) on this year's URL must
@@ -202,8 +216,8 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
             # being masked by silently serving last year's prices.
             raise
         _LOGGER.info("Water-link %d PDF unavailable (%s); trying %d", target, err, target - 1)
-        text = await fetch_pdf_text_layout(session, await _pdf_url_for(session, target - 1))
-        return text, target - 1
+        url = await _pdf_url_for(session, target - 1)
+        return await fetch_pdf_text_layout(session, url), target - 1, url
 
 
 def _maybe_extend_valid_until(tariff: WaterTariff, parsed_year: int) -> WaterTariff:
@@ -221,13 +235,15 @@ def _maybe_extend_valid_until(tariff: WaterTariff, parsed_year: int) -> WaterTar
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    text, year = await _fetch_pdf_text(session)
-    return _maybe_extend_valid_until(parse_tariff(text, year=year), year)
+    text, year, url = await _fetch_pdf_text(session)
+    return _maybe_extend_valid_until(parse_tariff(text, year=year, source_url=url), year)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
-    text, year = await _fetch_pdf_text(session)
-    return _maybe_extend_valid_until(parse_tariff(text, year=year, commune=commune), year)
+    text, year, url = await _fetch_pdf_text(session)
+    return _maybe_extend_valid_until(
+        parse_tariff(text, year=year, commune=commune, source_url=url), year
+    )
 
 
 # Anchored on the start-of-line: each commune row in the PDF starts at
@@ -242,7 +258,7 @@ _COMMUNE_LINE_RE = re.compile(
 
 async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
     """Discover the communes Water-link serves from the BASISTARIEF block."""
-    text, _ = await _fetch_pdf_text(session)
+    text, _year, _url = await _fetch_pdf_text(session)
     cut = text.find("BASISTARIEF")
     end = text.find("COMFORTTARIEF", cut) if cut >= 0 else -1
     if cut < 0 or end < 0:

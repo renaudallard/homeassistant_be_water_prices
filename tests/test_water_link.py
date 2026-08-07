@@ -220,6 +220,26 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
             new=AsyncMock(side_effect=[ExtractorError("HTTP 404"), text]),
         ) as mock,
     ):
-        _out, year = await water_link._fetch_pdf_text(session=None)  # type: ignore[arg-type]
+        _out, year, _url = await water_link._fetch_pdf_text(session=None)  # type: ignore[arg-type]
     assert mock.await_count == 2
     assert year == date.today().year - 1
+
+
+async def test_tariff_cites_the_pdf_it_actually_read() -> None:
+    """The source_url attribute must point at the card that was parsed.
+
+    The link is discovered rather than templated, so a card uploaded
+    outside January lives under a different path; citing the templated one
+    sends anyone verifying the figures to a URL that 404s.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import _html, water_link
+
+    page = _tariff_page(2026).replace("2026-01", "2026-02")
+    with (
+        patch.object(_html, "fetch_html", new=AsyncMock(return_value=page)),
+        patch.object(water_link, "fetch_pdf_text_layout", new=AsyncMock(return_value=_pdf_text())),
+    ):
+        tariff = await water_link.fetch(session=None)  # type: ignore[arg-type]
+    assert tariff.source_url == ("https://water-link.be/sites/default/files/2026-02/2026%20HH.pdf")
