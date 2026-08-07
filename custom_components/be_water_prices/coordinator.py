@@ -1196,14 +1196,19 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     Wraps :func:`statistics_during_period` via the recorder's executor so
     the SQLite query never runs on the event loop.
 
-    Returns the year's consumption, ``0.0`` when the query succeeded and
-    the year genuinely holds nothing yet, and raises
-    :class:`RecorderUnavailable` when the query could not be run at all.
-    Those two are different answers and the caller has to tell them apart:
-    an empty year may be anchored at zero, an unreadable one may not, or a
-    database hiccup would discard consumption already reported. Collapsing
-    both into ``None`` is what every year-stamp and deferral guard in this
-    module was re-deriving one call later.
+    Returns the year's consumption, and ``0.0`` when there is nothing to
+    read: an empty year, or no recorder to read it from. Raises
+    :class:`RecorderUnavailable` only when a recorder that is running could
+    not answer this query.
+
+    Those are different answers and the caller has to tell them apart: a
+    year with no statistics may be anchored at zero, a query that failed may
+    not, or a database hiccup would discard consumption already reported.
+    Collapsing both into ``None`` is what every year-stamp and deferral
+    guard in this module was re-deriving one call later. The absent-recorder
+    cases belong with the empty year rather than the failure, because they
+    never resolve: reporting them as unreadable leaves the caller waiting
+    for a recovery that cannot come.
 
     Reads the ``change`` field, which the recorder defines as the
     delta of the cumulative ``sum`` between the bucket's first and
@@ -1228,10 +1233,23 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
         # treated as unreadable forever.
         return 0.0
 
+    try:
+        instance = get_instance(hass)
+    except Exception as err:
+        # Importable but not running: an install without default_config that
+        # never enabled the recorder, or one whose recorder failed to start.
+        # manifest.json lists recorder under after_dependencies, so a
+        # configured recorder is always set up before this integration and
+        # this cannot be a startup race. It is the same answer as no recorder
+        # component at all, and it has to be, or such an install could never
+        # anchor a year and both YTD sensors would sit unknown forever.
+        _LOGGER.debug("no recorder instance for %s: %s", entity_id, err)
+        return 0.0
+
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
     try:
-        stats = await get_instance(hass).async_add_executor_job(
+        stats = await instance.async_add_executor_job(
             statistics_during_period,
             hass,
             start_dt,

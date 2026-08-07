@@ -1453,6 +1453,26 @@ async def test_recorder_ytd_reads_no_statistics_as_zero(hass: HomeAssistant) -> 
 
 
 @pytest.mark.asyncio
+async def test_recorder_ytd_reads_an_absent_recorder_as_zero(hass: HomeAssistant) -> None:
+    """A recorder that is not running is an empty year, not a failed read.
+
+    An install without default_config that never enabled the recorder has
+    the component importable but no instance behind it. Reporting that as
+    unreadable makes the caller wait for a recovery that cannot come, and
+    both YTD sensors would sit unknown for the life of the install.
+    """
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    def _no_instance(*_args: Any) -> Any:
+        raise KeyError("recorder")
+
+    with patch("homeassistant.components.recorder.get_instance", new=_no_instance):
+        got = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+
+    assert got == 0.0
+
+
+@pytest.mark.asyncio
 async def test_recorder_ytd_raises_when_the_query_fails(hass: HomeAssistant) -> None:
     """A query that could not run is reported as such, not as an empty year."""
     from unittest.mock import MagicMock
