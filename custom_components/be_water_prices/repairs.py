@@ -67,10 +67,14 @@ class SnapshotStaleRepairFlow(RepairsFlow):
         coordinator = self.hass.data.get(DOMAIN, {}).get(self._entry_id)
         if coordinator is not None:
             await coordinator.async_refresh()
-        # Whether or not the refresh succeeded, close the flow. If the
-        # snapshot is still stale the next coordinator tick re-creates
-        # the issue immediately; if it's now fresh the issue was
-        # already deleted by _sync_repair_issue.
+        if coordinator is None or coordinator.data is None or coordinator.data.snapshot_stale:
+            # Completing the flow makes the Repairs manager delete the
+            # issue. That is right once the refresh has cleared it, but on
+            # a retry that did not help it would hide the card until the
+            # next daily tick recreated it. Aborting leaves it in place.
+            return self.async_abort(reason="still_stale")
+        # The refresh returned a fresh snapshot, so _sync_repair_issue has
+        # already deleted the issue; close the flow normally.
         return self.async_create_entry(title="", data={})
 
 

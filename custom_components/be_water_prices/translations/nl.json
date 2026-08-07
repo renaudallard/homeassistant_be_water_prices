@@ -146,6 +146,9 @@
             "title": "Tariefophaling van {utility} opnieuw proberen",
             "description": "Het laatst succesvol opgehaalde tarief van {utility} is {age_days} dagen oud (geldig tot {valid_until}). Laatste fout: {last_error}.\n\nKlik op Indienen om onmiddellijk te vernieuwen. De Repair-kaart verdwijnt automatisch als de volgende ophaling een nieuwe snapshot teruggeeft; zo niet, dan blijft hij staan om opnieuw te proberen of de onderliggende fout te onderzoeken (kijk naar de issues op GitHub of de dagelijkse live-check workflow run)."
           }
+        },
+        "abort": {
+          "still_stale": "De vernieuwing is uitgevoerd, maar de snapshot van {utility} is nog steeds verouderd, dus de Repair-kaart blijft staan. Probeer het later opnieuw, of bekijk de issues op GitHub en de dagelijkse live-check workflow run voor de onderliggende fout."
         }
       }
     }
