@@ -108,7 +108,7 @@
       "fields": {
         "entry_id": {
           "name": "Config entry",
-          "description": "Optional. The config entry to backfill. Leave empty to backfill every loaded entry."
+          "description": "Optional. The config entry to backfill. Leave empty to backfill every loaded entry. Required when Clear before importing is on."
         },
         "start_date": {
           "name": "Start date",
@@ -116,7 +116,7 @@
         },
         "clear": {
           "name": "Clear before importing",
-          "description": "If on, wipe the existing long-term statistics for the targeted sensors before importing. Off by default."
+          "description": "If on, wipe the existing long-term statistics for the targeted sensors before importing. Off by default. Requires a config entry: clearing every loaded entry at once is irreversible, so the service refuses that combination."
         }
       }
     }

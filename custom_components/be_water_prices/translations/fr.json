@@ -124,7 +124,7 @@
       "fields": {
         "entry_id": {
           "name": "Entrée de configuration",
-          "description": "Optionnel. L'entrée de configuration à backfiller. Laissez vide pour traiter chaque entrée chargée."
+          "description": "Optionnel. L'entrée de configuration à backfiller. Laissez vide pour traiter chaque entrée chargée. Obligatoire lorsque Effacer avant l'import est actif."
         },
         "start_date": {
           "name": "Date de début",
@@ -132,7 +132,7 @@
         },
         "clear": {
           "name": "Effacer avant import",
-          "description": "Si actif, efface les long-term-statistics existantes pour les capteurs ciblés avant l'import. Désactivé par défaut."
+          "description": "Si actif, efface les long-term-statistics existantes pour les capteurs ciblés avant l'import. Désactivé par défaut. Nécessite une entrée de configuration : tout effacer d'un coup est irréversible, cette combinaison est donc refusée."
         }
       }
     }
