@@ -77,6 +77,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # restart does not re-anchor the running cost down to the recorder's
     # trailing daily total.
     await coordinator.async_load_ytd_state()
+    # Own the teardown before the first refresh, not after: that refresh
+    # resolves the meter and subscribes to it, so a ConfigEntryNotReady
+    # here would otherwise leave a live listener behind on every retry.
+    # A no-op while nothing is subscribed.
+    entry.async_on_unload(coordinator.async_unsub_live_tracking)
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryNotReady:
@@ -87,10 +92,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Update the running-cost / YTD sensors live on each meter reading,
     # not just on the daily tick. Subscribes to the resolved meter entity
-    # and re-points itself if a later tick resolves a different one, so the
-    # teardown is registered here rather than per subscription.
+    # and re-points itself if a later tick resolves a different one; the
+    # teardown for whichever subscription is current was registered above.
     coordinator.async_setup_live_tracking()
-    entry.async_on_unload(coordinator.async_unsub_live_tracking)
     # Register the OptionsFlow reload listener BEFORE the backfill so
     # any backfill failure (recorder not ready, parser exception,
     # future code addition that raises) does not leave the listener
