@@ -629,6 +629,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if self._cycle_dirty:
                 self._cycle_dirty = False
                 await self._store.async_save(self._cycle_state())
+            # That save yields to the loop, and a meter event handled while it
+            # ran can advance the mark past the figure computed above. Re-floor
+            # against the mark as it stands now rather than publishing a
+            # snapshot the cycle has already moved beyond.
+            ytd_m3 = self._floor_ytd_m3(ytd_m3, now_year)
+            ytd_cost = self._floor_cost(self._ytd_cost_from_m3(tariff, ytd_m3))
             self._ytd_published_meter = meter
             return ytd_m3, ytd_cost
         # Meter unavailable right now: serve the recorder's daily figure

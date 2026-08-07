@@ -2480,3 +2480,60 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 0.4
+
+
+@pytest.mark.asyncio
+async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
+    hass: HomeAssistant,
+) -> None:
+    """A draw during the tick's Store save must not be undone by the tick.
+
+    The tick computes the figure, then awaits the save. A meter event
+    handled while that runs advances the mark, so publishing the earlier
+    snapshot walks both YTD sensors backwards inside the year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # Make the next tick's Store save yield, and draw water while it does.
+        real_save = coordinator._store.async_save
+
+        async def _slow_save(data: Any) -> None:
+            hass.states.async_set("sensor.water_meter", "140")
+            await asyncio.sleep(0)
+            await real_save(data)
+
+        coordinator._cycle_dirty = True
+        with patch.object(coordinator._store, "async_save", new=_slow_save):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+        # 140 - 80 == 60; the tick must not republish the earlier 20.
+        assert coordinator.data.ytd_consumption_m3 == 60.0
