@@ -75,7 +75,13 @@ def _label_for_year(year: int) -> str:
 
 
 def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
-    """Try to parse the ``<table>`` for ``year``; return None if absent."""
+    """Try to parse the ``<table>`` for ``year``; return None if absent.
+
+    Absent means the year's card is not on the page yet, which the caller
+    answers by falling back to the previous year. A card that *is* present
+    but whose rows no longer parse raises instead: that is a broken parser,
+    and silently serving last year's rates for it would hide the breakage.
+    """
     # Pin to the residential 6 % card. A non-residential 21 % card on
     # the same page would also contain "vat" + the year and silently
     # bind to the wrong rate.
@@ -114,7 +120,7 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
                 var_sanitation = amt
 
     if None in (fixed_total, var_total, var_supply, var_sanitation):
-        return None
+        raise ExtractorError(f"VIVAQUA {year} table found but its rows could not be parsed")
     assert fixed_total is not None
     assert var_total is not None
     assert var_supply is not None
