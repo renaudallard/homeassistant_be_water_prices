@@ -32,6 +32,7 @@ fresh fetch and on entry unload).
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -1615,3 +1616,76 @@ async def test_unusable_meter_readings_leave_the_total_alone(hass: HomeAssistant
         hass.states.async_set("sensor.water_meter", "110")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
+
+
+@pytest.mark.asyncio
+async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
+    hass: HomeAssistant,
+) -> None:
+    """A re-pointed meter must not be anchored with the old meter's usage.
+
+    The tick moves the subscription to the newly resolved meter and then
+    awaits the recorder. If the new meter reports during that await, the
+    live path finds no baseline and would reconstruct one from the figure
+    still on screen, which belongs to the meter just left behind.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.meter_a", "100")
+    hass.states.async_set("sensor.meter_b", "unavailable")
+    discovered = "sensor.meter_a"
+    ytd_for = {"sensor.meter_a": 20.0, "sensor.meter_b": 40.0}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> str | None:
+        return discovered
+
+    async def _recorder(_hass: HomeAssistant, meter: str, _s: date, _e: date) -> float:
+        if meter == "sensor.meter_b":
+            # The new meter reports while its recorder query is in flight,
+            # and the loop gets a turn to deliver that event before the
+            # tick resumes, which is what opens the window.
+            hass.states.async_set("sensor.meter_b", "5000")
+            await asyncio.sleep(0)
+        return ytd_for[meter]
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=_recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        discovered = "sensor.meter_b"
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 40.0
+
+        # The next reading anchors from meter_b's own figure (5001 - 40),
+        # so the published total holds instead of dropping to the 21.0 an
+        # anchor built out of meter_a's 20.0 would have produced.
+        hass.states.async_set("sensor.meter_b", "5001")
+        await hass.async_block_till_done()
+        assert coordinator._ytd_baseline_m3 == 4961.0
+        assert coordinator.data.ytd_consumption_m3 == 40.0
+
+        # And it climbs from there.
+        hass.states.async_set("sensor.meter_b", "5002")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 41.0
