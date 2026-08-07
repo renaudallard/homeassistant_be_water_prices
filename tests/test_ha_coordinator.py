@@ -1420,8 +1420,12 @@ async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
-async def test_recorder_ytd_returns_none_without_usable_rows(hass: HomeAssistant) -> None:
-    """No statistics, or only empty deltas, must read as unknown not zero."""
+async def test_recorder_ytd_reads_no_statistics_as_zero(hass: HomeAssistant) -> None:
+    """A successful query over an empty year answers zero, not unknown.
+
+    An empty year may be anchored at zero; an unreadable one may not. The
+    caller can only tell them apart if the query says which happened.
+    """
     from unittest.mock import MagicMock
 
     from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
@@ -1445,15 +1449,18 @@ async def test_recorder_ytd_returns_none_without_usable_rows(hass: HomeAssistant
             patch("homeassistant.components.recorder.get_instance", return_value=instance),
         ):
             got = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
-        assert got is None
+        assert got == 0.0
 
 
 @pytest.mark.asyncio
-async def test_recorder_ytd_returns_none_when_the_query_raises(hass: HomeAssistant) -> None:
-    """A transient query failure degrades to unknown rather than crashing."""
+async def test_recorder_ytd_raises_when_the_query_fails(hass: HomeAssistant) -> None:
+    """A query that could not run is reported as such, not as an empty year."""
     from unittest.mock import MagicMock
 
-    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+    from custom_components.be_water_prices.coordinator import (
+        RecorderUnavailable,
+        _recorder_ytd_m3,
+    )
 
     def _stats(*_args: Any) -> Any:
         raise RuntimeError("database is locked")
@@ -1470,10 +1477,9 @@ async def test_recorder_ytd_returns_none_when_the_query_raises(hass: HomeAssista
             new=_stats,
         ),
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
+        pytest.raises(RecorderUnavailable),
     ):
-        assert (
-            await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) is None
-        )
+        await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
 
 @pytest.mark.asyncio
