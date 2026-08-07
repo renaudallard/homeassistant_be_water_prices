@@ -676,6 +676,60 @@ async def test_migrate_v1_entry_drops_phantom_farys_commune(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_phantom_strip_is_rolled_back_when_the_first_fetch_fails(
+    hass: HomeAssistant,
+) -> None:
+    """A failed first fetch must not leave the commune permanently gone.
+
+    The strip happens before the first refresh, so a transient outage on
+    setup would otherwise persist the stripped options and lose a commune
+    that a later blocklist revision could have allowed again. Setup rolls
+    the options back on ConfigEntryNotReady, and only that rollback keeps
+    the strip retryable.
+    """
+    from unittest.mock import patch
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.be_water_prices.providers.base import (
+        ExtractorError,
+        WaterExtractor,
+    )
+
+    async def _fetch_fails(_session: object) -> object:
+        raise ExtractorError("HTTP 503 from upstream")
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "25126",  # 1500 - Halle (Halle) -- phantom
+            CONF_COMMUNE_LABEL: "1500 - Halle (Halle)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    fake = WaterExtractor(
+        id="farys",
+        label="Farys",
+        region="flanders",
+        fetch=_fetch_fails,  # type: ignore[arg-type]
+    )
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        assert await hass.config_entries.async_setup(entry.entry_id) is False
+        await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    # The strip was undone, so the next attempt starts from the same place.
+    assert entry.options[CONF_COMMUNE] == "25126"
+    assert entry.options[CONF_COMMUNE_LABEL] == "1500 - Halle (Halle)"
+
+
+@pytest.mark.asyncio
 async def test_reconfigure_commune_drops_stale_saved_when_no_longer_in_list(
     hass: HomeAssistant,
 ) -> None:
