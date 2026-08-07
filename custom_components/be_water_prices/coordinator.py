@@ -612,6 +612,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # read-only (no anchoring) so the sensor is not blanked for a day.
         if recorder_ytd is not None:
             served = self._floor_ytd_m3(recorder_ytd, now_year)
+            self._absorb_served_m3(served, now_year)
             self._ytd_published_meter = meter
             return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
         if self._ytd_baseline_year == now_year and self._ytd_live_hwm_m3 is not None:
@@ -624,6 +625,27 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._ytd_published_meter = meter
             return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
         return None, None
+
+    def _absorb_served_m3(self, served: float, now_year: int) -> float | None:
+        """Raise this cycle's mark to a served figure that exceeded it.
+
+        The recorder can legitimately report more than the live mark: the
+        cycle anchors on the bare reading whenever the very first tick's
+        recorder query fails, so the mark starts at zero consumption while
+        the recorder still knows about the year. That larger figure gets
+        published, but nothing used to write it back, so any later path
+        reporting ``hwm - baseline`` walked the published volume back down.
+
+        Folding it in keeps every path that reads the mark at or above what
+        has already been shown.
+        """
+        if self._ytd_baseline_year != now_year or self._ytd_baseline_m3 is None:
+            return None
+        mark = self._ytd_baseline_m3 + served
+        if self._ytd_live_hwm_m3 is None or mark > self._ytd_live_hwm_m3:
+            self._ytd_live_hwm_m3 = mark
+            self._cycle_dirty = True
+        return self._ytd_live_hwm_m3
 
     def _floor_ytd_m3(self, recorder_ytd: float, now_year: int) -> float:
         """Clamp a recorder figure to this cycle's consumption mark.
