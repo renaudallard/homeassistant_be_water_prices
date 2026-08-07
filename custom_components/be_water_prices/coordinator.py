@@ -97,6 +97,16 @@ _SWAP_CONFIRM_READINGS = 3
 _IMPLAUSIBLE_JUMP_M3 = 100.0
 
 
+class RecorderUnavailable(Exception):
+    """The recorder could not be queried, as distinct from answering empty.
+
+    An empty answer means the year holds no consumption yet and may be
+    anchored at zero. This means the year's consumption is simply unknown
+    right now, and anchoring on it would discard whatever has already been
+    reported.
+    """
+
+
 def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
     """The per-entry Store holding that entry's YTD cycle anchor.
 
@@ -595,7 +605,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if need_bootstrap or live is None:
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)
-            recorder_ytd = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+            try:
+                recorder_ytd = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+            except RecorderUnavailable as err:
+                _LOGGER.debug("recorder unreadable for %s: %s", meter, err)
+                recorder_ytd = None
             if recorder_ytd is not None and self._ytd_recorder_year != now_year:
                 self._ytd_recorder_year = now_year
                 self._cycle_dirty = True
@@ -958,16 +972,20 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
     return None
 
 
-async def _recorder_ytd_m3(
-    hass: HomeAssistant, entity_id: str, start: date, end: date
-) -> float | None:
+async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end: date) -> float:
     """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
 
-    Wraps :func:`statistics_during_period` via the recorder's executor
-    so the SQLite query never runs on the event loop. Returns ``None``
-    when the recorder is unavailable, the meter has no statistics, or
-    a transient query failure -- callers fall back to surfacing the
-    YTD sensor as ``unknown`` rather than zero.
+    Wraps :func:`statistics_during_period` via the recorder's executor so
+    the SQLite query never runs on the event loop.
+
+    Returns the year's consumption, ``0.0`` when the query succeeded and
+    the year genuinely holds nothing yet, and raises
+    :class:`RecorderUnavailable` when the query could not be run at all.
+    Those two are different answers and the caller has to tell them apart:
+    an empty year may be anchored at zero, an unreadable one may not, or a
+    database hiccup would discard consumption already reported. Collapsing
+    both into ``None`` is what every year-stamp and deferral guard in this
+    module was re-deriving one call later.
 
     Reads the ``change`` field, which the recorder defines as the
     delta of the cumulative ``sum`` between the bucket's first and
@@ -987,7 +1005,10 @@ async def _recorder_ytd_m3(
             statistics_during_period,
         )
     except ImportError:
-        return None
+        # No recorder component at all: there are no statistics to read and
+        # there never will be, so the year starts here rather than being
+        # treated as unreadable forever.
+        return 0.0
 
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
@@ -1009,21 +1030,15 @@ async def _recorder_ytd_m3(
         )
     except Exception as err:
         _LOGGER.debug("recorder query for %s failed: %s", entity_id, err)
-        return None
+        raise RecorderUnavailable(str(err)) from err
 
     rows: list[Any] = list(stats.get(entity_id, []))
-    if not rows:
-        return None
     total = 0.0
-    seen = False
     for row in rows:
         delta = row.get("change")
         if delta is None:
             continue
         total += float(delta)
-        seen = True
-    if not seen:
-        return None
     # Replacing a water meter mid-year (cumulative sensor state drops
     # back to 0) produces a single large negative delta in the swap
     # bucket. Without a floor we'd surface a nonsensical -50 m³ as the
