@@ -90,9 +90,12 @@ LABEL = "Water-link"
 SOURCE_URL_FMT = "https://water-link.be/sites/default/files/{year}-01/{year}%20HH.pdf"
 TARIFF_PAGE_URL = "https://water-link.be/informatie/tarieven-en-kortingen/tarieven/antwerpen"
 _PDF_HOST = "water-link.be"
+# Bind the year to the filename, not to anywhere in the href: the upload
+# directory carries a year too, so a loose match would read
+# ".../2026-12/2027 HH.pdf" as the 2026 card and serve next year's rates.
 # The page also links "<year> andere.pdf" and "<year> NHH_0.pdf" (non-
-# household), so require that nothing alphabetic precedes the HH.
-_PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}[^"\'>\s]*?(?<![A-Za-z])HH\.pdf[^"\'>\s]*)'
+# household), which the required "<year><sep>HH.pdf" shape excludes.
+_PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}(?:%20|[\s_-])?HH\.pdf[^"\'>\s]*)'
 
 # Commune to anchor the rate row on. Antwerpen is the largest customer
 # block; ring communes share the same drinkwater/zuivering numbers but
