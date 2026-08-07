@@ -46,9 +46,14 @@ if str(ROOT) not in sys.path:
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):  # type: ignore[no-untyped-def]
-    """Auto-load custom integrations for any test that pulls a hass fixture.
+    """Auto-load custom integrations so the HA-driven tests can set up.
 
-    Tests that don't request ``hass`` simply don't trigger the dependency,
-    so the existing pure-pytest tests stay isolated from HA.
+    Naming the fixture here resolves it for *every* test, not only the ones
+    that pull ``hass``. That is deliberate: pytest-homeassistant-custom-
+    component hangs its own autouse fixtures off this dependency, including
+    the event-loop setup that the plain async parser tests need, so
+    requesting it lazily (only when ``hass`` is in ``request.fixturenames``)
+    breaks collection for most of the suite. The cost is a fraction of a
+    second across the pure tests, which is not worth the fragility.
     """
     yield
