@@ -37,7 +37,7 @@ jobs:
           exit 0
 
       - name: Open or update fixture-drift issue
-        if: steps.check.outputs.rc != '0'
+        if: steps.check.outputs.rc == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -68,6 +68,9 @@ jobs:
               --body-file issue_body.md
           fi
 
+      # rc 2 means nothing drifted but a utility was unreachable on a blip,
+      # so this run did not actually check everything: neither file an issue
+      # nor tell the maintainer an open one is safe to close.
       - name: Note drift cleared on existing issue
         if: steps.check.outputs.rc == '0'
         env:
