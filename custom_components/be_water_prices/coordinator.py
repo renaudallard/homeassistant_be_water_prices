@@ -535,8 +535,27 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # Meter unavailable right now: serve the recorder's daily figure
         # read-only (no anchoring) so the sensor is not blanked for a day.
         if recorder_ytd is not None:
-            return recorder_ytd, self._floor_cost(self._ytd_cost_from_m3(tariff, recorder_ytd))
+            served = self._floor_ytd_m3(recorder_ytd, now_year)
+            return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
         return None, None
+
+    def _floor_ytd_m3(self, recorder_ytd: float, now_year: int) -> float:
+        """Clamp a recorder figure to this cycle's consumption mark.
+
+        The cost already carries its own floor, but the m3 figure did not,
+        so a recorder total trailing the live mark republished a lower
+        volume. That sensor is a TOTAL with a Jan 1 last_reset, and the
+        statistics engine reads a decrease on the same cycle as a reset, so
+        the drop was re-added to the long-term sum.
+
+        Only same-year cycles are clamped: after a rollover the mark belongs
+        to last year and the new year has to be free to start near zero.
+        """
+        if self._ytd_baseline_year != now_year:
+            return recorder_ytd
+        if self._ytd_baseline_m3 is None or self._ytd_live_hwm_m3 is None:
+            return recorder_ytd
+        return max(recorder_ytd, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
 
     def _floor_cost(self, cost: float | None) -> float | None:
         """Clamp the published YTD cost to this cycle's high-water mark.

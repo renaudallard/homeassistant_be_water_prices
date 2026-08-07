@@ -217,6 +217,58 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_recorder_fallback_does_not_publish_below_the_live_mark(
+    hass: HomeAssistant,
+) -> None:
+    """A mid-year dropout must not republish a lower year-to-date volume.
+
+    The recorder's daily total trails the live meter, so serving it raw
+    after a dropout drops the m3 figure. That sensor is a TOTAL with a
+    Jan 1 last_reset, and the statistics engine reads a same-cycle
+    decrease as a reset, re-adding the whole figure to the long-term sum.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # Draw up to 130: baseline 80, live mark 130, so YTD is 50.
+        hass.states.async_set("sensor.water_meter", "130")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 50.0
+
+        # The meter drops out and the recorder's daily total trails it.
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        recorder.return_value = 49.7
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 50.0
+
+
+@pytest.mark.asyncio
 async def test_removing_the_entry_deletes_its_ytd_store(
     hass: HomeAssistant, hass_storage: dict[str, Any]
 ) -> None:
