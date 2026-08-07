@@ -140,6 +140,9 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         constant=WALLONIA_FSE_EUR_PER_M3,
         label="SWDE FSE",
         logger=_LOGGER,
+        # The Fonds Social is ~0.03 EUR/m3, so the 0.005 default would let a
+        # 15% move pass unreported. CILE and inBW already check it at 0.001.
+        threshold=0.001,
     )
 
     target = year or date.today().year
