@@ -604,7 +604,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # "consumption since Jan 1"; fall back to the current reading
             # (YTD ~0) when the recorder has nothing to place it.
             baseline = (live - recorder_ytd) if recorder_ytd is not None else live
-            self._set_cycle(now_year, baseline, live)
+            # Needing a bootstrap is not the same as starting a new cycle:
+            # this is also the first tick where a meter became usable inside
+            # a year the recorder fallback has already been billing. A
+            # prior-year floor was dropped above and a repoint cleared it, so
+            # one still stamped with this year means a continuation and must
+            # survive, exactly as it does on the live path.
+            self._set_cycle(now_year, baseline, live, keep_cost=self._ytd_cost_year == now_year)
         if not defer_anchor and self._ytd_baseline_m3 is not None and live is not None:
             ytd_m3 = self._apply_cycle(live)
             # Floor the cost before the save so a cost high-water-mark bump
