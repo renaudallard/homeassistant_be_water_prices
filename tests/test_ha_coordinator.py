@@ -485,7 +485,12 @@ async def test_live_ytd_reanchors_on_year_rollover(hass: HomeAssistant) -> None:
 
         coordinator = hass.data[DOMAIN][entry.entry_id]
         # Pretend the baseline was anchored last year and never re-ticked.
+        # The recorder figure has to age with it: a current-year recorder
+        # year alongside a prior-year baseline means the tick did run this
+        # year and published a current-year figure, which is the recovery
+        # case below rather than a rollover.
         coordinator._ytd_baseline_year = dt_util.now().year - 1
+        coordinator._ytd_recorder_year = dt_util.now().year - 1
 
         # A draw to 130 m³ would naively read 130 - 80 == 50 m³ YTD; the
         # rollover guard re-anchors to 130, so YTD resets to ~0 instead.
@@ -936,6 +941,63 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
         cost_now = coordinator.data.current_year_cost_eur
         assert cost_now is not None
         assert cost_now < cost_peak
+
+
+@pytest.mark.asyncio
+async def test_meter_recovery_keeps_the_new_year_recorder_figure(hass: HomeAssistant) -> None:
+    """Recovering after a rollover dropout must not discard the year's usage.
+
+    The tick keeps a prior-year baseline while the meter is down and serves
+    the current-year recorder figure. On recovery the live path has to
+    reconstruct the baseline from that figure; re-anchoring on the raw
+    reading instead would publish a decrease inside the same year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # Down across Jan 1: prior-year baseline kept, recorder serves 5 m³.
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        recorder.return_value = 5.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 5.0
+
+        # The meter comes back. Those 5 m³ are this year's and must survive.
+        hass.states.async_set("sensor.water_meter", "1000.5")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 5.0
+        assert coordinator._ytd_baseline_m3 == 995.5
+
+        # And it tracks from there.
+        hass.states.async_set("sensor.water_meter", "1003.5")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 8.0
 
 
 @pytest.mark.asyncio
