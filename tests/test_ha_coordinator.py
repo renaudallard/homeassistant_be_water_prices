@@ -1746,3 +1746,67 @@ async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssist
         hass.states.async_set("sensor.water_meter", "133")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 3.0
+
+
+@pytest.mark.asyncio
+async def test_transient_recorder_gap_does_not_reset_the_year(hass: HomeAssistant) -> None:
+    """A recorder hiccup must not throw away the year already published.
+
+    The live path reads the last published figure, which is None for the
+    whole interval after a tick whose recorder query failed. Treating that
+    like a year with no statistics re-anchors the cycle at the current
+    reading, and because the baseline year then matches, no later tick ever
+    consults the recorder again: the year's usage is gone for good.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=12.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # The meter has been down since December, so the anchor is last
+        # year's, and this year's 12 m3 came from the recorder.
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+        coordinator._ytd_baseline_m3 = 4000.0
+        assert coordinator.data.ytd_consumption_m3 == 12.0
+
+        # The next tick's recorder query fails transiently.
+        recorder.return_value = None
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 is None
+
+        # The meter comes back mid-interval. Those 12 m3 are still this
+        # year's, so the cycle must not be re-anchored at the reading.
+        hass.states.async_set("sensor.water_meter", "4520")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 is None
+        assert coordinator._ytd_baseline_year == dt_util.now().year - 1
+
+        # The next healthy tick republishes them.
+        recorder.return_value = 12.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 12.0
+        assert coordinator._ytd_baseline_m3 == 4508.0
