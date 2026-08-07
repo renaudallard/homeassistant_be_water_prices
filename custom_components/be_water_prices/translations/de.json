@@ -124,7 +124,7 @@
       "fields": {
         "entry_id": {
           "name": "Konfigurationseintrag",
-          "description": "Optional. Der zu nachladende Konfigurationseintrag. Leer lassen, um jeden geladenen Eintrag zu nachladen."
+          "description": "Optional. Der zu nachladende Konfigurationseintrag. Leer lassen, um jeden geladenen Eintrag zu nachladen. Erforderlich, wenn Vor dem Import löschen aktiv ist."
         },
         "start_date": {
           "name": "Startdatum",
@@ -132,7 +132,7 @@
         },
         "clear": {
           "name": "Vor dem Import löschen",
-          "description": "Wenn aktiv, werden die bestehenden Long-Term-Statistics für die gewählten Sensoren vor dem Import gelöscht. Standardmäßig deaktiviert."
+          "description": "Wenn aktiv, werden die bestehenden Long-Term-Statistics für die gewählten Sensoren vor dem Import gelöscht. Standardmäßig deaktiviert. Erfordert einen Konfigurationseintrag: alle geladenen Einträge auf einmal zu löschen ist unumkehrbar, daher wird diese Kombination abgelehnt."
         }
       }
     }

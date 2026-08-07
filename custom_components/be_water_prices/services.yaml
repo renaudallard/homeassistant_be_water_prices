@@ -12,7 +12,8 @@ backfill_prices:
       name: Config entry
       description: >
         Optional. The config entry to backfill (e.g. one specific
-        utility). Leave empty to backfill every loaded entry.
+        utility). Leave empty to backfill every loaded entry. Required
+        when "Clear before importing" is on.
       example: 01H8WZK0WZK0WZK0WZK0WZK0WZ
       selector:
         config_entry:
@@ -32,7 +33,9 @@ backfill_prices:
       description: >
         If on, wipe the existing long-term statistics for the targeted
         sensors before importing. Use this to overwrite a wrong tariff
-        value cleanly. Off by default (gap-fill behaviour).
+        value cleanly. Off by default (gap-fill behaviour). Requires a
+        config entry above: clearing every loaded entry at once is
+        irreversible, so the service refuses that combination.
       default: false
       selector:
         boolean:

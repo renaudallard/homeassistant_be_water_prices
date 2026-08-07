@@ -124,7 +124,7 @@
       "fields": {
         "entry_id": {
           "name": "Configuratie-invoer",
-          "description": "Optioneel. De configuratie-invoer om aan te vullen. Laat leeg om elke geladen invoer aan te vullen."
+          "description": "Optioneel. De configuratie-invoer om aan te vullen. Laat leeg om elke geladen invoer aan te vullen. Verplicht wanneer Wissen voor importeren aan staat."
         },
         "start_date": {
           "name": "Startdatum",
@@ -132,7 +132,7 @@
         },
         "clear": {
           "name": "Wissen voor importeren",
-          "description": "Indien aan, wis de bestaande long-term-statistics voor de gekozen sensoren voordat de import gebeurt. Standaard uit."
+          "description": "Indien aan, wis de bestaande long-term-statistics voor de gekozen sensoren voordat de import gebeurt. Standaard uit. Vereist een configuratie-invoer: alle geladen invoeren tegelijk wissen is onomkeerbaar, dus die combinatie wordt geweigerd."
         }
       }
     }
