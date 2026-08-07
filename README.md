@@ -161,7 +161,10 @@ per entry: `water_comfort_rate` only appears for Flemish utilities;
 created and report `unknown` until a water meter is wired up
 (explicit override in the OptionsFlow, or auto-discovered from the
 Energy dashboard). The next coordinator tick after the meter shows
-up fills in the values without an HA restart.
+up fills in the values without an HA restart. Re-pointing the Energy
+dashboard at a different water meter is picked up the same way: the
+following tick re-anchors on the new meter and live tracking moves
+with it, again without a restart.
 
 | Sensor | Description |
 | --- | --- |

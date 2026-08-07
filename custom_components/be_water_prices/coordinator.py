@@ -41,7 +41,14 @@ from homeassistant.const import (
     STATE_UNKNOWN,
     UnitOfVolume,
 )
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
+from homeassistant.core import (
+    CALLBACK_TYPE,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -138,6 +145,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # captured on each daily tick so meter state-change events can
         # recompute YTD live without re-querying the recorder.
         self._meter_entity_id: str | None = None
+        # Unsub for the live meter subscription. Kept so a later tick that
+        # resolves a different meter can re-point it; the entry unload calls
+        # async_unsub_live_tracking to tear the current one down.
+        self._meter_unsub: CALLBACK_TYPE | None = None
         # The year-to-date cycle anchor, persisted across restarts via
         # _store. ``_ytd_baseline_m3`` is the meter's cumulative reading at
         # the cycle start (Jan 1, or the moment of a meter swap); YTD is
@@ -460,7 +471,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         configured or there is no usable reading to anchor or serve.
         """
         meter = await self.async_resolve_meter_entity()
-        self._meter_entity_id = meter
+        if meter != self._meter_entity_id:
+            # Auto-discovery can start resolving a different Energy-dashboard
+            # source with no options change, so nothing reloads the entry.
+            # Move the live subscription across before anchoring on it.
+            self._meter_entity_id = meter
+            self.async_setup_live_tracking()
         if not meter:
             return None, None
         if self._ytd_meter_id != meter:
@@ -548,23 +564,36 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     @callback
     def async_setup_live_tracking(self) -> None:
-        """Subscribe to the configured meter so YTD sensors update on each draw.
+        """Subscribe to the resolved meter so YTD sensors update on each draw.
 
-        Called once after the first refresh has resolved the meter. The
-        unsub is registered on the config entry, so an options-change
-        reload (which may point at a different meter) re-subscribes
-        cleanly and an unload tears it down -- no leaked listener.
+        Called after the first refresh has resolved the meter, and again by
+        any later tick that resolves a different one. An options change
+        reloads the entry, but the Energy-dashboard source behind
+        auto-discovery can change with no reload at all, so the
+        subscription has to follow the meter rather than stay pinned to
+        whichever entity was resolved at setup.
         """
+        self.async_unsub_live_tracking()
         if self._meter_entity_id is None:
             return
-        self.entry.async_on_unload(
-            async_track_state_change_event(
-                self.hass, [self._meter_entity_id], self._async_meter_state_event
-            )
+        self._meter_unsub = async_track_state_change_event(
+            self.hass, [self._meter_entity_id], self._async_meter_state_event
         )
 
     @callback
+    def async_unsub_live_tracking(self) -> None:
+        """Tear down the live meter subscription, if any."""
+        if self._meter_unsub is not None:
+            self._meter_unsub()
+            self._meter_unsub = None
+
+    @callback
     def _async_meter_state_event(self, event: Event[EventStateChangedData]) -> None:
+        # Ignore anything that is not the meter we are currently anchored
+        # on, so a subscription that outlives a meter change cannot feed a
+        # foreign reading into the cycle.
+        if event.data["entity_id"] != self._meter_entity_id:
+            return
         self._recompute_live_ytd(event.data["new_state"])
 
     @callback

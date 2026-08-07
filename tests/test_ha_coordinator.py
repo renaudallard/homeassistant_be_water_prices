@@ -335,6 +335,72 @@ async def test_meter_events_do_not_starve_the_daily_refresh(hass: HomeAssistant)
         assert not scheduled.__self__.cancelled()
 
 
+async def test_live_tracking_follows_a_changed_auto_discovered_meter(
+    hass: HomeAssistant,
+) -> None:
+    """Live tracking must move when auto-discovery resolves another meter.
+
+    The Energy dashboard's water source can change with no options change,
+    so nothing reloads the entry. A subscription left behind on the old
+    entity would feed that meter's unrelated cumulative reading into the
+    running total.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.meter_a", "100")
+    hass.states.async_set("sensor.meter_b", "500")
+    discovered = "sensor.meter_a"
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> str | None:
+        return discovered
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # The dashboard is re-pointed at another meter; the next tick
+        # re-anchors on it (baseline 500 - 20).
+        discovered = "sensor.meter_b"
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator._meter_entity_id == "sensor.meter_b"
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # The abandoned meter must no longer reach the cycle.
+        hass.states.async_set("sensor.meter_a", "100.3")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # The new meter must.
+        hass.states.async_set("sensor.meter_b", "505")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+
 @pytest.mark.asyncio
 async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
     """A meter reporting litres is converted to m³ before the YTD math.
