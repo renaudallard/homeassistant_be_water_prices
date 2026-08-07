@@ -1471,3 +1471,88 @@ async def test_recorder_ytd_returns_none_when_the_query_raises(hass: HomeAssista
         assert (
             await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) is None
         )
+
+
+@pytest.mark.asyncio
+async def test_energy_dashboard_discovery_and_override(hass: HomeAssistant) -> None:
+    """Auto-discovery reads the Energy dashboard, and the option wins.
+
+    Nothing exercised the discovery walk itself: the malformed entries it
+    steps over, the non-water sources it skips, or the fact that an
+    explicit option short-circuits it before the energy component is even
+    consulted.
+    """
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import (
+        _discover_energy_water_meter,
+    )
+
+    manager = MagicMock()
+    manager.data = {
+        "energy_sources": [
+            {"type": "grid", "stat_energy_from": "sensor.grid"},
+            "a malformed entry",
+            {"type": "water", "stat_energy_from": "sensor.wm"},
+            {"type": "water", "stat_energy_from": "sensor.second_wm"},
+        ]
+    }
+
+    async def _get_manager(_hass: HomeAssistant) -> Any:
+        return manager
+
+    with patch("homeassistant.components.energy.async_get_manager", new=_get_manager):
+        assert await _discover_energy_water_meter(hass) == "sensor.wm"
+
+        # No water source configured, and no energy data at all.
+        manager.data = {"energy_sources": [{"type": "grid", "stat_energy_from": "sensor.grid"}]}
+        assert await _discover_energy_water_meter(hass) is None
+        manager.data = None
+        assert await _discover_energy_water_meter(hass) is None
+
+    async def _raises(_hass: HomeAssistant) -> Any:
+        raise RuntimeError("energy component not set up")
+
+    with patch("homeassistant.components.energy.async_get_manager", new=_raises):
+        assert await _discover_energy_water_meter(hass) is None
+
+
+@pytest.mark.asyncio
+async def test_explicit_meter_option_wins_over_discovery(hass: HomeAssistant) -> None:
+    """The OptionsFlow override must not consult the Energy dashboard."""
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _must_not_run(_hass: HomeAssistant) -> str | None:
+        raise AssertionError("discovery ran despite an explicit override")
+
+    hass.states.async_set("sensor.chosen", "100")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.chosen",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_must_not_run,
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        await hass.config.async_set_time_zone("Europe/Brussels")
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._meter_entity_id == "sensor.chosen"
