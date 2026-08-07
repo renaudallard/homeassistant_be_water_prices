@@ -67,3 +67,16 @@ def test_parses_2026_components() -> None:
 def test_raises_when_cvd_missing() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>")
+
+
+def test_cvd_section_without_a_figure_does_not_borrow_the_cva() -> None:
+    """A CVD section that stops carrying € must fail, not read the CVA.
+
+    The section scan used to run on past its own section and into the next
+    one's wrapper, so dropping the € from the CVD prose silently answered
+    with the CVA from the following section, which is a plausible enough
+    rate that nothing downstream would reject it.
+    """
+    html = fixture_html("swde_2026.html").replace("€ 3.24/m³", "EUR 3.24/m3")
+    with pytest.raises(ExtractorError):
+        parse_tariff(html, year=2026)

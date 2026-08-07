@@ -93,11 +93,15 @@ def _amount_after(heading: Tag) -> float | None:
     Walks forward through siblings until the next heading of the same
     or higher level (so the search is bounded to one section) and grabs
     the first € figure encountered.
+
+    Only true siblings are walked. Walking the whole remaining document
+    instead descends into the *next* section's wrapper element, whose text
+    already holds that section's figures, before ever reaching its
+    heading: a section with no € amount of its own would then answer with
+    the following section's number.
     """
-    for sibling in heading.find_all_next():
-        if sibling is heading:
-            continue
-        if sibling.name in ("h1", "h2", "h3", "h4") and sibling is not heading:
+    for sibling in heading.find_next_siblings():
+        if sibling.name in ("h1", "h2", "h3", "h4"):
             return None
         amounts = extract_amounts(sibling.get_text(" ", strip=True))
         if amounts:
