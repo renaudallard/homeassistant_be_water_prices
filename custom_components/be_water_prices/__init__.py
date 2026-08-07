@@ -140,6 +140,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unloaded
 
 
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the entry's persisted YTD anchor when it is removed.
+
+    Unload alone leaves the Store file behind, so removing and re-adding the
+    same utility used to restore a baseline belonging to the deleted entry.
+    """
+    from .coordinator import async_remove_ytd_store
+
+    await async_remove_ytd_store(hass, entry.entry_id)
+
+
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Fully reload the entry when options change.
 

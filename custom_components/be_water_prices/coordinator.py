@@ -91,6 +91,20 @@ _YTD_SAVE_DELAY_S = 30
 _SWAP_CONFIRM_READINGS = 3
 
 
+def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
+    """The per-entry Store holding that entry's YTD cycle anchor.
+
+    Defined once so entry removal deletes exactly the file the coordinator
+    writes rather than a second guess at the same key.
+    """
+    return Store(hass, _YTD_STORE_VERSION, f"{DOMAIN}.{entry_id}.ytd")
+
+
+async def async_remove_ytd_store(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete an entry's persisted YTD cycle anchor."""
+    await _ytd_store(hass, entry_id).async_remove()
+
+
 def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
     """Build the HA DeviceInfo block shared by every entity on this entry.
 
@@ -192,9 +206,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # live meter-event path additionally schedules a debounced save so a
         # hard crash between ticks keeps the climbing mark.
         self._cycle_dirty = False
-        self._store: Store[dict[str, Any]] = Store(
-            hass, _YTD_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.ytd"
-        )
+        self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
         super().__init__(
             hass,
             _LOGGER,

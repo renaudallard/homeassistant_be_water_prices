@@ -217,6 +217,52 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_removing_the_entry_deletes_its_ytd_store(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """The persisted YTD anchor must not outlive the entry that wrote it.
+
+    Unload only flushes the anchor. Without a removal hook the file stayed
+    in .storage forever, and re-adding the same utility restored a baseline
+    belonging to the deleted entry.
+    """
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        await hass.config.async_set_time_zone("Europe/Brussels")
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        store_key = f"{DOMAIN}.{entry.entry_id}.ytd"
+        assert store_key in hass_storage
+
+        assert await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
+        assert store_key not in hass_storage
+
+
+@pytest.mark.asyncio
 async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssistant) -> None:
     """A retry that did not help must leave the Repair card in place.
 
