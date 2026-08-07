@@ -2166,3 +2166,66 @@ async def test_cost_floor_from_an_older_store_still_drops_at_rollover(
     # Last year's EUR 999 floor must not clamp the new year's small bill.
     assert coordinator.data.current_year_cost_eur is not None
     assert coordinator.data.current_year_cost_eur < 999.0
+
+
+@pytest.mark.asyncio
+async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistant) -> None:
+    """A recorder figure above the live mark must not be walked back down.
+
+    The cycle anchors on the bare reading when the first tick's recorder
+    query fails, so the mark starts at zero consumption while the recorder
+    still knows about the year. Once that larger figure has been published,
+    every later path that reports the mark has to be at or above it.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=None)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        # First tick: the recorder has nothing, so the cycle anchors on the
+        # bare reading and the mark starts at zero consumption.
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_baseline_m3 == 100.0
+
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 5.0
+
+        # Meter drops out and the recorder now answers, above the mark.
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        recorder.return_value = 30.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 30.0
+
+        # The recorder then fails: the figure must hold, not drop back.
+        recorder.return_value = None
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 30.0
+
+        # And the meter recovering must not walk it back either.
+        hass.states.async_set("sensor.water_meter", "106")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 30.0
