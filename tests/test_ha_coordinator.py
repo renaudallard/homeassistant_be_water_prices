@@ -1122,8 +1122,11 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
 
         # Meter goes offline and stays down across the Jan 1 rollover: the
         # persisted cycle is from last year, the meter reads unavailable, and
-        # the recorder reports a small new-year figure.
+        # the recorder reports a small new-year figure. The cost mark is
+        # stamped with the year it was raised in, so age it alongside the
+        # baseline rather than leaving it looking like this year's.
         coordinator._ytd_baseline_year = dt_util.now().year - 1
+        coordinator._ytd_cost_year = dt_util.now().year - 1
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.return_value = 2.0
@@ -1932,3 +1935,66 @@ async def test_tick_defers_the_anchor_when_the_recorder_query_fails(
         await hass.async_block_till_done()
         assert coordinator._ytd_baseline_m3 == 4480.0
         assert coordinator.data.ytd_consumption_m3 == 40.0
+
+
+@pytest.mark.asyncio
+async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
+    hass: HomeAssistant,
+) -> None:
+    """A cycle that never anchors must still drop its floor on January 1.
+
+    HA's Energy dashboard accepts an external statistic id as the water
+    source, and several water integrations publish that way. There is no
+    entity behind it, so the meter reading is always None, the cycle never
+    anchors, and the baseline year stays None forever. Keying the rollover
+    reset on that year meant the cost mark was never dropped and the new
+    year opened pinned to the old year's final bill.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> str | None:
+        # An external statistic id, not an entity: hass.states.get() is None.
+        return "watermeter:daily_consumption"
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=78.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # A full year of consumption served straight off the recorder; the
+        # cycle never anchored, so there is no baseline year at all.
+        assert coordinator._ytd_baseline_year is None
+        assert coordinator.data.ytd_consumption_m3 == 78.0
+        december_cost = coordinator.data.current_year_cost_eur
+        assert december_cost is not None
+
+        # Roll over: the mark now belongs to last year.
+        coordinator._ytd_cost_year = dt_util.now().year - 1
+        recorder.return_value = 0.4
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        assert coordinator.data.ytd_consumption_m3 == 0.4
+        january_cost = coordinator.data.current_year_cost_eur
+        assert january_cost is not None
+        assert january_cost < december_cost

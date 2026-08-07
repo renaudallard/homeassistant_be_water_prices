@@ -202,6 +202,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # meter-recovery branch tell a current-year figure from a stale
         # prior-year one when the meter was down across the rollover.
         self._ytd_recorder_year: int | None = None
+        # Calendar year the cost high-water mark belongs to. Tracked
+        # separately from the baseline year because a cycle that never
+        # anchors (an Energy-dashboard source that is an external statistic
+        # rather than an entity) keeps a None baseline year forever, and the
+        # rollover reset below would then never fire for it.
+        self._ytd_cost_year: int | None = None
         # Meter the currently published YTD figure was computed from. The
         # live path reconstructs a missing baseline from that figure, which
         # is only valid while it still belongs to the meter we are on.
@@ -403,6 +409,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_baseline_m3 = data.get("baseline_m3")
         self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
         self._ytd_cost_hwm = data.get("cost_hwm")
+        self._ytd_cost_year = data.get("cost_year")
         self._ytd_recorder_year = data.get("recorder_year")
 
     async def async_save_ytd_state(self) -> None:
@@ -425,6 +432,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "baseline_m3": self._ytd_baseline_m3,
             "live_hwm_m3": self._ytd_live_hwm_m3,
             "cost_hwm": self._ytd_cost_hwm,
+            "cost_year": self._ytd_cost_year,
             # Persisted because the live re-anchor uses it to tell a
             # transiently missing figure from a year that genuinely has no
             # statistics. Losing it on restart made that guard fail open.
@@ -436,6 +444,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_baseline_year = None
         self._ytd_live_hwm_m3 = None
         self._ytd_cost_hwm = None
+        self._ytd_cost_year = None
         self._ytd_below_baseline_count = 0
         self._ytd_pending_high_m3 = None
 
@@ -446,6 +455,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # A fresh cycle (Jan 1 rollover or a confirmed meter swap) restarts
         # the cost floor so the running bill is allowed to drop to ~0 here.
         self._ytd_cost_hwm = None
+        self._ytd_cost_year = None
         self._ytd_below_baseline_count = 0
         self._ytd_pending_high_m3 = None
         self._cycle_dirty = True
@@ -540,14 +550,18 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         need_bootstrap = self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year
-        if self._ytd_baseline_year is not None and self._ytd_baseline_year != now_year:
-            # The persisted cycle is from a prior year. Drop its cost floor now,
-            # not only when a live reading re-anchors via _set_cycle, so a meter
-            # offline across the Jan 1 rollover does not clamp the new year's
-            # recorder-fallback cost to last year's peak. The same-year fallback
-            # (year matches) keeps its floor, so a mid-year meter dropout is
-            # still protected.
+        if self._ytd_cost_year is not None and self._ytd_cost_year != now_year:
+            # The cost floor is from a prior year. Drop it now, not only when a
+            # live reading re-anchors via _set_cycle, so a meter offline across
+            # the Jan 1 rollover does not clamp the new year's recorder-fallback
+            # cost to last year's peak. Keyed on the mark's own year rather than
+            # the baseline year, because a cycle that never anchors keeps a None
+            # baseline year and would otherwise carry its floor forever. The
+            # same-year floor is kept, so a mid-year dropout is still protected.
             self._ytd_cost_hwm = None
+            self._ytd_cost_year = None
+            self._cycle_dirty = True
+        if self._ytd_baseline_year is not None and self._ytd_baseline_year != now_year:
             self._ytd_below_baseline_count = 0
             self._cycle_dirty = True
         recorder_ytd: float | None = None
@@ -627,6 +641,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return self._ytd_cost_hwm
         if self._ytd_cost_hwm is None or cost > self._ytd_cost_hwm:
             self._ytd_cost_hwm = cost
+            self._ytd_cost_year = dt_util.now().year
             self._cycle_dirty = True
         return cost
 
