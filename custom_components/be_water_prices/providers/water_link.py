@@ -25,8 +25,13 @@
 
 """Water-link -- Antwerp city + ring (~200 k customers).
 
-Source PDF (one per year):
-    https://water-link.be/sites/default/files/<YYYY>-01/<YYYY>%20HH.pdf
+Source PDF (one per year), linked from the Antwerpen tariff page:
+    https://water-link.be/sites/default/files/<YYYY>-<MM>/<YYYY>%20HH.pdf
+
+The upload directory carries the month the card was published, so the link
+is read off the tariff page rather than templated, and the January path is
+kept only as a fallback. The page also links the "andere" and "NHH"
+(non-household) cards, so the anchor has to reject those.
 
 The watertarieven HTML page exposes 22 unlabelled rate tables and is
 brittle to parse for "the current year"; the PDF link surfaced through
@@ -63,11 +68,13 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
+from ._html import fetch_and_parse
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
@@ -75,7 +82,17 @@ _LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "water_link"
 LABEL = "Water-link"
+# The Drupal upload directory carries the year and month the card was
+# published, so it cannot be templated: a card uploaded in December or in
+# February sits under a different path and this URL would 404. Kept as the
+# fallback because every card so far has landed in January, but the link is
+# read off the tariff page first.
 SOURCE_URL_FMT = "https://water-link.be/sites/default/files/{year}-01/{year}%20HH.pdf"
+TARIFF_PAGE_URL = "https://water-link.be/informatie/tarieven-en-kortingen/tarieven/antwerpen"
+_PDF_HOST = "water-link.be"
+# The page also links "<year> andere.pdf" and "<year> NHH_0.pdf" (non-
+# household), so require that nothing alphabetic precedes the HH.
+_PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}[^"\'>\s]*?(?<![A-Za-z])HH\.pdf[^"\'>\s]*)'
 
 # Commune to anchor the rate row on. Antwerpen is the largest customer
 # block; ring communes share the same drinkwater/zuivering numbers but
@@ -136,11 +153,45 @@ def parse_tariff(
     )
 
 
+def _find_pdf_href(html: str, year: int) -> str:
+    """Pull the household tariff PDF link for ``year`` out of the page."""
+    m = re.search(_PDF_HREF_RE_FMT.format(year=year), html, re.IGNORECASE)
+    if m is None:
+        raise ExtractorError(f"no {year} household tariff PDF link on the Water-link page")
+    return m.group(1)
+
+
+async def _pdf_url_for(session: aiohttp.ClientSession, year: int) -> str:
+    """Return the URL of ``year``'s household tariff PDF.
+
+    Read off the tariff page so a card uploaded outside January is still
+    found. A page that does not carry the link (the prior-year fallback
+    asks for a year the page no longer lists) falls back to the templated
+    January path, which is where every card has landed so far.
+    """
+    try:
+        href = await fetch_and_parse(session, TARIFF_PAGE_URL, _find_pdf_href, year)
+    except TransientFetchError:
+        raise
+    except ExtractorError as err:
+        _LOGGER.info(
+            "Water-link %d PDF link not on the tariff page (%s); using the January path", year, err
+        )
+        return SOURCE_URL_FMT.format(year=year)
+    url = urljoin(TARIFF_PAGE_URL, href)
+    host = (urlparse(url).hostname or "").lower()
+    if urlparse(url).scheme != "https" or (
+        host != _PDF_HOST and not host.endswith(f".{_PDF_HOST}")
+    ):
+        raise ExtractorError(f"Water-link tariff PDF link points off-site: {url}")
+    return url
+
+
 async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
     """Fetch this year's PDF, falling back to last year. Returns (text, year)."""
     target = date.today().year
     try:
-        return await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target)), target
+        return await fetch_pdf_text_layout(session, await _pdf_url_for(session, target)), target
     except ExtractorError as err:
         if isinstance(err, TransientFetchError):
             # A transient blip (5xx / 429 / timeout) on this year's URL must
@@ -148,7 +199,7 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int]:
             # being masked by silently serving last year's prices.
             raise
         _LOGGER.info("Water-link %d PDF unavailable (%s); trying %d", target, err, target - 1)
-        text = await fetch_pdf_text_layout(session, SOURCE_URL_FMT.format(year=target - 1))
+        text = await fetch_pdf_text_layout(session, await _pdf_url_for(session, target - 1))
         return text, target - 1
 
 
