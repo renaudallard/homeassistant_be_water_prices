@@ -279,6 +279,62 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
         assert coordinator.data.ytd_consumption_m3 == 25.0
 
 
+async def test_meter_events_do_not_starve_the_daily_refresh(hass: HomeAssistant) -> None:
+    """A water draw must not push the daily tariff refresh out of reach.
+
+    Publishing the live figure through async_set_updated_data cancels and
+    re-arms the update_interval timer. A meter reports far more often than
+    once a day, so the tariff fetch would never come due again and the
+    snapshot would stay frozen until HA restarts.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+    fetches = 0
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        nonlocal fetches
+        fetches += 1
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert fetches == 1
+
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # The pending refresh is stored as the TimerHandle's bound cancel().
+        scheduled = coordinator._unsub_refresh
+        assert scheduled is not None
+
+        # Draws keep arriving between ticks. None of them may cancel or
+        # replace the pending refresh, or it never comes due.
+        for reading in ("105", "110", "115"):
+            hass.states.async_set("sensor.water_meter", reading)
+            await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 35.0
+        assert fetches == 1
+        assert coordinator._unsub_refresh is scheduled
+        assert not scheduled.__self__.cancelled()
+
+
 @pytest.mark.asyncio
 async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
     """A meter reporting litres is converted to m³ before the YTD math.
