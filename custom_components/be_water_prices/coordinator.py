@@ -305,6 +305,22 @@ def _fold(
     # happens to see.
     known_meter = cycle.year is not None
 
+    if (
+        offset is not None
+        and mark is not None
+        and recorder_m3 is not None
+        and recorder_m3 > (reading - offset if reading is not None and reading >= offset else mark)
+    ):
+        # The recorder knows about consumption this frame cannot account for:
+        # put the meter's own readings through it and they never reach that
+        # figure. So it is the frame that is wrong, not the figure. Drop it
+        # rather than publish over it, or the frame goes on producing the
+        # smaller number and walks the year straight back down as soon as the
+        # recorder stops answering. The next reading that clears the year's
+        # figure rebuilds it, and until then the tick keeps querying, because
+        # a missing frame is one of the things that makes it ask.
+        offset = None
+
     candidate: float | None = None
     swapped = False
     seen = [figure for figure in (mark, recorder_m3) if figure is not None]

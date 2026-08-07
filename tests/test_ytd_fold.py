@@ -188,12 +188,43 @@ def test_a_swap_ignores_a_recorder_total_spanning_the_old_meter() -> None:
     assert out.cycle.offset_m3 == 12.0
 
 
-def test_a_recorder_figure_above_the_mark_is_published() -> None:
-    """The meter is down and the recorder knows more than the mark does."""
+def test_a_recorder_figure_above_the_mark_drops_the_frame() -> None:
+    """The meter is down and the recorder knows more than the frame can say.
+
+    Run the meter's readings through that frame and they never produce 30, so
+    the frame is what is wrong. Keeping it would republish 5 the moment the
+    recorder stopped answering.
+    """
     out = _round(_anchored(5.0, 100.0), recorder_m3=30.0)
 
     assert out.m3 == 30.0
     assert out.cycle.m3 == 30.0
+    assert out.cycle.offset_m3 is None
+
+
+def test_the_next_reading_rebuilds_the_frame_around_the_proven_figure() -> None:
+    out = _round(_served(30.0), reading=106.0)
+
+    assert out.m3 == 30.0
+    assert out.cycle.offset_m3 == 76.0
+    # Left on the old frame of 100 the meter would have to reach 130 before
+    # the figure moved again, and those 24 m³ would never be reported.
+    assert _round(out.cycle, reading=107.0).m3 == 31.0
+
+
+def test_a_frame_that_accounts_for_the_recorder_figure_is_kept() -> None:
+    """A reading that arrived during the query still explains the figure."""
+    out = _round(_anchored(5.0, 100.0), reading=135.0, recorder_m3=30.0)
+
+    assert out.m3 == 35.0
+    assert out.cycle.offset_m3 == 100.0
+
+
+def test_a_glitch_low_reading_does_not_expose_the_frame() -> None:
+    """A reading below the frame says nothing about whether the frame is right."""
+    out = _round(_anchored(25.0, 100.0), reading=50.0, recorder_m3=20.0)
+
+    assert out.m3 == 25.0
     assert out.cycle.offset_m3 == 100.0
 
 
