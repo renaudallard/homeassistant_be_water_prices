@@ -202,6 +202,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # meter-recovery branch tell a current-year figure from a stale
         # prior-year one when the meter was down across the rollover.
         self._ytd_recorder_year: int | None = None
+        # Meter the currently published YTD figure was computed from. The
+        # live path reconstructs a missing baseline from that figure, which
+        # is only valid while it still belongs to the meter we are on.
+        self._ytd_published_meter: str | None = None
         # Run length of consecutive readings below the cycle baseline. A
         # single one is held as a glitch; only a sustained run re-anchors the
         # cycle as a genuine meter swap. In-memory only -- a real swap
@@ -558,11 +562,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if self._cycle_dirty:
                 self._cycle_dirty = False
                 await self._store.async_save(self._cycle_state())
+            self._ytd_published_meter = meter
             return ytd_m3, ytd_cost
         # Meter unavailable right now: serve the recorder's daily figure
         # read-only (no anchoring) so the sensor is not blanked for a day.
         if recorder_ytd is not None:
             served = self._floor_ytd_m3(recorder_ytd, now_year)
+            self._ytd_published_meter = meter
             return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
         return None, None
 
@@ -681,6 +687,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # the recorder figure already published for this year to ~0.
             recorder_ytd = self.data.ytd_consumption_m3
             if recorder_ytd is None:
+                return
+            if self._ytd_published_meter != self._meter_entity_id:
+                # The published figure was produced by the meter we have
+                # just moved off, so it is not this meter's year to date.
+                # Reconstructing from it would anchor the new meter with
+                # the old one's consumption. Wait for the tick's own
+                # bootstrap, which reads the recorder for this meter.
                 return
             if self._ytd_recorder_year != now_year:
                 # The meter was down across the Jan 1 rollover, so the
