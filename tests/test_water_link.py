@@ -107,6 +107,21 @@ def test_find_pdf_href_picks_the_household_card() -> None:
     assert _find_pdf_href(_tariff_page(2026), 2026).endswith("2026%20HH.pdf")
 
 
+def test_find_pdf_href_ignores_the_year_in_the_upload_directory() -> None:
+    """The directory carries a year too, so the match must be on the file.
+
+    Water-link uploads next year's card in December, under a directory
+    still named for this year. A loose match reads that as this year's
+    card and serves next year's rates months early.
+    """
+    from custom_components.be_water_prices.providers.water_link import _find_pdf_href
+
+    page = '<a href="https://water-link.be/sites/default/files/2026-12/2027%20HH.pdf">2027</a>'
+    with pytest.raises(ExtractorError):
+        _find_pdf_href(page, 2026)
+    assert _find_pdf_href(page, 2027).endswith("2027%20HH.pdf")
+
+
 def test_find_pdf_href_raises_when_year_absent() -> None:
     from custom_components.be_water_prices.providers.water_link import _find_pdf_href
 
