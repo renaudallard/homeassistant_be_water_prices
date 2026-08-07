@@ -1223,3 +1223,76 @@ async def test_reconfigure_flow_manual_picker_per_commune_blank_commune(
     assert entry.data[CONF_UTILITY] == "water_link"
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
+
+
+@pytest.mark.asyncio
+async def test_failed_first_refresh_leaves_no_meter_listener(hass: HomeAssistant) -> None:
+    """A setup that fails after the first refresh must not leak a listener.
+
+    The first refresh resolves the meter and subscribes to it, so any
+    failure between that point and the teardown registration leaves a live
+    state_changed listener behind on every retry.
+    """
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.be_water_prices.const import CONF_WATER_METER_SENSOR
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+
+    def _vivaqua_tariff() -> WaterTariff:
+        return WaterTariff(
+            utility="vivaqua",
+            region="brussels",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2030, 12, 31),
+            publication_label="VIVAQUA test",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=40.0,
+            linear_eur_per_m3=2.5,
+            sanering_gemeentelijk_eur_per_m3=2.5,
+        )
+
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch_ok(_session: object) -> object:
+        return _vivaqua_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(
+        id="vivaqua",
+        label="VIVAQUA",
+        region="brussels",
+        fetch=_fetch_ok,  # type: ignore[arg-type]
+    )
+    before = hass.bus.async_listeners().get("state_changed", 0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+        # The refresh succeeds and subscribes; platform setup then fails.
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            side_effect=RuntimeError("platform setup blew up"),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id) is False
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.SETUP_ERROR
+
+    assert hass.bus.async_listeners().get("state_changed", 0) == before
