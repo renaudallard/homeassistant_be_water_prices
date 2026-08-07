@@ -403,6 +403,9 @@ async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssist
 
     assert result["type"] == "abort"
     assert result["reason"] == "still_stale"
+    # The abort text names the utility, so it needs the issue's
+    # placeholders forwarded just like the form step above.
+    assert result["description_placeholders"]["utility"] == "VIVAQUA"
     assert coordinator.data is not None
     assert coordinator.data.snapshot_stale is True
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None

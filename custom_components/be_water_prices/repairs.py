@@ -53,16 +53,16 @@ class SnapshotStaleRepairFlow(RepairsFlow):
         self._entry_id = entry_id
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        # Forward the issue's placeholders so the form's title and
+        # description, and the abort message below, render
+        # {utility}/{age_days}/{valid_until}/{last_error} instead of
+        # literal braces. HA does not auto-forward issue placeholders to
+        # fix-flow steps (see ConfirmRepairFlow); mirror that lookup here.
+        issue_registry = ir.async_get(self.hass)
+        placeholders = None
+        if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
+            placeholders = issue.translation_placeholders
         if user_input is None:
-            # Forward the issue's placeholders so the form's title and
-            # description render {utility}/{age_days}/{valid_until}/
-            # {last_error} instead of literal braces. HA does not auto-
-            # forward issue placeholders to fix-flow steps (see
-            # ConfirmRepairFlow); mirror that lookup here.
-            issue_registry = ir.async_get(self.hass)
-            placeholders = None
-            if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
-                placeholders = issue.translation_placeholders
             return self.async_show_form(step_id="init", description_placeholders=placeholders)
         coordinator = self.hass.data.get(DOMAIN, {}).get(self._entry_id)
         if coordinator is not None:
@@ -72,7 +72,7 @@ class SnapshotStaleRepairFlow(RepairsFlow):
             # issue. That is right once the refresh has cleared it, but on
             # a retry that did not help it would hide the card until the
             # next daily tick recreated it. Aborting leaves it in place.
-            return self.async_abort(reason="still_stale")
+            return self.async_abort(reason="still_stale", description_placeholders=placeholders)
         # The refresh returned a fresh snapshot, so _sync_repair_issue has
         # already deleted the issue; close the flow normally.
         return self.async_create_entry(title="", data={})
