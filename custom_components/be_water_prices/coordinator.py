@@ -691,11 +691,15 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # been published yet, or the one on screen was produced by
                 # a meter we have moved off, and anchoring the new meter
                 # with the old one's consumption would publish a decrease.
-                # With no baseline at all there is nothing to do but wait
-                # for the tick. A prior-year baseline still falls through
-                # to _apply_cycle, which re-anchors the new year rather
-                # than leaving both YTD sensors unknown until then.
-                if self._ytd_baseline_m3 is None:
+                #
+                # Falling through re-anchors the cycle at the live reading
+                # and publishes ~0, which is right for a year that has no
+                # statistics yet but throws the year away if this figure is
+                # only *transiently* missing, e.g. the last tick's recorder
+                # query failed. _ytd_recorder_year tells those apart: once
+                # a current-year figure has been seen, wait for the tick to
+                # republish it rather than resetting the year.
+                if self._ytd_baseline_m3 is None or self._ytd_recorder_year == now_year:
                     return
             elif self._ytd_recorder_year != now_year:
                 # The meter was down across the Jan 1 rollover, so the
