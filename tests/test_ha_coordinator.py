@@ -2608,3 +2608,53 @@ async def test_meter_draw_does_not_churn_the_rate_sensors(hass: HomeAssistant) -
         "sensor.vivaqua_year_to_date_consumption",
         "sensor.vivaqua_current_year_cost",
     }
+
+
+@pytest.mark.asyncio
+async def test_unreadable_cycle_store_does_not_block_setup(hass: HomeAssistant) -> None:
+    """A cycle record that cannot be read must cost a bootstrap, not the entry.
+
+    The load runs during entry setup with nothing catching it, so anything
+    raising there would leave the integration unusable until the user found
+    and deleted the file.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    async def _boom(_self: Any) -> Any:
+        # Stands in for a future migration that cannot handle a record.
+        raise ValueError("unmigratable cycle record")
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._YtdStore.async_load",
+            new=_boom,
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    # Bootstrapped fresh from the recorder rather than failing setup.
+    assert coordinator.data.ytd_consumption_m3 == 20.0
