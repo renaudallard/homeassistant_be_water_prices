@@ -217,6 +217,63 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_one_absurd_reading_does_not_pin_the_year(hass: HomeAssistant) -> None:
+    """A lone garbage spike must not become the year's high-water mark.
+
+    The mark only ever climbs, so accepting a spike pins both the volume
+    and the cost to it until January, and it gets persisted on the way.
+    A real catch-up repeats the reading and is accepted on the next one.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # A 32-bit sentinel escaping the meter integration.
+        hass.states.async_set("sensor.water_meter", "4294967.295")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # Normal readings resume and the mark is still where it was.
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+        # A genuine catch-up repeats itself and is taken on the second read.
+        hass.states.async_set("sensor.water_meter", "400")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+        hass.states.async_set("sensor.water_meter", "401")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 321.0
+
+
+@pytest.mark.asyncio
 async def test_recorder_fallback_does_not_publish_below_the_live_mark(
     hass: HomeAssistant,
 ) -> None:

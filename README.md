@@ -306,7 +306,10 @@ fail at fetch time).
   options change that would lower the bill is never published as a
   decrease. The baseline only re-anchors on a genuine reset: the Jan 1
   rollover, or a meter swap confirmed by several consecutive readings
-  below the anchor (a single low reading is held as a glitch).
+  below the anchor (a single low reading is held as a glitch). The same
+  applies upward: a reading that climbs more than 100 m³ in one report is
+  held until the next reading confirms it, so one garbage value cannot pin
+  the year's figure while a real catch-up after a long outage still lands.
   Responsiveness is bounded by how often your meter entity itself pushes
   a new state.
 
