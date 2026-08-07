@@ -766,6 +766,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             except RecorderUnavailable as err:
                 _LOGGER.debug("recorder unreadable for %s: %s", meter, err)
                 self._recorder_ok = False
+            # That query yielded to the loop, and the reading captured before
+            # it is the one thing here that can have gone stale meanwhile. Read
+            # the meter again: this is the tick that decides how the year is
+            # framed, and framing it on a reading the meter has already moved
+            # past is wrong for the rest of the year, not just for this tick.
+            live = _state_volume_m3(self.hass.states.get(meter))
         else:
             # The cycle answered on its own, so nothing asked the recorder and
             # there is no pending doubt about it. Forget the last answer rather

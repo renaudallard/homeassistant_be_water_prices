@@ -1704,18 +1704,74 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 40.0
 
-        # The next reading anchors from meter_b's own figure (5001 - 40),
-        # so the published total holds instead of dropping to the 21.0 an
-        # anchor built out of meter_a's 20.0 would have produced.
-        hass.states.async_set("sensor.meter_b", "5001")
-        await hass.async_block_till_done()
-        assert coordinator._ytd.offset_m3 == 4961.0
-        assert coordinator.data.ytd_consumption_m3 == 40.0
+        # The frame comes from meter_b's own figure: the 5000 it reported
+        # during the query against the 40 that query answered. Built out of
+        # meter_a's 20.0 instead it would be 4980 and publish 21.0.
+        assert coordinator._ytd.offset_m3 == 4960.0
 
         # And it climbs from there.
-        hass.states.async_set("sensor.meter_b", "5002")
+        hass.states.async_set("sensor.meter_b", "5001")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 41.0
+
+        hass.states.async_set("sensor.meter_b", "5002")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 42.0
+
+
+@pytest.mark.asyncio
+async def test_a_reading_that_lands_during_the_recorder_query_is_used(
+    hass: HomeAssistant,
+) -> None:
+    """The meter must be read after the recorder await, not before it.
+
+    The query is the one place the tick yields to the loop. A meter that was
+    unavailable when the tick started and reports while the query runs would
+    otherwise be missed, and the tick is what frames the year: waiting for
+    the next one costs a day of live tracking, and the frame it eventually
+    builds is placed against a figure a day out of date.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _recorder(_hass: HomeAssistant, _meter: str, _s: date, _e: date) -> float:
+        # The meter comes back while the query is in flight, and the loop
+        # gets a turn to deliver that event before the tick resumes.
+        hass.states.async_set("sensor.water_meter", "100")
+        await asyncio.sleep(0)
+        return 20.0
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=_recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # The tick framed the year on the reading that arrived mid-query.
+        assert coordinator._ytd.offset_m3 == 80.0
+        assert coordinator.data.ytd_consumption_m3 == 20.0
+
+        # So live tracking is running already, without waiting a day.
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
 
 
 @pytest.mark.asyncio
