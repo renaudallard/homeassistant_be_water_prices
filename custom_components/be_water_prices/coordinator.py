@@ -84,7 +84,7 @@ _LOGGER = logging.getLogger(__name__)
 # The minor version carries shape changes so a rollback degrades to a
 # re-bootstrap instead of a failed setup; see _YtdStore.
 _YTD_STORE_VERSION = 1
-_YTD_STORE_MINOR_VERSION = 1
+_YTD_STORE_MINOR_VERSION = 2
 # Debounce window for the live path's best-effort Store flush. The daily
 # tick and a clean unload save authoritatively; this only bounds how much of
 # the climbing high-water mark a hard crash between ticks can lose.
@@ -126,7 +126,71 @@ class _YtdStore(Store[dict[str, Any]]):
     async def _async_migrate_func(
         self, old_major_version: int, old_minor_version: int, old_data: dict[str, Any]
     ) -> dict[str, Any]:
+        if old_minor_version < 2:
+            return _migrate_cycle_to_v2(old_data)
         return old_data
+
+
+def _migrate_cycle_to_v2(old: dict[str, Any]) -> dict[str, Any]:
+    """Fold the eight-key cycle written before v2 into the single record.
+
+    The old shape carried two year-to-date figures that never met: the live
+    one, ``live_hwm_m3 - baseline_m3``, and the recorder-served one,
+    ``served_hwm_m3``, each with its own year stamp. The record holds one, so
+    the migration picks the newer year and the larger figure in it, which is
+    what every reader of the old shape would have published anyway.
+
+    A mark that cannot be dated is dropped rather than carried: it could
+    never be released, and it would pin the bill at an old peak in this year
+    and every year after it. The default on ``cost_year`` only applies when
+    the key is absent, which is a release predating it, whose mark belongs
+    to the anchor's own year. Present and ``None`` is a release that knew
+    about the key and had nothing to date, and keeps its ``None``.
+    """
+    if "m3" in old or "offset_m3" in old:
+        # Already the new shape. Home Assistant re-stamps a store with its own
+        # minor version after any migration, so a release rolled back over this
+        # one loaded the record, failed to recognise a single key, and wrote it
+        # straight back under minor 1. The label says which release touched the
+        # file last, not what shape it holds, so decide by the keys that are
+        # actually there. Folding a v2 payload as if it were v1 finds none of
+        # the keys it looks for and empties the record.
+        return {key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")}
+    anchor_year = old.get("year")
+    offset = old.get("baseline_m3")
+    hwm = old.get("live_hwm_m3")
+    live_m3 = max(0.0, hwm - offset) if offset is not None and hwm is not None else None
+    mark_year = old.get("cost_year", anchor_year)
+    served = old.get("served_hwm_m3")
+    cost = old.get("cost_hwm")
+
+    figures: list[tuple[int, float]] = []
+    if anchor_year and live_m3 is not None:
+        figures.append((anchor_year, live_m3))
+    if mark_year and served is not None:
+        figures.append((mark_year, served))
+    cost_year = mark_year if cost is not None else None
+
+    years = [year for year, _ in figures]
+    if cost_year:
+        years.append(cost_year)
+    if not years:
+        return {
+            "meter": old.get("meter"),
+            "year": None,
+            "m3": None,
+            "cost": None,
+            "offset_m3": None,
+        }
+    year = max(years)
+    current = [figure for stamp, figure in figures if stamp == year]
+    return {
+        "meter": old.get("meter"),
+        "year": year,
+        "m3": max(current) if current else None,
+        "cost": cost if cost_year == year else None,
+        "offset_m3": offset if anchor_year == year and live_m3 is not None else None,
+    }
 
 
 def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
@@ -388,66 +452,27 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # resolves a different meter can re-point it; the entry unload calls
         # async_unsub_live_tracking to tear the current one down.
         self._meter_unsub: CALLBACK_TYPE | None = None
-        # The year-to-date cycle anchor, persisted across restarts via
-        # _store. ``_ytd_baseline_m3`` is the meter's cumulative reading at
-        # the cycle start (Jan 1, or the moment of a meter swap); YTD is
-        # ``live - baseline`` from there on. Restoring it means an HA
-        # restart / reload no longer re-derives the baseline from the
-        # trailing recorder figure, which used to snap the published YTD
-        # downward.
-        self._ytd_baseline_m3: float | None = None
-        # High-water mark of the meter reading this cycle. YTD is reported
-        # as ``hwm - baseline`` so a momentary low / down-rounded meter
-        # reading cannot pull the running cost below where it already was --
-        # a year-to-date figure only ever climbs until a genuine reset.
-        self._ytd_live_hwm_m3: float | None = None
-        # High-water mark of the published cost this cycle. The m3 figure
-        # above is monotonic, but the EUR cost is recomputed every tick from
-        # the daily-fetched tariff and the elapsed-day fraction, so a
-        # momentarily lower tariff fetch or a backward wall-clock step could
-        # otherwise drop the running bill even while consumption is flat.
-        # Clamping to this mark gives the cost the same never-decreases
-        # guarantee; it restarts (None) only when the cycle re-anchors.
-        self._ytd_cost_hwm: float | None = None
-        # Calendar year the baseline belongs to, so a live meter event
-        # that fires after the Jan 1 rollover (but before the next daily
-        # tick re-anchors) does not report the stale prior-year baseline.
-        self._ytd_baseline_year: int | None = None
-        # Meter the persisted cycle belongs to: if the user repoints the
-        # water-meter option at a different entity, the stored baseline is
-        # meaningless and must be re-bootstrapped from the recorder.
-        self._ytd_meter_id: str | None = None
-        # Calendar year the last recorder YTD figure belongs to. Lets the
-        # meter-recovery branch tell a current-year figure from a stale
-        # prior-year one when the meter was down across the rollover.
-        self._ytd_recorder_year: int | None = None
-        # Calendar year the cost high-water mark belongs to. Tracked
-        # separately from the baseline year because a cycle that never
-        # anchors (an Energy-dashboard source that is an external statistic
-        # rather than an entity) keeps a None baseline year forever, and the
-        # rollover reset below would then never fire for it.
-        self._ytd_cost_year: int | None = None
-        # Highest year-to-date volume served straight from the recorder while
-        # no cycle was anchored. The cycle mark cannot floor those ticks
-        # because there is no baseline, so this stands in for it. Stamped and
-        # dropped with _ytd_cost_year, which dates both fallback floors.
-        self._ytd_served_hwm_m3: float | None = None
-        # Meter the currently published YTD figure was computed from. The
-        # live path reconstructs a missing baseline from that figure, which
-        # is only valid while it still belongs to the meter we are on.
-        self._ytd_published_meter: str | None = None
-        # Run length of consecutive readings below the cycle baseline. A
-        # single one is held as a glitch; only a sustained run re-anchors the
-        # cycle as a genuine meter swap. In-memory only -- a real swap
-        # re-accumulates the run after a restart.
-        self._ytd_below_baseline_count = 0
-        # A high reading held pending confirmation by the next one. In-memory
-        # only: a restart simply re-runs the hold on the next reading.
-        self._ytd_pending_high_m3: float | None = None
-        # Set when the cycle anchor OR a high-water mark changes. The daily
-        # tick and a clean unload flush it to the Store authoritatively; the
-        # live meter-event path additionally schedules a debounced save so a
-        # hard crash between ticks keeps the climbing mark.
+        # The year-to-date cycle, persisted across restarts via _store. It
+        # holds the year's consumption, its cost floor and the meter offset
+        # that produces them; see :class:`_YtdCycle`. Restoring it means an
+        # HA restart or reload no longer re-derives the year from the
+        # recorder's trailing daily total, which used to snap the published
+        # figure downward.
+        self._ytd = _YtdCycle()
+        # A reading held pending confirmation by the next one, and the run
+        # length of consecutive readings below the cycle's bar. Both are
+        # in-memory only: a restart simply re-runs the hold, and a real
+        # meter swap re-accumulates the run.
+        self._ytd_hold_m3: float | None = None
+        self._ytd_hold_run = 0
+        # Whether the last recorder query succeeded, None before anything has
+        # asked. Transient by design: it says what the database did a moment
+        # ago, which is exactly as long as the answer is worth trusting.
+        self._recorder_ok: bool | None = None
+        # Set when the cycle changes. The daily tick and a clean unload flush
+        # it to the Store authoritatively; the live meter-event path
+        # additionally schedules a debounced save so a hard crash between
+        # ticks keeps the climbing figure.
         self._cycle_dirty = False
         self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
         super().__init__(
@@ -618,12 +643,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         return await _discover_energy_water_meter(self.hass)
 
     async def async_load_ytd_state(self) -> None:
-        """Restore the persisted YTD cycle anchor before the first refresh.
+        """Restore the persisted YTD cycle before the first refresh.
 
-        Restoring the Jan 1 baseline across restarts is what keeps the
-        running cost monotonic: without it every restart re-derived the
-        baseline from the recorder's trailing daily total and snapped the
-        published YTD downward.
+        Restoring it across restarts is what keeps the running cost
+        monotonic: without it every restart re-derived the year from the
+        recorder's trailing daily total and snapped the published figure
+        downward.
 
         A cycle that cannot be read or migrated is dropped rather than
         raised: this runs during entry setup with nothing catching it, so a
@@ -637,34 +662,22 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return
         if not data:
             return
-        self._ytd_meter_id = data.get("meter")
-        self._ytd_baseline_year = data.get("year")
-        self._ytd_baseline_m3 = data.get("baseline_m3")
-        self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
-        self._ytd_cost_hwm = data.get("cost_hwm")
-        # Entries written before this key existed carry a mark belonging to
-        # the cycle's own year, so fall back to that. Leaving it unstamped
-        # would stop the rollover reset from ever firing for them, which is
-        # exactly what keying the reset on this field was meant to fix.
-        self._ytd_cost_year = data.get("cost_year", self._ytd_baseline_year)
-        self._ytd_served_hwm_m3 = data.get("served_hwm_m3")
-        if self._ytd_cost_year is None:
-            # A cycle that never anchored has no year to fall back to either,
-            # and that is precisely the case this field exists for. A mark we
-            # cannot date can never be released, so drop it rather than carry
-            # it forward forever. Only a pre-upgrade store reaches this: every
-            # writer since sets the mark and its year together.
-            self._ytd_cost_hwm = None
-        self._ytd_recorder_year = data.get("recorder_year")
+        self._ytd = _YtdCycle(
+            meter=data.get("meter"),
+            year=data.get("year"),
+            m3=data.get("m3"),
+            cost=data.get("cost"),
+            offset_m3=data.get("offset_m3"),
+        )
 
     async def async_save_ytd_state(self) -> None:
         """Flush a pending cycle change to the Store on a clean unload / reload.
 
-        The daily tick persists on each anchor change and the live path
-        schedules a debounced save, but a reload can land between those, so
-        flush here too -- otherwise the climbing high-water mark would revert
-        to its last persisted value and a glitch right after the restart
-        would no longer be clamped.
+        The daily tick persists on each change and the live path schedules a
+        debounced save, but a reload can land between those, so flush here
+        too. Otherwise the climbing figure would revert to its last persisted
+        value and a glitch right after the restart would no longer be
+        clamped.
         """
         if self._cycle_dirty:
             self._cycle_dirty = False
@@ -672,115 +685,57 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _cycle_state(self) -> dict[str, Any]:
         return {
-            "meter": self._ytd_meter_id,
-            "year": self._ytd_baseline_year,
-            "baseline_m3": self._ytd_baseline_m3,
-            "live_hwm_m3": self._ytd_live_hwm_m3,
-            "cost_hwm": self._ytd_cost_hwm,
-            "cost_year": self._ytd_cost_year,
-            "served_hwm_m3": self._ytd_served_hwm_m3,
-            # Persisted because the live re-anchor uses it to tell a
-            # transiently missing figure from a year that genuinely has no
-            # statistics. Losing it on restart made that guard fail open.
-            "recorder_year": self._ytd_recorder_year,
+            "meter": self._ytd.meter,
+            "year": self._ytd.year,
+            "m3": self._ytd.m3,
+            "cost": self._ytd.cost,
+            "offset_m3": self._ytd.offset_m3,
         }
 
-    def _reset_cycle(self) -> None:
-        self._ytd_baseline_m3 = None
-        self._ytd_baseline_year = None
-        self._ytd_live_hwm_m3 = None
-        self._ytd_cost_hwm = None
-        self._ytd_cost_year = None
-        self._ytd_served_hwm_m3 = None
-        self._ytd_below_baseline_count = 0
-        self._ytd_pending_high_m3 = None
+    def _fold_cycle(
+        self,
+        tariff: WaterTariff,
+        *,
+        meter: str,
+        now_year: int,
+        reading: float | None,
+        recorder_m3: float | None,
+    ) -> tuple[float | None, float | None]:
+        """Fold a round of evidence into the cycle and return what to publish.
 
-    def _set_cycle(
-        self, year: int, baseline: float, hwm: float, *, keep_cost: bool = False
-    ) -> None:
-        self._ytd_baseline_year = year
-        self._ytd_baseline_m3 = baseline
-        self._ytd_live_hwm_m3 = hwm
-        # A fresh cycle (Jan 1 rollover or a confirmed meter swap) restarts
-        # the cost floor so the running bill is allowed to drop to ~0 here.
-        # ``keep_cost`` marks the one caller that is resuming an existing
-        # cycle rather than starting a new one, where dropping the floor
-        # would publish a decrease inside the year.
-        if not keep_cost:
-            self._ytd_cost_hwm = None
-            self._ytd_cost_year = None
-            self._ytd_served_hwm_m3 = None
-        self._ytd_below_baseline_count = 0
-        self._ytd_pending_high_m3 = None
-        self._cycle_dirty = True
-
-    def _apply_cycle(self, live: float) -> float:
-        """Return YTD m³ for ``live`` and re-anchor the cycle on a reset.
-
-        Monotonic within a cycle: YTD is ``hwm - baseline`` where ``hwm`` is
-        the highest reading seen this cycle, so a momentary low / down-rounded
-        meter reading cannot lower the figure. The baseline only re-anchors
-        (YTD -> ~0) on a genuine reset -- the Jan 1 rollover, or a meter swap
-        confirmed by several consecutive readings below the cycle anchor (a
-        single sub-baseline reading is held as a glitch, not a swap).
+        The rule itself is :func:`_fold`; this is the only place that keeps
+        its answer. The record and the transient hold state are written back
+        before returning, so a caller that decides not to publish still
+        cannot lose a swap run, a held reading, or a rebuilt frame.
         """
-        now_year = dt_util.now().year
-        if self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year:
-            self._set_cycle(now_year, live, live)
-            return 0.0
-        if live < self._ytd_baseline_m3:
-            # Below the anchor is either a transient glitch (a rebooting
-            # meter reporting 0, a dropout) or a genuine meter swap.
-            # Distinguish by persistence: only re-anchor after several
-            # consecutive sub-baseline readings, so a single spurious low
-            # value is held rather than flooring the year-to-date figure.
-            self._ytd_below_baseline_count += 1
-            if self._ytd_below_baseline_count >= _SWAP_CONFIRM_READINGS:
-                self._set_cycle(now_year, live, live)
-                return 0.0
-            held = self._ytd_live_hwm_m3
-            if held is None:
-                held = self._ytd_baseline_m3
-            return max(0.0, held - self._ytd_baseline_m3)
-        # A reading at or above the anchor clears any pending swap run.
-        self._ytd_below_baseline_count = 0
-        if self._ytd_live_hwm_m3 is None or live > self._ytd_live_hwm_m3:
-            if (
-                self._ytd_live_hwm_m3 is not None
-                and live - self._ytd_live_hwm_m3 > _IMPLAUSIBLE_JUMP_M3
-                and self._ytd_pending_high_m3 is None
-            ):
-                # A jump this large in one report is a garbage reading far
-                # more often than real usage. The mark only ever climbs, so
-                # accepting one would pin the year's figure to it until
-                # January. Hold it for one reading the same way a single
-                # sub-baseline value is held, and let the next reading
-                # decide: a meter really sitting there repeats the jump,
-                # while a spike is followed by normal values that leave the
-                # mark where it was.
-                self._ytd_pending_high_m3 = live
-                return max(0.0, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
-            # Mark dirty so the climbing mark is persisted. Without this the
-            # Store kept only the bootstrap value, so after a restart the
-            # high-water mark reverted and a glitch could no longer be
-            # clamped -- defeating the across-restart guard it provides.
-            self._ytd_live_hwm_m3 = live
+        out = _fold(
+            self._ytd,
+            now_year=now_year,
+            meter=meter,
+            reading=reading,
+            recorder_m3=recorder_m3,
+            recorder_ok=self._recorder_ok,
+            hold_m3=self._ytd_hold_m3,
+            hold_run=self._ytd_hold_run,
+            cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3),
+        )
+        if out.cycle != self._ytd:
             self._cycle_dirty = True
-        self._ytd_pending_high_m3 = None
-        return max(0.0, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
+        self._ytd = out.cycle
+        self._ytd_hold_m3 = out.hold_m3
+        self._ytd_hold_run = out.hold_run
+        return out.m3, out.cost
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
-        """Compute YTD m³ and cost, anchoring the cycle baseline.
+        """Compute YTD m³ and cost for the daily tick.
 
-        The baseline is restored from the Store across restarts, so this no
-        longer re-derives it from the recorder on every tick. The recorder
-        is consulted only to *bootstrap* the baseline the first time (or
-        after a year rollover / meter change), placing the Jan 1 reading as
-        ``live - recorder_ytd``. From there YTD tracks the live meter via
-        :meth:`_apply_cycle`, which keeps it monotonic.
+        The recorder is consulted only when the cycle cannot answer on its
+        own: no frame for this year, or no reading to put through it. From
+        there the live meter drives, and :func:`_fold` keeps the figure
+        monotonic.
 
         Returns ``(ytd_m3, ytd_cost_eur)``; both ``None`` when no meter is
-        configured or there is no usable reading to anchor or serve.
+        configured or nothing is known about this year yet.
         """
         meter = await self.async_resolve_meter_entity()
         if meter != self._meter_entity_id:
@@ -791,186 +746,50 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self.async_setup_live_tracking()
         if not meter:
             return None, None
-        if self._ytd_meter_id != meter:
-            # Option repointed at a different meter -> the stored baseline
-            # belongs to the old one; drop it and re-bootstrap.
-            self._reset_cycle()
-            self._ytd_meter_id = meter
-            # The recorder year is not meter-scoped, so a new meter that has
-            # no statistics of its own would otherwise look like a year whose
-            # figure is merely missing, and never anchor at all.
-            self._ytd_recorder_year = None
-            self._cycle_dirty = True
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
-        need_bootstrap = self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year
-        if self._ytd_cost_year is not None and self._ytd_cost_year != now_year:
-            # The cost floor is from a prior year. Drop it now, not only when a
-            # live reading re-anchors via _set_cycle, so a meter offline across
-            # the Jan 1 rollover does not clamp the new year's recorder-fallback
-            # cost to last year's peak. Keyed on the mark's own year rather than
-            # the baseline year, because a cycle that never anchors keeps a None
-            # baseline year and would otherwise carry its floor forever. The
-            # same-year floor is kept, so a mid-year dropout is still protected.
-            self._ytd_cost_hwm = None
-            self._ytd_cost_year = None
-            self._ytd_served_hwm_m3 = None
-            self._cycle_dirty = True
-        if self._ytd_baseline_year is not None and self._ytd_baseline_year != now_year:
-            self._ytd_below_baseline_count = 0
-            self._cycle_dirty = True
-        recorder_ytd: float | None = None
-        if need_bootstrap or live is None:
+        recorder_m3: float | None = None
+        # Decide before folding, not after: the fold clears the record itself
+        # when the meter has been repointed, and a gate reading the cleared
+        # record would miss the very case that needs the query most.
+        if (
+            self._ytd.meter != meter
+            or self._ytd.year != now_year
+            or self._ytd.offset_m3 is None
+            or live is None
+        ):
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)
             try:
-                recorder_ytd = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+                recorder_m3 = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+                self._recorder_ok = True
             except RecorderUnavailable as err:
                 _LOGGER.debug("recorder unreadable for %s: %s", meter, err)
-                recorder_ytd = None
-            if recorder_ytd is not None and self._ytd_recorder_year != now_year:
-                self._ytd_recorder_year = now_year
-                self._cycle_dirty = True
-        # A failed recorder query is not an empty one: this year does have
-        # statistics, we just could not read them. Anchoring anyway would
-        # publish ~0 and, because the baseline year would then match, no
-        # later tick would consult the recorder again. Skip the whole
-        # anchor-and-publish path and retry on the next tick.
-        defer_anchor = (
-            need_bootstrap and recorder_ytd is None and self._ytd_recorder_year == now_year
+                self._recorder_ok = False
+        else:
+            # The cycle answered on its own, so nothing asked the recorder and
+            # there is no pending doubt about it. Forget the last answer rather
+            # than letting it stand: this branch is the healthy year, so a
+            # failure from months ago would otherwise still be believed at the
+            # January rollover and block the first live reading from starting
+            # the new year.
+            self._recorder_ok = None
+        ytd_m3, ytd_cost = self._fold_cycle(
+            tariff, meter=meter, now_year=now_year, reading=live, recorder_m3=recorder_m3
         )
-        if defer_anchor:
-            _LOGGER.debug("recorder unavailable for %s; deferring the YTD anchor", meter)
-        elif live is not None and need_bootstrap:
-            # baseline == reading at Jan 1, reconstructed from the recorder's
-            # "consumption since Jan 1"; fall back to the current reading
-            # (YTD ~0) when the recorder has nothing to place it.
-            baseline = (live - recorder_ytd) if recorder_ytd is not None else live
-            # Needing a bootstrap is not the same as starting a new cycle:
-            # this is also the first tick where a meter became usable inside
-            # a year the recorder fallback has already been billing. A
-            # prior-year floor was dropped above and a repoint cleared it, so
-            # one still stamped with this year means a continuation and must
-            # survive, exactly as it does on the live path.
-            self._set_cycle(now_year, baseline, live, keep_cost=self._ytd_cost_year == now_year)
-        if not defer_anchor and self._ytd_baseline_m3 is not None and live is not None:
-            ytd_m3 = self._apply_cycle(live)
-            # Floor the cost before the save so a cost high-water-mark bump
-            # is persisted in the same write as the m3 anchor it came from.
-            ytd_cost = self._floor_cost(self._ytd_cost_from_m3(tariff, ytd_m3))
-            if self._cycle_dirty:
-                self._cycle_dirty = False
-                await self._store.async_save(self._cycle_state())
-            # That save yields to the loop, and a meter event handled while it
-            # ran can advance the mark past the figure computed above. Re-floor
-            # against the mark as it stands now rather than publishing a
-            # snapshot the cycle has already moved beyond.
-            ytd_m3 = self._floor_ytd_m3(ytd_m3, now_year)
-            ytd_cost = self._floor_cost(self._ytd_cost_from_m3(tariff, ytd_m3))
-            self._ytd_published_meter = meter
-            return ytd_m3, ytd_cost
-        # Meter unavailable right now: serve the recorder's daily figure
-        # read-only (no anchoring) so the sensor is not blanked for a day.
-        if recorder_ytd is not None:
-            served = self._floor_ytd_m3(recorder_ytd, now_year)
-            self._absorb_served_m3(served, now_year)
-            self._ytd_published_meter = meter
-            return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
-        # No live reading and no recorder figure either. Rather than blank
-        # both sensors for a whole day over a recorder hiccup, serve what is
-        # known: this year's cycle mark, or, for a cycle that never anchors
-        # at all, the figure already on screen. Both are gated on the year,
-        # so a rollover still reports unknown until the new year has
-        # something of its own.
-        if self._ytd_baseline_year == now_year and self._ytd_live_hwm_m3 is not None:
-            served = self._floor_ytd_m3(0.0, now_year)
-            self._ytd_published_meter = meter
-            return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
-        if (
-            self._ytd_recorder_year == now_year
-            and self.data is not None
-            and self.data.ytd_consumption_m3 is not None
-        ):
-            served = self.data.ytd_consumption_m3
-            self._ytd_published_meter = meter
-            return served, self._floor_cost(self._ytd_cost_from_m3(tariff, served))
-        return None, None
-
-    def _absorb_served_m3(self, served: float, now_year: int) -> float | None:
-        """Raise this cycle's mark to a served figure that exceeded it.
-
-        The recorder can legitimately report more than the live mark: the
-        cycle anchors on the bare reading whenever the very first tick's
-        recorder query fails, so the mark starts at zero consumption while
-        the recorder still knows about the year. That larger figure gets
-        published, but nothing used to write it back, so any later path
-        reporting ``hwm - baseline`` walked the published volume back down.
-
-        Folding it in keeps every path that reads the mark at or above what
-        has already been shown.
-        """
-        if self._ytd_baseline_year != now_year or self._ytd_baseline_m3 is None:
-            return None
-        mark = self._ytd_baseline_m3 + served
-        if self._ytd_live_hwm_m3 is None or mark > self._ytd_live_hwm_m3:
-            self._ytd_live_hwm_m3 = mark
-            self._cycle_dirty = True
-        return self._ytd_live_hwm_m3
-
-    def _floor_ytd_m3(self, recorder_ytd: float, now_year: int) -> float:
-        """Clamp a recorder figure to this cycle's consumption mark.
-
-        The cost already carries its own floor, but the m3 figure did not,
-        so a recorder total trailing the live mark republished a lower
-        volume. That sensor is a TOTAL with a Jan 1 last_reset, and the
-        statistics engine reads a decrease on the same cycle as a reset, so
-        the drop was re-added to the long-term sum.
-
-        Both marks are gated on the year, so after a rollover they belong to
-        last year and the new year is free to start near zero.
-        """
-        if (
-            self._ytd_baseline_year == now_year
-            and self._ytd_baseline_m3 is not None
-            and self._ytd_live_hwm_m3 is not None
-        ):
-            return max(recorder_ytd, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
-        # No cycle anchored this year, so there is no mark to clamp against.
-        # That is the only state an Energy-dashboard source that is an
-        # external statistic is ever in, and it is also every tick where the
-        # meter has been down since before January. Keep a mark of the
-        # highest figure served this year instead, stamped with the same year
-        # as the cost floor and dropped with it, so the volume cannot walk
-        # backwards when the recorder total does.
-        served = recorder_ytd
-        if self._ytd_cost_year == now_year and self._ytd_served_hwm_m3 is not None:
-            served = max(served, self._ytd_served_hwm_m3)
-        if self._ytd_served_hwm_m3 is None or served > self._ytd_served_hwm_m3:
-            self._ytd_served_hwm_m3 = served
-            self._ytd_cost_year = now_year
-            self._cycle_dirty = True
-        return served
-
-    def _floor_cost(self, cost: float | None) -> float | None:
-        """Clamp the published YTD cost to this cycle's high-water mark.
-
-        :meth:`_apply_cycle` already keeps the m3 figure monotonic; this
-        gives the EUR cost the same guarantee so a momentarily lower tariff
-        fetch, a backward wall-clock step, or an un-clamped recorder fallback
-        cannot publish a running bill below where it already stood this
-        cycle. The mark restarts (``None``) whenever the cycle re-anchors via
-        :meth:`_set_cycle` -- the Jan 1 rollover or a confirmed meter swap --
-        so the bill is still allowed to drop to ~0 there.
-        """
-        if cost is None:
-            return None
-        if self._ytd_cost_hwm is not None and cost < self._ytd_cost_hwm:
-            return self._ytd_cost_hwm
-        if self._ytd_cost_hwm is None or cost > self._ytd_cost_hwm:
-            self._ytd_cost_hwm = cost
-            self._ytd_cost_year = dt_util.now().year
-            self._cycle_dirty = True
-        return cost
+        if self._cycle_dirty:
+            self._cycle_dirty = False
+            folded = self._ytd
+            await self._store.async_save(self._cycle_state())
+            if self._ytd != folded:
+                # That save yielded to the loop and a meter event handled
+                # while it ran moved the cycle on. Publish the cycle as it
+                # stands rather than the figure computed before the await,
+                # which the year has already climbed past.
+                ytd_m3, ytd_cost = self._fold_cycle(
+                    tariff, meter=meter, now_year=now_year, reading=None, recorder_m3=None
+                )
+        return ytd_m3, ytd_cost
 
     def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float) -> float | None:
         """Apply the pro-rated YTD bill math to a year-to-date m³ figure.
@@ -1027,61 +846,32 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         """Push a fresh YTD figure from the meter's live state.
 
         Pure in-memory arithmetic (no recorder / network call), so it is
-        safe to run on every meter update. No-ops until the daily tick
-        has anchored a baseline, or when the meter reads unavailable /
-        unknown / non-numeric / a non-convertible unit -- the last good
-        value stays.
+        safe to run on every meter update. The same rule the daily tick
+        uses, minus the recorder answer the tick can bring: a reading that
+        the cycle cannot place yet contributes nothing and the last good
+        value stays, as it does when the meter reads unavailable, unknown,
+        non-numeric or in a unit that is not a volume.
         """
         if self.data is None:
+            return
+        meter = self._meter_entity_id
+        if meter is None:
             return
         live = _state_volume_m3(state)
         if live is None:
             return
-        now_year = dt_util.now().year
-        if self._ytd_baseline_m3 is None or self._ytd_baseline_year != now_year:
-            # The daily tick could not anchor a baseline because the meter
-            # was unavailable at tick time. Reconstruct it from the last
-            # recorder YTD figure on the first usable reading so live
-            # tracking resumes now instead of staying frozen until the
-            # next daily tick (~24h). A baseline left over from a prior year
-            # counts as unanchored too: the tick keeps it when the meter is
-            # down, and letting _apply_cycle re-anchor it instead would drop
-            # the recorder figure already published for this year to ~0.
-            recorder_ytd = self.data.ytd_consumption_m3
-            if recorder_ytd is None or self._ytd_published_meter != self._meter_entity_id:
-                # Nothing usable to reconstruct from: either no figure has
-                # been published yet, or the one on screen was produced by
-                # a meter we have moved off, and anchoring the new meter
-                # with the old one's consumption would publish a decrease.
-                #
-                # Falling through re-anchors the cycle at the live reading
-                # and publishes ~0, which is right for a year that has no
-                # statistics yet but throws the year away if this figure is
-                # only *transiently* missing, e.g. the last tick's recorder
-                # query failed. _ytd_recorder_year tells those apart: once
-                # a current-year figure has been seen, wait for the tick to
-                # republish it rather than resetting the year.
-                if self._ytd_baseline_m3 is None or self._ytd_recorder_year == now_year:
-                    return
-            elif self._ytd_recorder_year != now_year:
-                # The meter was down across the Jan 1 rollover, so the
-                # recorder figure is last year's. Start the new year at ~0
-                # rather than reconstructing a stale prior-year baseline.
-                self._set_cycle(now_year, live, live)
-            else:
-                # A continuation, not a reset: _apply_cycle republishes
-                # exactly recorder_ytd below, so the running bill has not
-                # restarted and must keep the floor it already had.
-                self._set_cycle(
-                    now_year,
-                    live - recorder_ytd,
-                    live,
-                    keep_cost=self._ytd_cost_year == now_year,
-                )
-        # _apply_cycle handles the Jan 1 rollover and meter-swap re-anchors
-        # and keeps the figure monotonic; the save below persists the mark.
-        ytd_m3 = self._apply_cycle(live)
-        ytd_cost = self._floor_cost(self._ytd_cost_from_m3(self.data.tariff, ytd_m3))
+        ytd_m3, ytd_cost = self._fold_cycle(
+            self.data.tariff,
+            meter=meter,
+            now_year=dt_util.now().year,
+            reading=live,
+            recorder_m3=None,
+        )
+        if ytd_m3 is None:
+            # Nothing is known about this year yet. The fold has still kept
+            # whatever the reading proved, so the sensors hold rather than
+            # blanking on a year that has not started.
+            return
         if ytd_m3 == self.data.ytd_consumption_m3 and ytd_cost == self.data.current_year_cost_eur:
             # Nothing changed -- a same-value meter re-report or an
             # attribute-only state event. Skip so a frequently-reporting
@@ -1091,10 +881,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # the volume figure is unchanged at ~0.
             return
         if self._cycle_dirty:
-            # The high-water mark advanced. Schedule a debounced flush (the
-            # daily tick / unload save authoritatively; this just bounds the
-            # mark a hard crash between ticks can lose). _cycle_dirty stays
-            # set so the next authoritative save still writes and clears it.
+            # The cycle moved. Schedule a debounced flush (the daily tick and
+            # the unload save authoritatively; this just bounds how much of
+            # the climbing figure a hard crash between ticks can lose).
+            # _cycle_dirty stays set so the next authoritative save still
+            # writes and clears it.
             self._store.async_delay_save(self._cycle_state, _YTD_SAVE_DELAY_S)
         # Publish without async_set_updated_data: that helper cancels and
         # re-arms the update_interval timer, and a meter reports far more

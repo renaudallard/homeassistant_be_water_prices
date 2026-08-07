@@ -174,7 +174,7 @@ with it, again without a restart.
 | `water_sanering_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `water_all_in_basis` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 | `water_projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
-| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure is **monotonic within the year**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease — the bill only drops to ~0 on the 1 January rollover. Returns `unknown` until a water meter is configured in the options step. |
+| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure is **monotonic within the year**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. Returns `unknown` until a water meter is configured in the options step. |
 | `water_ytd_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark so it never decreases mid-year. Companion to `water_current_year_cost`. |
 
 Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
@@ -305,11 +305,20 @@ fail at fetch time).
   low meter reading, a transiently lower tariff fetch, or a mid-year
   options change that would lower the bill is never published as a
   decrease. The baseline only re-anchors on a genuine reset: the Jan 1
-  rollover, or a meter swap confirmed by several consecutive readings
-  below the anchor (a single low reading is held as a glitch). The same
-  applies upward: a reading that climbs more than 100 m³ in one report is
-  held until the next reading confirms it, so one garbage value cannot pin
-  the year's figure while a real catch-up after a long outage still lands.
+  rollover, a meter swap confirmed by several consecutive readings too low
+  to belong to the year (a single low reading is held as a glitch), or
+  pointing the integration at a different meter, which restarts the year's
+  figure because the new meter's reading says nothing about the old one's.
+  The same applies upward: a reading that climbs more than 100 m³ in one
+  report is held until the next reading confirms it, so one garbage value
+  cannot pin the year's figure while a real catch-up after a long outage
+  still lands.
+  If the recorder cannot be read at the moment the year rolls over, both
+  sensors report `unknown` until it answers again rather than starting the
+  new year at 0: a query that failed is not the same as a year that is
+  genuinely empty, and anchoring on it would discard consumption already
+  recorded. An install with no recorder at all is a genuinely empty year
+  and does start from 0.
   Responsiveness is bounded by how often your meter entity itself pushes
   a new state.
 
