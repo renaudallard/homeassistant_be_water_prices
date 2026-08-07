@@ -208,6 +208,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # rather than an entity) keeps a None baseline year forever, and the
         # rollover reset below would then never fire for it.
         self._ytd_cost_year: int | None = None
+        # Highest year-to-date volume served straight from the recorder while
+        # no cycle was anchored. The cycle mark cannot floor those ticks
+        # because there is no baseline, so this stands in for it. Stamped and
+        # dropped with _ytd_cost_year, which dates both fallback floors.
+        self._ytd_served_hwm_m3: float | None = None
         # Meter the currently published YTD figure was computed from. The
         # live path reconstructs a missing baseline from that figure, which
         # is only valid while it still belongs to the meter we are on.
@@ -414,6 +419,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # would stop the rollover reset from ever firing for them, which is
         # exactly what keying the reset on this field was meant to fix.
         self._ytd_cost_year = data.get("cost_year", self._ytd_baseline_year)
+        self._ytd_served_hwm_m3 = data.get("served_hwm_m3")
         if self._ytd_cost_year is None:
             # A cycle that never anchored has no year to fall back to either,
             # and that is precisely the case this field exists for. A mark we
@@ -444,6 +450,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "live_hwm_m3": self._ytd_live_hwm_m3,
             "cost_hwm": self._ytd_cost_hwm,
             "cost_year": self._ytd_cost_year,
+            "served_hwm_m3": self._ytd_served_hwm_m3,
             # Persisted because the live re-anchor uses it to tell a
             # transiently missing figure from a year that genuinely has no
             # statistics. Losing it on restart made that guard fail open.
@@ -456,6 +463,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_live_hwm_m3 = None
         self._ytd_cost_hwm = None
         self._ytd_cost_year = None
+        self._ytd_served_hwm_m3 = None
         self._ytd_below_baseline_count = 0
         self._ytd_pending_high_m3 = None
 
@@ -473,6 +481,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if not keep_cost:
             self._ytd_cost_hwm = None
             self._ytd_cost_year = None
+            self._ytd_served_hwm_m3 = None
         self._ytd_below_baseline_count = 0
         self._ytd_pending_high_m3 = None
         self._cycle_dirty = True
@@ -577,6 +586,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # same-year floor is kept, so a mid-year dropout is still protected.
             self._ytd_cost_hwm = None
             self._ytd_cost_year = None
+            self._ytd_served_hwm_m3 = None
             self._cycle_dirty = True
         if self._ytd_baseline_year is not None and self._ytd_baseline_year != now_year:
             self._ytd_below_baseline_count = 0
@@ -678,14 +688,30 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         statistics engine reads a decrease on the same cycle as a reset, so
         the drop was re-added to the long-term sum.
 
-        Only same-year cycles are clamped: after a rollover the mark belongs
-        to last year and the new year has to be free to start near zero.
+        Both marks are gated on the year, so after a rollover they belong to
+        last year and the new year is free to start near zero.
         """
-        if self._ytd_baseline_year != now_year:
-            return recorder_ytd
-        if self._ytd_baseline_m3 is None or self._ytd_live_hwm_m3 is None:
-            return recorder_ytd
-        return max(recorder_ytd, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
+        if (
+            self._ytd_baseline_year == now_year
+            and self._ytd_baseline_m3 is not None
+            and self._ytd_live_hwm_m3 is not None
+        ):
+            return max(recorder_ytd, self._ytd_live_hwm_m3 - self._ytd_baseline_m3)
+        # No cycle anchored this year, so there is no mark to clamp against.
+        # That is the only state an Energy-dashboard source that is an
+        # external statistic is ever in, and it is also every tick where the
+        # meter has been down since before January. Keep a mark of the
+        # highest figure served this year instead, stamped with the same year
+        # as the cost floor and dropped with it, so the volume cannot walk
+        # backwards when the recorder total does.
+        served = recorder_ytd
+        if self._ytd_cost_year == now_year and self._ytd_served_hwm_m3 is not None:
+            served = max(served, self._ytd_served_hwm_m3)
+        if self._ytd_served_hwm_m3 is None or served > self._ytd_served_hwm_m3:
+            self._ytd_served_hwm_m3 = served
+            self._ytd_cost_year = now_year
+            self._cycle_dirty = True
+        return served
 
     def _floor_cost(self, cost: float | None) -> float | None:
         """Clamp the published YTD cost to this cycle's high-water mark.

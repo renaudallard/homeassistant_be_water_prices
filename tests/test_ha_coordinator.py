@@ -2417,3 +2417,66 @@ async def test_first_anchor_of_a_running_year_keeps_the_cost_floor(
     # had already been published, so it must not drop.
     assert coordinator._ytd_baseline_m3 == 70.0
     assert coordinator.data.current_year_cost_eur == 177.25
+
+
+@pytest.mark.asyncio
+async def test_served_volume_does_not_walk_back_without_an_anchor(
+    hass: HomeAssistant,
+) -> None:
+    """A falling recorder total must not lower the published volume.
+
+    An external-statistic source never anchors, so the cycle mark cannot
+    floor it and the recorder figure was published raw. HA sums a
+    `total` sensor unconditionally, so a meter that steps backwards, or a
+    user adjusting the statistic, really does lower the same-year total.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> str | None:
+        return "myintegration:water_consumption"
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=45.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_baseline_year is None  # never anchors
+        assert coordinator.data.ytd_consumption_m3 == 45.0
+
+        # The recorder total steps backwards inside the same year.
+        recorder.return_value = 40.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 45.0
+
+        # A genuine climb still gets through.
+        recorder.return_value = 51.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 51.0
+
+        # And the new year is free to start near zero.
+        coordinator._ytd_cost_year = dt_util.now().year - 1
+        recorder.return_value = 0.4
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 0.4
