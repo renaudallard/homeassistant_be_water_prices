@@ -414,6 +414,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # would stop the rollover reset from ever firing for them, which is
         # exactly what keying the reset on this field was meant to fix.
         self._ytd_cost_year = data.get("cost_year", self._ytd_baseline_year)
+        if self._ytd_cost_year is None:
+            # A cycle that never anchored has no year to fall back to either,
+            # and that is precisely the case this field exists for. A mark we
+            # cannot date can never be released, so drop it rather than carry
+            # it forward forever. Only a pre-upgrade store reaches this: every
+            # writer since sets the mark and its year together.
+            self._ytd_cost_hwm = None
         self._ytd_recorder_year = data.get("recorder_year")
 
     async def async_save_ytd_state(self) -> None:

@@ -2229,3 +2229,66 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         hass.states.async_set("sensor.water_meter", "106")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
+
+
+@pytest.mark.asyncio
+async def test_undatable_cost_floor_from_an_older_store_is_dropped(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """A pre-upgrade mark with no year at all must not be carried forward.
+
+    A cycle that never anchors persists year=None, so falling back to the
+    baseline year leaves the mark undatable. The rollover reset is keyed on
+    that year and the clamp branch never stamps one, so such a mark would
+    pin the bill at the old peak in this year and every year after it.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> str | None:
+        return "watermeter:daily_consumption"
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    # Exactly what the previous release wrote for a never-anchored cycle:
+    # a cost mark, and nothing to date it by.
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
+        "version": 1,
+        "data": {
+            "meter": "watermeter:daily_consumption",
+            "year": None,
+            "baseline_m3": None,
+            "live_hwm_m3": None,
+            "cost_hwm": 999.0,
+        },
+    }
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=2.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    assert coordinator.data.ytd_consumption_m3 == 2.0
+    cost = coordinator.data.current_year_cost_eur
+    assert cost is not None
+    assert cost < 999.0
