@@ -617,14 +617,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # mark a hard crash between ticks can lose). _cycle_dirty stays
             # set so the next authoritative save still writes and clears it.
             self._store.async_delay_save(self._cycle_state, _YTD_SAVE_DELAY_S)
-        self.async_set_updated_data(
-            replace(
-                self.data,
-                snapshot_age_hours=self._age_hours(self.data.fetched_at),
-                ytd_consumption_m3=ytd_m3,
-                current_year_cost_eur=ytd_cost,
-            )
+        # Publish without async_set_updated_data: that helper cancels and
+        # re-arms the update_interval timer, and a meter reports far more
+        # often than once a day, so the daily tariff refresh would be pushed
+        # forward on every draw and never come due.
+        self.data = replace(
+            self.data,
+            snapshot_age_hours=self._age_hours(self.data.fetched_at),
+            ytd_consumption_m3=ytd_m3,
+            current_year_cost_eur=ytd_cost,
         )
+        self.async_update_listeners()
 
 
 def _numeric_state(state: State | None) -> float | None:

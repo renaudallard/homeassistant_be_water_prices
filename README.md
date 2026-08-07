@@ -291,6 +291,8 @@ fail at fetch time).
   `water_ytd_consumption` update **live**: each time your configured
   water-meter sensor reports new usage, the running bill and YTD volume
   recompute immediately (in-memory, no extra recorder or network call).
+  A live update never defers the 24 h tariff refresh above, however often
+  the meter reports.
   The January 1 meter reading is anchored once from the recorder and
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the
