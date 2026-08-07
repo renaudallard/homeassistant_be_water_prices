@@ -73,6 +73,36 @@ def test_find_pdf_href_raises_when_page_has_no_pdf() -> None:
         _find_pdf_href("<p>tarieven als tabel, geen pdf</p>", 2026)
 
 
+@pytest.mark.parametrize(
+    ("href", "allowed"),
+    [
+        ("/volumes/general/overzicht-tarieven-2026.pdf", True),
+        ("https://www.aquaduin.be/x/overzicht-tarieven-2026.pdf", True),
+        ("https://cdn.aquaduin.be/x/overzicht-tarieven-2026.pdf", True),
+        ("http://www.aquaduin.be/x/overzicht-tarieven-2026.pdf", False),
+        ("https://aquaduin.be.evil.test/overzicht-tarieven-2026.pdf", False),
+        ("https://evil.test/overzicht-tarieven-2026.pdf", False),
+    ],
+)
+async def test_discover_pdf_url_stays_on_aquaduin(href: str, allowed: bool) -> None:
+    """The PDF link is read off a remote page, so it must stay on-site.
+
+    Whatever that href says is what gets fetched next, so a rewritten page
+    could otherwise point the integration at an arbitrary host.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import _html, aquaduin
+
+    with patch.object(_html, "fetch_html", new=AsyncMock(return_value=f'<a href="{href}">t</a>')):
+        if allowed:
+            url = await aquaduin._discover_pdf_url(None, 2026)  # type: ignore[arg-type]
+            assert url.endswith("overzicht-tarieven-2026.pdf")
+        else:
+            with pytest.raises(ExtractorError, match="off-site"):
+                await aquaduin._discover_pdf_url(None, 2026)  # type: ignore[arg-type]
+
+
 async def test_transient_error_propagates_not_masked() -> None:
     from unittest.mock import AsyncMock, patch
 

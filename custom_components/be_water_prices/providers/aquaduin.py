@@ -56,7 +56,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 
@@ -77,6 +77,8 @@ LABEL = "Aquaduin"
 # directory cannot be hardcoded. The page URL and the "overzicht-tarieven-
 # <year>.pdf" filename are the stable parts, so we discover the href here.
 SOURCE_URL_FMT = "https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-{year}"
+# The tariff PDF href is read off that page, so pin what it may resolve to.
+_PDF_HOST = "aquaduin.be"
 
 # Anchored on the PDF's exact wording -- "Basistarief 30 m³ + 30 m³ per
 # gedomicilieerde persoon  N,NNNN euro/m³". The intervening "+ 30 m³ per
@@ -116,10 +118,20 @@ def _find_pdf_href(html: str, year: int) -> str:
 
 
 async def _discover_pdf_url(session: aiohttp.ClientSession, year: int) -> str:
-    """Return the absolute URL of the ``year`` tariff-card PDF."""
+    """Return the absolute URL of the ``year`` tariff-card PDF.
+
+    The href comes off a remote page, so it decides what gets fetched next.
+    Keep it on Aquaduin's own site over HTTPS rather than following it
+    wherever it points.
+    """
     page_url = SOURCE_URL_FMT.format(year=year)
     href = await fetch_and_parse(session, page_url, _find_pdf_href, year)
-    return urljoin(page_url, href)
+    pdf_url = urljoin(page_url, href)
+    parsed = urlparse(pdf_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or (host != _PDF_HOST and not host.endswith(f".{_PDF_HOST}")):
+        raise ExtractorError(f"Aquaduin tariff PDF link points off-site: {pdf_url}")
+    return pdf_url
 
 
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
