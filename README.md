@@ -319,6 +319,11 @@ fail at fetch time).
   genuinely empty, and anchoring on it would discard consumption already
   recorded. An install with no recorder at all is a genuinely empty year
   and does start from 0.
+  The figure also heals itself upward. If the meter is down long enough that
+  the recorder reports more consumption than the anchor can account for, the
+  anchor is rebuilt around the recorder's figure on the next reading instead
+  of being kept, so consumption during the outage is counted rather than
+  waiting for the meter to climb past the old anchor.
   Responsiveness is bounded by how often your meter entity itself pushes
   a new state.
 
