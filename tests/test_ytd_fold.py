@@ -36,7 +36,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from custom_components.be_water_prices.coordinator import _fold, _YtdCycle, _YtdFold
+from custom_components.be_water_prices.coordinator import (
+    _fold,
+    _migrate_cycle_to_v2,
+    _YtdCycle,
+    _YtdFold,
+)
 
 _METER = "sensor.water_meter"
 _OTHER = "sensor.other_meter"
@@ -329,3 +334,110 @@ def test_a_region_with_no_bill_math_publishes_a_volume_and_no_cost() -> None:
     assert out.m3 == 25.0
     assert out.cost is None
     assert out.cycle.cost == 500.0
+
+
+def test_the_live_cycle_migrates_to_its_figure_and_frame() -> None:
+    old = {"meter": "m", "year": _YEAR, "baseline_m3": 4000.0, "live_hwm_m3": 4100.0}
+
+    assert _migrate_cycle_to_v2(old) == {
+        "meter": "m",
+        "year": _YEAR,
+        "m3": 100.0,
+        "cost": None,
+        "offset_m3": 4000.0,
+    }
+
+
+def test_a_cost_mark_written_before_its_year_key_takes_the_anchor_year() -> None:
+    """The key being absent is a release that predates it."""
+    old = {"meter": "m", "year": _YEAR - 1, "baseline_m3": 4000.0, "live_hwm_m3": 4100.0}
+
+    got = _migrate_cycle_to_v2({**old, "cost_hwm": 999.0})
+
+    assert got["year"] == _YEAR - 1
+    assert got["cost"] == 999.0
+
+
+def test_a_cost_mark_that_cannot_be_dated_is_dropped() -> None:
+    """The key present and None is a release that had nothing to date.
+
+    Such a mark could never be released, so carrying it would pin the bill
+    at an old peak in this year and every year after it.
+    """
+    old = {"meter": "m", "year": None, "baseline_m3": None, "live_hwm_m3": None}
+
+    assert _migrate_cycle_to_v2({**old, "cost_hwm": 999.0}) == {
+        "meter": "m",
+        "year": None,
+        "m3": None,
+        "cost": None,
+        "offset_m3": None,
+    }
+    assert _migrate_cycle_to_v2({**old, "cost_hwm": 999.0, "cost_year": None})["cost"] is None
+
+
+def test_a_dated_cost_mark_survives_a_cycle_that_never_anchored() -> None:
+    old = {
+        "meter": "m",
+        "year": None,
+        "baseline_m3": None,
+        "live_hwm_m3": None,
+        "cost_hwm": 177.25,
+        "cost_year": _YEAR,
+    }
+
+    assert _migrate_cycle_to_v2(old) == {
+        "meter": "m",
+        "year": _YEAR,
+        "m3": None,
+        "cost": 177.25,
+        "offset_m3": None,
+    }
+
+
+def test_two_old_stamps_that_disagree_resolve_to_the_newer_year() -> None:
+    """A meter down across Jan 1 dated its two figures differently.
+
+    The live anchor stayed on last year while the recorder-served figure and
+    the cost mark moved to this one. One record holds one year, so the newer
+    wins and the frame behind the older figure goes with it.
+    """
+    old = {
+        "meter": "m",
+        "year": _YEAR - 1,
+        "baseline_m3": 4000.0,
+        "live_hwm_m3": 4100.0,
+        "cost_hwm": 50.0,
+        "cost_year": _YEAR,
+        "served_hwm_m3": 7.0,
+    }
+
+    assert _migrate_cycle_to_v2(old) == {
+        "meter": "m",
+        "year": _YEAR,
+        "m3": 7.0,
+        "cost": 50.0,
+        "offset_m3": None,
+    }
+
+
+def test_migrating_a_record_that_is_already_current_changes_nothing() -> None:
+    """A store an older release handed back still holds the new shape.
+
+    Home Assistant re-stamps a store with its own minor version after any
+    migration, so a rollback rewrites the record it could not read under the
+    old label. Folding that as if it were the old shape empties it.
+    """
+    current = {"meter": "m", "year": _YEAR, "m3": 50.0, "cost": 210.0, "offset_m3": 4000.0}
+
+    assert _migrate_cycle_to_v2(current) == current
+    assert _migrate_cycle_to_v2(_migrate_cycle_to_v2(current)) == current
+
+
+def test_a_migrated_record_loads_as_a_cycle() -> None:
+    """The migration's keys are the ones async_load_ytd_state reads."""
+    old = {"meter": "m", "year": _YEAR, "baseline_m3": 4000.0, "live_hwm_m3": 4100.0}
+
+    assert _YtdCycle(**_migrate_cycle_to_v2(old)) == _YtdCycle(
+        meter="m", year=_YEAR, m3=100.0, cost=None, offset_m3=4000.0
+    )
