@@ -686,16 +686,18 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # down, and letting _apply_cycle re-anchor it instead would drop
             # the recorder figure already published for this year to ~0.
             recorder_ytd = self.data.ytd_consumption_m3
-            if recorder_ytd is None:
-                return
-            if self._ytd_published_meter != self._meter_entity_id:
-                # The published figure was produced by the meter we have
-                # just moved off, so it is not this meter's year to date.
-                # Reconstructing from it would anchor the new meter with
-                # the old one's consumption. Wait for the tick's own
-                # bootstrap, which reads the recorder for this meter.
-                return
-            if self._ytd_recorder_year != now_year:
+            if recorder_ytd is None or self._ytd_published_meter != self._meter_entity_id:
+                # Nothing usable to reconstruct from: either no figure has
+                # been published yet, or the one on screen was produced by
+                # a meter we have moved off, and anchoring the new meter
+                # with the old one's consumption would publish a decrease.
+                # With no baseline at all there is nothing to do but wait
+                # for the tick. A prior-year baseline still falls through
+                # to _apply_cycle, which re-anchors the new year rather
+                # than leaving both YTD sensors unknown until then.
+                if self._ytd_baseline_m3 is None:
+                    return
+            elif self._ytd_recorder_year != now_year:
                 # The meter was down across the Jan 1 rollover, so the
                 # recorder figure is last year's. Start the new year at ~0
                 # rather than reconstructing a stale prior-year baseline.

@@ -1689,3 +1689,62 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
         hass.states.async_set("sensor.meter_b", "5002")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 41.0
+
+
+@pytest.mark.asyncio
+async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssistant) -> None:
+    """A new year with nothing to reconstruct from must still start.
+
+    Restarting in early January with the meter down and no current-year
+    statistics leaves both YTD sensors unknown. The first usable reading
+    has to re-anchor the year rather than wait for the next daily tick,
+    which is a day of missing history.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        # The anchor is last year's, the meter is down, and the recorder
+        # has no statistics for the new year yet.
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+        coordinator._ytd_recorder_year = dt_util.now().year - 1
+        hass.states.async_set("sensor.water_meter", "unavailable")
+        await hass.async_block_till_done()
+        recorder.return_value = None
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 is None
+
+        # The meter comes back: the new year starts now, not tomorrow.
+        hass.states.async_set("sensor.water_meter", "130")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 0.0
+        assert coordinator._ytd_baseline_m3 == 130.0
+        assert coordinator._ytd_baseline_year == dt_util.now().year
+
+        hass.states.async_set("sensor.water_meter", "133")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 3.0
