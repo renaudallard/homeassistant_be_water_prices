@@ -2353,3 +2353,67 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 is None
+
+
+@pytest.mark.asyncio
+async def test_first_anchor_of_a_running_year_keeps_the_cost_floor(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """Anchoring a year the recorder was already billing is a continuation.
+
+    Needing a bootstrap is not the same as starting a new cycle: it is also
+    the first tick where a meter becomes usable inside a year whose bill has
+    already been published from the recorder. Clearing the floor there lets
+    a lower tariff fetch publish a decrease, and after a restart the tick is
+    the path that anchors, so the floor persisted to survive restarts was
+    the one being thrown away.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        # Cheaper rates than the ones that set the persisted floor.
+        return replace(_fresh_tariff(), linear_eur_per_m3=1.20)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    # Persisted by a tick that served the recorder while the meter was down:
+    # no anchor, but a cost floor stamped with this year.
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
+        "version": 1,
+        "data": {
+            "meter": "sensor.water_meter",
+            "year": None,
+            "baseline_m3": None,
+            "live_hwm_m3": None,
+            "cost_hwm": 177.25,
+            "cost_year": dt_util.now().year,
+            "recorder_year": dt_util.now().year,
+        },
+    }
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=30.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    # The meter anchored this year for the first time, but the year's bill
+    # had already been published, so it must not drop.
+    assert coordinator._ytd_baseline_m3 == 70.0
+    assert coordinator.data.current_year_cost_eur == 177.25
