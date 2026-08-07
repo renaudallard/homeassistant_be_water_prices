@@ -1810,3 +1810,62 @@ async def test_transient_recorder_gap_does_not_reset_the_year(hass: HomeAssistan
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 12.0
         assert coordinator._ytd_baseline_m3 == 4508.0
+
+
+@pytest.mark.asyncio
+async def test_recorder_year_survives_a_restart(hass: HomeAssistant) -> None:
+    """The transient-gap guard must still hold after a restart.
+
+    That guard tells a momentarily unpublished figure from a year with no
+    statistics by asking whether a current-year recorder figure was ever
+    seen. The answer lives only in memory unless it is persisted, so a
+    restart made the guard fail open and the next live reading reset the
+    year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "unavailable")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=12.0)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator._ytd_baseline_year = dt_util.now().year - 1
+        coordinator._ytd_baseline_m3 = 4000.0
+        coordinator._cycle_dirty = True
+        assert coordinator.data.ytd_consumption_m3 == 12.0
+        assert coordinator._ytd_recorder_year == dt_util.now().year
+
+        # Restart, and the first tick after it hits a recorder failure.
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+        recorder.return_value = None
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator._ytd_recorder_year == dt_util.now().year
+        assert coordinator.data.ytd_consumption_m3 is None
+
+        # The meter returns: the year must not be reset at the reading.
+        hass.states.async_set("sensor.water_meter", "4520")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 is None
+        assert coordinator._ytd_baseline_year == dt_util.now().year - 1

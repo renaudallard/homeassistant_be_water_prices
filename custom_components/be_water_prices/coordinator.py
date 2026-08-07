@@ -403,6 +403,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_baseline_m3 = data.get("baseline_m3")
         self._ytd_live_hwm_m3 = data.get("live_hwm_m3")
         self._ytd_cost_hwm = data.get("cost_hwm")
+        self._ytd_recorder_year = data.get("recorder_year")
 
     async def async_save_ytd_state(self) -> None:
         """Flush a pending cycle change to the Store on a clean unload / reload.
@@ -424,6 +425,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "baseline_m3": self._ytd_baseline_m3,
             "live_hwm_m3": self._ytd_live_hwm_m3,
             "cost_hwm": self._ytd_cost_hwm,
+            # Persisted because the live re-anchor uses it to tell a
+            # transiently missing figure from a year that genuinely has no
+            # statistics. Losing it on restart made that guard fail open.
+            "recorder_year": self._ytd_recorder_year,
         }
 
     def _reset_cycle(self) -> None:
@@ -546,8 +551,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)
             recorder_ytd = await _recorder_ytd_m3(self.hass, meter, jan1, today)
-            if recorder_ytd is not None:
+            if recorder_ytd is not None and self._ytd_recorder_year != now_year:
                 self._ytd_recorder_year = now_year
+                self._cycle_dirty = True
         if live is not None and need_bootstrap:
             # baseline == reading at Jan 1, reconstructed from the recorder's
             # "consumption since Jan 1"; fall back to the current reading
