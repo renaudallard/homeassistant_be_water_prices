@@ -37,6 +37,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
@@ -1342,3 +1343,131 @@ async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None:
+    """Pin the recorder query itself, which every other test mocks away.
+
+    The three decisions here all move money: reading "change" rather than
+    the all-time "sum", asking for m3 so a litre meter is not summed a
+    thousand times too high, and flooring a meter swap's negative delta.
+    Autospec makes the call signature part of the assertion, so an HA
+    signature change surfaces here instead of at a user's next tick.
+    """
+    from unittest.mock import MagicMock
+
+    from homeassistant.util.unit_conversion import VolumeConverter
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    captured: dict[str, Any] = {}
+
+    def _stats(*args: Any) -> dict[str, list[dict[str, Any]]]:
+        captured["args"] = args
+        return {"sensor.wm": [{"change": 10.0}, {"change": 5.5}, {"change": None}]}
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=_stats,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+
+    assert total == 15.5
+    _hass, _start, _end, ids, period, units, types = captured["args"]
+    assert ids == {"sensor.wm"}
+    assert period == "day"
+    assert types == {"change"}
+    assert units == {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS}
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
+    """Replacing a meter mid-year must not surface a negative year to date."""
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    def _stats(*_args: Any) -> dict[str, list[dict[str, Any]]]:
+        return {"sensor.wm": [{"change": 10.0}, {"change": -30.0}]}
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=_stats,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        assert await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) == 0.0
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_returns_none_without_usable_rows(hass: HomeAssistant) -> None:
+    """No statistics, or only empty deltas, must read as unknown not zero."""
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    for rows in ({}, {"sensor.wm": []}, {"sensor.wm": [{"change": None}]}):
+
+        def _stats(*_args: Any, _rows: Any = rows) -> Any:
+            return _rows
+
+        with (
+            patch(
+                "homeassistant.components.recorder.statistics.statistics_during_period",
+                new=_stats,
+            ),
+            patch("homeassistant.components.recorder.get_instance", return_value=instance),
+        ):
+            got = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+        assert got is None
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_returns_none_when_the_query_raises(hass: HomeAssistant) -> None:
+    """A transient query failure degrades to unknown rather than crashing."""
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    def _stats(*_args: Any) -> Any:
+        raise RuntimeError("database is locked")
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=_stats,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        assert (
+            await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) is None
+        )
