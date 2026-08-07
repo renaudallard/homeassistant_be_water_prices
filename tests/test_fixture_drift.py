@@ -81,3 +81,46 @@ async def test_hard_live_fetch_is_errored() -> None:
     result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
     assert result.error is not None
     assert result.skipped is None
+
+
+async def test_transient_skip_marks_the_run_incomplete() -> None:
+    """A blip must not be reported as a clean, drift-free run.
+
+    The workflow comments "Drift cleared. Safe to close." on any open drift
+    issue when the run comes back clean. A utility that was merely
+    unreachable was never actually checked, so that comment would be wrong.
+    """
+
+    async def _raise_transient(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise TransientFetchError("HTTP 503")
+
+    chk = FixtureCheck(
+        label="TEST",
+        fixture="vivaqua_linear_2026.html",
+        parse_fixture=_dummy_tariff,
+        fetch_live=_raise_transient,
+    )
+    result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
+    assert result.transient is True
+
+
+async def test_ci_blocked_skip_does_not_mark_the_run_incomplete() -> None:
+    """The permanently blocked utility is expected, so it stays quiet.
+
+    Treating it as incomplete would suppress the cleared comment forever.
+    """
+    from scripts.fixture_drift import CI_BLOCKED
+
+    async def _never_called(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise AssertionError("must not fetch a CI-blocked utility")
+
+    label = next(iter(CI_BLOCKED))
+    chk = FixtureCheck(
+        label=label,
+        fixture="vivaqua_linear_2026.html",
+        parse_fixture=_dummy_tariff,
+        fetch_live=_never_called,
+    )
+    result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
+    assert result.skipped is not None
+    assert result.transient is False

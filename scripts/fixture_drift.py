@@ -40,10 +40,12 @@ For each (extractor, fixture) pair below, this script:
      get today's published numbers.
   2. Runs the same parser on the committed fixture bytes.
   3. Diffs every numerical field of :class:`WaterTariff`.
-  4. Prints a markdown report and exits non-zero when any field drifted
-     by more than the per-class threshold (rates: 0.001 EUR/m³, fees:
-     0.01 EUR/year). Tiny moves are noise; bigger ones mean either the
-     utility revised its tariff or the parser regressed.
+  4. Prints a markdown report and exits 1 when any field drifted by more
+     than the per-class threshold (rates: 0.001 EUR/m³, fees: 0.01
+     EUR/year). Tiny moves are noise; bigger ones mean either the utility
+     revised its tariff or the parser regressed. Exit 2 means nothing
+     drifted but at least one utility was unreachable on a blip, so the
+     run did not actually check everything.
 
 Run by ``.github/workflows/fixture_drift.yml`` weekly. On drift the
 workflow opens or updates a single GitHub issue with this report.
@@ -258,6 +260,11 @@ class DriftResult:
     deltas: list[FieldDelta]
     error: str | None
     skipped: str | None = None  # set when CI cannot reach this utility
+    # True when the skip was a one-off upstream blip rather than one of the
+    # permanently CI-blocked utilities. A run that skipped for this reason
+    # has not actually checked everything, so it must not be reported as
+    # drift-free.
+    transient: bool = False
 
 
 # Utilities whose live publication is unreachable from GitHub Actions
@@ -320,7 +327,9 @@ async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> Drift
         # must not flip the exit code, or the weekly workflow would open a
         # false "fixtures need refresh" issue. Record it as a skip, like
         # live_check classifies its TRANSIENT results.
-        return DriftResult(chk, [], error=None, skipped=f"transient upstream failure: {err}")
+        return DriftResult(
+            chk, [], error=None, skipped=f"transient upstream failure: {err}", transient=True
+        )
     except ExtractorError as err:
         return DriftResult(chk, [], error=f"live fetch failed: {err}")
     except Exception:
@@ -337,7 +346,14 @@ async def _run() -> tuple[list[DriftResult], int]:
     # code: we cannot drift-check them from the runner, but a real
     # user is unaffected. The skip reason still appears in the report
     # so the maintainer can rerun locally.
-    return results, 1 if (drifted or errored) else 0
+    if drifted or errored:
+        return results, 1
+    # Nothing drifted, but a utility skipped on a blip was not actually
+    # checked. Exit 2 so the workflow neither files an issue nor claims the
+    # drift cleared on one it already has open.
+    if any(r.transient for r in results):
+        return results, 2
+    return results, 0
 
 
 def _fmt(value: float | None) -> str:
