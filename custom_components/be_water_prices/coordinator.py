@@ -80,7 +80,10 @@ from .providers.base import WaterExtractor, relabel_with_human_commune
 _LOGGER = logging.getLogger(__name__)
 
 # Bumped only if the persisted YTD cycle dict changes shape incompatibly.
+# The minor version carries shape changes so a rollback degrades to a
+# re-bootstrap instead of a failed setup; see _YtdStore.
 _YTD_STORE_VERSION = 1
+_YTD_STORE_MINOR_VERSION = 1
 # Debounce window for the live path's best-effort Store flush. The daily
 # tick and a clean unload save authoritatively; this only bounds how much of
 # the climbing high-water mark a hard crash between ticks can lose.
@@ -107,13 +110,36 @@ class RecorderUnavailable(Exception):
     """
 
 
+class _YtdStore(Store[dict[str, Any]]):
+    """Store for the YTD cycle anchor, with a place to migrate its shape.
+
+    The shape is versioned through ``minor_version`` rather than
+    ``version`` on purpose: Home Assistant calls the migration for either,
+    but only re-raises the base NotImplementedError on a *major* mismatch.
+    Since the load runs during entry setup with nothing catching it, a
+    major bump would break setup for anyone rolling the integration back,
+    while an older build meeting a newer minor simply finds no keys it
+    knows and re-bootstraps from the recorder.
+    """
+
+    async def _async_migrate_func(
+        self, old_major_version: int, old_minor_version: int, old_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        return old_data
+
+
 def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
     """The per-entry Store holding that entry's YTD cycle anchor.
 
     Defined once so entry removal deletes exactly the file the coordinator
     writes rather than a second guess at the same key.
     """
-    return Store(hass, _YTD_STORE_VERSION, f"{DOMAIN}.{entry_id}.ytd")
+    return _YtdStore(
+        hass,
+        _YTD_STORE_VERSION,
+        f"{DOMAIN}.{entry_id}.ytd",
+        minor_version=_YTD_STORE_MINOR_VERSION,
+    )
 
 
 async def async_remove_ytd_store(hass: HomeAssistant, entry_id: str) -> None:
@@ -415,8 +441,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         running cost monotonic: without it every restart re-derived the
         baseline from the recorder's trailing daily total and snapped the
         published YTD downward.
+
+        A cycle that cannot be read or migrated is dropped rather than
+        raised: this runs during entry setup with nothing catching it, so a
+        bad record would otherwise block the entry entirely. Starting with
+        no cycle costs one re-bootstrap from the recorder.
         """
-        data = await self._store.async_load()
+        try:
+            data = await self._store.async_load()
+        except Exception:
+            _LOGGER.exception("could not load the YTD cycle; starting a fresh one")
+            return
         if not data:
             return
         self._ytd_meter_id = data.get("meter")
