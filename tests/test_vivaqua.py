@@ -69,6 +69,20 @@ def test_raises_when_no_year_table_present() -> None:
         parse_tariff("<html><body>nothing here</body></html>", year=2026)
 
 
+def test_unparseable_current_year_table_does_not_serve_last_year() -> None:
+    """A present but unreadable current-year card must fail, not fall back.
+
+    Falling back treats a broken parser like a card Brugel has not published
+    yet: last year's rates get served under this year's label, and the
+    March 31 grace period keeps the staleness Repair quiet while it happens.
+    """
+    # Rename only the 2026 table's two "supply" rows; it is the first card
+    # on the page, so the 2025 one below it stays intact.
+    html = fixture_html("vivaqua_linear_2026.html").replace(">supply</td>", ">water supply</td>", 2)
+    with pytest.raises(ExtractorError):
+        parse_tariff(html, year=2026)
+
+
 async def test_fetch_parses_off_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     """fetch() routes the bs4 parse through fetch_and_parse (off the loop).
 
