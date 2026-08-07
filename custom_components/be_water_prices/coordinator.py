@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import calendar
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -145,6 +146,188 @@ def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
 async def async_remove_ytd_store(hass: HomeAssistant, entry_id: str) -> None:
     """Delete an entry's persisted YTD cycle anchor."""
     await _ytd_store(hass, entry_id).async_remove()
+
+
+@dataclass(frozen=True)
+class _YtdCycle:
+    """One year's running consumption, and the frame that produces it.
+
+    ``m3`` is what the year has published: the high-water mark of every
+    figure it has seen, whatever produced them. ``offset_m3`` is the
+    meter's cumulative reading at the start of the cycle (Jan 1, or the
+    moment of a confirmed meter swap), so a live reading ``r`` contributes
+    ``r - offset_m3``. A cycle with a figure but no frame is one being
+    served straight from the recorder: the year's consumption is known,
+    the reading that would produce it is not.
+
+    ``year`` dates the whole record. A stamp from a previous year makes
+    ``m3``, ``cost`` and ``offset_m3`` invisible without erasing them,
+    because the stamp is what tells a cycle that has merely rolled over
+    from one that never existed, and only the latter may start a year at
+    zero.
+    """
+
+    meter: str | None = None
+    year: int | None = None
+    m3: float | None = None
+    cost: float | None = None
+    offset_m3: float | None = None
+
+
+@dataclass(frozen=True)
+class _YtdFold:
+    """What :func:`_fold` decided: the new cycle, and what to publish."""
+
+    cycle: _YtdCycle
+    m3: float | None
+    cost: float | None
+    hold_m3: float | None
+    hold_run: int
+
+
+def _fold(
+    cycle: _YtdCycle,
+    *,
+    now_year: int,
+    meter: str,
+    reading: float | None,
+    recorder_m3: float | None,
+    recorder_ok: bool | None,
+    hold_m3: float | None,
+    hold_run: int,
+    cost_of: Callable[[float], float | None],
+) -> _YtdFold:
+    """Fold one round of evidence into the year-to-date cycle.
+
+    The whole rule, with no clock, no I/O and no coordinator state. Both
+    callers, the daily tick and the live meter event, hand over the
+    evidence they have and get back the new record plus the figures to
+    publish. The tick can bring a recorder answer, the live path never
+    does; nothing else distinguishes them.
+
+    ``recorder_m3`` is this year's consumption as the recorder reports it,
+    or ``None`` when it was not asked or could not answer. ``recorder_ok``
+    tells those apart for the one decision that needs it: ``False`` when
+    the query failed, ``True`` when it succeeded, ``None`` when nothing has
+    asked yet. ``hold_m3`` is a reading held pending confirmation by the
+    next one and ``hold_run`` counts consecutive readings below the frame;
+    both are transient and neither is persisted.
+
+    Every figure a round produces is a candidate, and the published one is
+    the highest of the candidates and the mark already standing. That
+    comparison is source-blind, which is what keeps a year-to-date figure
+    from walking backwards when the evidence changes hands.
+    """
+    if cycle.meter != meter:
+        # Repointed at a different meter: its cumulative reading has nothing
+        # to do with the old one's, so the record goes rather than being
+        # reinterpreted. The year's figure restarts, which is the user's
+        # only escape from a meter that was wrong all along.
+        cycle = _YtdCycle(meter=meter)
+        hold_m3 = None
+        hold_run = 0
+
+    current = cycle.year == now_year
+    mark = cycle.m3 if current else None
+    floor = cycle.cost if current else None
+    offset = cycle.offset_m3 if current else None
+    if not current:
+        hold_m3 = None
+        hold_run = 0
+    # A record still carrying a stamp has history on this meter, so a
+    # reading it cannot place comes from a meter that has been running all
+    # along. A cleared record has no such history and must wait for the
+    # recorder rather than declare the year starts at the first reading it
+    # happens to see.
+    known_meter = cycle.year is not None
+
+    candidate: float | None = None
+    swapped = False
+    seen = [figure for figure in (mark, recorder_m3) if figure is not None]
+    # What a reading has to clear to belong to this cycle. A framed year
+    # measures against the frame. A year served from the recorder has no
+    # frame yet, so its own consumption stands in: a meter that has been
+    # running since January cannot read below what the year has used.
+    bar = offset if offset is not None else (max(seen) if seen else None)
+    if reading is None:
+        pass
+    elif bar is not None and reading < bar:
+        # Below the bar is either a transient glitch (a rebooting meter
+        # reporting 0, a dropout) or a genuine meter swap. Distinguish by
+        # persistence: a lone low reading is held rather than flooring the
+        # year, and only a sustained run re-anchors.
+        hold_run += 1
+        if hold_run >= _SWAP_CONFIRM_READINGS:
+            # Zero the record before the figures are compared below, or the
+            # old mark resurrects itself through the comparison and the swap
+            # never takes effect.
+            swapped = True
+            offset = reading
+            mark = 0.0
+            floor = None
+            candidate = 0.0
+            hold_m3 = None
+            hold_run = 0
+    elif offset is None:
+        # No frame this year yet, and the reading clears the bar. Build the
+        # frame from the highest figure the year already has, so the reading
+        # continues what is published instead of restarting it.
+        hold_run = 0
+        if seen:
+            base = max(seen)
+            offset = reading - base
+            candidate = base
+        elif known_meter and recorder_ok is not False:
+            # Nothing to place the reading against, and no reason to believe
+            # the year holds anything: it starts here. A failed query is not
+            # such a reason, since the year may well have consumption we
+            # simply could not read, and anchoring would discard it.
+            offset = reading
+            candidate = 0.0
+    else:
+        hold_run = 0
+        framed = reading - offset
+        if mark is not None and framed - mark > _IMPLAUSIBLE_JUMP_M3 and hold_m3 is None:
+            # A step this large in one report is a garbage value far more
+            # often than real usage, and the mark only ever climbs, so taking
+            # it would pin the year until January. Hold it for one reading: a
+            # meter really sitting there repeats the jump, while a spike is
+            # followed by normal values.
+            hold_m3 = reading
+        else:
+            candidate = framed
+            hold_m3 = None
+
+    if swapped:
+        # The year restarts on the new meter, so a recorder total spanning
+        # the old one says nothing about it.
+        recorder_m3 = None
+    figures = [figure for figure in (mark, candidate, recorder_m3) if figure is not None]
+    if not figures:
+        # Nothing is known about this year. Leave the record alone, stamp and
+        # all, and report nothing rather than publish a zero it has not
+        # earned: the stamp is what stops the next reading starting the year
+        # over.
+        return _YtdFold(cycle, None, None, hold_m3, hold_run)
+    published = max(figures)
+
+    cost = cost_of(published)
+    if cost is not None:
+        if floor is not None and cost < floor:
+            # Consumption is monotonic by construction, but the bill is
+            # recomputed each tick from a freshly fetched tariff and an
+            # elapsed-day fraction, so it needs the same floor to stop a
+            # lower tariff or a backward clock step publishing a decrease.
+            cost = floor
+        else:
+            floor = cost
+    return _YtdFold(
+        _YtdCycle(meter=meter, year=now_year, m3=published, cost=floor, offset_m3=offset),
+        published,
+        cost,
+        hold_m3,
+        hold_run,
+    )
 
 
 def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
