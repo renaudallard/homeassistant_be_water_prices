@@ -1556,3 +1556,62 @@ async def test_explicit_meter_option_wins_over_discovery(hass: HomeAssistant) ->
         await hass.async_block_till_done()
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert coordinator._meter_entity_id == "sensor.chosen"
+
+
+@pytest.mark.asyncio
+async def test_unusable_meter_readings_leave_the_total_alone(hass: HomeAssistant) -> None:
+    """Garbage states must be ignored, not folded into the running total.
+
+    Only the "unavailable" branch was covered. A non-numeric state and a
+    reading carrying a unit that is not a volume both reach the same
+    sanitiser, and either one landing in the cycle would corrupt the year.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        hass.states.async_set("sensor.water_meter", "105")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+        # A meter integration emitting a non-numeric placeholder.
+        hass.states.async_set("sensor.water_meter", "n/a")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+        # A numeric reading whose unit is not a volume at all. Kept close
+        # to the last good value so the implausible-jump hold is not what
+        # rejects it and the unit check is genuinely under test.
+        hass.states.async_set("sensor.water_meter", "106", {"unit_of_measurement": "kWh"})
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+
+        # Recovering with a real reading resumes tracking.
+        hass.states.async_set("sensor.water_meter", "110")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 30.0
