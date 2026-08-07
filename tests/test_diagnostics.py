@@ -82,3 +82,77 @@ def test_scrub_tokens_removes_commune_from_snapshot() -> None:
 def test_scrub_tokens_passes_none_and_empty_through() -> None:
     assert scrub_tokens(None, ["geel"]) is None
     assert scrub_tokens("nothing sensitive", []) == "nothing sensitive"
+
+
+async def test_dump_carries_no_postcode_commune_or_meter(hass) -> None:  # type: ignore[no-untyped-def]
+    """The whole dump must be free of the identifying fields.
+
+    The file is attached to GitHub issues, and the existing tests only
+    exercised the private helpers, so nothing checked what the assembled
+    dump actually contains or that the redaction key set stayed complete.
+    """
+    import json
+    from datetime import date
+    from unittest.mock import AsyncMock, patch
+
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.be_water_prices.const import (
+        CONF_COMMUNE,
+        CONF_COMMUNE_LABEL,
+        CONF_CONSUMPTION_M3_PER_YEAR,
+        CONF_POSTCODE,
+        CONF_UTILITY,
+        CONF_WATER_METER_SENSOR,
+        DOMAIN,
+    )
+    from custom_components.be_water_prices.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.my_house_water_meter", "100")
+
+    async def _fetch(_session):  # type: ignore[no-untyped-def]
+        return WaterTariff(
+            utility="pidpa",
+            region="flanders",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="Pidpa tarieven 2026 (Geel)",
+            source_url="https://www.pidpa.be/ons-aanbod/je-gemeente/geel",
+            yearly_fixed_fee=50.0,
+            basis_eur_per_m3=2.0,
+            comfort_eur_per_m3=4.0,
+        )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa", CONF_POSTCODE: "2440", CONF_COMMUNE: "geel"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_COMMUNE_LABEL: "Geel",
+            CONF_WATER_METER_SENSOR: "sensor.my_house_water_meter",
+        },
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="pidpa", label="Pidpa", region="flanders", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        dump = await async_get_config_entry_diagnostics(hass, entry)
+
+    blob = json.dumps(dump).lower()
+    for secret in ("2440", "geel", "my_house_water_meter"):
+        assert secret not in blob, f"{secret!r} leaked into the diagnostics dump"
+    # The dump is still useful: the tariff block survived, dates included.
+    assert dump["snapshot"]["tariff"]["valid_from"] == "2026-01-01"
