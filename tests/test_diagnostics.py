@@ -151,7 +151,11 @@ async def test_dump_carries_no_postcode_commune_or_meter(hass) -> None:  # type:
         await hass.async_block_till_done()
         dump = await async_get_config_entry_diagnostics(hass, entry)
 
-    blob = json.dumps(dump).lower()
+    # fetched_at is wall-clock with microseconds, so on roughly one run in
+    # a few thousand it contains the postcode digits by chance. It is not
+    # a redaction target, so scan everything except it.
+    scanned = {**dump, "snapshot": {k: v for k, v in dump["snapshot"].items() if k != "fetched_at"}}
+    blob = json.dumps(scanned).lower()
     for secret in ("2440", "geel", "my_house_water_meter"):
         assert secret not in blob, f"{secret!r} leaked into the diagnostics dump"
     # The dump is still useful: the tariff block survived, dates included.
