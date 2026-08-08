@@ -2380,9 +2380,11 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
     """A recorder figure above the live mark must not be walked back down.
 
     The cycle anchors on the bare reading when the first tick's recorder
-    query fails, so the mark starts at zero consumption while the recorder
-    still knows about the year. Once that larger figure has been published,
-    every later path that reports the mark has to be at or above it.
+    query finds an empty year, so the mark starts at zero consumption while
+    the recorder still knows about the year. Once that larger figure has
+    been published, every later path that reports the mark has to be at or
+    above it, and the meter has to carry on from it rather than from where
+    the anchor had got to on its own.
     """
     await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
@@ -2426,16 +2428,25 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
 
+        # Those 30 m³ belong to the last reading the meter gave, 105, so the
+        # anchor moves under them: 105 - 30. Left at 100 it would go on
+        # producing 5 and swallow every m³ up to 130.
+        assert coordinator._ytd.offset_m3 == 75.0
+
         # The recorder then fails: the figure must hold, not drop back.
         recorder.side_effect = RecorderUnavailable("database is locked")
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
 
-        # And the meter recovering must not walk it back either.
+        # And the meter recovering counts on from there, one m³ at a time.
         hass.states.async_set("sensor.water_meter", "106")
         await hass.async_block_till_done()
-        assert coordinator.data.ytd_consumption_m3 == 30.0
+        assert coordinator.data.ytd_consumption_m3 == 31.0
+
+        hass.states.async_set("sensor.water_meter", "107")
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 32.0
 
 
 @pytest.mark.asyncio

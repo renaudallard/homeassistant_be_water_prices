@@ -34,6 +34,7 @@ the right evidence.
 
 from __future__ import annotations
 
+import random
 from collections.abc import Callable
 
 from custom_components.be_water_prices.coordinator import (
@@ -188,20 +189,20 @@ def test_a_swap_ignores_a_recorder_total_spanning_the_old_meter() -> None:
     assert out.cycle.offset_m3 == 12.0
 
 
-def test_a_recorder_figure_above_the_mark_is_published() -> None:
-    """The meter is down and the recorder knows more than the mark does.
+def test_a_recorder_figure_above_the_mark_moves_the_frame_under_it() -> None:
+    """The meter is down and the recorder knows more than the frame produces.
 
-    The figure is published, but the frame is left alone. A recorder figure
-    above the year's own figure only says the figure is behind, which is
-    the ordinary state whenever a reading was held or missed; it is not
-    evidence that the frame is wrong. See the two tests below for what
-    treating it as such costs.
+    Those 30 m³ belong to the last reading the frame saw, 105, so the frame
+    moves to 105 - 30. Left at 100 it would go on producing 5, and the meter
+    would have to climb all the way to 130 before the year moved again.
     """
     out = _round(_anchored(5.0, 100.0), recorder_m3=30.0)
 
     assert out.m3 == 30.0
     assert out.cycle.m3 == 30.0
-    assert out.cycle.offset_m3 == 100.0
+    assert out.cycle.offset_m3 == 75.0
+    # And the meter counts on from the larger figure.
+    assert _round(out.cycle, reading=106.0).m3 == 31.0
 
 
 def _replay(
@@ -247,15 +248,20 @@ def test_a_garbled_low_reading_cannot_reframe_the_year() -> None:
 
     A meter coming back from the outage that made the tick query is exactly
     the one likely to emit a truncated register or a dropped digit. Such a
-    reading is held as a glitch, and it must not become the frame by any
-    route: the figure is monotonic, so anchoring on it would pin both
+    reading is held as a glitch and contributes nothing, in particular not a
+    frame: the figure is monotonic, so anchoring on it would pin both
     sensors for the rest of the year.
+
+    The frame does move, but only by the 5 m³ the recorder itself proves,
+    from 4000 to 4045 - 45. It never goes near the garbled reading.
     """
     # Jan 1 the meter read 4000; it now reads 4045 but reports 404.
-    assert _replay(
-        _anchored(40.0, 4000.0, cost=120.0),
-        [(404.0, 45.0), (4046.0, None), (4047.0, None), (4048.0, None)],
-    ) == [45.0, 46.0, 47.0, 48.0]
+    out = _round(_anchored(40.0, 4000.0, cost=120.0), reading=404.0, recorder_m3=45.0)
+
+    assert out.m3 == 45.0
+    assert out.cycle.offset_m3 == 3995.0
+    assert out.hold_run == 1
+    assert _replay(out.cycle, [(4046.0, None), (4047.0, None)]) == [51.0, 52.0]
 
 
 def test_a_reading_frames_a_year_that_has_a_figure_but_no_frame() -> None:
@@ -510,3 +516,71 @@ def test_a_migrated_record_loads_as_a_cycle() -> None:
     assert _YtdCycle(**_migrate_cycle_to_v2(old)) == _YtdCycle(
         meter="m", year=_YEAR, m3=100.0, cost=None, offset_m3=4000.0
     )
+
+
+def _honest_run(seed: int, *, dropouts: bool) -> str | None:
+    """Replay one randomised sequence of an honest meter and recorder.
+
+    Nothing lies here: the meter only climbs and the recorder reports the
+    year's true consumption. Only the timing varies, which is what the rule
+    has to be robust to.
+    """
+    rnd = random.Random(seed)
+    jan1 = rnd.choice([0.0, 100.0, 4000.0, 987654.0])
+    true = jan1
+    cycle = _YtdCycle(meter=_METER)
+    hold_m3: float | None = None
+    hold_run = 0
+    recorder_ok = True
+    last_published: float | None = None
+    last_reading: float | None = None
+    for step in range(rnd.randrange(5, 40)):
+        true = round(true + rnd.uniform(0.0, 3.0), 3)
+        truth = round(true - jan1, 6)
+        readable = True if not dropouts else (step == 0 or rnd.random() > 0.25)
+        # A daily tick brings a recorder answer; a live meter event never does.
+        tick = True if step == 0 else rnd.random() > 0.5
+        out = _round(
+            cycle,
+            reading=true if readable else None,
+            recorder_m3=truth if tick else None,
+            recorder_ok=recorder_ok,
+            hold_m3=hold_m3,
+            hold_run=hold_run,
+        )
+        cycle, hold_m3, hold_run = out.cycle, out.hold_m3, out.hold_run
+        if out.m3 is None:
+            continue
+        if last_published is not None and out.m3 < last_published - 1e-9:
+            return f"decrease {last_published} -> {out.m3}"
+        if not dropouts and abs(out.m3 - truth) > 1e-6:
+            return f"published {out.m3}, truth {truth}"
+        if readable and last_reading is not None and last_published is not None:
+            drawn = true - last_reading
+            if out.m3 - last_published < drawn - 1e-6:
+                return (
+                    f"swallowed {drawn - (out.m3 - last_published):.3f} m³: meter "
+                    f"{last_reading} -> {true} but figure {last_published} -> {out.m3}"
+                )
+        if readable:
+            last_reading = true
+        last_published = out.m3
+    return None
+
+
+def test_an_honest_meter_and_recorder_are_reported_exactly() -> None:
+    """With the meter always readable the year is framed once and stays right."""
+    failures = [(s, r) for s in range(2000) if (r := _honest_run(s, dropouts=False))]
+
+    assert not failures, failures[:3]
+
+
+def test_no_water_is_swallowed_when_the_meter_drops_out() -> None:
+    """Framing off a figure read at an earlier instant misplaces the water
+    drawn in between, which is inherent to that recovery path. What must not
+    happen is losing any: between two readings the figure has to climb by at
+    least as much as the meter did.
+    """
+    failures = [(s, r) for s in range(2000) if (r := _honest_run(s, dropouts=True))]
+
+    assert not failures, failures[:3]
