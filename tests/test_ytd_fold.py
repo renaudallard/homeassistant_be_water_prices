@@ -188,44 +188,82 @@ def test_a_swap_ignores_a_recorder_total_spanning_the_old_meter() -> None:
     assert out.cycle.offset_m3 == 12.0
 
 
-def test_a_recorder_figure_above_the_mark_drops_the_frame() -> None:
-    """The meter is down and the recorder knows more than the frame can say.
+def test_a_recorder_figure_above_the_mark_is_published() -> None:
+    """The meter is down and the recorder knows more than the mark does.
 
-    Run the meter's readings through that frame and they never produce 30, so
-    the frame is what is wrong. Keeping it would republish 5 the moment the
-    recorder stopped answering.
+    The figure is published, but the frame is left alone. A recorder figure
+    above the year's own figure only says the figure is behind, which is
+    the ordinary state whenever a reading was held or missed; it is not
+    evidence that the frame is wrong. See the two tests below for what
+    treating it as such costs.
     """
     out = _round(_anchored(5.0, 100.0), recorder_m3=30.0)
 
     assert out.m3 == 30.0
     assert out.cycle.m3 == 30.0
-    assert out.cycle.offset_m3 is None
+    assert out.cycle.offset_m3 == 100.0
 
 
-def test_the_next_reading_rebuilds_the_frame_around_the_proven_figure() -> None:
+def _replay(
+    cycle: _YtdCycle, rounds: list[tuple[float | None, float | None]]
+) -> list[float | None]:
+    """Feed each fold's own result back in, as both callers do."""
+    published: list[float | None] = []
+    hold_m3: float | None = None
+    hold_run = 0
+    for reading, recorder_m3 in rounds:
+        out = _round(
+            cycle, reading=reading, recorder_m3=recorder_m3, hold_m3=hold_m3, hold_run=hold_run
+        )
+        cycle, hold_m3, hold_run = out.cycle, out.hold_m3, out.hold_run
+        published.append(out.m3)
+    return published
+
+
+def test_a_recorder_figure_a_hair_above_the_year_keeps_the_frame() -> None:
+    """The recorder and the frame compute the same water two ways.
+
+    The recorder sums a year of daily deltas while the frame subtracts two
+    readings, so the two disagree in the last bits over identical water. If
+    that counted as evidence against the frame, the frame would be dropped
+    on a routine tick and rebuilt around the recorder's figure, throwing
+    away everything drawn while the meter was down.
+    """
+    summed = 0.0
+    for _ in range(220):
+        summed += 0.4
+    assert summed > 88.0  # 88.00000000000017
+
+    # The meter read 4000 on Jan 1 and 4088 before it dropped out; 30 m³ is
+    # drawn during the outage, so it comes back at 4118.
+    assert _replay(
+        _anchored(88.0, 4000.0, cost=300.0),
+        [(None, summed), (4118.0, None), (4119.0, None)],
+    ) == [summed, 118.0, 119.0]
+
+
+def test_a_garbled_low_reading_cannot_reframe_the_year() -> None:
+    """A reading too low to belong to the year must not anchor it either.
+
+    A meter coming back from the outage that made the tick query is exactly
+    the one likely to emit a truncated register or a dropped digit. Such a
+    reading is held as a glitch, and it must not become the frame by any
+    route: the figure is monotonic, so anchoring on it would pin both
+    sensors for the rest of the year.
+    """
+    # Jan 1 the meter read 4000; it now reads 4045 but reports 404.
+    assert _replay(
+        _anchored(40.0, 4000.0, cost=120.0),
+        [(404.0, 45.0), (4046.0, None), (4047.0, None), (4048.0, None)],
+    ) == [45.0, 46.0, 47.0, 48.0]
+
+
+def test_a_reading_frames_a_year_that_has_a_figure_but_no_frame() -> None:
     out = _round(_served(30.0), reading=106.0)
 
     assert out.m3 == 30.0
     assert out.cycle.offset_m3 == 76.0
-    # Left on the old frame of 100 the meter would have to reach 130 before
-    # the figure moved again, and those 24 m³ would never be reported.
     assert _round(out.cycle, reading=107.0).m3 == 31.0
-
-
-def test_a_frame_that_accounts_for_the_recorder_figure_is_kept() -> None:
-    """A reading that arrived during the query still explains the figure."""
-    out = _round(_anchored(5.0, 100.0), reading=135.0, recorder_m3=30.0)
-
-    assert out.m3 == 35.0
-    assert out.cycle.offset_m3 == 100.0
-
-
-def test_a_glitch_low_reading_does_not_expose_the_frame() -> None:
-    """A reading below the frame says nothing about whether the frame is right."""
-    out = _round(_anchored(25.0, 100.0), reading=50.0, recorder_m3=20.0)
-
-    assert out.m3 == 25.0
-    assert out.cycle.offset_m3 == 100.0
 
 
 def test_a_recorder_figure_below_the_mark_does_not_walk_it_back() -> None:
