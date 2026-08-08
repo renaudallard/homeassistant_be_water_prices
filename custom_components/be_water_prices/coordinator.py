@@ -247,6 +247,7 @@ class _YtdFold:
     cost: float | None
     hold_m3: float | None
     hold_run: int
+    high_m3: float | None
 
 
 def _fold(
@@ -259,6 +260,7 @@ def _fold(
     recorder_ok: bool | None,
     hold_m3: float | None,
     hold_run: int,
+    high_m3: float | None,
     cost_of: Callable[[float], float | None],
 ) -> _YtdFold:
     """Fold one round of evidence into the year-to-date cycle.
@@ -281,13 +283,6 @@ def _fold(
     the highest of the candidates and the mark already standing. That
     comparison is source-blind, which is what keeps a year-to-date figure
     from walking backwards when the evidence changes hands.
-
-    The frame is not carried across a round, it is rebuilt from the figure
-    that was published and the meter reading that figure belongs to. That is
-    what stops the two drifting apart: a recorder figure the meter's own
-    readings cannot produce moves the frame down by exactly its excess, so
-    the next reading counts on from the larger figure instead of from where
-    the frame had got to on its own.
     """
     if cycle.meter != meter:
         # Repointed at a different meter: its cumulative reading has nothing
@@ -297,6 +292,7 @@ def _fold(
         cycle = _YtdCycle(meter=meter)
         hold_m3 = None
         hold_run = 0
+        high_m3 = None
 
     current = cycle.year == now_year
     mark = cycle.m3 if current else None
@@ -305,16 +301,20 @@ def _fold(
     if not current:
         hold_m3 = None
         hold_run = 0
+        high_m3 = None
+    # The highest reading the meter has shown this cycle, whether or not it
+    # was admitted. Held and rejected readings still say where the register
+    # has been, and that is the only thing that tells a meter climbing past a
+    # stale frame from one dipping below a sound one.
+    was_high = high_m3
+    if reading is not None and (high_m3 is None or reading > high_m3):
+        high_m3 = reading
     # A record still carrying a stamp has history on this meter, so a
     # reading it cannot place comes from a meter that has been running all
     # along. A cleared record has no such history and must wait for the
     # recorder rather than declare the year starts at the first reading it
     # happens to see.
     known_meter = cycle.year is not None
-    # The meter reading the frame and the figure last agreed at. Everything
-    # below moves this rather than the frame, and the frame is rebuilt from
-    # it at the end.
-    anchor = offset + mark if offset is not None and mark is not None else None
 
     candidate: float | None = None
     swapped = False
@@ -337,27 +337,28 @@ def _fold(
             # old mark resurrects itself through the comparison and the swap
             # never takes effect.
             swapped = True
-            anchor = reading
+            offset = reading
             mark = 0.0
             floor = None
             candidate = 0.0
             hold_m3 = None
             hold_run = 0
     elif offset is None:
-        # No frame this year yet, and the reading clears the bar. The year's
-        # highest figure belongs to this reading, so the reading continues
-        # what is published instead of restarting it.
+        # No frame this year yet, and the reading clears the bar. Build the
+        # frame from the highest figure the year already has, so the reading
+        # continues what is published instead of restarting it.
         hold_run = 0
         if seen:
-            candidate = max(seen)
-            anchor = reading
+            base = max(seen)
+            offset = reading - base
+            candidate = base
         elif known_meter and recorder_ok is not False:
             # Nothing to place the reading against, and no reason to believe
             # the year holds anything: it starts here. A failed query is not
             # such a reason, since the year may well have consumption we
             # simply could not read, and anchoring would discard it.
+            offset = reading
             candidate = 0.0
-            anchor = reading
     else:
         hold_run = 0
         framed = reading - offset
@@ -371,12 +372,6 @@ def _fold(
         else:
             candidate = framed
             hold_m3 = None
-            if anchor is None or reading > anchor:
-                # A reading under the one the frame was built at is a dip the
-                # figure clamps, not a new position for it. Moving the anchor
-                # down to it would let the frame count the same water twice
-                # when the meter climbs back.
-                anchor = reading
 
     if swapped:
         # The year restarts on the new meter, so a recorder total spanning
@@ -388,14 +383,31 @@ def _fold(
         # all, and report nothing rather than publish a zero it has not
         # earned: the stamp is what stops the next reading starting the year
         # over.
-        return _YtdFold(cycle, None, None, hold_m3, hold_run)
+        return _YtdFold(cycle, None, None, hold_m3, hold_run, high_m3)
     published = max(figures)
-    # Rebuild the frame around what is actually being published. When the
-    # meter drove the figure this puts it back exactly where it was; when a
-    # recorder figure the meter could not produce won, it moves down by that
-    # excess, which is what stops the frame republishing the smaller number
-    # and swallowing everything drawn until the meter catches up.
-    offset = anchor - published if anchor is not None else None
+
+    if (
+        offset is not None
+        and reading is not None
+        and recorder_m3 is not None
+        and candidate is not None
+        and (was_high is None or reading >= was_high)
+        and published > reading - offset
+        and reading >= published
+    ):
+        # A reading and a recorder figure read in the same round are the only
+        # pair that dates the year's consumption to a meter position, so this
+        # is the only place the frame can be corrected without guessing. The
+        # figure on its own says how much water the year has seen but not
+        # where the meter stood when it did, and the frame's own last position
+        # is not an answer: a reading held as a spike, or one never seen at
+        # all, leaves it behind the meter, and correcting against it would
+        # count the same water twice.
+        #
+        # Rebuilt this way the frame produces exactly what is being published,
+        # so the meter carries on from there instead of having to climb back
+        # up to where the frame had got to on its own.
+        offset = reading - published
 
     cost = cost_of(published)
     if cost is not None:
@@ -413,6 +425,7 @@ def _fold(
         cost,
         hold_m3,
         hold_run,
+        high_m3,
     )
 
 
@@ -487,6 +500,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # meter swap re-accumulates the run.
         self._ytd_hold_m3: float | None = None
         self._ytd_hold_run = 0
+        # Highest reading the meter has shown this cycle. In memory only: it
+        # decides whether a reading is the meter climbing or a dip, and after
+        # a restart the very next reading re-establishes it.
+        self._ytd_high_m3: float | None = None
         # Whether the last recorder query succeeded, None before anything has
         # asked. Transient by design: it says what the database did a moment
         # ago, which is exactly as long as the answer is worth trusting.
@@ -739,6 +756,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             recorder_ok=self._recorder_ok,
             hold_m3=self._ytd_hold_m3,
             hold_run=self._ytd_hold_run,
+            high_m3=self._ytd_high_m3,
             cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3),
         )
         if out.cycle != self._ytd:
@@ -746,6 +764,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd = out.cycle
         self._ytd_hold_m3 = out.hold_m3
         self._ytd_hold_run = out.hold_run
+        self._ytd_high_m3 = out.high_m3
         return out.m3, out.cost
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
@@ -771,6 +790,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         recorder_m3: float | None = None
+        # The frame produces less than the year has already published, so it
+        # has fallen behind what is known. Only a reading and a recorder
+        # figure read together can put it back, so ask for one. The mismatch
+        # closes as soon as the frame is rebuilt, which makes this
+        # self-terminating: a year whose meter drives it never queries.
+        stale_frame = (
+            self._ytd.m3 is not None
+            and self._ytd.offset_m3 is not None
+            and live is not None
+            and self._ytd.m3 > live - self._ytd.offset_m3
+        )
         # Decide before folding, not after: the fold clears the record itself
         # when the meter has been repointed, and a gate reading the cleared
         # record would miss the very case that needs the query most.
@@ -779,6 +809,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             or self._ytd.year != now_year
             or self._ytd.offset_m3 is None
             or live is None
+            or stale_frame
         ):
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)

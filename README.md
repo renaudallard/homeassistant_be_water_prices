@@ -321,9 +321,12 @@ fail at fetch time).
   and does start from 0.
   The figure also heals itself upward. If the meter drops out and the
   recorder reports more consumption for the year than the anchor accounts
-  for, the anchor moves under that figure rather than being kept, so the
-  meter carries on from the larger number instead of having to climb back
-  up to the old anchor first.
+  for, the next daily tick re-reads the meter and the recorder together and
+  moves the anchor under that figure, so the meter counts on from the larger
+  number rather than having to climb back up to the old anchor first. It
+  takes a tick rather than happening on the next reading, because only a
+  meter reading and a recorder figure read at the same moment can say where
+  the meter stood when that water was used.
   Responsiveness is bounded by how often your meter entity itself pushes
   a new state.
 
