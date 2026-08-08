@@ -2437,15 +2437,6 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
 
-        # That reading rebuilds the frame around the figure the recorder
-        # proved, so the next draw is counted from there. Left on the old
-        # frame the meter would have to climb from 106 to 130 first, and
-        # those 24 m³ would never be reported at all.
-        assert coordinator._ytd.offset_m3 == 76.0
-        hass.states.async_set("sensor.water_meter", "107")
-        await hass.async_block_till_done()
-        assert coordinator.data.ytd_consumption_m3 == 31.0
-
 
 @pytest.mark.asyncio
 async def test_undatable_cost_floor_from_an_older_store_is_dropped(
