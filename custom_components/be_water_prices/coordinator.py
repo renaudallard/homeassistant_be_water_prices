@@ -281,6 +281,13 @@ def _fold(
     the highest of the candidates and the mark already standing. That
     comparison is source-blind, which is what keeps a year-to-date figure
     from walking backwards when the evidence changes hands.
+
+    The frame is not carried across a round, it is rebuilt from the figure
+    that was published and the meter reading that figure belongs to. That is
+    what stops the two drifting apart: a recorder figure the meter's own
+    readings cannot produce moves the frame down by exactly its excess, so
+    the next reading counts on from the larger figure instead of from where
+    the frame had got to on its own.
     """
     if cycle.meter != meter:
         # Repointed at a different meter: its cumulative reading has nothing
@@ -304,6 +311,10 @@ def _fold(
     # recorder rather than declare the year starts at the first reading it
     # happens to see.
     known_meter = cycle.year is not None
+    # The meter reading the frame and the figure last agreed at. Everything
+    # below moves this rather than the frame, and the frame is rebuilt from
+    # it at the end.
+    anchor = offset + mark if offset is not None and mark is not None else None
 
     candidate: float | None = None
     swapped = False
@@ -326,28 +337,27 @@ def _fold(
             # old mark resurrects itself through the comparison and the swap
             # never takes effect.
             swapped = True
-            offset = reading
+            anchor = reading
             mark = 0.0
             floor = None
             candidate = 0.0
             hold_m3 = None
             hold_run = 0
     elif offset is None:
-        # No frame this year yet, and the reading clears the bar. Build the
-        # frame from the highest figure the year already has, so the reading
-        # continues what is published instead of restarting it.
+        # No frame this year yet, and the reading clears the bar. The year's
+        # highest figure belongs to this reading, so the reading continues
+        # what is published instead of restarting it.
         hold_run = 0
         if seen:
-            base = max(seen)
-            offset = reading - base
-            candidate = base
+            candidate = max(seen)
+            anchor = reading
         elif known_meter and recorder_ok is not False:
             # Nothing to place the reading against, and no reason to believe
             # the year holds anything: it starts here. A failed query is not
             # such a reason, since the year may well have consumption we
             # simply could not read, and anchoring would discard it.
-            offset = reading
             candidate = 0.0
+            anchor = reading
     else:
         hold_run = 0
         framed = reading - offset
@@ -361,6 +371,12 @@ def _fold(
         else:
             candidate = framed
             hold_m3 = None
+            if anchor is None or reading > anchor:
+                # A reading under the one the frame was built at is a dip the
+                # figure clamps, not a new position for it. Moving the anchor
+                # down to it would let the frame count the same water twice
+                # when the meter climbs back.
+                anchor = reading
 
     if swapped:
         # The year restarts on the new meter, so a recorder total spanning
@@ -374,6 +390,12 @@ def _fold(
         # over.
         return _YtdFold(cycle, None, None, hold_m3, hold_run)
     published = max(figures)
+    # Rebuild the frame around what is actually being published. When the
+    # meter drove the figure this puts it back exactly where it was; when a
+    # recorder figure the meter could not produce won, it moves down by that
+    # excess, which is what stops the frame republishing the smaller number
+    # and swallowing everything drawn until the meter catches up.
+    offset = anchor - published if anchor is not None else None
 
     cost = cost_of(published)
     if cost is not None:
