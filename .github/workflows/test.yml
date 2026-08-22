@@ -12,11 +12,20 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.13 is what Home Assistant ships, so it is the version that
+        # decides whether a release works. 3.14 is here because that is
+        # what a current Debian / Raspberry Pi OS gives a local checkout,
+        # and without it a 3.14-only failure shows up as a green local run
+        # and a red CI one (or worse, the reverse).
+        python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
