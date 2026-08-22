@@ -85,6 +85,14 @@ CONF_COMMUNE = "commune"
 CONF_COMMUNE_LABEL = "commune_label"
 
 DEFAULT_CONSUMPTION_M3 = 80
+MIN_CONSUMPTION_M3 = 1
+MAX_CONSUMPTION_M3 = 2000
 DEFAULT_PERSONS = 1
 MIN_PERSONS = 1
 MAX_PERSONS = 5
+
+# How far the configured yearly consumption has to sit from a whole year
+# the meter actually measured before we offer to replace it. A household
+# varies from year to year without the projection being wrong, so the
+# prompt is for a figure that was never right rather than for weather.
+PROJECTION_DRIFT_RATIO = 0.10

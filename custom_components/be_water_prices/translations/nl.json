@@ -151,6 +151,20 @@
           "still_stale": "De vernieuwing is uitgevoerd, maar de snapshot van {utility} is nog steeds verouderd, dus de Repair-kaart blijft staan. Probeer het later opnieuw, of bekijk de issues op GitHub en de dagelijkse live-check workflow run voor de onderliggende fout."
         }
       }
+    },
+    "projection_outdated": {
+      "title": "Projectie van {utility} gebruikt een verouderd verbruik",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Uw verbruik van {year} gebruiken voor de projectie van {utility}",
+            "description": "Uw watermeter heeft {metered} m³ gemeten over heel {year}. De sensor voor de geprojecteerde jaarkost staat nog op {configured} m³ per jaar.\n\nKlik op Indienen om de ingestelde waarde te vervangen door {metered} m³. De geprojecteerde kost wordt onmiddellijk bijgewerkt. De sensoren sinds 1 januari veranderen hoe dan ook niet, want die lezen altijd de meter en niet deze instelling.\n\nNegeer deze kaart om {configured} m³ te behouden."
+          }
+        },
+        "abort": {
+          "cannot_apply": "De {utility}-invoer kan niet meer worden bijgewerkt, er is dus niets gewijzigd. Waarschijnlijk is die verwijderd terwijl deze kaart openstond."
+        }
+      }
     }
   }
 }

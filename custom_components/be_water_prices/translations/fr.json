@@ -151,6 +151,20 @@
           "still_stale": "Le rafraîchissement a été effectué, mais le snapshot {utility} est toujours obsolète, la carte Repair reste donc affichée. Réessayez plus tard, ou consultez les issues GitHub et le run quotidien de la workflow live-check pour la cause sous-jacente."
         }
       }
+    },
+    "projection_outdated": {
+      "title": "La projection {utility} utilise une consommation obsolète",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Utiliser votre consommation {year} pour la projection {utility}",
+            "description": "Votre compteur d'eau a mesuré {metered} m³ sur toute l'année {year}. Le capteur de coût annuel projeté est toujours réglé sur {configured} m³ par an.\n\nCliquez sur Soumettre pour remplacer la valeur configurée par {metered} m³. Le coût projeté est mis à jour immédiatement. Les capteurs depuis le 1er janvier ne changent pas dans les deux cas, car ils lisent toujours le compteur et non ce réglage.\n\nIgnorez cette carte pour conserver {configured} m³."
+          }
+        },
+        "abort": {
+          "cannot_apply": "L'entrée {utility} ne peut plus être mise à jour, rien n'a donc été modifié. Elle a probablement été supprimée pendant que cette carte était ouverte."
+        }
+      }
     }
   }
 }

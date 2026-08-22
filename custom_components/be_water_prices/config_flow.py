@@ -101,7 +101,9 @@ from .const import (
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
+    MAX_CONSUMPTION_M3,
     MAX_PERSONS,
+    MIN_CONSUMPTION_M3,
     MIN_PERSONS,
     REGION_FLANDERS,
 )
@@ -166,8 +168,8 @@ def _options_schema(
             default=current.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3),
         ): NumberSelector(
             NumberSelectorConfig(
-                min=1,
-                max=2000,
+                min=MIN_CONSUMPTION_M3,
+                max=MAX_CONSUMPTION_M3,
                 step=1,
                 mode=NumberSelectorMode.BOX,
             )
@@ -212,7 +214,7 @@ def _options_schema(
         )
 
     # Optional: a water-meter sensor (cumulative m³) that powers the
-    # ``water_current_year_cost`` YTD sensor. Filtered to entities whose
+    # ``current_year_cost`` YTD sensor. Filtered to entities whose
     # device_class is ``water`` so the dropdown only surfaces sensors
     # the integration actually knows how to read.
     meter_default = current.get(CONF_WATER_METER_SENSOR)
