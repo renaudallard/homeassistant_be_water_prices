@@ -52,6 +52,7 @@ publication and how to parse it.
 - **Projected annual cost** — every entry has a `projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
 - **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
 - **Translated UI** — English, Dutch, French and German.
+- **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
@@ -342,6 +343,33 @@ fail at fetch time).
   household size, or switching to a cheaper commune — is **not**
   reflected in `current_year_cost` until the next January 1; the
   `projected_annual_cost` sensor reflects it immediately.
+
+### Keeping the projection honest
+
+`projected_annual_cost` runs off the consumption figure you typed at
+setup, which is a guess until your meter has measured a real year. Once
+it has, the daily tick compares the two and, when the typed figure is
+**10 %** or more off, raises a Repair under **Settings → Repairs**
+showing both numbers. Its button writes the measured figure into the
+options; ignoring the card keeps what you typed. Nothing is overwritten
+without you pressing it.
+
+A year only counts if the meter has statistics on both sides of it: a
+bucket before 1 January proves it was already running when the year
+started, one in that year's December proves it was still running at the
+end. A meter installed in June therefore never produces a prompt. That
+check is also why the prompt can appear the first day you wire up a
+meter that has been recording in Home Assistant since before last
+January, rather than only after a January 1 rollover.
+
+A year in which the recorded register went backwards is skipped too,
+which is what replacing a `total` meter looks like. A
+`total_increasing` meter never gets that far: Home Assistant reads the
+drop as a new cycle and its running sum climbs through the swap, which
+already yields the figure this wants.
+
+The year-to-date sensors are unaffected either way: they always read the
+meter, never this setting.
 
 ### Failure mode
 

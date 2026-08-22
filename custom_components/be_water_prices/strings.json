@@ -135,6 +135,20 @@
           "still_stale": "The refresh ran, but the {utility} snapshot is still stale, so the Repair card stays. Retry later, or check the integration's GitHub issues and the daily live-check workflow run for the underlying failure."
         }
       }
+    },
+    "projection_outdated": {
+      "title": "{utility} projection uses an outdated consumption figure",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Use your {year} water use for the {utility} projection",
+            "description": "Your water meter measured {metered} m³ over the whole of {year}. The projected annual cost sensor is still set to {configured} m³ per year.\n\nPress Submit to replace the configured figure with {metered} m³. The projected cost updates immediately. The year-to-date sensors are unaffected either way, since those always read the meter rather than this setting.\n\nIgnore this card to keep {configured} m³."
+          }
+        },
+        "abort": {
+          "cannot_apply": "The {utility} entry can no longer be updated, so nothing was changed. It was most likely removed while this card was open."
+        }
+      }
     }
   }
 }

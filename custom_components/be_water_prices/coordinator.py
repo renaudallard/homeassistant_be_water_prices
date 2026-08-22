@@ -71,6 +71,9 @@ from .const import (
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
+    MAX_CONSUMPTION_M3,
+    MIN_CONSUMPTION_M3,
+    PROJECTION_DRIFT_RATIO,
     SNAPSHOT_STALE_AFTER_DAYS,
     UPDATE_INTERVAL_HOURS,
 )
@@ -513,6 +516,15 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # additionally schedules a debounced save so a hard crash between
         # ticks keeps the climbing figure.
         self._cycle_dirty = False
+        # (meter, year, configured m3) the projection prompt was last
+        # decided for. The answer only changes when one of those does, so
+        # remembering them spares the thirteen-month statistics query on
+        # every tick but the first. The meter belongs in the key: an
+        # options change reloads the entry and rebuilds this, but
+        # Energy-dashboard auto-discovery can resolve a different meter
+        # with no reload at all, and that is a different year's worth of
+        # water.
+        self._projection_checked: tuple[str, int, float] | None = None
         self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
         super().__init__(
             hass,
@@ -655,6 +667,66 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         else:
             ir.async_delete_issue(self.hass, DOMAIN, self.stale_issue_id)
 
+    @property
+    def projection_issue_id(self) -> str:
+        """Stable Repairs issue id for this entry's projection-drift prompt."""
+        return f"projection_outdated_{self.entry.entry_id}"
+
+    async def _sync_projection_issue(self, meter: str) -> None:
+        """Offer a whole metered year as the projected-cost sensor's input.
+
+        The projection runs off a figure typed once during setup and never
+        revisited, while the meter has since measured a full year of the
+        real thing. Overwriting the option outright would move a sensor
+        with no visible cause, so the measured figure is offered through a
+        Repair the user accepts or ignores.
+
+        Reads a closed year straight from the recorder and asks the running
+        cycle nothing, so it cannot disturb the year in progress.
+        """
+        year = dt_util.now().year - 1
+        configured = float(
+            self.entry.options.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3)
+        )
+        if self._projection_checked == (meter, year, configured):
+            return
+        try:
+            metered = await _recorder_full_year_m3(self.hass, meter, year)
+        except RecorderUnavailable as err:
+            # Leave the pair unrecorded so the next tick asks again rather
+            # than treating an unreadable database as a settled answer.
+            _LOGGER.debug("could not read %d for %s: %s", year, meter, err)
+            return
+        self._projection_checked = (meter, year, configured)
+        offer = round(metered) if metered is not None else None
+        if (
+            offer is None
+            or not MIN_CONSUMPTION_M3 <= offer <= MAX_CONSUMPTION_M3
+            or configured <= 0
+            or abs(offer - configured) / configured < PROJECTION_DRIFT_RATIO
+        ):
+            ir.async_delete_issue(self.hass, DOMAIN, self.projection_issue_id)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self.projection_issue_id,
+            is_fixable=True,
+            is_persistent=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="projection_outdated",
+            translation_placeholders={
+                "utility": self._extractor.label,
+                "year": str(year),
+                "metered": f"{offer:d}",
+                "configured": f"{configured:.0f}",
+            },
+            # The fix flow writes the option, so it needs both the entry to
+            # write it to and the figure to write; the issue's placeholders
+            # are display strings and are not read back as numbers.
+            data={"entry_id": self.entry.entry_id, "consumption_m3": offer},
+        )
+
     def _project_cost(self, tariff: WaterTariff) -> float | None:
         opts = self.entry.options
         consumption = float(opts.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3))
@@ -787,6 +859,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self.async_setup_live_tracking()
         if not meter:
             return None, None
+        # Before anything reads the meter or folds the cycle, not after:
+        # this awaits a recorder query, and an await between the fold and
+        # the return is exactly the window a live meter event uses to
+        # publish a higher figure that the stale locals here would then
+        # overwrite with a lower one. Everything below re-reads its state.
+        # Advisory, so a failure logs and is dropped rather than taking the
+        # tick down and blanking every sensor on the entry.
+        try:
+            await self._sync_projection_issue(meter)
+        except Exception:
+            _LOGGER.exception("could not check the projection against a metered year")
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         recorder_m3: float | None = None
@@ -1040,27 +1123,23 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
     return None
 
 
-async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end: date) -> float:
-    """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
+async def _recorder_daily_rows(
+    hass: HomeAssistant, entity_id: str, start: date, end: date
+) -> list[Any]:
+    """Return the daily statistics buckets for ``entity_id`` over ``[start, end]``.
 
     Wraps :func:`statistics_during_period` via the recorder's executor so
     the SQLite query never runs on the event loop.
 
-    Returns the year's consumption, and ``0.0`` when there is nothing to
-    read: an empty year, or no recorder to read it from. Raises
-    :class:`RecorderUnavailable` only when a recorder that is running could
-    not answer this query.
+    Returns an empty list when there is nothing to read: an empty period, or
+    no recorder to read it from. Raises :class:`RecorderUnavailable` only
+    when a recorder that is running could not answer this query.
 
-    Those are different answers and the caller has to tell them apart: a
-    year with no statistics may be anchored at zero, a query that failed may
-    not, or a database hiccup would discard consumption already reported.
-    Collapsing both into ``None`` is what every year-stamp and deferral
-    guard in this module was re-deriving one call later. The absent-recorder
-    cases belong with the empty year rather than the failure, because they
-    never resolve: reporting them as unreadable leaves the caller waiting
-    for a recovery that cannot come.
+    The absent-recorder cases belong with the empty period rather than with
+    the failure, because they never resolve: reporting them as unreadable
+    leaves the caller waiting for a recovery that cannot come.
 
-    Reads the ``change`` field, which the recorder defines as the
+    Asks for the ``change`` field, which the recorder defines as the
     delta of the cumulative ``sum`` between the bucket's first and
     last sample. Reading ``sum`` directly would yield the all-time
     running total -- summing those would multiply the figure by however
@@ -1081,7 +1160,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
         # No recorder component at all: there are no statistics to read and
         # there never will be, so the year starts here rather than being
         # treated as unreadable forever.
-        return 0.0
+        return []
 
     try:
         instance = get_instance(hass)
@@ -1094,7 +1173,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
         # component at all, and it has to be, or such an install could never
         # anchor a year and both YTD sensors would sit unknown forever.
         _LOGGER.debug("no recorder instance for %s: %s", entity_id, err)
-        return 0.0
+        return []
 
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
@@ -1119,8 +1198,24 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
         raise RecorderUnavailable(str(err)) from err
 
     rows: list[Any] = list(stats.get(entity_id, []))
+    return rows
+
+
+async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end: date) -> float:
+    """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
+
+    Returns the period's consumption, and ``0.0`` when there is nothing to
+    read. Raises :class:`RecorderUnavailable` only when a recorder that is
+    running could not answer the query.
+
+    Those are different answers and the caller has to tell them apart: a
+    year with no statistics may be anchored at zero, a query that failed may
+    not, or a database hiccup would discard consumption already reported.
+    Collapsing both into ``None`` is what every year-stamp and deferral
+    guard in this module was re-deriving one call later.
+    """
     total = 0.0
-    for row in rows:
+    for row in await _recorder_daily_rows(hass, entity_id, start, end):
         delta = row.get("change")
         if delta is None:
             continue
@@ -1131,3 +1226,65 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     # year-to-date consumption; floor at 0 so the sensor degrades to
     # "no consumption since meter swap" rather than negative numbers.
     return max(0.0, total)
+
+
+async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int) -> float | None:
+    """Return ``year``'s metered consumption, or ``None`` if it is not a whole year.
+
+    Only a year the meter has statistics on both sides of can be read as a
+    full one. A meter that first reported in June produces a June-to-December
+    figure indistinguishable from a frugal year, and offering that as the
+    yearly consumption would understate the projection for as long as the
+    user kept it. So the window opens in the previous December: a bucket
+    before 1 January proves the meter was already running when the year
+    started, and a bucket in the year's own December proves it was still
+    running when the year ended.
+
+    Asking for history on either side rather than for a bucket dated
+    1 January is deliberate. A meter reports when water moves, so a quiet
+    day has no bucket at all, and a household away over New Year would fail
+    the stricter test while having a perfectly complete year.
+
+    A negative daily delta means the recorded register went backwards. On a
+    ``total`` meter that is what replacing the meter looks like, and the
+    deltas around it no longer describe one meter's consumption, so the year
+    is not offered rather than offered wrong. A ``total_increasing`` meter
+    never produces one: Home Assistant reads the drop as the start of a new
+    cycle and its running sum climbs straight through, which already gives
+    this the figure it wants.
+    """
+    rows = await _recorder_daily_rows(hass, entity_id, date(year - 1, 12, 1), date(year, 12, 31))
+    # Daily buckets start at local midnight, so each of these lands exactly
+    # on a bucket boundary. The upper one is not defensive: asking for a
+    # day period makes Home Assistant re-align the end of the window to the
+    # following local midnight, and the end handed over is already midnight,
+    # so it gains a whole day and the query returns 1 January of the year
+    # after. Summing that would count a day that belongs to the next year,
+    # and a meter replaced on New Year's day would put its negative delta in
+    # that bucket and have the whole year refused for it.
+    jan1 = dt_util.start_of_local_day(date(year, 1, 1)).timestamp()
+    dec1 = dt_util.start_of_local_day(date(year, 12, 1)).timestamp()
+    next_year = dt_util.start_of_local_day(date(year + 1, 1, 1)).timestamp()
+    before_year = False
+    into_december = False
+    total = 0.0
+    for row in rows:
+        bucket = row.get("start")
+        if bucket is None:
+            continue
+        if bucket < jan1:
+            before_year = True
+            continue
+        if bucket >= next_year:
+            continue
+        if bucket >= dec1:
+            into_december = True
+        delta = row.get("change")
+        if delta is None:
+            continue
+        if delta < 0:
+            return None
+        total += float(delta)
+    if not (before_year and into_december):
+        return None
+    return total

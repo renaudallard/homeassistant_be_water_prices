@@ -139,6 +139,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # mark instead of reverting to the last daily-tick value.
             await coordinator.async_save_ytd_state()
             ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
+            ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
         if not domain_data:
             async_unregister_services(hass)
     return unloaded
