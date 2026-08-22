@@ -49,8 +49,8 @@ publication and how to parse it.
 - **Walloon CWaPE tiers** — first 30 m³ at `0.5·CVD + FSE` (CVA exempt on the residential first block), above 30 m³ at full `CVD + CVA + FSE`, plus the regulator-defined `20·CVD + 30·CVA` redevance. Verified to the cent against inBW's published facture.
 - **Brussels linear** — VIVAQUA's single-rate domestic tariff plus the annual fixed fee.
 - **Postcode auto-resolution** — enter your postcode and the right utility is picked automatically. Fall through to a manual picker for the long tail.
-- **Projected annual cost** — every entry has a `water_projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
-- **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `water_current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
+- **Projected annual cost** — every entry has a `projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
+- **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice.
 - **Translated UI** — English, Dutch, French and German.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
@@ -149,16 +149,23 @@ with `basis_volume = 30 + 30·persons` for Flanders. The math lives in
 as a pure function so it stays unit-testable without a Home Assistant
 install.
 
-`sensor.<entry>_water_all_in_basis` reports the per-m³ price you
-actually pay (basis or linear plus sanering, VAT-incl) so a dashboard
-can surface "your water costs you X EUR per cubic metre" at a glance.
+The all-in basis rate sensor reports the per-m³ price you actually
+pay (basis or linear plus sanering, VAT-incl) so a dashboard can
+surface "your water costs you X EUR per cubic metre" at a glance.
 
 ## Sensors
 
-All sensors share one device per config entry. Up to eight entities
-per entry: `water_comfort_rate` only appears for Flemish utilities;
-`water_current_year_cost` and `water_ytd_consumption` are always
-created and report `unknown` until a water meter is wired up
+All sensors share one device per config entry, named after the
+utility (`VIVAQUA`, `De Watergroep`, ...). Home Assistant builds the
+entity id from the device name plus the sensor name, so the projected
+cost lands on `sensor.vivaqua_projected_annual_cost` for a VIVAQUA
+entry and `sensor.de_watergroep_projected_annual_cost` for a De
+Watergroep one. The table below lists the suffix; rename the device
+and the prefix follows.
+
+Up to eight entities per entry: `comfort_rate` only appears for
+Flemish utilities; `current_year_cost` and `year_to_date_consumption`
+are always created and report `unknown` until a water meter is wired up
 (explicit override in the OptionsFlow, or auto-discovered from the
 Energy dashboard). The next coordinator tick after the meter shows
 up fills in the values without an HA restart. Re-pointing the Energy
@@ -166,16 +173,16 @@ dashboard at a different water meter is picked up the same way: the
 following tick re-anchors on the new meter and live tracking moves
 with it, again without a restart.
 
-| Sensor | Description |
+| Entity id suffix | Description |
 | --- | --- |
-| `water_yearly_fee` | Vastrecht / redevance in EUR/year, ex-VAT, parsed from the utility's own publication. |
-| `water_basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
-| `water_comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
-| `water_sanering_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
-| `water_all_in_basis` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
-| `water_projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
-| `water_current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure is **monotonic within the year**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. Returns `unknown` until a water meter is configured in the options step. |
-| `water_ytd_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark so it never decreases mid-year. Companion to `water_current_year_cost`. |
+| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, parsed from the utility's own publication. |
+| `basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
+| `comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
+| `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
+| `all_in_basis_rate` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
+| `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
+| `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure is **monotonic within the year**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. Returns `unknown` until a water meter is configured in the options step. |
+| `year_to_date_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark so it never decreases mid-year. Companion to `current_year_cost`. |
 
 Each sensor exposes `valid_from`, `valid_until`, `publication_label`,
 `source_url`, `snapshot_age_hours`, `snapshot_stale`, and `last_error`
@@ -247,7 +254,7 @@ auto-resolves cleanly.
      HA's Energy dashboard (Settings → Dashboards → Energy → Water
      consumption); set it only when you want a different sensor than
      what the Energy dashboard sees. The
-     `water_current_year_cost` and `water_ytd_consumption` entities
+     `current_year_cost` and `year_to_date_consumption` entities
      are always created -- they report `unknown` until a meter is
      wired up through either path, and the next coordinator tick
      after that fills them in without an HA restart.
@@ -290,8 +297,8 @@ fail at fetch time).
 - **Projected cost** — recomputed every coordinator tick **and**
   immediately when you save new options, so changing your consumption
   or household size shows up without waiting for the next refresh.
-- **Running cost / consumption** — `water_current_year_cost` and
-  `water_ytd_consumption` update **live**: each time your configured
+- **Running cost / consumption** — `current_year_cost` and
+  `year_to_date_consumption` update **live**: each time your configured
   water-meter sensor reports new usage, the running bill and YTD volume
   recompute immediately (in-memory, no extra recorder or network call).
   A live update never defers the 24 h tariff refresh above, however often
@@ -333,8 +340,8 @@ fail at fetch time).
   Because the running cost is a high-water mark, a mid-year change that
   *lowers* your bill — enabling the social tariff, reducing the
   household size, or switching to a cheaper commune — is **not**
-  reflected in `water_current_year_cost` until the next January 1; the
-  `water_projected_annual_cost` sensor reflects it immediately.
+  reflected in `current_year_cost` until the next January 1; the
+  `projected_annual_cost` sensor reflects it immediately.
 
 ### Failure mode
 
@@ -428,9 +435,9 @@ reporting an issue.
   the integrale waterprijs basistarief -- it does not split drinkwater
   from sanering. We store the integrated value in `basis_eur_per_m3`
   with sanering = 0; the bill total is correct but the
-  `water_basis_rate` sensor shows the integrated rate rather than
+  `basis_rate` sensor shows the integrated rate rather than
   drinkwater alone. Pidpa and AGSO Knokke publish split components
-  and surface drinkwater-only on `water_basis_rate`.
+  and surface drinkwater-only on `basis_rate`.
 
 ## Development
 

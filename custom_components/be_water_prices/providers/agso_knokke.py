@@ -44,8 +44,8 @@ for "the latest year present" without relying on a fragile heading
 match. Falls back to the only table when just one is published.
 
 Stores all three components separately (drinkwater + afvoer +
-zuivering) the way Pidpa does, so the ``water_basis_rate`` /
-``water_sanering_rate`` sensors decompose cleanly. Uses the standard
+zuivering) the way Pidpa does, so the ``basis_rate`` /
+``sewerage_rate`` sensors decompose cleanly. Uses the standard
 VMM vastrecht (50/30/20 + 10/6/4) materialised from
 :mod:`const`.
 """

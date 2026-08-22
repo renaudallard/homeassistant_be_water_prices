@@ -30,9 +30,9 @@ a plain venv. The coordinator imports both helpers and applies them to
 the user's stored options:
 
   * :func:`compute_annual_cost` -- the full-year projection that powers
-    ``sensor.water_projected_annual_cost``. Pro-rates nothing.
+    ``sensor.<utility>_projected_annual_cost``. Pro-rates nothing.
   * :func:`compute_ytd_cost` -- the running year-to-date bill that
-    powers ``sensor.water_current_year_cost``. The volumetric branch is
+    powers ``sensor.<utility>_current_year_cost``. The volumetric branch is
     the same; only the annual fees (vastrecht / redevance) are
     pro-rated by the elapsed fraction of the calendar year so the
     sensor sits at ~0 on Jan 1 and grows to the full fee by Dec 31.
