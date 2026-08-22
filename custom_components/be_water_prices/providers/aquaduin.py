@@ -46,7 +46,7 @@ per-m³ rate among Flemish operators). The PDF does not split it into separate
 drinkwater / sanering rows the way Pidpa or AGSO Knokke do. We store
 it as ``basis_eur_per_m3`` with sanering = 0, which keeps the
 volumetric math correct (per_m3_basis = basis + sanering still equals
-the published 5.9908). The trade-off: the ``water_basis_rate`` sensor
+the published 5.9908). The trade-off: the ``basis_rate`` sensor
 shows the integrated rate rather than the drinkwater-only rate, which
 is unavoidable without per-component publication.
 """
