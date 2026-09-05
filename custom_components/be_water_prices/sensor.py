@@ -46,7 +46,7 @@ from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from ._redact import scrub_tokens, sensitive_tokens
+from ._redact import scrub_tokens, sensitive_tokens, source_url_without_commune
 from .const import (
     CONF_COMMUNE,
     CONF_UTILITY,
@@ -55,6 +55,10 @@ from .const import (
 )
 from .coordinator import CoordinatorData, WaterCoordinator, utility_device_info
 from .providers import get
+
+# Kept under the old private name so the sensor attribute and the
+# device's configuration_url redact through one helper.
+_source_url_without_commune = source_url_without_commune
 
 EUR_PER_M3 = f"{CURRENCY_EURO}/{UnitOfVolume.CUBIC_METERS}"
 EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
@@ -95,20 +99,6 @@ def _publication_label_without_commune(label: str, tokens: list[str]) -> str:
                 # Outermost ( found; drop it plus the preceding space.
                 return label[: i - 1] if i > 0 and label[i - 1] == " " else label[:i]
     return label
-
-
-def _source_url_without_commune(source_url: str, commune: str | None) -> str:
-    """Redact a per-commune slug from the tariff source URL.
-
-    The Pidpa per-commune URL ends in the commune slug (the town name),
-    so the source_url attribute would otherwise leak the household
-    location into the recorder / screenshots just like the publication
-    label. Other per-commune utilities do not carry the commune in the
-    URL, so the substring check leaves them untouched.
-    """
-    if commune and commune in source_url:
-        return source_url.replace(commune, "**redacted**")
-    return source_url
 
 
 @dataclass(frozen=True, kw_only=True)

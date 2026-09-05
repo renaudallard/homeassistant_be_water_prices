@@ -141,6 +141,46 @@ def test_source_url_redacts_commune_slug() -> None:
     assert _source_url_without_commune(url, "25071") == url
 
 
+def test_the_device_link_redacts_the_commune_too() -> None:
+    """The device card is as public as the sensor attribute.
+
+    configuration_url deep-links to the tariff publication, and for the
+    per-commune utilities that URL carries the town name. It shows in
+    screenshots and exports exactly like the attribute that was already
+    being redacted.
+    """
+    from datetime import UTC
+
+    from custom_components.be_water_prices.const import CONF_COMMUNE
+    from custom_components.be_water_prices.coordinator import (
+        CoordinatorData,
+        utility_device_info,
+    )
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    coordinator = _StubCoordinator()
+    coordinator.entry.data = {CONF_UTILITY: "pidpa"}
+    coordinator.entry.options = {CONF_COMMUNE: "geel"}
+    coordinator.data = CoordinatorData(  # type: ignore[assignment]
+        tariff=WaterTariff(
+            utility="pidpa",
+            region="flanders",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="Pidpa tarieven 2026 (Geel)",
+            source_url="https://www.pidpa.be/ons-aanbod/je-gemeente/geel",
+            yearly_fixed_fee=50.0,
+        ),
+        fetched_at=datetime(2026, 1, 2, tzinfo=UTC),
+        snapshot_age_hours=1.0,
+        snapshot_stale=False,
+    )
+
+    info = utility_device_info(coordinator)  # type: ignore[arg-type]
+    assert "geel" not in (info["configuration_url"] or "")
+    assert "**redacted**" in (info["configuration_url"] or "")
+
+
 def test_label_suffix_survives_when_it_is_not_the_commune() -> None:
     """Only a suffix naming the commune is redaction; the rest is content.
 

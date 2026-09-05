@@ -61,6 +61,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import VolumeConverter
 
+from ._redact import source_url_without_commune
 from .const import (
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
@@ -496,7 +497,13 @@ def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
         model = ""
     source_url: str | None = None
     if coordinator.data is not None:
-        source_url = coordinator.data.tariff.source_url
+        # The device card is as public as the sensor attribute -- it shows
+        # in screenshots and exports the same way -- so the commune slug
+        # comes out of the deep link too.
+        source_url = source_url_without_commune(
+            coordinator.data.tariff.source_url,
+            coordinator.entry.options.get(CONF_COMMUNE),
+        )
     return DeviceInfo(
         identifiers={(DOMAIN, coordinator.entry.entry_id)},
         name=coordinator.entry.title,
