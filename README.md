@@ -336,12 +336,14 @@ you paid is worth more than a tidy chart.
   report is held until the next reading confirms it, so one garbage value
   cannot pin the year's figure while a real catch-up after a long outage
   still lands.
-  If the recorder cannot be read at the moment the year rolls over, both
-  sensors report `unknown` until it answers again rather than starting the
-  new year at 0: a query that failed is not the same as a year that is
-  genuinely empty, and anchoring on it would discard consumption already
-  recorded. An install with no recorder at all is a genuinely empty year
-  and does start from 0.
+  If the recorder cannot be read at the moment the year rolls over, neither
+  sensor starts the new year at 0: a query that failed is not the same as a
+  year that is genuinely empty, and anchoring on it would discard
+  consumption already recorded. The daily tick reports `unknown` in that
+  state. A meter reading arriving before the tick has placed the new year
+  cannot move the figure either, so the sensors hold the last value they
+  published -- December's -- until the tick gets an answer. An install with
+  no recorder at all is a genuinely empty year and does start from 0.
   The figure also heals itself upward. If the meter drops out and the
   recorder reports more consumption for the year than the anchor accounts
   for, the next daily tick re-reads the meter and the recorder together and
