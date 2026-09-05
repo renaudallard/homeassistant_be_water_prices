@@ -229,6 +229,28 @@ def test_a_repeated_jump_is_a_genuine_catch_up() -> None:
     assert out.hold_m3 is None
 
 
+def test_a_reading_that_refutes_the_hold_faces_the_jump_test_itself() -> None:
+    """A hold is not a licence for whatever arrives next.
+
+    Releasing on any second reading meant one spike opened the door for
+    the next, whatever it was, and that one went into the year's mark
+    untested. A reading well below the held value refutes it rather
+    than confirming it, so it has to stand on its own.
+    """
+    out = _round(_anchored(25.0, 80.0), reading=250.0, hold_m3=400.0)
+
+    assert out.m3 == 25.0
+    assert out.hold_m3 == 250.0
+
+
+def test_a_reading_above_the_hold_still_confirms_it() -> None:
+    """A register that has climbed past the held value is a real catch-up."""
+    out = _round(_anchored(25.0, 80.0), reading=900.0, hold_m3=400.0)
+
+    assert out.m3 == 820.0
+    assert out.hold_m3 is None
+
+
 def test_a_normal_reading_releases_a_held_jump() -> None:
     out = _round(_anchored(25.0, 80.0), reading=106.0, hold_m3=400.0)
 

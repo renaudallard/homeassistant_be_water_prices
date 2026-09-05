@@ -400,7 +400,16 @@ def _fold(
         hold_run = 0
         hold_span_s = 0.0
         framed = reading - offset
-        if mark is not None and framed - mark > _IMPLAUSIBLE_JUMP_M3 and hold_m3 is None:
+        # A held jump is released by a reading that stands behind it --
+        # the meter really is up there. A reading that lands somewhere
+        # else entirely refutes the hold instead of confirming it, and
+        # has to face the jump test on its own rather than being waved
+        # through on the strength of the value it just contradicted.
+        corroborated = hold_m3 is not None and reading >= hold_m3 - _IMPLAUSIBLE_JUMP_M3
+        if corroborated:
+            candidate = framed
+            hold_m3 = None
+        elif mark is not None and framed - mark > _IMPLAUSIBLE_JUMP_M3:
             # A step this large in one report is a garbage value far more
             # often than real usage, and the mark only ever climbs, so taking
             # it would pin the year until January. Hold it for one reading: a
