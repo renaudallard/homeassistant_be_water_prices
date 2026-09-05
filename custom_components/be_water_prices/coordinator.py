@@ -1194,15 +1194,29 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
     data = getattr(manager, "data", None)
     if not data:
         return None
-    for source in data.get("energy_sources", []):
-        if not isinstance(source, dict):
-            continue
-        if source.get("type") != "water":
-            continue
-        stat = source.get("stat_energy_from")
-        if stat:
-            return str(stat)
-    return None
+    stats = [
+        str(source["stat_energy_from"])
+        for source in data.get("energy_sources", [])
+        if isinstance(source, dict)
+        and source.get("type") == "water"
+        and source.get("stat_energy_from")
+    ]
+    if not stats:
+        return None
+    if len(stats) > 1:
+        # One meter is what the YTD helpers are built around: they take a
+        # single statistic id, and the live path tracks one entity. A
+        # household with two water meters gets the first and no hint that
+        # the rest are missing from the bill, so say so once per tick at
+        # a level that reaches the log by default.
+        _LOGGER.warning(
+            "Energy dashboard lists %d water meters; billing %s and ignoring %s. "
+            "Set the water meter explicitly in the integration options to choose.",
+            len(stats),
+            stats[0],
+            ", ".join(stats[1:]),
+        )
+    return stats[0]
 
 
 async def _recorder_daily_rows(
