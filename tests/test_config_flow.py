@@ -75,10 +75,19 @@ def test_other_flanders_postcodes_resolve_to_de_watergroep() -> None:
     assert _resolve_postcode("3500") == "de_watergroep"
 
 
-def test_brabant_wallon_postcodes_resolve_to_inbw() -> None:
+def test_brabant_wallon_is_split_between_inbw_and_swde() -> None:
+    # The province is not inBW territory end to end: the ZDE gives inBW 20
+    # of its 44 postcodes and SWDE the other 24, so the table decides and
+    # a blanket range rule would mis-bill half the province.
     assert _resolve_postcode("1300") == "inbw"
     assert _resolve_postcode("1380") == "inbw"
-    assert _resolve_postcode("1499") == "inbw"
+    assert _resolve_postcode("1495") == "inbw"
+    assert _resolve_postcode("1315") == "swde"
+    assert _resolve_postcode("1421") == "swde"
+    assert _resolve_postcode("1480") == "swde"
+    # A number inside the range that no commune uses has no answer at all,
+    # which sends the user to the manual picker instead of guessing.
+    assert _resolve_postcode("1499") is None
 
 
 def test_liege_core_resolves_to_cile() -> None:
