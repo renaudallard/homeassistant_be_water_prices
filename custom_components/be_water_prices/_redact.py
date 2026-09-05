@@ -70,3 +70,17 @@ def scrub_tokens(value: Any, tokens: list[str], placeholder: str = "**REDACTED**
     if isinstance(value, list):
         return [scrub_tokens(v, tokens, placeholder) for v in value]
     return value
+
+
+def source_url_without_commune(source_url: str, commune: str | None) -> str:
+    """Redact a per-commune slug from the tariff source URL.
+
+    The Pidpa per-commune URL ends in the commune slug (the town name),
+    so a published source_url would otherwise leak the household
+    location into the recorder / screenshots just like the publication
+    label. Other per-commune utilities do not carry the commune in the
+    URL, so the substring check leaves them untouched.
+    """
+    if commune and commune in source_url:
+        return source_url.replace(commune, "**redacted**")
+    return source_url
