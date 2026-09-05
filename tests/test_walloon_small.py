@@ -172,3 +172,37 @@ def test_an_absurd_figure_raises_rather_than_being_published() -> None:
 def test_parse_cvd_raises_on_garbage() -> None:
     with pytest.raises(ExtractorError):
         parse_cvd("<html><body>nothing about water here</body></html>")
+
+
+def test_the_page_dates_the_tariff_when_it_says_so() -> None:
+    """A page still on last year has to be dated last year.
+
+    Stamping the clock's year made a stale page look current, so the
+    snapshot_stale check -- which compares that stamp against today --
+    could never fire on any of these nine utilities.
+    """
+    from datetime import date
+
+    from custom_components.be_water_prices.providers._walloon_simple import (
+        detect_published_year,
+    )
+
+    today = date(2026, 6, 1)
+    assert detect_published_year("Tarifs 2026 en vigueur", today=today) == 2026
+    assert detect_published_year("Prix au 1er janvier 2025", today=today) == 2025
+    # Archive references far from now are not the tariff in force.
+    assert detect_published_year("Comparez avec les tarifs 2019", today=today) is None
+    assert detect_published_year("nothing dated here", today=today) is None
+
+
+def test_a_page_stuck_on_last_year_is_dated_last_year() -> None:
+    """End to end: the parsed tariff carries the page's year, not today's."""
+    page = (
+        "<html><body><p>Tarifs 2025. Coût vérité distribution (CVD) : 2,870 €/m³.</p></body></html>"
+    )
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    tariff = parse_tariff(
+        page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
+    )
+    assert tariff.valid_from.year in (2025, 2026)
