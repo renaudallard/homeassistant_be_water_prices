@@ -437,14 +437,19 @@ data:
   clear: false                            # optional; if true, wipe existing stats first
 ```
 
-`clear: true` first calls the recorder's `async_clear_statistics`
-on the targeted entities, then re-imports — useful for cleanly
-overwriting a wrong value. `clear: true` **requires** an explicit
-`entry_id`; the service rejects the blanket combination
-(`clear: true` without `entry_id`) to keep one careless call from
-wiping long-term statistics across every loaded entry. Default is
-gap-fill (the importer upserts on `(statistic_id, start)`, so a
-no-clear re-run is safely idempotent).
+`clear: true` calls the recorder's `async_clear_statistics` on the
+targeted entities before re-importing. That deletes those sensors'
+statistics **in full** — every year of them, not just the window being
+re-imported — because the recorder has no windowed delete. Whatever
+sat before `start_date` is gone and is not written back. It
+**requires** an explicit `entry_id`; the service rejects the blanket
+combination (`clear: true` without `entry_id`) to keep one careless
+call from wiping long-term statistics across every loaded entry.
+
+You rarely need it: the default gap-fill upserts on
+`(statistic_id, start)`, so re-running without `clear` overwrites the
+window in place and is safely idempotent. Reach for `clear` only when
+rows outside the window are themselves wrong.
 
 ### Diagnostics
 

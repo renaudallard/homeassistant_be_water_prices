@@ -31,11 +31,14 @@ backfill_prices:
     clear:
       name: Clear before importing
       description: >
-        If on, wipe the existing long-term statistics for the targeted
-        sensors before importing. Use this to overwrite a wrong tariff
-        value cleanly. Off by default (gap-fill behaviour). Requires a
-        config entry above: clearing every loaded entry at once is
-        irreversible, so the service refuses that combination.
+        If on, delete the targeted sensors' long-term statistics
+        entirely before importing -- every year of them, not just the
+        window being re-imported, because the recorder only deletes a
+        statistic whole. Anything older than the start date below is
+        gone and is not written back. Off by default, which overwrites
+        the window and leaves the rest alone; that is enough to correct
+        a wrong tariff value. Requires a config entry above, since
+        clearing every loaded entry at once is irreversible.
       default: false
       selector:
         boolean:
