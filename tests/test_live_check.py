@@ -166,3 +166,37 @@ def test_render_reports_transient_without_a_failure_banner() -> None:
     assert "No regressions" in out
     assert "1 transient" in out
     assert "extractors failed" not in out
+
+
+def test_every_ci_blocked_key_matches_a_real_extractor() -> None:
+    """Nothing referenced this map, so a typo in it was invisible.
+
+    A key that matches no extractor means the utility is fetched on the
+    runner after all, its CDN answers 403, _http_error calls that a real
+    failure, and the daily workflow opens -- then comments on, every day,
+    forever -- an issue for a utility that works fine for real users.
+    """
+    from custom_components.be_water_prices.providers import all_extractors
+    from scripts.live_check import CI_BLOCKED
+
+    ids = {extractor.id for extractor in all_extractors()}
+    assert set(CI_BLOCKED) <= ids, (
+        f"CI_BLOCKED names extractors that do not exist: {sorted(set(CI_BLOCKED) - ids)}"
+    )
+
+
+async def test_a_ci_blocked_extractor_is_skipped_without_fetching() -> None:
+    """The skip has to happen before the fetch, not after it fails."""
+    from custom_components.be_water_prices.providers import WaterExtractor, WaterTariff
+    from scripts.live_check import CI_BLOCKED, _check_one
+
+    blocked_id = next(iter(CI_BLOCKED))
+
+    async def _never_called(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise AssertionError("must not fetch a CI-blocked utility")
+
+    extractor = WaterExtractor(
+        id=blocked_id, label="blocked", region="flanders", fetch=_never_called
+    )
+    result = await _check_one(session=None, extractor=extractor)  # type: ignore[arg-type]
+    assert result.status == "SKIP"
