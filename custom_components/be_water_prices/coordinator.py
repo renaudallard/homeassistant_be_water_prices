@@ -346,6 +346,11 @@ def _fold(
             candidate = 0.0
             hold_m3 = None
             hold_run = 0
+            # The mark belongs to the meter that has just been replaced,
+            # and the new one starts far below it. Leaving it behind would
+            # keep every later reading under a mark it cannot reach, and
+            # the frame could never be corrected again this year.
+            high_m3 = reading
     elif offset is None:
         # No frame this year yet, and the reading clears the bar. Build the
         # frame from the highest figure the year already has, so the reading

@@ -152,6 +152,19 @@ def test_a_dip_with_a_mark_behind_it_still_rebuilds_the_frame() -> None:
     assert out.cycle.offset_m3 == 75.0
 
 
+def test_a_confirmed_swap_takes_the_mark_with_it() -> None:
+    """The old meter's high-water mark must not outlive the old meter.
+
+    A new meter starts far below the one it replaced, so a mark left
+    behind sits above every reading it will ever produce and the frame
+    can never be corrected again this year.
+    """
+    out = _round(_anchored(25.0, 80.0), reading=3.0, hold_run=2, high_m3=105.0)
+
+    assert out.cycle.offset_m3 == 3.0
+    assert out.high_m3 == 3.0
+
+
 def test_an_implausible_jump_is_held_for_one_reading() -> None:
     """A garbage spike must not become the year's mark."""
     out = _round(_anchored(25.0, 80.0), reading=400.0)
