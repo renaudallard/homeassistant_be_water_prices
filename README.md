@@ -181,7 +181,7 @@ with it, again without a restart.
 
 | Entity id suffix | Description |
 | --- | --- |
-| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, parsed from the utility's own publication. |
+| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT. Parsed from the publication for VIVAQUA only. Flemish entries carry the decreed uniform vastrecht (50+30+20, or 50 alone on the drinkwater-only fallback); Walloon entries use the regulator's formula `20·CVD + 30·CVA`, where the CVD is parsed and the CVA is the flat SPGE constant. |
 | `basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
 | `comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
 | `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
