@@ -124,3 +124,34 @@ def test_a_thin_farys_scrape_aborts_too() -> None:
         pytest.raises(R.ScrapeTooThinError, match="Farys"),
     ):
         R.build_dwg_flanders_carveout()
+
+
+def test_both_carveouts_share_one_pair_of_fetches() -> None:
+    """The two carve-outs read the same two pages; fetch them once.
+
+    Building them independently hit each operator's dropdown twice per
+    annual run for no gain.
+    """
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from scripts import refresh_postcodes as R
+
+    page = (Path(__file__).parent / "fixtures" / "dewatergroep_tarieven_2026.html").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    calls: list[str] = []
+
+    def _fetch(url: str) -> str:
+        calls.append(url)
+        return page
+
+    R._DROPDOWN_CACHE = None
+    try:
+        with patch.object(R, "_fetch", _fetch):
+            R.build_dwg_flanders_carveout()
+            R.build_farys_vlaams_brabant_carveout()
+    finally:
+        R._DROPDOWN_CACHE = None
+
+    assert len(calls) == 2, f"expected one fetch per dropdown, got {calls}"
