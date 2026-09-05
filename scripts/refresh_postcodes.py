@@ -123,6 +123,15 @@ def fetch_postcodes() -> list[dict[str, object]]:
     return list(data["features"])
 
 
+class ScrapeTooThinError(Exception):
+    """A dropdown scrape came back with implausibly few postcodes.
+
+    Distinct from an HTTP error: the fetch succeeded and returned a
+    page, it just was not the page we asked for. Committing the result
+    would silently flip every carve-out postcode to the other operator.
+    """
+
+
 class ZdeQueryError(Exception):
     """The ZDE endpoint could not be queried (network / HTTP failure).
 
@@ -230,6 +239,14 @@ def render_dict(mapping: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
+# Floors for the two dropdown scrapes. The live lists carry roughly 310
+# De Watergroep and 290 Farys entries, so anything under a hundred means
+# the fetch came back with something other than the page -- a bot-check
+# interstitial, a consent wall, a restyle that dropped the <option>
+# elements. All of those answer HTTP 200, so only the count catches them.
+MIN_PLAUSIBLE_DWG_POSTCODES = 100
+MIN_PLAUSIBLE_FARYS_POSTCODES = 100
+
 DWG_DROPDOWN_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
 FARYS_DROPDOWN_URL = "https://www.farys.be/nl/watertarieven"
 # Captures "<postcode> - <commune> (<gemeente>)" from a <option> label
@@ -293,12 +310,7 @@ def build_dwg_flanders_carveout() -> list[str]:
     are phantoms (Leffinge, Hemelveerdegem, ...) are correctly treated
     as DWG-only.
     """
-    print("scraping DWG commune dropdown …", file=sys.stderr)
-    dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
-    print(f"  {len(dwg_pc)} DWG postcodes", file=sys.stderr)
-    print("scraping Farys commune dropdown (filtered) …", file=sys.stderr)
-    farys_pc = _scrape_farys_postcodes_filtered(_fetch(FARYS_DROPDOWN_URL))
-    print(f"  {len(farys_pc)} Farys postcodes (post-phantom-filter)", file=sys.stderr)
+    dwg_pc, farys_pc = _scrape_both_dropdowns()
     aquaduin_pc = {str(pc) for pc in _AQUADUIN_POSTCODES}
     split_pc = set(_SPLIT_POSTCODES.keys())
     carve = sorted(
@@ -313,6 +325,27 @@ def build_dwg_flanders_carveout() -> list[str]:
     return carve
 
 
+def _scrape_both_dropdowns() -> tuple[set[str], set[str]]:
+    """Both commune dropdowns, refusing a result that is too thin to be real."""
+    print("scraping DWG commune dropdown …", file=sys.stderr)
+    dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
+    print(f"  {len(dwg_pc)} DWG postcodes", file=sys.stderr)
+    if len(dwg_pc) < MIN_PLAUSIBLE_DWG_POSTCODES:
+        raise ScrapeTooThinError(
+            f"De Watergroep dropdown yielded {len(dwg_pc)} postcodes, expected at least "
+            f"{MIN_PLAUSIBLE_DWG_POSTCODES}; the page is probably not the tariff page"
+        )
+    print("scraping Farys commune dropdown (filtered) …", file=sys.stderr)
+    farys_pc = _scrape_farys_postcodes_filtered(_fetch(FARYS_DROPDOWN_URL))
+    print(f"  {len(farys_pc)} Farys postcodes (post-phantom-filter)", file=sys.stderr)
+    if len(farys_pc) < MIN_PLAUSIBLE_FARYS_POSTCODES:
+        raise ScrapeTooThinError(
+            f"Farys dropdown yielded {len(farys_pc)} postcodes, expected at least "
+            f"{MIN_PLAUSIBLE_FARYS_POSTCODES}; the page is probably not the tariff page"
+        )
+    return dwg_pc, farys_pc
+
+
 def build_farys_vlaams_brabant_carveout() -> list[str]:
     """Farys-served postcodes in 1500-1999 that De Watergroep does not list.
 
@@ -321,10 +354,7 @@ def build_farys_vlaams_brabant_carveout() -> list[str]:
     into Halle-Vilvoorde (Beersel, Asse, Zaventem, ...) and those
     postcodes would otherwise be resolved to the wrong operator.
     """
-    print("scraping DWG commune dropdown …", file=sys.stderr)
-    dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
-    print("scraping Farys commune dropdown (filtered) …", file=sys.stderr)
-    farys_pc = _scrape_farys_postcodes_filtered(_fetch(FARYS_DROPDOWN_URL))
+    dwg_pc, farys_pc = _scrape_both_dropdowns()
     split_pc = set(_SPLIT_POSTCODES.keys())
     carve = sorted(
         pc for pc in farys_pc if 1500 <= int(pc) <= 1999 and pc not in dwg_pc and pc not in split_pc
@@ -362,8 +392,15 @@ def main() -> int:
         # incomplete by a transient ZDE outage. Rerun once the endpoint is back.
         print(f"aborting: {err}", file=sys.stderr)
         return 1
-    carve = build_dwg_flanders_carveout()
-    farys_carve = build_farys_vlaams_brabant_carveout()
+    try:
+        carve = build_dwg_flanders_carveout()
+        farys_carve = build_farys_vlaams_brabant_carveout()
+    except ScrapeTooThinError as err:
+        # Same reasoning as the Walloon half. An empty carve-out is valid
+        # Python and would flip every postcode in it to the other operator
+        # the moment it was pasted in.
+        print(f"aborting: {err}", file=sys.stderr)
+        return 1
     print("# === Walloon _PER_POSTCODE ===")
     print(render_dict(mapping))
     print()
