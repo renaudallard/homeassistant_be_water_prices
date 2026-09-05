@@ -200,8 +200,7 @@ def parse_cvd(html: str) -> float:
     plausible = [
         v
         for v in matches
-        if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD
-        and abs(v - WALLONIA_CVA_EUR_PER_M3) > 1e-9
+        if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD and abs(v - WALLONIA_CVA_EUR_PER_M3) > 1e-9
     ]
     if plausible:
         return max(plausible)

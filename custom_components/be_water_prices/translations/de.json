@@ -142,7 +142,7 @@
       "title": "{utility}-Tarif-Snapshot ist veraltet",
       "fix_flow": {
         "step": {
-          "init": {
+          "confirm": {
             "title": "{utility}-Tarifabruf erneut versuchen",
             "description": "Der letzte erfolgreich abgerufene {utility}-Tarif ist {age_days} Tage alt (gültig bis {valid_until}). Letzter Fehler: {last_error}.\n\nKlicken Sie auf Senden, um eine sofortige Aktualisierung auszulösen. Die Repair-Karte verschwindet automatisch, wenn der nächste Abruf einen neuen Snapshot liefert; andernfalls bleibt sie sichtbar, um es erneut zu versuchen oder die zugrundeliegende Ursache zu untersuchen (prüfen Sie die GitHub-Issues oder den täglichen live-check Workflow-Lauf)."
           }
@@ -156,7 +156,7 @@
       "title": "{utility}-Projektion nutzt einen veralteten Verbrauchswert",
       "fix_flow": {
         "step": {
-          "init": {
+          "confirm": {
             "title": "Ihren Verbrauch von {year} für die {utility}-Projektion verwenden",
             "description": "Ihr Wasserzähler hat im gesamten Jahr {year} {metered} m³ gemessen. Der Sensor für die projizierten Jahreskosten steht weiterhin auf {configured} m³ pro Jahr.\n\nKlicken Sie auf Senden, um den konfigurierten Wert durch {metered} m³ zu ersetzen. Die projizierten Kosten werden sofort aktualisiert. Die Sensoren seit dem 1. Januar ändern sich in beiden Fällen nicht, da sie immer den Zähler lesen und nicht diese Einstellung.\n\nIgnorieren Sie diese Karte, um {configured} m³ beizubehalten."
           }

@@ -209,7 +209,7 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
     # The form forwards the issue's placeholders so {utility} etc. render
     # instead of literal braces.
     assert result["description_placeholders"]["utility"] == "VIVAQUA"
-    result = await flow.async_step_init({})
+    result = await flow.async_step_confirm({})
     assert result["type"] == "create_entry"
     await hass.async_block_till_done()
 
@@ -399,8 +399,8 @@ async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssist
     flow.hass = hass
     flow.handler = DOMAIN
     flow.issue_id = coordinator.stale_issue_id
-    await flow.async_step_init()
-    result = await flow.async_step_init({})
+    await flow.async_step_confirm()
+    result = await flow.async_step_confirm({})
     await hass.async_block_till_done()
 
     assert result["type"] == "abort"
