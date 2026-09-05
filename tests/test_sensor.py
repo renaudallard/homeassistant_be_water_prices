@@ -141,6 +141,30 @@ def test_source_url_redacts_commune_slug() -> None:
     assert _source_url_without_commune(url, "25071") == url
 
 
+def test_label_suffix_survives_when_it_is_not_the_commune() -> None:
+    """Only a suffix naming the commune is redaction; the rest is content.
+
+    VIVAQUA puts the VAT basis in that parenthetical and De Watergroep's
+    fallback puts its drinkwater-only marker there. Dropping them told
+    the user less about their tariff and hid nothing.
+    """
+    from custom_components.be_water_prices.sensor import (
+        _publication_label_without_commune as strip,
+    )
+
+    assert strip("Price from January 1st 2026 (VAT included 6 %)", ["Geel"]) == (
+        "Price from January 1st 2026 (VAT included 6 %)"
+    )
+    # An entry with no commune configured has nothing to redact.
+    assert strip("Pidpa tarieven 2026 (Geel)", []) == "Pidpa tarieven 2026 (Geel)"
+    # The commune itself still goes, nested marker and all.
+    assert strip("Pidpa tarieven 2026 (Geel)", ["Geel"]) == "Pidpa tarieven 2026"
+    assert (
+        strip("De Watergroep tarieven 2026 (Halle (DWG-served default))", ["Halle"])
+        == "De Watergroep tarieven 2026"
+    )
+
+
 def test_last_error_is_scrubbed_of_the_commune() -> None:
     """A fetch error quotes the URL it failed on, commune slug and all.
 

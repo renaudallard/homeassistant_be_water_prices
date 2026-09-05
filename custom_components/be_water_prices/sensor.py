@@ -65,15 +65,21 @@ EUR_PER_YEAR = f"{CURRENCY_EURO}/year"
 # applied by diagnostics.py to CONF_COMMUNE_LABEL.
 
 
-def _publication_label_without_commune(label: str) -> str:
-    """Return ``label`` with the trailing ``(commune)`` suffix removed.
+def _publication_label_without_commune(label: str, tokens: list[str]) -> str:
+    """Return ``label`` with a trailing ``(commune)`` suffix removed.
+
+    Only a suffix that actually names the configured commune goes. The
+    parenthetical is not reserved for the commune: VIVAQUA publishes
+    "Price from January 1st 2026 (VAT included 6 %)" and De Watergroep's
+    drinkwater-only fallback carries its own marker, and dropping those
+    told the user less about their tariff while redacting nothing.
 
     Walks backward counting parens so nested labels like the DWG
     default-commune fallback (``"Halle (DWG-served default)"``) are
-    also stripped correctly. A regex with ``[^()]+`` would match only
-    the innermost paren and leave the outer commune name in place.
+    also stripped whole. A regex with ``[^()]+`` would match only the
+    innermost paren and leave the outer commune name in place.
     """
-    if not label.endswith(")"):
+    if not tokens or not label.endswith(")"):
         return label
     depth = 0
     for i in range(len(label) - 1, -1, -1):
@@ -83,6 +89,9 @@ def _publication_label_without_commune(label: str) -> str:
         elif ch == "(":
             depth -= 1
             if depth == 0:
+                inner = label[i + 1 : -1].casefold()
+                if not any(token.casefold() in inner for token in tokens):
+                    return label
                 # Outermost ( found; drop it plus the preceding space.
                 return label[: i - 1] if i > 0 and label[i - 1] == " " else label[:i]
     return label
@@ -404,7 +413,9 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
             "region": t.region,
             "valid_from": t.valid_from.isoformat(),
             "valid_until": t.valid_until.isoformat() if t.valid_until else None,
-            "publication_label": _publication_label_without_commune(t.publication_label),
+            "publication_label": _publication_label_without_commune(
+                t.publication_label, sensitive_tokens(self.coordinator.entry)
+            ),
             "source_url": _source_url_without_commune(
                 t.source_url, self.coordinator.entry.options.get(CONF_COMMUNE)
             ),
