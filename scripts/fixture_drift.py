@@ -370,9 +370,12 @@ def _render(results: list[DriftResult]) -> str:
 
     lines = ["# Water fixture drift report", ""]
     if not drifted and not errored:
+        # Naming the unchecked ones matters: a utility whose host answers
+        # 5xx or 429 forever is skipped on every run, and a headline that
+        # only counts the ones that passed reads as an all-clear for it.
         lines.append(
             f"All {len(clean)} fixtures match live within threshold "
-            f"({len(skipped)} skipped: see below)."
+            f"({len(skipped)} not checked this run: see below)."
             if skipped
             else f"All {len(results)} fixtures match live within threshold."
         )
