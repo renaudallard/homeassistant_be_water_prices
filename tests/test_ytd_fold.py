@@ -62,6 +62,8 @@ def _round(
     recorder_ok: bool | None = True,
     hold_m3: float | None = None,
     hold_run: int = 0,
+    hold_span_s: float = 0.0,
+    elapsed_s: float = 86400.0,
     high_m3: float | None = None,
     now_year: int = _YEAR,
     meter: str = _METER,
@@ -76,6 +78,8 @@ def _round(
         recorder_ok=recorder_ok,
         hold_m3=hold_m3,
         hold_run=hold_run,
+        hold_span_s=hold_span_s,
+        elapsed_s=elapsed_s,
         high_m3=high_m3,
         cost_of=cost_of,
     )
@@ -169,6 +173,30 @@ def test_a_reading_under_the_bar_lapses_a_held_jump() -> None:
 
     assert out.hold_m3 is None
     assert out.hold_run == 1
+
+
+def test_a_burst_of_low_readings_is_not_a_swap() -> None:
+    """Three readings inside a second are a glitch, not a replacement.
+
+    The live path folds on every state event, so a meter that drops out
+    and reconnects can produce a whole confirmation run in no time at
+    all. A real replacement keeps reading low for far longer.
+    """
+    out = _round(_anchored(25.0, 80.0), reading=3.0, hold_run=2, hold_span_s=0.4, elapsed_s=0.3)
+
+    assert out.cycle.offset_m3 == 80.0
+    assert out.m3 == 25.0
+    assert out.hold_run == 3
+
+
+def test_a_run_that_lasts_is_still_a_swap() -> None:
+    """Spread over hours, the same three readings do re-anchor the year."""
+    out = _round(
+        _anchored(25.0, 80.0), reading=3.0, hold_run=2, hold_span_s=3600.0, elapsed_s=3600.0
+    )
+
+    assert out.cycle.offset_m3 == 3.0
+    assert out.m3 == 0.0
 
 
 def test_a_confirmed_swap_takes_the_mark_with_it() -> None:

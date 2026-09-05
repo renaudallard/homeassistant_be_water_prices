@@ -1318,21 +1318,56 @@ async def test_live_ytd_single_subbaseline_reading_is_held(hass: HomeAssistant) 
 
 @pytest.mark.asyncio
 async def test_live_ytd_sustained_subbaseline_reanchors(hass: HomeAssistant) -> None:
-    """Several consecutive sub-baseline readings are a genuine meter swap.
+    """Several sub-baseline readings spread over time are a genuine swap.
 
-    The new meter climbs from ~0, so once enough consecutive readings sit
-    below the old anchor the cycle re-anchors and YTD restarts at ~0.
+    The new meter climbs from ~0, so once enough readings sit below the
+    old anchor -- and have done so for long enough to rule out a burst of
+    glitches -- the cycle re-anchors and YTD restarts at ~0.
     """
     coordinator = await _setup_metered_entry(hass)
 
-    # New meter climbing from ~10 -- three distinct sub-baseline readings.
-    for reading in ("10", "11", "12"):
-        hass.states.async_set("sensor.water_meter", reading)
-        await hass.async_block_till_done()
+    # New meter climbing from ~10 -- three distinct sub-baseline readings,
+    # an hour apart, which is what tells a replacement from a dropout.
+    clock = [0.0]
+    with patch(
+        "custom_components.be_water_prices.coordinator.time.monotonic",
+        side_effect=lambda: clock[0],
+    ):
+        for reading in ("10", "11", "12"):
+            clock[0] += 3600.0
+            hass.states.async_set("sensor.water_meter", reading)
+            await hass.async_block_till_done()
 
-    # The third consecutive sub-baseline reading confirms the swap.
+    # The third sub-baseline reading confirms the swap.
     assert coordinator._ytd.offset_m3 == 12.0
     assert coordinator.data.ytd_consumption_m3 == 0.0
+
+
+@pytest.mark.asyncio
+async def test_live_ytd_burst_of_subbaseline_readings_does_not_reanchor(
+    hass: HomeAssistant,
+) -> None:
+    """The same three readings inside a second are a glitch, not a swap.
+
+    The live path folds on every state event, so a meter that drops out
+    and reconnects can produce a whole confirmation run in no time at all.
+    Re-anchoring on that pins the year to a reading the meter never
+    really moved to.
+    """
+    coordinator = await _setup_metered_entry(hass)
+    before = coordinator._ytd.offset_m3
+
+    clock = [0.0]
+    with patch(
+        "custom_components.be_water_prices.coordinator.time.monotonic",
+        side_effect=lambda: clock[0],
+    ):
+        for reading in ("10", "11", "12"):
+            clock[0] += 0.2
+            hass.states.async_set("sensor.water_meter", reading)
+            await hass.async_block_till_done()
+
+    assert coordinator._ytd.offset_m3 == before
 
 
 @pytest.mark.asyncio
@@ -1493,7 +1528,9 @@ async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
         ),
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
-        assert await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) == 10.0
+        assert (
+            await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) == 10.0
+        )
 
 
 @pytest.mark.asyncio
