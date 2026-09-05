@@ -104,9 +104,9 @@ dominant operator for that area:
 | 2100-2999 | rest of Antwerp province | Pidpa *(Water-link's ring communes -- Edegem, Hove, Mortsel, Schoten, Beveren, etc. -- overlap with Pidpa territory; manual picker for those addresses)* |
 | 1300-1499, 4000-7999 | Brabant Wallon + Wallonia | per-postcode table from the **Géoportail Wallonie ZDE** (540 postcodes mapped to SWDE / CILE / inBW / INASEP / AIEC / AIEM / CIESAC / IDEN / IEG; postcodes served by régies communales we don't ship return *unresolved* and drop into the manual picker rather than mis-defaulting to SWDE) |
 | 8300, 8301 | Knokke-Heist | AGSO Knokke-Heist |
-| 8430, 8620, 8630, 8660, 8670 | Westkust (Aquaduin communes) | Aquaduin |
-| 8000-9999 (121 DWG-served postcodes) | Kortrijk, Harelbeke, Roeselare, Waregem, Ieper, Sint-Niklaas outer parishes, Eeklo, Maldegem, etc. | De Watergroep |
-| 1770, 8020, 8400, 8450, 8490, 9080, 9550, 9570 | Postcodes genuinely split at street level (e.g. 8400 Stene/Mariakerke, 9080 Zaffelare/Lochristi) | **Multi-choice**: the config flow asks the user to pick between the candidate operators |
+| 8620, 8630, 8660, 8670, 8690, 8691 | Westkust (Aquaduin communes) | Aquaduin |
+| 8000-9999 (122 DWG-served postcodes) | Kortrijk, Harelbeke, Roeselare, Waregem, Ieper, Sint-Niklaas outer parishes, Eeklo, Maldegem, etc. | De Watergroep |
+| 1770, 8020, 8400, 8490, 9080, 9550, 9570 | Postcodes genuinely split at street level (e.g. 8400 Stene/Mariakerke, 9080 Zaffelare/Lochristi) | **Multi-choice**: the config flow asks the user to pick between the candidate operators |
 | 8000-9999 (rest) | West-Vl. + Oost-Vl. (mostly Farys) | Farys |
 
 Postcodes outside these mappings drop into the manual utility picker.
@@ -218,10 +218,10 @@ auto-resolves cleanly.
    most of Wallonia (1300-1499 + 4000-7999) auto-resolve to their
    dominant utility. Anything else falls through to step 2.
 2. **Utility** *(only if step 1 didn't resolve)* — pick from the dropdown
-   of registered utilities. For the eight postcodes genuinely split
+   of registered utilities. For the seven postcodes genuinely split
    between two or three operators at street level (1770 Liedekerke,
-   8020 Oostkamp, 8400 Oostende, 8450 Bredene, 8490 Jabbeke, 9080
-   Lochristi, 9550 Herzele, 9570 Lierde), the picker is pre-narrowed
+   8020 Oostkamp, 8400 Oostende, 8490 Jabbeke, 9080 Lochristi, 9550
+   Herzele, 9570 Lierde), the picker is pre-narrowed
    to just the candidate operators so you only see the choices that
    actually serve your address.
 3. **Options** — annual consumption (m³/yr, default 80). Flemish
