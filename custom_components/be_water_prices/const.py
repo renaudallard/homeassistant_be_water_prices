@@ -88,8 +88,19 @@ DEFAULT_CONSUMPTION_M3 = 80
 MIN_CONSUMPTION_M3 = 1
 MAX_CONSUMPTION_M3 = 2000
 DEFAULT_PERSONS = 1
-MIN_PERSONS = 1
-MAX_PERSONS = 5
+# Registered residents drive two separate things, and only one of them
+# is capped. The basisvolume is 30 m3 per wooneenheid plus 30 m3 per
+# gedomicilieerde with no maximum, so a bound of 5 understated the free
+# block for a larger household and overstated its bill. The korting on
+# the vastrecht IS capped at 5, but the decree phrases that cap as "the
+# total korting can never exceed the vastrecht charged", which the
+# max(0.0, ...) in pricing.py already enforces: at the decreed uniform
+# 100 EUR vastrecht and 20 EUR per resident, the fifth person zeroes it.
+#
+# So these two only bound what a person can sensibly type. Zero is a
+# real answer -- a second home, or a rental between tenants.
+MIN_PERSONS = 0
+MAX_PERSONS = 20
 
 # How far the configured yearly consumption has to sit from a whole year
 # the meter actually measured before we offer to replace it. A household

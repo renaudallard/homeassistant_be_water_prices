@@ -226,10 +226,13 @@ auto-resolves cleanly.
    actually serve your address.
 3. **Options** — annual consumption (m³/yr, default 80). Flemish
    utilities additionally ask:
-   - **Gedomicilieerd_persons** *(1-5)* — drives the basisvolume
-     (`30 + 30·persons` m³) and the per-resident vastrecht korting
-     (10 EUR for the drinkwater leg, 20 EUR for the integrale total).
-     Default 1.
+   - **Gedomicilieerd_persons** *(0-20)* — drives the basisvolume
+     (`30 + 30·persons` m³, which the decree does not cap) and the
+     per-resident vastrecht korting (10 EUR for the drinkwater leg,
+     20 EUR for the integrale total). The korting stops mattering past
+     five residents, where it has cancelled the vastrecht outright.
+     Default 1; 0 is right for a second home or a rental between
+     tenants.
    - **Social tariff** — VMM means-tested 80 % reduction on the
      post-calc bill. Off by default.
 
