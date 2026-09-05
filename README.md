@@ -291,11 +291,13 @@ exact commune in the same flow. When the postcode resolves to the
 same operator you already have, the dropdown is pre-filled with your
 current commune so you can submit as-is to just refresh.
 
-Either path reloads the integration in place. Annual consumption,
-registered residents, social tariff and the water-meter sensor carry
-over; the saved commune is cleared when the utility changes (the new
-operator uses different commune IDs, so a stale value would silently
-fail at fetch time).
+Either path reloads the integration in place. Annual consumption and the
+water-meter sensor carry over. Registered residents and the social
+tariff are Flemish-only settings: they survive a move to another Flemish
+operator and are dropped when the new one is not Flemish, since the
+options step stops offering them. The saved commune is cleared when the
+utility changes (the new operator uses different commune IDs, so a stale
+value would silently fail at fetch time).
 
 Switching operators can also strand price history: a Flemish comfort
 rate has no counterpart in Wallonia, so its statistics would sit there
