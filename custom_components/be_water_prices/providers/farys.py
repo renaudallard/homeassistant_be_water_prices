@@ -92,11 +92,18 @@ _BASIS_DRINKWATER_RE = re.compile(
 _COMFORT_DRINKWATER_RE = re.compile(
     r"Comforttarief\s+drinkwater\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})", re.IGNORECASE
 )
+# Spelled out to the closing "(per m³)" rather than bridged with a
+# permissive gap. "[^€]+" only stops at the first euro sign, so a row
+# whose ex-VAT cell is empty let the match run past the row boundary and
+# return the comforttarief on the next line -- exactly twice the right
+# number, and plausible enough to ship.
 _BASIS_GEMEENTELIJK_RE = re.compile(
-    r"Basistarief\s+gemeentelijke[^€]+€\s*([\d]+,\d{3,5})", re.IGNORECASE | re.DOTALL
+    r"Basistarief\s+gemeentelijke\s+bijdrage\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE,
 )
 _BASIS_BOVENGEMEENTELIJK_RE = re.compile(
-    r"Basistarief\s+bovengemeentelijke[^€]+€\s*([\d]+,\d{3,5})", re.IGNORECASE | re.DOTALL
+    r"Basistarief\s+bovengemeentelijke\s+bijdrage\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})",
+    re.IGNORECASE,
 )
 
 
