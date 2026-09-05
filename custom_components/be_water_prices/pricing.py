@@ -67,14 +67,17 @@ def _compute_bill(
     is annual (resets on Jan 1), so YTD consumption fills it up the
     same way an annual projection does.
 
-    **Flanders** (block): basis volume = ``30 + 30·persons`` m³ (capped
-    at persons=5 by the config flow). Inside the basis volume each m³
+    **Flanders** (block): basis volume = ``30 + 30·persons`` m³, which
+    the decree does not cap. Inside the basis volume each m³
     pays ``basis + sanering_boven + sanering_gemeente``; above it each
     m³ pays the comforttarief which is exactly ``2 ×`` each of those
     components -- this 2× rule is mandated by VMM and applies
     uniformly, so the calc engine doubles the sanering values rather
     than the extractors carrying duplicate fields. The annual vastrecht
-    is ``max(0, yearly_fixed_fee − persons · korting) · fee_factor``.
+    is ``max(0, yearly_fixed_fee − persons · korting) · fee_factor``;
+    that floor is also what caps the korting at five residents, since
+    the uniform 20 EUR per resident cancels the uniform 100 EUR
+    vastrecht exactly.
     ``social_tariff=True`` applies the VMM 80 % reduction on the
     post-calc total.
     """

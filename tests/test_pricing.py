@@ -204,6 +204,31 @@ def test_flanders_consumption_exactly_at_basis_volume_boundary() -> None:
     assert compute_annual_cost(_pidpa_2026(), 60, 1) == 397.65
 
 
+def test_a_large_household_gets_its_whole_basis_volume() -> None:
+    """The free block is 30 m3 per resident with no cap in the decree.
+
+    Bounding the input at five residents clamped the block to 180 m3, so
+    a seven-person household paid the comforttarief on 60 m3 it should
+    have had at the basistarief.
+    """
+    from custom_components.be_water_prices.const import MAX_PERSONS, MIN_PERSONS
+
+    assert MIN_PERSONS == 0
+    assert MAX_PERSONS > 5
+    five = compute_annual_cost(_pidpa_2026(), 250, 5)
+    seven = compute_annual_cost(_pidpa_2026(), 250, 7)
+    assert five is not None and seven is not None
+    # Both have had the vastrecht cancelled by the korting, so the whole
+    # difference is the extra 60 m3 sitting in the basis block.
+    assert seven < five
+
+
+def test_a_wooneenheid_with_no_residents_is_allowed() -> None:
+    """A second home has nobody domiciled; it still gets the 30 m3 block."""
+    cost = compute_annual_cost(_pidpa_2026(), 20, 0)
+    assert cost is not None and cost > 0
+
+
 def test_flanders_vastrecht_floors_at_zero_for_huge_household() -> None:
     # An extreme: persons=10 would give negative vastrecht under naive math.
     # The MIN/MAX_PERSONS clamp lives in the config flow; the math itself
