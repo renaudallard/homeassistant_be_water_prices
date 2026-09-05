@@ -139,8 +139,8 @@ of the corresponding regional bill:
 
 ```
 Brussels  : (consumption × (linear + sanering) + redevance) × (1 + VAT)
-Flanders  : (basis_volume × (basis + sanering)
-             + over × (comfort + 2·sanering)
+Flanders  : (min(consumption, basis_volume) × (basis + sanering)
+             + max(0, consumption - basis_volume) × (comfort + 2·sanering)
              + max(0, vastrecht - persons·korting)) × (1 + VAT)
 Wallonia  : (min(consumption, 30) × (0.5·CVD + FSE)
              + max(0, consumption - 30) × (CVD + CVA + FSE)
