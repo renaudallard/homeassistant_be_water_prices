@@ -484,14 +484,62 @@ async def test_reconfigure_flow_keeps_commune_when_utility_unchanged(
         assert result["type"] == data_entry_flow.FlowResultType.FORM
         assert result["step_id"] == "reconfigure_commune"
 
-        # Submit without picking -> existing commune is preserved.
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        # The form is pre-filled with the saved commune, so submitting it
+        # as-is sends that value back and it is preserved.
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "25071"}
+        )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
 
     assert entry.data[CONF_UTILITY] == "farys"
     assert entry.options[CONF_COMMUNE] == "25071"
     assert entry.options[CONF_COMMUNE_LABEL] == "9000 - Gent (Centrum)"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_flow_clearing_the_commune_drops_it(
+    hass: HomeAssistant,
+) -> None:
+    """Clearing the pre-filled commune has to mean what the form says.
+
+    The step offers leaving it empty to fall back to the default, and
+    the old behaviour quietly kept the saved value instead -- so on a
+    utility whose commune list has moved on, the entry went on feeding
+    an id the operator no longer knows.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "25071",
+            CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+
+    fake_communes = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=fake_communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        # Submitted with nothing selected.
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert CONF_COMMUNE not in entry.options
+    assert CONF_COMMUNE_LABEL not in entry.options
 
 
 @pytest.mark.asyncio
