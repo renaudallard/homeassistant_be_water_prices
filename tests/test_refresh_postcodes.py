@@ -79,3 +79,48 @@ def test_error_payload_is_not_read_as_no_coverage(payload: dict[str, Any]) -> No
     """
     with patch("urllib.request.urlopen", _urlopen_returning(payload)), pytest.raises(ZdeQueryError):
         query_zde_for_centroid(4.5, 50.5)
+
+
+def test_an_interstitial_page_aborts_instead_of_emitting_an_empty_carveout() -> None:
+    """A 200 that is not the tariff page must not become a committed answer.
+
+    _fetch only raises on an HTTP error status, so a bot check or a
+    consent wall reads as a page with no <option> elements. The carve-out
+    then renders as a valid empty frozenset, and pasting it flips every
+    postcode in it to the other operator.
+    """
+    from unittest.mock import patch
+
+    import pytest
+
+    from scripts import refresh_postcodes as R
+
+    interstitial = "<html><body><h1>Just a moment...</h1></body></html>"
+    with (
+        patch.object(R, "_fetch", lambda _url: interstitial),
+        pytest.raises(R.ScrapeTooThinError, match="De Watergroep"),
+    ):
+        R.build_dwg_flanders_carveout()
+
+
+def test_a_thin_farys_scrape_aborts_too() -> None:
+    """The mirror case: a good DWG page and a broken Farys one."""
+    from pathlib import Path
+    from unittest.mock import patch
+
+    import pytest
+
+    from scripts import refresh_postcodes as R
+
+    real = (Path(__file__).parent / "fixtures" / "dewatergroep_tarieven_2026.html").read_text(
+        encoding="utf-8", errors="replace"
+    )
+
+    def _fetch(url: str) -> str:
+        return real if "dewatergroep" in url else "<html><body>nope</body></html>"
+
+    with (
+        patch.object(R, "_fetch", _fetch),
+        pytest.raises(R.ScrapeTooThinError, match="Farys"),
+    ):
+        R.build_dwg_flanders_carveout()
