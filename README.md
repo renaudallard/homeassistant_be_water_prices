@@ -408,9 +408,12 @@ moment.
 
 On every first setup of a calendar year, the integration imports
 hourly flat-line rows from **1 January of the current year up to the
-previous full hour** for every `MEASUREMENT`-class price sensor on
-the entry (`yearly_fee`, `basis_rate`, `comfort_rate` for Flanders,
-`sanering_rate`, `all_in_basis`). The start is clamped to the
+previous full hour** for the five flat-line price sensors on the entry
+(`yearly_fixed_fee`, `basis_rate`, `comfort_rate` on Flemish entries,
+`sewerage_rate`, `all_in_basis_rate`). `projected_annual_cost` is
+`MEASUREMENT`-class too but is deliberately not among them: it moves
+with your options rather than with the tariff, so a flat line back to
+January would be fiction. The start is clamped to the
 tariff snapshot's `valid_from` so periods with no published source
 are not invented. The auto-once gate is stamped onto the config
 entry's data; when the calendar year rolls over the gate trips and
