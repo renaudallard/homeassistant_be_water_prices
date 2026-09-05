@@ -224,8 +224,13 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
 # Each <option> is "<postcode> - <commune> (<gemeente>)" with value =
 # numeric ID. We store the numeric ID as the option's id and the full
 # label as its display string.
+# The gap between the tag and the label is not padded with \\s* on
+# either side: three ways to split the same run of whitespace makes
+# the engine enumerate every split when the match fails, which is
+# cubic in the length of that run. .strip() below does the same job
+# in linear time.
 _OPTION_RE = re.compile(
-    r'<option[^>]*value="(\d+)"[^>]*>\s*([^<]+?)\s*</option>',
+    r'<option[^>]*value="(\d+)"[^>]*>([^<]*)</option>',
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -243,13 +248,7 @@ _OPTION_RE = re.compile(
 # without pulling the providers package in.
 
 
-async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
-    """Discover all 290+ Farys communes by scraping the watertarieven dropdown.
-
-    Drops the 23 phantom entries Farys's UI lists without backing tariff
-    data (see ``_UNSERVABLE_COMMUNE_LABELS``).
-    """
-    html = await fetch_text(session, PAGE_URL)
+def _parse_commune_options(html: str) -> list[CommuneOption]:
     communes: list[CommuneOption] = []
     seen: set[str] = set()
     for match in _OPTION_RE.finditer(html):
@@ -259,6 +258,21 @@ async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, 
             continue
         seen.add(commune_id)
         communes.append(CommuneOption(id=commune_id, label=label))
+    return communes
+
+
+async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
+    """Discover all 290+ Farys communes by scraping the watertarieven dropdown.
+
+    Drops the 23 phantom entries Farys's UI lists without backing tariff
+    data (see ``_UNSERVABLE_COMMUNE_LABELS``).
+    """
+    html = await fetch_text(session, PAGE_URL)
+    # Scanning 290 options over a 67 KB page is milliseconds, but this
+    # runs from the config flow on Home Assistant's event loop and the
+    # module's own fetch_and_parse hands every other parse to a thread
+    # for exactly that reason. Keep the discipline.
+    communes = await asyncio.to_thread(_parse_commune_options, html)
     if not communes:
         raise ExtractorError("could not discover any Farys communes from the watertarieven page")
     return tuple(communes)

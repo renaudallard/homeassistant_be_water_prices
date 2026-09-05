@@ -254,8 +254,13 @@ FARYS_DROPDOWN_URL = "https://www.farys.be/nl/watertarieven"
 _POSTCODE_FROM_LABEL_RE = re.compile(r"^\s*(\d{4})\b")
 # Matches "<option ... value=...>label</option>". Used for both DWG
 # (GUID values) and Farys (numeric values); we only care about the label.
+# The gap between the tag and the label is not padded with \\s* on
+# either side: three ways to split the same run of whitespace makes
+# the engine enumerate every split when the match fails, which is
+# cubic in the length of that run. .strip() below does the same job
+# in linear time.
 _OPTION_LABEL_RE = re.compile(
-    r"<option[^>]*>\s*([^<]+?)\s*</option>",
+    r"<option[^>]*>([^<]*)</option>",
     re.IGNORECASE | re.DOTALL,
 )
 
