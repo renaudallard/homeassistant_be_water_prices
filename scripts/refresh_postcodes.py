@@ -29,7 +29,7 @@
 Two outputs, both printed to stdout one after the other (paste each
 block into ``custom_components/be_water_prices/providers/_postcodes.py``):
 
-  1. The Walloon ``_PER_POSTCODE`` dict (4000-7999):
+  1. The Walloon ``_PER_POSTCODE`` dict (1300-1499, 4000-7999):
      - Downloads the Opendatasoft Belgian postcode polygon set
        (georef-belgium-postal-codes; ~1231 polygons, one per former
        commune carrying a (postcode, centroid) pair).
@@ -55,9 +55,9 @@ Re-run the script annually -- the Walloon ZDE is updated by the
 distributors via ZDEOnMap, and DWG's commune coverage shifts when
 intercommunales merge.
 
-The remaining Flemish range rules (Brussels, Brabant Wallon, Antwerp
-core, AGSO Knokke-Heist, Aquaduin Westkust) are hand-curated and
-stable enough not to need scraping.
+The remaining range rules (Brussels, Antwerp core, AGSO Knokke-Heist,
+Aquaduin Westkust) are hand-curated and stable enough not to need
+scraping.
 """
 
 from __future__ import annotations
@@ -164,6 +164,16 @@ def query_zde_for_centroid(lon: float, lat: float) -> str | None:
     return str(features[0]["attributes"].get("DISTRIBUTEUR") or "").strip() or None
 
 
+def _is_walloon_postcode(code: int) -> bool:
+    """Postcodes the ZDE is authoritative for.
+
+    Brabant wallon (1300-1499) is in here rather than in a range rule
+    because the province is served by inBW and SWDE in roughly equal
+    parts -- a blanket rule gets 24 of its 44 postcodes wrong.
+    """
+    return 1300 <= code <= 1499 or 4000 <= code <= 7999
+
+
 def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
     """Walloon postcode → utility_id mapping derived from the ZDE."""
     out: dict[str, str] = {}
@@ -173,7 +183,7 @@ def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
     walloon = [
         f
         for f in features
-        if 4000 <= int(str(f["properties"]["postcode"])) <= 7999  # type: ignore[index]
+        if _is_walloon_postcode(int(str(f["properties"]["postcode"])))  # type: ignore[index]
     ]
     print(f"querying ZDE for {len(walloon)} Walloon postcode polygons …", file=sys.stderr)
     for i, feature in enumerate(walloon):

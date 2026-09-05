@@ -98,11 +98,10 @@ dominant operator for that area:
 | Postcode range | Region | Default utility |
 | --- | --- | --- |
 | 1000-1299 | Brussels-Capital | VIVAQUA |
-| 1300-1499 | Brabant Wallon | inBW |
 | 1500-1999, 3000-3999 | Vlaams-Brabant + Halle-Vilvoorde + Limburg | De Watergroep |
 | 2000-2070 | Antwerp city core | Water-link |
 | 2100-2999 | rest of Antwerp province | Pidpa *(Water-link's ring communes -- Edegem, Hove, Mortsel, Schoten, Beveren, etc. -- overlap with Pidpa territory; manual picker for those addresses)* |
-| 4000-7999 | Wallonia | per-postcode table from the **Géoportail Wallonie ZDE** (496 postcodes mapped to SWDE / CILE / inBW / INASEP / AIEC / AIEM / CIESAC / IDEN / IEG; postcodes served by régies communales we don't ship return *unresolved* and drop into the manual picker rather than mis-defaulting to SWDE) |
+| 1300-1499, 4000-7999 | Brabant Wallon + Wallonia | per-postcode table from the **Géoportail Wallonie ZDE** (540 postcodes mapped to SWDE / CILE / inBW / INASEP / AIEC / AIEM / CIESAC / IDEN / IEG; postcodes served by régies communales we don't ship return *unresolved* and drop into the manual picker rather than mis-defaulting to SWDE) |
 | 8300, 8301 | Knokke-Heist | AGSO Knokke-Heist |
 | 8430, 8620, 8630, 8660, 8670 | Westkust (Aquaduin communes) | Aquaduin |
 | 8000-9999 (121 DWG-served postcodes) | Kortrijk, Harelbeke, Roeselare, Waregem, Ieper, Sint-Niklaas outer parishes, Eeklo, Maldegem, etc. | De Watergroep |
@@ -214,9 +213,9 @@ The UI walks **two or three steps**, depending on whether your postcode
 auto-resolves cleanly.
 
 1. **Postcode** — 4-digit Belgian postcode. Brussels (1000-1299),
-   Brabant Wallon (1300-1499), Antwerp (2000-2999), most of Flanders
-   (1500-1999 + 3000-3999) and most of Wallonia (4000-7999) auto-resolve
-   to their dominant utility. Anything else falls through to step 2.
+   Antwerp (2000-2999), most of Flanders (1500-1999 + 3000-3999) and
+   most of Wallonia (1300-1499 + 4000-7999) auto-resolve to their
+   dominant utility. Anything else falls through to step 2.
 2. **Utility** *(only if step 1 didn't resolve)* — pick from the dropdown
    of registered utilities. For the eight postcodes genuinely split
    between two or three operators at street level (1770 Liedekerke,
