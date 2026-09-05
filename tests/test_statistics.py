@@ -32,7 +32,7 @@ matters most and none of them had a test.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import voluptuous as vol
@@ -143,6 +143,8 @@ async def test_orphan_clear_only_touches_keys_the_tariff_lost(hass: HomeAssistan
     recorder = MagicMock()
     cleared: list[Any] = []
     recorder.async_clear_statistics = cleared.append
+    # Nothing recorded before this year, so the orphan line is safe to drop.
+    recorder.async_add_executor_job = AsyncMock(return_value={})
     hass.data[DATA_INSTANCE] = recorder
     with patch("homeassistant.components.recorder.get_instance", return_value=recorder):
         await _async_clear_orphan_backfill_keys(hass, entry)
@@ -151,3 +153,57 @@ async def test_orphan_clear_only_touches_keys_the_tariff_lost(hass: HomeAssistan
     assert any("comfort_rate" in e for e in flat)
     assert not any("basis_rate" in e for e in flat)
     assert not any("yearly_fee" in e for e in flat)
+
+
+async def test_orphan_clear_keeps_a_key_that_has_older_history(hass: HomeAssistant) -> None:
+    """A key with rows from an earlier year must not be wiped.
+
+    The recorder only deletes a statistic whole, so clearing a comfort
+    rate that ran for three Flemish years would destroy the record of
+    what the household actually paid. A stale line is the lesser harm.
+    """
+    from datetime import date
+
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    entry = _entry(hass)
+    coordinator = MagicMock()
+    coordinator.data = CoordinatorData(
+        tariff=WaterTariff(
+            utility="swde",
+            region="wallonia",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="SWDE 2026",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=147.24,
+            cvd_eur_per_m3=3.24,
+        ),
+        fetched_at=None,
+        snapshot_age_hours=0.0,
+        snapshot_stale=False,
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    ent_reg = er.async_get(hass)
+    ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{entry.entry_id}_comfort_rate",
+        suggested_object_id="vivaqua_comfort_rate",
+    )
+
+    recorder = MagicMock()
+    cleared: list[Any] = []
+    recorder.async_clear_statistics = cleared.append
+    recorder.async_add_executor_job = AsyncMock(
+        return_value={"sensor.vivaqua_comfort_rate": [{"mean": 5.85}]}
+    )
+    hass.data[DATA_INSTANCE] = recorder
+    with patch("homeassistant.components.recorder.get_instance", return_value=recorder):
+        await _async_clear_orphan_backfill_keys(hass, entry)
+
+    assert cleared == []

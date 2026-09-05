@@ -289,6 +289,13 @@ over; the saved commune is cleared when the utility changes (the new
 operator uses different commune IDs, so a stale value would silently
 fail at fetch time).
 
+Switching operators can also strand price history: a Flemish comfort
+rate has no counterpart in Wallonia, so its statistics would sit there
+as a line that never moves again. Rows written earlier in the current
+year are dropped, but anything from a previous year is kept -- the
+recorder can only delete a statistic whole, and a real record of what
+you paid is worth more than a tidy chart.
+
 ## Daily operation
 
 ### Refresh cadence
