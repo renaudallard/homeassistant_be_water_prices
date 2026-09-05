@@ -73,16 +73,25 @@ def test_raises_when_cvd_missing() -> None:
 
 
 def test_fse_drift_is_reported(caplog: pytest.LogCaptureFixture) -> None:
-    """A moved Fonds Social must be reported by the SWDE refresh.
+    """A moved Fonds Social must stop the parse, not just log about it.
 
     SWDE is the drift sentinel for the shared SPGE constants, but the FSE
     is only ~0.03 EUR/m3, so the default 0.005 tolerance would have let a
-    15% move through unreported.
+    15% move through unreported. A warning was not enough on its own:
+    the extractor still returned a tariff priced on the old constant, so
+    nothing downstream could tell that every Walloon entry had gone
+    wrong.
     """
     html = fixture_html("swde_2026.html").replace("€ 0.0339/m³", "€ 0.0375/m³")
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING), pytest.raises(ExtractorError, match="SWDE FSE"):
         parse_tariff(html, year=2026)
     assert "SWDE FSE" in caplog.text
+
+
+def test_the_untouched_page_still_parses() -> None:
+    """The guard must only fire on a real move, not on every fetch."""
+    tariff = parse_tariff(fixture_html("swde_2026.html"), year=2026)
+    assert tariff.cvd_eur_per_m3 is not None
 
 
 def test_cvd_section_without_a_figure_does_not_borrow_the_cva() -> None:
