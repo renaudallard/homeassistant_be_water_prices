@@ -1428,6 +1428,33 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
 
 
 @pytest.mark.asyncio
+async def test_a_wedged_energy_manager_does_not_stall_the_tick(hass: HomeAssistant) -> None:
+    """A manager that never resolves must cost one tick, not the process.
+
+    The singleton hides behind an event that is only set once its first
+    load succeeds, so one failed read of .storage/energy leaves every
+    later caller waiting on it forever.
+    """
+    import asyncio as _asyncio
+
+    from custom_components.be_water_prices.coordinator import (
+        _discover_energy_water_meter,
+    )
+
+    async def _never_returns(_hass: Any) -> Any:
+        await _asyncio.Event().wait()
+
+    with (
+        patch("homeassistant.components.energy.async_get_manager", new=_never_returns),
+        patch(
+            "custom_components.be_water_prices.coordinator._ENERGY_MANAGER_TIMEOUT_S",
+            0.05,
+        ),
+    ):
+        assert await _discover_energy_water_meter(hass) is None
+
+
+@pytest.mark.asyncio
 async def test_recorder_ytd_drops_a_first_bucket_with_no_baseline(hass: HomeAssistant) -> None:
     """A first bucket whose change is the whole register must not be billed.
 
