@@ -228,6 +228,33 @@ def parse_cvd(html: str) -> float:
     )
 
 
+# The phrasings these pages date themselves with. CILE heads its table
+# "au 1er janvier YYYY", INASEP and the Callmepower pages use "Tarifs
+# YYYY" / "en YYYY".
+_PUBLISHED_YEAR_RES = (
+    re.compile(r"1\s*er\s+janvier\s+(20\d\d)", re.IGNORECASE),
+    re.compile(r"tarifs?\s+(20\d\d)", re.IGNORECASE),
+    re.compile(r"\ben\s+(20\d\d)", re.IGNORECASE),
+)
+
+
+def detect_published_year(text: str, *, today: date | None = None) -> int | None:
+    """The tariff year the page states, or ``None`` if it states none.
+
+    Stamping the clock's year instead meant a page still publishing last
+    year's rate was dated as current, so the snapshot never looked stale
+    and nothing downstream could tell. Years far from today are ignored:
+    these pages carry historic references and archive links, and only a
+    year adjacent to now can be the one in force.
+    """
+    now = (today or date.today()).year
+    found = {
+        int(match.group(1)) for pattern in _PUBLISHED_YEAR_RES for match in pattern.finditer(text)
+    }
+    plausible = [year for year in found if now - 1 <= year <= now + 1]
+    return max(plausible) if plausible else None
+
+
 def build_tariff(
     *,
     utility_id: str,
@@ -269,7 +296,10 @@ def parse_tariff(
 ) -> WaterTariff:
     """One-call parser for any of the small Walloon intercommunales."""
     cvd = parse_cvd(html)
-    target = year or date.today().year
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+    target = year or detect_published_year(soup.get_text(" ", strip=True)) or date.today().year
     return build_tariff(
         utility_id=utility_id,
         cvd=cvd,
