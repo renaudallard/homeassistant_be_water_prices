@@ -42,6 +42,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CURRENCY_EURO, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -293,7 +294,28 @@ async def async_setup_entry(
     )
 
 
-class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
+@dataclass
+class _ResetGuardState(ExtraStoredData):
+    """The drop-guard's memory, kept across restarts.
+
+    Both halves matter. Without ``last_native`` the first value after a
+    restart has nothing to be compared against, so a drop that happens
+    over the restart goes unnoticed. Without ``reset_at`` the guard
+    forgets a drop it already recorded and hands the recorder a negative
+    delta for a cycle it had already closed.
+    """
+
+    reset_at: datetime | None
+    last_native: float | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "reset_at": self.reset_at.isoformat() if self.reset_at is not None else None,
+            "last_native": self.last_native,
+        }
+
+
+class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEntity):
     _attr_has_entity_name = True
     entity_description: WaterSensorDescription
 
@@ -306,13 +328,34 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity):
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
         self._attr_device_info = utility_device_info(coordinator)
-        # Timestamp of the last mid-cycle decrease for a TOTAL sensor. See
-        # _handle_coordinator_update. In-memory only: it is rebuilt from
-        # the running value after a restart, so the (rare) combination of a
-        # mid-year drop and a restart before the next Jan 1 may shift one
-        # statistics delta.
+        # Timestamp of the last mid-cycle decrease for a TOTAL sensor, and
+        # the value it was measured against. See _handle_coordinator_update.
+        # Both are restored in async_added_to_hass so a restart neither
+        # forgets a drop already recorded nor misses one that happens while
+        # the entity is down.
         self._reset_at: datetime | None = None
         self._last_native: float | None = None
+
+    @property
+    def extra_restore_state_data(self) -> _ResetGuardState | None:
+        if self.entity_description.last_reset_fn is None:
+            return None
+        return _ResetGuardState(self._reset_at, self._last_native)
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self.entity_description.last_reset_fn is None:
+            return
+        stored = await self.async_get_last_extra_data()
+        if stored is None:
+            return
+        data = stored.as_dict()
+        raw = data.get("reset_at")
+        if isinstance(raw, str):
+            self._reset_at = dt_util.parse_datetime(raw)
+        last = data.get("last_native")
+        if isinstance(last, (int, float)) and not isinstance(last, bool):
+            self._last_native = float(last)
 
     def _note_value(self, value: float | None) -> None:
         # A TOTAL sensor (current_year_cost / ytd_consumption) can legitimately
