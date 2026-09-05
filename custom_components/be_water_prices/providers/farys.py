@@ -107,6 +107,22 @@ _BASIS_BOVENGEMEENTELIJK_RE = re.compile(
 )
 
 
+def _active_period_year(soup: BeautifulSoup) -> int | None:
+    """The tariff year Farys marks as selected, if the switcher is present.
+
+    The payload renders one button per published period and flags the
+    one it is showing with ``<li class="active">``. Reading it means a
+    page that starts serving next year's card early is dated by the page
+    rather than by our clock -- which is also what lets the stale-snapshot
+    check notice a page still stuck on last year.
+    """
+    active = soup.select_one("ul.js-period-rates li.active button[value]")
+    if active is None:
+        return None
+    value = str(active.get("value", "")).strip()
+    return int(value) if value.isdigit() and len(value) == 4 else None
+
+
 def _extract_html_payload(ajax_response_text: str) -> str:
     """Pull the `insert`-command `data` field out of a Drupal AJAX response."""
     try:
@@ -156,7 +172,7 @@ def parse_tariff(
         text, _BASIS_BOVENGEMEENTELIJK_RE, "bovengemeentelijke saneringsbijdrage"
     )
 
-    target = year or date.today().year
+    target = year or _active_period_year(soup) or date.today().year
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,

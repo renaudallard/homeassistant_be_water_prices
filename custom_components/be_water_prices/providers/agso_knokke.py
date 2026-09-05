@@ -53,6 +53,7 @@ VMM vastrecht (50/30/20 + 10/6/4) materialised from
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
 
 import aiohttp
@@ -111,6 +112,24 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
     )
 
 
+# Each table is introduced by its own heading, in one of the two shapes
+# the page has used: "OVERZICHT TARIEVEN 2025" and "OVERZICHT
+# TARIEVEN&nbsp; PER 1/1/2026".
+_YEAR_HEADING_RE = re.compile(
+    r"OVERZICHT\s+TARIEVEN[\s\xa0]*(?:PER\s*\d{1,2}/\d{1,2}/)?(\d{4})",
+    re.IGNORECASE,
+)
+
+
+def _year_for_table(table: Tag) -> int | None:
+    """The year of the nearest heading above ``table``, if it carries one."""
+    for text in table.find_all_previous(string=_YEAR_HEADING_RE):
+        match = _YEAR_HEADING_RE.search(str(text))
+        if match:
+            return int(match.group(1))
+    return None
+
+
 def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     """Parse a captured AGSO Knokke-Heist tarieven page."""
     soup = BeautifulSoup(html, "html.parser")
@@ -118,8 +137,6 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if not tables:
         raise ExtractorError("could not locate AGSO Knokke tariff tables")
 
-    # Pick the table with the highest integrale basis -- the page typically
-    # shows previous + current year, and tariffs only index up year-on-year.
     ranked: list[tuple[float, Tag]] = []
     for table in tables:
         score = _table_integrale_basis(table)
@@ -127,11 +144,30 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
             ranked.append((score, table))
     if not ranked:
         raise ExtractorError("none of the AGSO Knokke tables carry an Integrale waterprijs row")
-    ranked.sort(key=lambda x: x[0], reverse=True)
-    chosen = ranked[0][1]
 
     target = year or date.today().year
-    parsed = _parse_one(chosen, target)
+    # Prefer the table the page itself labels with the year we want, then
+    # the newest one that has already started. Picking by price instead
+    # meant a page publishing next year's card early was read as this
+    # year's, which also stopped the stale-snapshot check ever firing:
+    # the year was stamped from the clock, so it always looked current.
+    dated = [(y, table) for table in tables if (y := _year_for_table(table)) is not None]
+    dated = [(y, table) for y, table in dated if _table_integrale_basis(table) is not None]
+    chosen: Tag | None = next((table for y, table in dated if y == target), None)
+    chosen_year = target
+    if chosen is None and dated:
+        past = sorted((y for y, _ in dated if y <= target), reverse=True)
+        if past:
+            chosen_year = past[0]
+            chosen = next(table for y, table in dated if y == chosen_year)
+    if chosen is None:
+        # No usable heading: fall back to the highest integrale basis,
+        # since the operator only ever indexes up year on year.
+        ranked.sort(key=lambda x: x[0], reverse=True)
+        chosen = ranked[0][1]
+        chosen_year = target
+
+    parsed = _parse_one(chosen, chosen_year)
     if parsed is None:
         raise ExtractorError(
             "AGSO Knokke chosen table missing drinkwater / afvoer / zuivering rows"
