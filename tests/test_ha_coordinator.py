@@ -1388,8 +1388,81 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
     _hass, _start, _end, ids, period, units, types = stats.call_args.args
     assert ids == {"sensor.wm"}
     assert period == "day"
-    assert types == {"change"}
+    assert types == {"change", "sum"}
     assert units == {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS}
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_drops_a_first_bucket_with_no_baseline(hass: HomeAssistant) -> None:
+    """A first bucket whose change is the whole register must not be billed.
+
+    The recorder subtracts the sum it finds immediately before the window
+    and falls back to zero when there is none, so the opening bucket
+    carries every cubic metre the meter has ever measured. Counting it
+    inflates the year for as long as the year lasts.
+    """
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            autospec=True,
+        ) as stats,
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        # The meter has measured 140.16 m3 in its life and 60.0 of that
+        # predates the window; only the 20.16 that follows belongs to it.
+        stats.return_value = {
+            "sensor.wm": [
+                {"change": 140.16, "sum": 140.16},
+                {"change": 12.0, "sum": 152.16},
+                {"change": 8.16, "sum": 160.32},
+            ]
+        }
+        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+
+    assert total == pytest.approx(20.16)
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_keeps_a_first_bucket_that_has_a_baseline(
+    hass: HomeAssistant,
+) -> None:
+    """With an earlier sum to subtract, the opening bucket is a real day."""
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            autospec=True,
+        ) as stats,
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        stats.return_value = {
+            "sensor.wm": [
+                {"change": 0.4, "sum": 140.16},
+                {"change": 12.0, "sum": 152.16},
+            ]
+        }
+        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+
+    assert total == pytest.approx(12.4)
 
 
 @pytest.mark.asyncio
