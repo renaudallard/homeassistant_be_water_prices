@@ -107,6 +107,52 @@ def test_the_cva_decoy_cannot_win_the_generic_scan() -> None:
     assert parse_cvd(without_anchor) != WALLONIA_CVA_EUR_PER_M3
 
 
+def test_an_example_only_page_raises_rather_than_publishing_the_example() -> None:
+    """AIEM prints "0,5 x CVD (soit 1,435 EUR)" before the real value.
+
+    If a redesign ever drops the real value, the worked example is the
+    only figure left on the page. Publishing it would halve the rate
+    silently, so the floor of the plausibility window exists to refuse
+    it -- which nothing tested.
+    """
+    page = "<html><body><p>Le CVA vaut 0,5 x CVD (soit 1,435€) par m³.</p></body></html>"
+    with pytest.raises(ExtractorError, match="no plausible CVD"):
+        parse_cvd(page)
+
+
+def test_a_historic_value_does_not_beat_the_current_one() -> None:
+    """Taking the first match would answer with last year's rate."""
+    page = (
+        "<html><body><p>En 2024 le CVD était de 2,300 €/m³. "
+        "Aujourd'hui le CVD s'élève à 2,870 €/m³.</p></body></html>"
+    )
+    assert parse_cvd(page) == 2.87
+
+
+def test_an_anchor_on_a_placeholder_falls_through_to_the_real_value() -> None:
+    """Both anchors are gated on the window for the same reason.
+
+    An anchor that lands on an example or a placeholder would otherwise
+    ride straight out, and it wins over the generic scan.
+    """
+    actual = (
+        "<html><body><p>Valeur actuelle du CVD : 0,500€ (exemple). "
+        "Le CVD réel est de 2,870 €.</p></body></html>"
+    )
+    assert parse_cvd(actual) == 2.87
+    labeled = (
+        "<html><body><p>Coût vérité distribution (CVD) : 0,500 €. "
+        "Le CVD facturé est de 2,870 €.</p></body></html>"
+    )
+    assert parse_cvd(labeled) == 2.87
+
+
+def test_an_absurd_figure_raises_rather_than_being_published() -> None:
+    """The ceiling catches a cached or garbled page."""
+    with pytest.raises(ExtractorError, match="no plausible CVD"):
+        parse_cvd("<html><body><p>CVD 87,000 €</p></body></html>")
+
+
 def test_parse_cvd_raises_on_garbage() -> None:
     with pytest.raises(ExtractorError):
         parse_cvd("<html><body>nothing about water here</body></html>")
