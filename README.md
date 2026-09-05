@@ -98,7 +98,8 @@ dominant operator for that area:
 | Postcode range | Region | Default utility |
 | --- | --- | --- |
 | 1000-1299 | Brussels-Capital | VIVAQUA |
-| 1500-1999, 3000-3999 | Vlaams-Brabant + Halle-Vilvoorde + Limburg | De Watergroep |
+| 1500-1999 (17 Farys-served postcodes) | Halle-Vilvoorde (Beersel, Asse, Zaventem, Machelen, Drogenbos, etc.) | Farys |
+| 1500-1999, 3000-3999 (rest) | Vlaams-Brabant + Halle-Vilvoorde + Limburg | De Watergroep |
 | 2000-2070 | Antwerp city core | Water-link |
 | 2100-2999 | rest of Antwerp province | Pidpa *(Water-link's ring communes -- Edegem, Hove, Mortsel, Schoten, Beveren, etc. -- overlap with Pidpa territory; manual picker for those addresses)* |
 | 1300-1499, 4000-7999 | Brabant Wallon + Wallonia | per-postcode table from the **Géoportail Wallonie ZDE** (540 postcodes mapped to SWDE / CILE / inBW / INASEP / AIEC / AIEM / CIESAC / IDEN / IEG; postcodes served by régies communales we don't ship return *unresolved* and drop into the manual picker rather than mis-defaulting to SWDE) |

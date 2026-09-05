@@ -75,6 +75,21 @@ def test_other_flanders_postcodes_resolve_to_de_watergroep() -> None:
     assert _resolve_postcode("3500") == "de_watergroep"
 
 
+def test_farys_pockets_in_halle_vilvoorde_beat_the_range_rule() -> None:
+    # Farys serves a handful of Halle-Vilvoorde communes that sit inside
+    # the De Watergroep range. The carve-out has to win over the range or
+    # these households are priced against the wrong operator.
+    assert _resolve_postcode("1620") == "farys"  # Drogenbos
+    assert _resolve_postcode("1653") == "farys"  # Dworp (Beersel)
+    assert _resolve_postcode("1933") == "farys"  # Sterrebeek (Zaventem)
+    # Neighbours inside the same range stay with De Watergroep.
+    assert _resolve_postcode("1640") == "de_watergroep"
+    assert _resolve_postcode("1740") == "de_watergroep"
+    # A street-level split still goes to the chooser rather than the
+    # carve-out.
+    assert _resolve_postcode("1770") == "de_watergroep"
+
+
 def test_brabant_wallon_is_split_between_inbw_and_swde() -> None:
     # The province is not inBW territory end to end: the ZDE gives inBW 20
     # of its 44 postcodes and SWDE the other 24, so the table decides and

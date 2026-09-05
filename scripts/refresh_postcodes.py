@@ -41,8 +41,11 @@ block into ``custom_components/be_water_prices/providers/_postcodes.py``):
        long tail (BOUILLON, VRESSE, …) since we don't ship an
        extractor for them.
 
-  2. The ``_DWG_POSTCODES_FLANDERS`` frozenset (DWG-served pockets
-     scattered inside the otherwise-Farys 8000-9999 block):
+  2. Two mirror carve-out frozensets --
+     ``_DWG_POSTCODES_FLANDERS`` (DWG-served pockets inside the
+     otherwise-Farys 8000-9999 block) and
+     ``_FARYS_POSTCODES_VLAAMS_BRABANT`` (Farys-served pockets inside
+     the otherwise-DWG 1500-1999 block):
      - Scrapes DWG's commune dropdown at /nl-be/drinkwater/tarieven
        and Farys's commune dropdown at /tarieven/woonklant.
      - Keeps postcodes that DWG lists but Farys does not (so the
@@ -310,6 +313,36 @@ def build_dwg_flanders_carveout() -> list[str]:
     return carve
 
 
+def build_farys_vlaams_brabant_carveout() -> list[str]:
+    """Farys-served postcodes in 1500-1999 that De Watergroep does not list.
+
+    The mirror of build_dwg_flanders_carveout: the range rule makes
+    De Watergroep the default for Vlaams-Brabant, but Farys reaches
+    into Halle-Vilvoorde (Beersel, Asse, Zaventem, ...) and those
+    postcodes would otherwise be resolved to the wrong operator.
+    """
+    print("scraping DWG commune dropdown …", file=sys.stderr)
+    dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
+    print("scraping Farys commune dropdown (filtered) …", file=sys.stderr)
+    farys_pc = _scrape_farys_postcodes_filtered(_fetch(FARYS_DROPDOWN_URL))
+    split_pc = set(_SPLIT_POSTCODES.keys())
+    carve = sorted(
+        pc for pc in farys_pc if 1500 <= int(pc) <= 1999 and pc not in dwg_pc and pc not in split_pc
+    )
+    print(f"unambiguous Farys carve-outs in 1500-1999: {len(carve)}", file=sys.stderr)
+    return carve
+
+
+def render_farys_frozenset(postcodes: list[str]) -> str:
+    lines = ["_FARYS_POSTCODES_VLAAMS_BRABANT: frozenset[int] = frozenset("]
+    lines.append("    {")
+    for pc in postcodes:
+        lines.append(f"        {pc},")
+    lines.append("    }")
+    lines.append(")")
+    return "\n".join(lines)
+
+
 def render_dwg_frozenset(postcodes: list[str]) -> str:
     lines = ["_DWG_POSTCODES_FLANDERS: frozenset[int] = frozenset("]
     lines.append("    {")
@@ -330,11 +363,15 @@ def main() -> int:
         print(f"aborting: {err}", file=sys.stderr)
         return 1
     carve = build_dwg_flanders_carveout()
+    farys_carve = build_farys_vlaams_brabant_carveout()
     print("# === Walloon _PER_POSTCODE ===")
     print(render_dict(mapping))
     print()
     print("# === Flemish _DWG_POSTCODES_FLANDERS ===")
     print(render_dwg_frozenset(carve))
+    print()
+    print("# === Flemish _FARYS_POSTCODES_VLAAMS_BRABANT ===")
+    print(render_farys_frozenset(farys_carve))
     return 0
 
 
