@@ -27,7 +27,11 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
+from typing import Any
+from unittest.mock import AsyncMock, patch
+
+from homeassistant.util import dt as dt_util
 
 from custom_components.be_water_prices.const import CONF_UTILITY
 from custom_components.be_water_prices.sensor import (
@@ -78,6 +82,48 @@ def test_last_reset_advances_on_mid_cycle_drop() -> None:
     assert sensor.last_reset == reset
 
 
+async def test_the_drop_guard_survives_a_restart() -> None:
+    """A restart must not forget a drop, nor the value it was measured against.
+
+    Held only in memory, the guard came back empty: the recorded reset
+    point was lost, so the recorder saw the next figure as a negative
+    delta on a cycle that had already been closed, and the last value was
+    lost too, so a drop happening across the restart went unnoticed.
+    """
+    sensor = _sensor("ytd_consumption")
+    earlier = dt_util.now() - timedelta(days=3)
+
+    class _Stored:
+        def as_dict(self) -> dict[str, Any]:
+            return {"reset_at": earlier.isoformat(), "last_native": 42.0}
+
+    with (
+        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=_Stored())),
+        patch(
+            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
+            AsyncMock(),
+        ),
+    ):
+        await sensor.async_added_to_hass()
+
+    assert sensor._reset_at == earlier
+    assert sensor._last_native == 42.0
+    # The restored value is a real comparison point straight away, so a
+    # drop over the restart is caught on the first update.
+    sensor._note_value(1.0)
+    assert sensor._reset_at is not None and sensor._reset_at > earlier
+
+
+def test_the_guard_is_handed_out_for_storage() -> None:
+    sensor = _sensor("ytd_consumption")
+    sensor._note_value(10.0)
+    stored = sensor.extra_restore_state_data
+    assert stored is not None
+    assert stored.as_dict()["last_native"] == 10.0
+    # A sensor with no drop guard has nothing to store.
+    assert _sensor("basis_rate").extra_restore_state_data is None
+
+
 def test_last_reset_none_for_non_total_sensor() -> None:
     sensor = _sensor("basis_rate")
     sensor._note_value(5.0)
@@ -102,7 +148,7 @@ def test_last_error_is_scrubbed_of_the_commune() -> None:
     redacted, so publishing last_error raw put the household's location
     back into the recorder through the side door.
     """
-    from datetime import UTC, datetime
+    from datetime import UTC
 
     from custom_components.be_water_prices.const import CONF_COMMUNE, CONF_COMMUNE_LABEL
     from custom_components.be_water_prices.coordinator import CoordinatorData
