@@ -1467,7 +1467,12 @@ async def test_recorder_ytd_keeps_a_first_bucket_that_has_a_baseline(
 
 @pytest.mark.asyncio
 async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
-    """Replacing a meter mid-year must not surface a negative year to date."""
+    """A backwards bucket is dropped, not netted against the rest of the year.
+
+    Replacing a meter puts one large negative delta in the swap bucket.
+    Subtracting it erased the consumption the old meter had genuinely
+    measured; the 10 m3 used before the swap is still 10 m3 used.
+    """
     from unittest.mock import MagicMock
 
     from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
@@ -1488,7 +1493,7 @@ async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
         ),
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
-        assert await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) == 0.0
+        assert await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) == 10.0
 
 
 @pytest.mark.asyncio
