@@ -1249,12 +1249,18 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 start,
             )
             continue
+        if delta < 0:
+            # A bucket whose register went backwards is not consumption
+            # and cannot be netted against the rest of the year. It is a
+            # meter swap, or a gap long enough that the recorder lost the
+            # run-up and rebuilt the sum from a lower base. Either way the
+            # water in the other buckets was really used, and subtracting
+            # this from it would quietly erase months of it.
+            _LOGGER.debug("%s: dropping a negative bucket of %s m³", entity_id, delta)
+            continue
         total += float(delta)
-    # Replacing a water meter mid-year (cumulative sensor state drops
-    # back to 0) produces a single large negative delta in the swap
-    # bucket. Without a floor we'd surface a nonsensical -50 m³ as the
-    # year-to-date consumption; floor at 0 so the sensor degrades to
-    # "no consumption since meter swap" rather than negative numbers.
+    # Nothing above can push the total below zero any more, but the floor
+    # stays: it costs nothing and the sensor must never read negative.
     return max(0.0, total)
 
 
