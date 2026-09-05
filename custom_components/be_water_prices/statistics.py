@@ -224,9 +224,47 @@ async def async_backfill_prices(
     return rows_total
 
 
+async def _async_has_statistics_before(
+    hass: HomeAssistant, entity_id: str, cutoff: datetime
+) -> bool:
+    """Whether ``entity_id`` carries long-term rows older than ``cutoff``."""
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+    from homeassistant.components.recorder.statistics import (
+        statistics_during_period,
+    )
+
+    instance = get_instance(hass)
+    try:
+        stats = await instance.async_add_executor_job(
+            statistics_during_period,
+            hass,
+            datetime(1970, 1, 1, tzinfo=dt_util.UTC),
+            cutoff,
+            {entity_id},
+            "month",
+            None,
+            {"mean"},
+        )
+    except Exception as err:
+        # Any failure here means we cannot prove the history is empty, so
+        # keep the rows rather than risk deleting years of real data.
+        _LOGGER.debug("could not read history for %s: %s", entity_id, err)
+        return True
+    return bool(stats.get(entity_id))
+
+
 async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Clear LTS rows for backfill keys the *current* operator's tariff
     does not produce (orphan rows left over by the previous operator).
+
+    The recorder only offers a whole-statistic delete, so this refuses to
+    run for any key that carries rows from an earlier year: those are a
+    genuine record of what the household paid under the old operator and
+    losing them is worse than leaving a stale line behind. Only a key
+    whose entire history sits inside the current year -- the flat line the
+    previous operator's backfill just wrote -- is cleared.
     """
     # mypy --strict flags get_instance because the recorder module does
     # not re-export it via __all__; same pattern as async_backfill_prices.
@@ -250,6 +288,9 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
         return
     ent_reg = er.async_get(hass)
     recorder = get_instance(hass)
+    year_start = dt_util.start_of_local_day(
+        datetime(dt_util.now().year, 1, 1, tzinfo=dt_util.DEFAULT_TIME_ZONE)
+    ).astimezone(dt_util.UTC)
     for desc in SENSORS:
         if desc.key not in _BACKFILL_KEYS:
             continue
@@ -260,6 +301,11 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
         unique_id = f"{entry.entry_id}_{desc.key}"
         entity_id = ent_reg.async_get_entity_id("sensor", DOMAIN, unique_id)
         if entity_id is None:
+            continue
+        if await _async_has_statistics_before(hass, entity_id, year_start):
+            _LOGGER.debug(
+                "keeping %s: it holds history from before %s", entity_id, year_start.date()
+            )
             continue
         recorder.async_clear_statistics([entity_id])
 
