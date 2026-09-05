@@ -276,6 +276,10 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # options when the user picked a per-commune operator.
         self._reconfigure_commune: str | None = None
         self._reconfigure_commune_label: str | None = None
+        # Whether the commune step was actually rendered and submitted.
+        # Without it a cleared selection is indistinguishable from the
+        # step never having been shown.
+        self._reconfigure_commune_submitted: bool = False
         # Set by ``async_step_reconfigure_commune`` when the saved
         # commune is no longer in the live list (phantom blocklist
         # addition, operator renumber). Forces ``_async_finish_reconfigure``
@@ -414,6 +418,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         self._candidates = ()
         self._reconfigure_commune = None
         self._reconfigure_commune_label = None
+        self._reconfigure_commune_submitted = False
         self._drop_stale_reconfigure_commune = False
         return self.async_show_menu(
             step_id="reconfigure",
@@ -505,6 +510,11 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # entry options and later crash fetch_for_commune.
             if chosen == "":
                 chosen = None
+            # Record that this step was rendered and submitted, so a
+            # cleared selection is read as "drop the commune" rather
+            # than falling through to whatever was saved before. The
+            # step's own text offers exactly that choice.
+            self._reconfigure_commune_submitted = True
             if chosen is not None:
                 self._reconfigure_commune = chosen
                 for option in communes:
@@ -585,6 +595,13 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             new_options[CONF_COMMUNE] = self._reconfigure_commune
             if self._reconfigure_commune_label is not None:
                 new_options[CONF_COMMUNE_LABEL] = self._reconfigure_commune_label
+        elif self._reconfigure_commune_submitted:
+            # The step was shown and came back with nothing selected.
+            # Keeping the old commune would contradict the form, and on
+            # a utility whose commune list has moved on it would keep
+            # feeding a value the operator no longer knows.
+            new_options.pop(CONF_COMMUNE, None)
+            new_options.pop(CONF_COMMUNE_LABEL, None)
         if self._postcode is not None:
             new_options[CONF_POSTCODE] = self._postcode
 
