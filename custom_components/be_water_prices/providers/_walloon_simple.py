@@ -120,21 +120,30 @@ def warn_constant_drift(
     logger: logging.Logger,
     threshold: float = 0.005,
 ) -> None:
-    """Log a warning when a CVA / FSE value scraped from a utility's page
-    diverges from the SPGE flat-Wallonia constant in :mod:`const`.
+    """Refuse a CVA / FSE value that has moved away from the SPGE constant.
+
+    The CVA and FSE are flat across Wallonia and carried here as
+    constants, so when a page publishes a different figure every Walloon
+    entry is being priced on a number that is no longer the tariff. A log
+    line was the only signal, and nothing reads the log: the extractor
+    still returned a tariff, so live_check passed, fixture_drift compared
+    only fields we source from the page, and users were quietly
+    mis-billed until somebody noticed.
+
+    Raising instead puts it on the paths that are watched. The
+    coordinator keeps serving the last good snapshot and raises the
+    stale-snapshot Repair, and the daily live check fails and opens an
+    issue -- which is what a regulated price change should look like.
 
     ``label`` should identify both the utility and the component, e.g.
     ``"SWDE CVA"`` or ``"CILE FSE"``. No-op when ``published`` is ``None``
     (the row was not present on the page).
 
-    Only SWDE, CILE, and inBW currently publish CVA / FSE values on
-    their pages and call this helper. The small Walloon extractors
-    (AIEC, AIEM, CIESAC, IDEN, IEG, INASEP) rely on the SPGE constants
-    directly because their pages do not break down CVA / FSE
-    separately; there is nothing to compare against, so the absence of
-    a drift check is intentional rather than an oversight. If a future
-    page redesign exposes these components, route the parser through
-    this helper.
+    Only SWDE, CILE and inBW publish CVA / FSE values on their pages and
+    call this helper. The six small Walloon extractors do not, so they
+    have nothing to compare against -- unimplemented rather than
+    impossible, and worth revisiting if a page redesign exposes the
+    components.
     """
     if published is None:
         return
@@ -144,6 +153,11 @@ def warn_constant_drift(
             label,
             published,
             constant,
+        )
+        raise ExtractorError(
+            f"{label} published value {published} differs from the flat-Wallonia "
+            f"constant {constant}; the SPGE component has moved and every Walloon "
+            f"tariff is priced on the old figure until the constant is updated"
         )
 
 
