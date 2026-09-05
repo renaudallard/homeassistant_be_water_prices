@@ -323,9 +323,11 @@ def parse_commune_tariff(html: str, *, commune_slug: str, year: int | None = Non
         fallback = _find_latest_year_table(soup)
         if fallback is not None:
             table, fallback_year = fallback
+            # The commune is the household's town: the integration
+            # scrubs it everywhere it is published, so it does not go
+            # into the log either.
             _LOGGER.warning(
-                "Pidpa per-commune page for %r does not list %d; falling back to %d",
-                commune_slug,
+                "Pidpa per-commune page does not list %d; falling back to %d",
                 target,
                 fallback_year,
             )
