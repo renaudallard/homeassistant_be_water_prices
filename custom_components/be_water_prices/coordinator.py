@@ -61,7 +61,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import VolumeConverter
 
-from ._redact import source_url_without_commune
+from ._redact import scrub_tokens, sensitive_tokens, source_url_without_commune
 from .const import (
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
@@ -621,10 +621,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # last_error are surfaced as attributes so dashboards can
             # flag the issue.
             if self._last_good is not None:
+                # The message quotes the URL it failed on, and a
+                # per-commune URL carries the town name. The sensor
+                # attribute, diagnostics and the Repair card all scrub
+                # that; the log was the one surface left publishing it.
+                scrubbed = scrub_tokens(
+                    str(err), sensitive_tokens(self.entry), placeholder="**redacted**"
+                )
                 _LOGGER.warning(
                     "water tariff fetch failed (%s), serving cached: %s",
                     type(err).__name__,
-                    err,
+                    scrubbed,
                 )
                 stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)
                 ytd_m3, ytd_cost = await self._compute_ytd(self._last_good.tariff)
@@ -633,7 +640,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     fetched_at=self._last_good.fetched_at,
                     snapshot_age_hours=self._age_hours(self._last_good.fetched_at),
                     snapshot_stale=stale,
-                    last_error=str(err),
+                    last_error=scrubbed,
                     projected_annual_cost_eur=self._project_cost(self._last_good.tariff),
                     current_year_cost_eur=ytd_cost,
                     ytd_consumption_m3=ytd_m3,
@@ -710,7 +717,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                         if data.tariff.valid_until is not None
                         else "unknown"
                     ),
-                    "last_error": data.last_error or "(none)",
+                    # Already scrubbed on the way into CoordinatorData,
+                    # but a caller could build one by hand.
+                    "last_error": scrub_tokens(
+                        data.last_error, sensitive_tokens(self.entry), placeholder="**redacted**"
+                    )
+                    or "(none)",
                 },
                 # Carry the entry id so the Repairs UI flow handler in
                 # repairs.py knows which coordinator to refresh when the
