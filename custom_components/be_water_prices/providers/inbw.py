@@ -37,8 +37,11 @@ against their published values; drift > 0.005 logs a warning.
 
 inBW's TLS chain is misconfigured -- the server does not send the
 GoDaddy intermediate certificate, so the default Python trust path
-fails. ``fetch_html`` is called with ``verify_ssl=False`` for this
-host; see the rationale in :func:`_pdf.fetch_text`.
+fails. The fetch verifies normally and only retries with
+``verify_ssl=False`` after a certificate or SSL error specifically,
+logging a warning when it does, so the day inBW fixes its chain the
+downgrade stops happening on its own. See the rationale in
+:func:`_pdf.fetch_text`.
 
 Tariff structure is the standard Wallonia residential model; see
 :func:`pricing.compute_annual_cost` for the math.
