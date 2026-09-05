@@ -253,22 +253,18 @@ async def test_comfort_rate_is_removed_when_the_operator_loses_it(hass) -> None:
     """
     from homeassistant.helpers import entity_registry as er
 
-    from custom_components.be_water_prices.const import DOMAIN
-    from custom_components.be_water_prices.sensor import (
-        SENSORS,
-        _async_remove_inapplicable_entities,
-        _is_applicable,
-    )
+    from custom_components.be_water_prices.const import CONF_UTILITY, DOMAIN
+    from custom_components.be_water_prices.sensor import async_remove_inapplicable_entities
 
     entry = _StubEntry()
+    entry.data = {CONF_UTILITY: "swde"}  # Wallonia: no comfort rate
     ent_reg = er.async_get(hass)
     for key in ("basis_rate", "comfort_rate"):
         ent_reg.async_get_or_create(
             "sensor", DOMAIN, f"{entry.entry_id}_{key}", suggested_object_id=f"x_{key}"
         )
 
-    applicable = [d for d in SENSORS if _is_applicable(d, region="wallonia")]
-    _async_remove_inapplicable_entities(hass, entry, applicable)  # type: ignore[arg-type]
+    async_remove_inapplicable_entities(hass, entry)  # type: ignore[arg-type]
 
     assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_comfort_rate") is None
     assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_basis_rate") is not None

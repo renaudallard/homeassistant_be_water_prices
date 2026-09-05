@@ -290,13 +290,11 @@ async def async_setup_entry(
     coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
     region = get(entry.data[CONF_UTILITY]).region
     applicable = [desc for desc in SENSORS if _is_applicable(desc, region=region)]
-    _async_remove_inapplicable_entities(hass, entry, applicable)
     async_add_entities(WaterSensor(coordinator, desc) for desc in applicable)
 
 
-def _async_remove_inapplicable_entities(
-    hass: HomeAssistant, entry: ConfigEntry, applicable: list[WaterSensorDescription]
-) -> None:
+@callback
+def async_remove_inapplicable_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Drop registry entries for sensors this operator does not produce.
 
     Reconfiguring a Flemish entry to Brussels or Wallonia stops the
@@ -304,9 +302,14 @@ def _async_remove_inapplicable_entities(
     Assistant shows it as restored, with the "no longer being provided"
     banner and a delete button. Tidy it away instead, the way
     statistics.py already clears the long-term rows it leaves behind.
+
+    Called from __init__ after the backfill rather than during platform
+    setup, because the statistics cleanup finds those orphan rows *by*
+    the registry entry: removing it first left the rows behind forever.
     """
+    region = get(entry.data[CONF_UTILITY]).region
     ent_reg = er.async_get(hass)
-    keep = {desc.key for desc in applicable}
+    keep = {desc.key for desc in SENSORS if _is_applicable(desc, region=region)}
     for desc in SENSORS:
         if desc.key in keep:
             continue
