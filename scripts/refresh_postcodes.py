@@ -331,8 +331,19 @@ def build_dwg_flanders_carveout() -> list[str]:
     return carve
 
 
+_DROPDOWN_CACHE: tuple[set[str], set[str]] | None = None
+
+
 def _scrape_both_dropdowns() -> tuple[set[str], set[str]]:
-    """Both commune dropdowns, refusing a result that is too thin to be real."""
+    """Both commune dropdowns, refusing a result that is too thin to be real.
+
+    Cached for the life of the process: the two carve-outs are built from
+    the same pair of pages, and this is a one-shot script, so fetching
+    them once each is both faster and politer to the operators.
+    """
+    global _DROPDOWN_CACHE
+    if _DROPDOWN_CACHE is not None:
+        return _DROPDOWN_CACHE
     print("scraping DWG commune dropdown …", file=sys.stderr)
     dwg_pc = _scrape_postcodes(_fetch(DWG_DROPDOWN_URL))
     print(f"  {len(dwg_pc)} DWG postcodes", file=sys.stderr)
@@ -349,7 +360,8 @@ def _scrape_both_dropdowns() -> tuple[set[str], set[str]]:
             f"Farys dropdown yielded {len(farys_pc)} postcodes, expected at least "
             f"{MIN_PLAUSIBLE_FARYS_POSTCODES}; the page is probably not the tariff page"
         )
-    return dwg_pc, farys_pc
+    _DROPDOWN_CACHE = (dwg_pc, farys_pc)
+    return _DROPDOWN_CACHE
 
 
 def build_farys_vlaams_brabant_carveout() -> list[str]:
