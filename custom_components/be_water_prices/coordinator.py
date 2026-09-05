@@ -104,6 +104,10 @@ _SWAP_CONFIRM_READINGS = 3
 # updates carrying the same stale value -- and re-anchor the year on a
 # glitch. A real replacement keeps reading low for far longer than this.
 _SWAP_CONFIRM_SPAN_S = 600.0
+
+# How long to wait for the Energy dashboard's manager singleton before
+# giving up on it for this tick.
+_ENERGY_MANAGER_TIMEOUT_S = 10.0
 # A single meter report that climbs more than this many m3 is held for one
 # reading before it is allowed to advance the high-water mark. A household
 # uses roughly 80-100 m3 a year, so a step this size in one report is a
@@ -1157,8 +1161,15 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
     except ImportError:
         return None
     try:
-        manager = await async_get_manager(hass)
-    except Exception as err:  # energy component may surface anything; degrade gracefully
+        # The manager is a singleton behind an asyncio.Event that is only
+        # set once its first load succeeds. A failed read of
+        # .storage/energy -- an EIO on the SD card is the classic one --
+        # leaves the event unset forever, and every later caller waits on
+        # it. Bound the wait so a poisoned singleton costs one tick
+        # instead of wedging the coordinator for the life of the process.
+        async with asyncio.timeout(_ENERGY_MANAGER_TIMEOUT_S):
+            manager = await async_get_manager(hass)
+    except Exception as err:  # a timeout, or whatever the energy component surfaced
         _LOGGER.debug("energy manager unavailable: %s", err)
         return None
     data = getattr(manager, "data", None)
