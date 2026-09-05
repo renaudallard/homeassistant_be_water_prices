@@ -62,6 +62,29 @@ def test_empty_sanering_row_raises_instead_of_taking_the_comforttarief() -> None
         parse_tariff(blanked, year=2026)
 
 
+def test_the_year_comes_from_the_page_not_the_clock() -> None:
+    """Farys flags the period it is showing; that is the tariff's year.
+
+    Stamping the clock's year meant a page serving next year's card
+    early was dated as this year's, and a page still stuck on last
+    year's looked current -- so the stale-snapshot check could never
+    fire on either.
+    """
+    raw = fixture_html("farys_gent_2026.json")
+    assert parse_tariff(raw).valid_from.year == 2026
+    # Move the active flag onto the other period button.
+    active = "\\u003Cli class=\\u0022active\\u0022\\u003E"
+    inactive = "\\u003Cli class=\\u0022\\u0022\\u003E"
+    assert raw.count(active) == 1 and raw.count(inactive) == 1
+    switched = (
+        raw.replace(active, "<<TMP>>", 1).replace(inactive, active, 1).replace("<<TMP>>", inactive)
+    )
+    assert parse_tariff(switched).valid_from.year == 2025
+
+    # An explicit year still wins over the page.
+    assert parse_tariff(raw, year=2030).valid_from.year == 2030
+
+
 def test_raises_when_response_is_not_json() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("not json at all")
