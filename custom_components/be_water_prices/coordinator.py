@@ -328,13 +328,21 @@ def _fold(
     # running since January cannot read below what the year has used.
     bar = offset if offset is not None else (max(seen) if seen else None)
     if reading is None:
-        pass
+        # No reading to confirm or refute a held jump, and the hold only
+        # means anything against the reading that follows it directly.
+        # Keeping it would let the next spike through unheld, whenever it
+        # came.
+        hold_m3 = None
     elif bar is not None and reading < bar:
         # Below the bar is either a transient glitch (a rebooting meter
         # reporting 0, a dropout) or a genuine meter swap. Distinguish by
         # persistence: a lone low reading is held rather than flooring the
         # year, and only a sustained run re-anchors.
         hold_run += 1
+        # A reading under the bar says nothing about a jump held above it,
+        # so the hold lapses here too rather than standing until some
+        # later spike walks straight past it.
+        hold_m3 = None
         if hold_run >= _SWAP_CONFIRM_READINGS:
             # Zero the record before the figures are compared below, or the
             # old mark resurrects itself through the comparison and the swap

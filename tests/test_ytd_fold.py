@@ -152,6 +152,25 @@ def test_a_dip_with_a_mark_behind_it_still_rebuilds_the_frame() -> None:
     assert out.cycle.offset_m3 == 75.0
 
 
+def test_a_missing_reading_lapses_a_held_jump() -> None:
+    """The hold only means anything against the reading right after it."""
+    out = _round(_anchored(25.0, 80.0), reading=None, hold_m3=400.0)
+
+    assert out.hold_m3 is None
+
+
+def test_a_reading_under_the_bar_lapses_a_held_jump() -> None:
+    """A dip says nothing about a spike held above it, so the hold goes.
+
+    Left standing, the hold would wave through whatever spike arrived
+    next, however much later and however unrelated.
+    """
+    out = _round(_anchored(25.0, 80.0), reading=3.0, hold_m3=400.0)
+
+    assert out.hold_m3 is None
+    assert out.hold_run == 1
+
+
 def test_a_confirmed_swap_takes_the_mark_with_it() -> None:
     """The old meter's high-water mark must not outlive the old meter.
 
