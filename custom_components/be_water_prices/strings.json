@@ -126,7 +126,7 @@
       "title": "{utility} tariff snapshot is stale",
       "fix_flow": {
         "step": {
-          "init": {
+          "confirm": {
             "title": "Retry the {utility} tariff fetch",
             "description": "The last successfully fetched {utility} tariff is {age_days} days old (valid until {valid_until}). Last fetch error: {last_error}.\n\nPress Submit to trigger an immediate refresh. The Repair card auto-clears if the next fetch returns a fresh snapshot; otherwise it stays so you can retry again or investigate the underlying failure (check the integration's GitHub issues or the daily live-check workflow run)."
           }
@@ -140,7 +140,7 @@
       "title": "{utility} projection uses an outdated consumption figure",
       "fix_flow": {
         "step": {
-          "init": {
+          "confirm": {
             "title": "Use your {year} water use for the {utility} projection",
             "description": "Your water meter measured {metered} m³ over the whole of {year}. The projected annual cost sensor is still set to {configured} m³ per year.\n\nPress Submit to replace the configured figure with {metered} m³. The projected cost updates immediately. The year-to-date sensors are unaffected either way, since those always read the meter rather than this setting.\n\nIgnore this card to keep {configured} m³."
           }

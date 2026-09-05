@@ -142,7 +142,7 @@
       "title": "Snapshot de tarif {utility} obsolète",
       "fix_flow": {
         "step": {
-          "init": {
+          "confirm": {
             "title": "Réessayer la récupération du tarif {utility}",
             "description": "Le dernier tarif {utility} récupéré avec succès a {age_days} jours (valable jusqu'au {valid_until}). Dernière erreur : {last_error}.\n\nCliquez sur Soumettre pour déclencher un rafraîchissement immédiat. La carte Repair disparaît automatiquement si la prochaine récupération renvoie un nouveau snapshot ; sinon elle reste affichée pour réessayer ou investiguer la cause sous-jacente (consultez les issues GitHub ou le run quotidien de la workflow live-check)."
           }
@@ -156,7 +156,7 @@
       "title": "La projection {utility} utilise une consommation obsolète",
       "fix_flow": {
         "step": {
-          "init": {
+          "confirm": {
             "title": "Utiliser votre consommation {year} pour la projection {utility}",
             "description": "Votre compteur d'eau a mesuré {metered} m³ sur toute l'année {year}. Le capteur de coût annuel projeté est toujours réglé sur {configured} m³ par an.\n\nCliquez sur Soumettre pour remplacer la valeur configurée par {metered} m³. Le coût projeté est mis à jour immédiatement. Les capteurs depuis le 1er janvier ne changent pas dans les deux cas, car ils lisent toujours le compteur et non ce réglage.\n\nIgnorez cette carte pour conserver {configured} m³."
           }

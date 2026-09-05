@@ -448,11 +448,44 @@ async def test_fix_flow_writes_the_measured_year_into_the_options(
         result = await flow.async_step_init()
         assert result["type"] == "form"
         assert result["description_placeholders"]["metered"] == "131"
-        result = await flow.async_step_init({})
+        result = await flow.async_step_confirm({})
         assert result["type"] == "create_entry"
         await hass.async_block_till_done()
 
     assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 131
+
+
+@pytest.mark.asyncio
+async def test_opening_the_card_shows_a_form_before_doing_anything(
+    hass: HomeAssistant,
+) -> None:
+    """Going through the real manager must not apply the fix on the way in.
+
+    The Repairs manager starts a flow with the issue id as its init data,
+    so the first step is called with a dict rather than None. A flow that
+    reads that as a submission rewrites the entry the moment somebody
+    opens the card.
+    """
+    from homeassistant.setup import async_setup_component
+
+    assert await async_setup_component(hass, "repairs", {})
+    entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=131.0))
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    before = dict(entry.options)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch_tariff)
+
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_FULL_YEAR, new=AsyncMock(return_value=131.0)),
+    ):
+        result = await hass.data["repairs"]["flow_manager"].async_init(
+            DOMAIN, data={"issue_id": coordinator.projection_issue_id}
+        )
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "confirm"
+    assert dict(entry.options) == before
 
 
 @pytest.mark.asyncio
@@ -463,7 +496,7 @@ async def test_fix_flow_aborts_when_the_entry_cannot_be_updated(hass: HomeAssist
     flow.hass = hass
     flow.handler = DOMAIN
     flow.issue_id = "projection_outdated_does-not-exist"
-    result = await flow.async_step_init({})
+    result = await flow.async_step_confirm({})
     assert result["type"] == "abort"
     assert result["reason"] == "cannot_apply"
 

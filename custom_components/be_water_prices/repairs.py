@@ -58,6 +58,13 @@ class SnapshotStaleRepairFlow(RepairsFlow):
         self._entry_id = entry_id
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        # The Repairs manager starts the flow with the issue id as its init
+        # data, so user_input is already a dict on the very first call and
+        # a single step would run its action before anyone saw a form.
+        # Hand straight over to a named step, as ConfirmRepairFlow does.
+        return await self.async_step_confirm()
+
+    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         # Forward the issue's placeholders so the form's title and
         # description, and the abort message below, render
         # {utility}/{age_days}/{valid_until}/{last_error} instead of
@@ -68,7 +75,7 @@ class SnapshotStaleRepairFlow(RepairsFlow):
         if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
             placeholders = issue.translation_placeholders
         if user_input is None:
-            return self.async_show_form(step_id="init", description_placeholders=placeholders)
+            return self.async_show_form(step_id="confirm", description_placeholders=placeholders)
         coordinator = self.hass.data.get(DOMAIN, {}).get(self._entry_id)
         if coordinator is not None:
             await coordinator.async_refresh()
@@ -91,6 +98,12 @@ class ProjectionOutdatedRepairFlow(RepairsFlow):
         self._consumption_m3 = consumption_m3
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        # Same reason as the stale-snapshot flow: the manager's init data
+        # arrives as user_input, so acting in this step would write the
+        # option the moment the card is opened.
+        return await self.async_step_confirm()
+
+    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         # Same placeholder forwarding as the stale-snapshot flow: HA does
         # not hand an issue's placeholders to its fix-flow steps, so the
         # form would render literal {year} / {metered} braces without this.
@@ -99,7 +112,7 @@ class ProjectionOutdatedRepairFlow(RepairsFlow):
         if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
             placeholders = issue.translation_placeholders
         if user_input is None:
-            return self.async_show_form(step_id="init", description_placeholders=placeholders)
+            return self.async_show_form(step_id="confirm", description_placeholders=placeholders)
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         if entry is None or not self._consumption_m3:
             # The entry was removed while the card sat there, or the issue
