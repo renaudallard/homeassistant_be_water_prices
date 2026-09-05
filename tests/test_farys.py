@@ -44,6 +44,24 @@ def test_parses_2026_gent_centrum_rates() -> None:
     assert t.yearly_fixed_fee_per_resident_discount == 20.0
 
 
+def test_empty_sanering_row_raises_instead_of_taking_the_comforttarief() -> None:
+    """A row with no amount must not be filled in from the row below.
+
+    A commune with no municipal sewerage line renders the label with an
+    empty amount block. Bridging the gap to the next euro sign lands on
+    the comforttarief, which is exactly twice the basistarief and
+    plausible enough to ship as a real rate.
+    """
+    from custom_components.be_water_prices.providers.base import ExtractorError
+
+    raw = fixture_html("farys_gent_2026.json")
+    # Empty the gemeentelijke basistarief cells, euro signs included.
+    blanked = raw.replace("\\u0026euro; 1,9572", "").replace("\\u0026euro; 2,0746", "")
+    assert blanked != raw
+    with pytest.raises(ExtractorError, match="gemeentelijke saneringsbijdrage"):
+        parse_tariff(blanked, year=2026)
+
+
 def test_raises_when_response_is_not_json() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("not json at all")
