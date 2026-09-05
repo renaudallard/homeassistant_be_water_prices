@@ -114,6 +114,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_maybe_backfill_once(hass, entry)
     except Exception:
         _LOGGER.exception("price-history backfill failed; entry continues without it")
+    # After the backfill, not before: the orphan-statistics cleanup finds
+    # the rows it has to consider through the entity registry, so pulling
+    # the registry entry first would strand them permanently.
+    from .sensor import async_remove_inapplicable_entities
+
+    async_remove_inapplicable_entities(hass, entry)
     return True
 
 

@@ -266,3 +266,57 @@ async def test_backfill_stops_at_the_snapshot_s_validity(hass: HomeAssistant) ->
     assert rows <= hours_in_2020 + 1
     unclamped = (datetime.now() - datetime(2020, 1, 1)).days * 24
     assert rows < unclamped / 2
+
+
+async def test_orphan_entities_are_removed_after_the_statistics_cleanup(
+    hass: HomeAssistant,
+) -> None:
+    """Order matters: the rows are found through the registry entry.
+
+    The statistics cleanup looks each orphan key up by its entity id, so
+    removing the registry entry during platform setup -- before the
+    backfill runs -- left the rows behind with nothing left to find them
+    by.
+    """
+    from datetime import date
+
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+
+    calls: list[str] = []
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return WaterTariff(
+            utility="vivaqua",
+            region="brussels",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="VIVAQUA 2026",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=40.0,
+            linear_eur_per_m3=2.0,
+        )
+
+    entry = _entry(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+
+    async def _backfill(*_a: Any, **_k: Any) -> None:
+        calls.append("backfill")
+
+    def _remove(*_a: Any, **_k: Any) -> None:
+        calls.append("remove_entities")
+
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.statistics.async_maybe_backfill_once",
+            new=_backfill,
+        ),
+        patch(
+            "custom_components.be_water_prices.sensor.async_remove_inapplicable_entities",
+            new=_remove,
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert calls == ["backfill", "remove_entities"], calls
