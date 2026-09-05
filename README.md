@@ -421,7 +421,10 @@ January would be fiction. The start is clamped to the
 tariff snapshot's `valid_from` so periods with no published source
 are not invented. The auto-once gate is stamped onto the config
 entry's data; when the calendar year rolls over the gate trips and
-the next setup extends the line into the new year. The YTD sensors
+the next setup extends the line into the new year, unless the snapshot
+is stale -- then it waits, so a year is never filled in with rates that
+had already expired. The window also stops at the tariff's own
+`valid_until`. The YTD sensors
 (`current_year_cost`, `ytd_consumption`) are intentionally excluded
 because their values come from the user's actual meter history.
 

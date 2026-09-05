@@ -40,6 +40,7 @@ excluded -- synthesising them would invent consumption.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -72,6 +73,9 @@ DATA_BACKFILL_YEAR = "backfill_year"
 # Sensor keys eligible for backfill: MEASUREMENT-class scalars derivable
 # from the latest tariff. The TOTAL-class YTD sensors are excluded on
 # purpose -- their values come from the user's water meter history.
+# How many hourly rows to build between yields to the event loop.
+_BACKFILL_YIELD_EVERY = 744  # a long month
+
 _BACKFILL_KEYS: tuple[str, ...] = (
     "yearly_fee",
     "basis_rate",
@@ -214,6 +218,12 @@ async def async_backfill_prices(
                 )
             )
             bucket += timedelta(hours=1)
+            # A full year is ~8760 rows per sensor and five sensors run
+            # through this loop, so building them in one go held the
+            # event loop for a third of a second on this hardware. Give
+            # it air every month's worth.
+            if len(rows) % _BACKFILL_YIELD_EVERY == 0:
+                await asyncio.sleep(0)
 
         metadata = StatisticMetaData(
             statistic_id=entity_id,
