@@ -162,6 +162,19 @@ async def async_backfill_prices(
 
     start_utc = start.astimezone(dt_util.UTC).replace(minute=0, second=0, microsecond=0)
     end_utc = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    # Clamp the far end to the snapshot too. Only the near end was
+    # clamped, so on a year rollover against a page that has not
+    # published the new year yet, last year's rates were flat-lined
+    # across January as though they still applied.
+    if tariff.valid_until is not None:
+        valid_until_dt = datetime(
+            tariff.valid_until.year,
+            tariff.valid_until.month,
+            tariff.valid_until.day,
+            23,
+            tzinfo=tz,
+        ).astimezone(dt_util.UTC)
+        end_utc = min(end_utc, valid_until_dt.replace(minute=0, second=0, microsecond=0))
     if end_utc <= start_utc:
         return 0
 
@@ -327,6 +340,16 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     current_gate = f"{current_year}:{current_utility}"
     previous_gate = entry.data.get(DATA_BACKFILL_YEAR)
     if previous_gate == current_gate:
+        return
+
+    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is not None and coordinator.data is not None and coordinator.data.snapshot_stale:
+        # The snapshot cannot cover the window we are about to fill, and
+        # stamping the gate anyway would lock in whatever we wrote: the
+        # gate is keyed on (year, utility), so a later run with a fresh
+        # tariff would find it already satisfied and never correct the
+        # line. Leave it unstamped and retry on the next setup.
+        _LOGGER.debug("snapshot is stale; deferring the auto-once backfill for %s", entry.entry_id)
         return
 
     # On operator change, any LTS rows the previous operator wrote for
