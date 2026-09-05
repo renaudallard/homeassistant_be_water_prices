@@ -306,15 +306,18 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
     return await asyncio.to_thread(parse_commune_tariff, text, year=year, commune_label=commune)
 
 
+# The gap between the tag and the label is not padded with \\s* on
+# either side: three ways to split the same run of whitespace makes
+# the engine enumerate every split when the match fails, which is
+# cubic in the length of that run. .strip() below does the same job
+# in linear time.
 _OPTION_RE = re.compile(
-    r'<option[^>]*value="(\{[0-9A-Fa-f-]+\})"[^>]*>\s*([^<]+?)\s*</option>',
+    r'<option[^>]*value="(\{[0-9A-Fa-f-]+\})"[^>]*>([^<]*)</option>',
     re.IGNORECASE | re.DOTALL,
 )
 
 
-async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
-    """Discover the 700 De Watergroep communes by scraping the dropdown."""
-    html = await fetch_html(session, COMMUNE_LIST_URL)
+def _parse_commune_options(html: str) -> list[CommuneOption]:
     communes: list[CommuneOption] = []
     seen: set[str] = set()
     for match in _OPTION_RE.finditer(html):
@@ -324,6 +327,16 @@ async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, 
             continue
         seen.add(guid)
         communes.append(CommuneOption(id=guid, label=label))
+    return communes
+
+
+async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
+    """Discover the 700 De Watergroep communes by scraping the dropdown."""
+    html = await fetch_html(session, COMMUNE_LIST_URL)
+    # Same reasoning as farys.list_communes: this is reached from the
+    # config flow on the event loop, and every other parse in this
+    # module goes through a thread.
+    communes = await asyncio.to_thread(_parse_commune_options, html)
     if not communes:
         raise ExtractorError("could not discover any De Watergroep communes from the dropdown")
     return tuple(communes)
