@@ -1143,7 +1143,9 @@ async def _recorder_daily_rows(
     delta of the cumulative ``sum`` between the bucket's first and
     last sample. Reading ``sum`` directly would yield the all-time
     running total -- summing those would multiply the figure by however
-    many years of meter history exist.
+    many years of meter history exist. ``sum`` comes along anyway
+    because the first bucket's ``change`` is only meaningful next to
+    it: see :func:`_recorder_ytd_m3`.
     """
     try:
         # mypy --strict flags both names because the recorder module
@@ -1191,7 +1193,7 @@ async def _recorder_daily_rows(
             # class. Without this a litre-reporting meter would be summed
             # as if it were already cubic metres -- ~1000× too high.
             {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS},
-            {"change"},
+            {"change", "sum"},
         )
     except Exception as err:
         _LOGGER.debug("recorder query for %s failed: %s", entity_id, err)
@@ -1215,9 +1217,28 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     guard in this module was re-deriving one call later.
     """
     total = 0.0
-    for row in await _recorder_daily_rows(hass, entity_id, start, end):
+    for index, row in enumerate(await _recorder_daily_rows(hass, entity_id, start, end)):
         delta = row.get("change")
         if delta is None:
+            continue
+        if index == 0 and _change_is_the_whole_register(row):
+            # The recorder builds ``change`` by subtracting the sum it
+            # finds immediately before the window, and falls back to zero
+            # when it finds none. The first bucket's change is then the
+            # meter's entire running total rather than that day's
+            # consumption, and billing it into the window inflates the
+            # year by every cubic metre the meter has ever measured.
+            #
+            # It reads the same whether the earlier rows were purged or
+            # the meter is genuinely new, so the bucket is dropped either
+            # way: one missing day beats an unbounded over-count that
+            # persists until the year turns.
+            _LOGGER.debug(
+                "%s has no bucket before %s; dropping the first day rather than"
+                " billing the meter's running total into the year",
+                entity_id,
+                start,
+            )
             continue
         total += float(delta)
     # Replacing a water meter mid-year (cumulative sensor state drops
@@ -1226,6 +1247,19 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     # year-to-date consumption; floor at 0 so the sensor degrades to
     # "no consumption since meter swap" rather than negative numbers.
     return max(0.0, total)
+
+
+def _change_is_the_whole_register(row: Any) -> bool:
+    """Whether ``row``'s change is really the meter's cumulative total.
+
+    True when the recorder had no earlier sum to subtract, which it
+    reports by leaving ``change`` equal to ``sum``.
+    """
+    change = row.get("change")
+    total = row.get("sum")
+    if change is None or total is None:
+        return False
+    return bool(total) and abs(float(change) - float(total)) < 1e-9
 
 
 async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int) -> float | None:
