@@ -594,11 +594,15 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # so the user sees a fresh fetch on the next sensor tick.
             return self.async_update_reload_and_abort(entry)
 
+        # A branch that changes something leaves the reload to the update
+        # listener __init__ registers. Asking for one here as well ran
+        # async_setup_entry twice over, each time re-fetching the tariff
+        # live, on top of the one the backfill gate already costs.
         if new_utility == old_utility:
             # Same utility but commune changed via the manual flow.
-            return self.async_update_reload_and_abort(entry, options=new_options)
+            return self.async_update_and_abort(entry, options=new_options)
 
-        return self.async_update_reload_and_abort(
+        return self.async_update_and_abort(
             entry,
             unique_id=new_unique_id,
             title=get(new_utility).label,
