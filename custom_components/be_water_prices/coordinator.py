@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import calendar
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -96,6 +97,13 @@ _YTD_SAVE_DELAY_S = 30
 # swapped (re-anchoring YTD to ~0). A single low value is held as a glitch so
 # a rebooting meter reporting 0 does not floor the running figure.
 _SWAP_CONFIRM_READINGS = 3
+# ...and how long that run has to last. Counting readings alone is a
+# proxy for persistence that only holds on the daily tick. The live path
+# fires on every state event, so three of them can land inside a second
+# -- a meter that drops out and reconnects, or a burst of attribute-only
+# updates carrying the same stale value -- and re-anchor the year on a
+# glitch. A real replacement keeps reading low for far longer than this.
+_SWAP_CONFIRM_SPAN_S = 600.0
 # A single meter report that climbs more than this many m3 is held for one
 # reading before it is allowed to advance the high-water mark. A household
 # uses roughly 80-100 m3 a year, so a step this size in one report is a
@@ -250,6 +258,7 @@ class _YtdFold:
     cost: float | None
     hold_m3: float | None
     hold_run: int
+    hold_span_s: float
     high_m3: float | None
 
 
@@ -263,6 +272,8 @@ def _fold(
     recorder_ok: bool | None,
     hold_m3: float | None,
     hold_run: int,
+    hold_span_s: float,
+    elapsed_s: float,
     high_m3: float | None,
     cost_of: Callable[[float], float | None],
 ) -> _YtdFold:
@@ -295,6 +306,7 @@ def _fold(
         cycle = _YtdCycle(meter=meter)
         hold_m3 = None
         hold_run = 0
+        hold_span_s = 0.0
         high_m3 = None
 
     current = cycle.year == now_year
@@ -304,6 +316,7 @@ def _fold(
     if not current:
         hold_m3 = None
         hold_run = 0
+        hold_span_s = 0.0
         high_m3 = None
     # The highest reading the meter has shown this cycle, whether or not it
     # was admitted. Held and rejected readings still say where the register
@@ -339,11 +352,12 @@ def _fold(
         # persistence: a lone low reading is held rather than flooring the
         # year, and only a sustained run re-anchors.
         hold_run += 1
+        hold_span_s += max(0.0, elapsed_s)
         # A reading under the bar says nothing about a jump held above it,
         # so the hold lapses here too rather than standing until some
         # later spike walks straight past it.
         hold_m3 = None
-        if hold_run >= _SWAP_CONFIRM_READINGS:
+        if hold_run >= _SWAP_CONFIRM_READINGS and hold_span_s >= _SWAP_CONFIRM_SPAN_S:
             # Zero the record before the figures are compared below, or the
             # old mark resurrects itself through the comparison and the swap
             # never takes effect.
@@ -354,6 +368,7 @@ def _fold(
             candidate = 0.0
             hold_m3 = None
             hold_run = 0
+            hold_span_s = 0.0
             # The mark belongs to the meter that has just been replaced,
             # and the new one starts far below it. Leaving it behind would
             # keep every later reading under a mark it cannot reach, and
@@ -364,6 +379,7 @@ def _fold(
         # frame from the highest figure the year already has, so the reading
         # continues what is published instead of restarting it.
         hold_run = 0
+        hold_span_s = 0.0
         if seen:
             base = max(seen)
             offset = reading - base
@@ -377,6 +393,7 @@ def _fold(
             candidate = 0.0
     else:
         hold_run = 0
+        hold_span_s = 0.0
         framed = reading - offset
         if mark is not None and framed - mark > _IMPLAUSIBLE_JUMP_M3 and hold_m3 is None:
             # A step this large in one report is a garbage value far more
@@ -399,7 +416,7 @@ def _fold(
         # all, and report nothing rather than publish a zero it has not
         # earned: the stamp is what stops the next reading starting the year
         # over.
-        return _YtdFold(cycle, None, None, hold_m3, hold_run, high_m3)
+        return _YtdFold(cycle, None, None, hold_m3, hold_run, hold_span_s, high_m3)
     published = max(figures)
 
     if (
@@ -450,6 +467,7 @@ def _fold(
         cost,
         hold_m3,
         hold_run,
+        hold_span_s,
         high_m3,
     )
 
@@ -525,6 +543,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # meter swap re-accumulates the run.
         self._ytd_hold_m3: float | None = None
         self._ytd_hold_run = 0
+        self._ytd_hold_span_s = 0.0
+        self._ytd_last_fold_at: float | None = None
         # Highest reading the meter has shown this cycle. In memory only: it
         # decides whether a reading is the meter climbing or a dip, and after
         # a restart the very next reading re-establishes it.
@@ -841,6 +861,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         before returning, so a caller that decides not to publish still
         cannot lose a swap run, a held reading, or a rebuilt frame.
         """
+        # How long since the last round. The rule itself keeps no clock,
+        # so the caller measures the gap and hands it over as evidence --
+        # that is what tells a run of readings spread over hours from a
+        # burst of them inside a second.
+        now = time.monotonic()
+        elapsed_s = 0.0 if self._ytd_last_fold_at is None else now - self._ytd_last_fold_at
+        self._ytd_last_fold_at = now
         out = _fold(
             self._ytd,
             now_year=now_year,
@@ -850,6 +877,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             recorder_ok=self._recorder_ok,
             hold_m3=self._ytd_hold_m3,
             hold_run=self._ytd_hold_run,
+            hold_span_s=self._ytd_hold_span_s,
+            elapsed_s=elapsed_s,
             high_m3=self._ytd_high_m3,
             cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3),
         )
@@ -858,6 +887,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd = out.cycle
         self._ytd_hold_m3 = out.hold_m3
         self._ytd_hold_run = out.hold_run
+        self._ytd_hold_span_s = out.hold_span_s
         self._ytd_high_m3 = out.high_m3
         return out.m3, out.cost
 
