@@ -394,13 +394,22 @@ def _fold(
         and reading is not None
         and recorder_m3 is not None
         and candidate is not None
-        and (was_high is None or reading >= was_high)
+        and was_high is not None
+        and reading >= was_high
         and published > reading - offset
         and reading >= published
     ):
         # A reading and a recorder figure read in the same round are the only
         # pair that dates the year's consumption to a meter position, so this
-        # is the only place the frame can be corrected without guessing. The
+        # is the only place the frame can be corrected without guessing.
+        #
+        # It also takes a high-water mark to compare against. Without one
+        # the record has seen nothing on this meter yet -- a restart, a
+        # fresh year -- and a reading that happens to dip cannot be told
+        # from one that climbs, so a single low sample would rebuild the
+        # frame beneath the meter and over-report every day until January.
+        # Waiting a round for the mark to re-establish itself costs the
+        # correction nothing. The
         # figure on its own says how much water the year has seen but not
         # where the meter stood when it did, and the frame's own last position
         # is not an answer: a reading held as a spike, or one never seen at

@@ -132,6 +132,26 @@ def test_a_reading_below_the_mark_republishes_the_mark() -> None:
     assert out.cycle.offset_m3 == 80.0
 
 
+def test_a_dip_after_a_restart_does_not_rebuild_the_frame() -> None:
+    """A restart leaves no high-water mark, so a low reading proves nothing.
+
+    Rebuilding the frame on it drops the frame beneath the meter and
+    every later reading is over-reported for the rest of the year.
+    """
+    out = _round(_anchored(25.0, 80.0), reading=100.0, recorder_m3=25.0, high_m3=None)
+
+    assert out.m3 == 25.0
+    assert out.cycle.offset_m3 == 80.0
+
+
+def test_a_dip_with_a_mark_behind_it_still_rebuilds_the_frame() -> None:
+    """The correction is only deferred, not lost: one round later it fires."""
+    out = _round(_anchored(25.0, 80.0), reading=100.0, recorder_m3=25.0, high_m3=100.0)
+
+    assert out.m3 == 25.0
+    assert out.cycle.offset_m3 == 75.0
+
+
 def test_an_implausible_jump_is_held_for_one_reading() -> None:
     """A garbage spike must not become the year's mark."""
     out = _round(_anchored(25.0, 80.0), reading=400.0)
