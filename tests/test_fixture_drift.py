@@ -124,3 +124,21 @@ async def test_ci_blocked_skip_does_not_mark_the_run_incomplete() -> None:
     result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
     assert result.skipped is not None
     assert result.transient is False
+
+
+def test_every_ci_blocked_label_matches_a_real_check() -> None:
+    """The skip is keyed by a free-text label, so it can silently desync.
+
+    Renaming a CHECKS label while tidying leaves CI_BLOCKED pointing at
+    nothing: the utility is fetched on the runner after all, its CDN
+    answers 403, and the weekly workflow opens a "fixtures need refresh"
+    issue every Sunday for a utility that is not broken. The existing
+    skip test builds its FixtureCheck from CI_BLOCKED itself, so it
+    cannot notice.
+    """
+    from scripts.fixture_drift import CHECKS, CI_BLOCKED
+
+    labels = {check.label for check in CHECKS}
+    assert set(CI_BLOCKED) <= labels, (
+        f"CI_BLOCKED names labels no check carries: {sorted(set(CI_BLOCKED) - labels)}"
+    )
