@@ -242,3 +242,33 @@ def test_last_error_is_scrubbed_of_the_commune() -> None:
     attrs = _sensor_with("basis_rate", coordinator).extra_state_attributes
     assert "geel" not in attrs["last_error"].lower()
     assert "404" in attrs["last_error"]
+
+
+async def test_comfort_rate_is_removed_when_the_operator_loses_it(hass) -> None:  # type: ignore[no-untyped-def]
+    """Reconfiguring out of Flanders must not leave a restored entity behind.
+
+    The comfort rate stops being created, but its registry entry
+    survives and Home Assistant shows it with the "no longer being
+    provided" banner until somebody clicks delete.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.be_water_prices.const import DOMAIN
+    from custom_components.be_water_prices.sensor import (
+        SENSORS,
+        _async_remove_inapplicable_entities,
+        _is_applicable,
+    )
+
+    entry = _StubEntry()
+    ent_reg = er.async_get(hass)
+    for key in ("basis_rate", "comfort_rate"):
+        ent_reg.async_get_or_create(
+            "sensor", DOMAIN, f"{entry.entry_id}_{key}", suggested_object_id=f"x_{key}"
+        )
+
+    applicable = [d for d in SENSORS if _is_applicable(d, region="wallonia")]
+    _async_remove_inapplicable_entities(hass, entry, applicable)  # type: ignore[arg-type]
+
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_comfort_rate") is None
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_basis_rate") is not None
