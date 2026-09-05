@@ -48,6 +48,17 @@ from .base import ExtractorError, TransientFetchError
 _LOGGER = logging.getLogger(__name__)
 
 
+def error_text(err: BaseException) -> str:
+    """A message for ``err`` that is never empty.
+
+    ``str()`` of an exception raised with no arguments is "", which
+    leaves the surrounding message ending at its colon -- and that
+    message reaches users through the last_error attribute and the
+    stale-snapshot Repair card.
+    """
+    return str(err) or type(err).__name__
+
+
 def _http_error(url: str, status: int) -> ExtractorError:
     """Map an HTTP status to the right error class.
 
@@ -123,14 +134,26 @@ async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
         return payload.decode("utf-8", errors="replace")
 
 
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def _strip_bom(payload: bytes) -> bytes:
+    """Drop a leading UTF-8 BOM some publishers put in front of %PDF.
+
+    pdfplumber and pypdf both look for %PDF at byte zero, so the BOM has
+    to come off rather than merely be tolerated: accepting it and then
+    handing the reader bytes it cannot open turned a clear "this is not
+    a PDF" into an empty extraction with no error at all.
+    """
+    return payload[len(_UTF8_BOM) :] if payload.startswith(_UTF8_BOM) else payload
+
+
 def _is_pdf_payload(payload: bytes) -> bool:
     """Return True if the bytes look like a PDF.
 
     PDFs start with ``%PDF``; some publishers prepend a UTF-8 BOM.
     """
-    if payload.startswith(b"%PDF"):
-        return True
-    return payload.startswith(b"\xef\xbb\xbf%PDF")
+    return _strip_bom(payload).startswith(b"%PDF")
 
 
 async def fetch_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
@@ -145,7 +168,7 @@ async def fetch_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
                 raise _http_error(url, resp.status)
             payload = await _read_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching {url}: {err}") from err
+        raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
 
     if not _is_pdf_payload(payload):
         snippet = payload[:80]
@@ -172,7 +195,7 @@ def extract_pdf_text(payload: bytes) -> str:
     except ExtractorError:
         raise
     except Exception as err:
-        raise ExtractorError(f"PDF parse error: {err}") from err
+        raise ExtractorError(f"PDF parse error: {error_text(err)}") from err
 
 
 def extract_pdf_text_layout(payload: bytes) -> str:
@@ -180,10 +203,16 @@ def extract_pdf_text_layout(payload: bytes) -> str:
     try:
         import pdfplumber
 
-        with pdfplumber.open(BytesIO(payload)) as pdf:
-            return "\n".join((page.dedupe_chars().extract_text() or "") for page in pdf.pages)
+        with pdfplumber.open(BytesIO(_strip_bom(payload))) as pdf:
+            text = "\n".join((page.dedupe_chars().extract_text() or "") for page in pdf.pages)
     except Exception as err:
-        raise ExtractorError(f"PDF layout parse error: {err}") from err
+        raise ExtractorError(f"PDF layout parse error: {error_text(err)}") from err
+    if not text.strip():
+        # A PDF with no text layer, or none we can reach. Returning ""
+        # sends the parser off to fail on a missing row, which points
+        # the maintainer at the regex rather than at the document.
+        raise ExtractorError("PDF carried no extractable text layer")
+    return text
 
 
 async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str:
@@ -198,7 +227,7 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
                 raise _http_error(url, resp.status)
             payload = await _read_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching {url}: {err}") from err
+        raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
     if not _is_pdf_payload(payload):
         raise ExtractorError(f"expected a PDF at {url}, payload starts with {payload[:80]!r}")
     return await asyncio.to_thread(extract_pdf_text_layout, payload)
@@ -231,7 +260,7 @@ async def fetch_text(
                 raise _http_error(url, resp.status)
             return await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching {url}: {err}") from err
+        raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
 
 
 _NUMERIC_SEPARATORS = (
