@@ -205,8 +205,8 @@ def build_wallonia_map(features: list[dict[str, object]]) -> dict[str, str]:
             continue  # multiple sub-municipal polygons share a postcode
         seen_postcodes.add(postcode)
         centroid = props["geo_point_2d"]  # type: ignore[index]
-        lon = float(centroid["lon"])  # type: ignore[index]
-        lat = float(centroid["lat"])  # type: ignore[index]
+        lon = float(centroid["lon"])
+        lat = float(centroid["lat"])
         distributor = query_zde_for_centroid(lon, lat)
         # Throttle and report progress once per network call, before the
         # early continues -- otherwise no-hit / unsupported centroids (the
@@ -263,7 +263,8 @@ _OPTION_LABEL_RE = re.compile(
 def _fetch(url: str) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": "be_water_prices refresh_postcodes"})
     with urllib.request.urlopen(req, timeout=60) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+        body: bytes = resp.read()
+    return body.decode("utf-8", errors="replace")
 
 
 def _scrape_postcodes(html: str) -> set[str]:

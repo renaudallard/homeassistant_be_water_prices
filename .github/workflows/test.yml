@@ -38,6 +38,8 @@ jobs:
           ruff check .
           ruff format --check .
       - name: Type check
-        run: mypy --strict custom_components/be_water_prices
+        run: |
+          mypy --strict custom_components/be_water_prices
+          mypy --strict scripts
       - name: Tests
         run: pytest tests/ -q
