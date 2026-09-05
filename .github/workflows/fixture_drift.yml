@@ -70,7 +70,21 @@ jobs:
 
       # rc 2 means nothing drifted but a utility was unreachable on a blip,
       # so this run did not actually check everything: neither file an issue
-      # nor tell the maintainer an open one is safe to close.
+      # nor tell the maintainer an open one is safe to close. It still has
+      # to be visible -- a host that is permanently 5xx or rate-limited
+      # lands here every week and would otherwise leave no trace at all.
+      - name: Record the incomplete run
+        if: steps.check.outputs.rc == '2'
+        run: |
+          {
+            echo "## Incomplete run"
+            echo
+            echo "A utility was unreachable, so this run did not drift-check"
+            echo "everything. No issue is filed and no open one is cleared."
+            echo
+            cat report.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Note drift cleared on existing issue
         if: steps.check.outputs.rc == '0'
         env:

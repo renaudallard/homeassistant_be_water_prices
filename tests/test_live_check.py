@@ -168,6 +168,17 @@ def test_render_reports_transient_without_a_failure_banner() -> None:
     assert "extractors failed" not in out
 
 
+def test_render_names_what_it_could_not_check() -> None:
+    """A transient row is not an all-clear, and nothing here escalates.
+
+    A host that answers 5xx or 429 permanently lands in this branch on
+    every run, forever, with no counter and no issue. The least the
+    report can do is stop implying the utility was checked.
+    """
+    out = _render([_result("OK"), _result("TRANSIENT")])
+    assert "could not be checked this run" in out
+
+
 def test_every_ci_blocked_key_matches_a_real_extractor() -> None:
     """Nothing referenced this map, so a typo in it was invisible.
 

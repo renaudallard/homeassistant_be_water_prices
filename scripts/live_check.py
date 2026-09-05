@@ -223,9 +223,19 @@ def _render(results: list[CheckResult]) -> str:
         lines.append(f"**{len(failed)} of {len(results)} extractors failed.**" + suffix)
     else:
         counts = ", ".join([f"{ok} OK", *extras])
-        # A transient row is not "green", so say so plainly while
-        # making clear nothing actually regressed.
-        headline = "No regressions" if transient else "All reachable extractors green"
+        # A transient row is not "green", and it is not "checked" either.
+        # Saying only "no regressions" reads as an all-clear for a utility
+        # this run never got an answer out of, which is how a host that is
+        # permanently 5xx or rate-limited stays invisible: nothing here
+        # ever escalates, so the wording has to carry it.
+        if transient:
+            names = ", ".join(sorted(r.label for r in transient))
+            headline = (
+                f"No regressions, but {len(transient)} of {len(results)} could not be "
+                f"checked this run ({names})"
+            )
+        else:
+            headline = "All reachable extractors green"
         lines.append(f"{headline} ({counts}).")
     return "\n".join(lines)
 
