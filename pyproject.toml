@@ -25,6 +25,14 @@ ignore = ["E501", "RUF001", "RUF002", "RUF003"]
 # instead of slipping through and breaking the workflow's Type check.
 strict = true
 
+# tests/ is deliberately outside the strict boundary. The suite leans on
+# partial stubs and deliberately-wrong inputs to drive error paths, and
+# type-checking it would mean either weakening those or teaching mypy
+# about every mock. scripts/ is checked in CI alongside the component.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
 [[tool.mypy.overrides]]
 module = [
     "pypdf",
