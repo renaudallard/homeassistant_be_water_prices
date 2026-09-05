@@ -32,16 +32,26 @@ jobs:
           attempts=5
           delays="10 30 60 120"
           set -- $delays
+          # Latch the bits across attempts. Reading only the last attempt
+          # meant four rounds of a genuinely broken extractor followed by
+          # one round where it merely timed out reported "no regressions"
+          # and opened nothing. A round that comes back fully green still
+          # clears the run, so a failure that actually recovers on retry
+          # stays quiet.
+          worst=0
+          green=0
           for i in $(seq 1 "$attempts"); do
             echo "::group::attempt $i"
             python scripts/live_check.py > report.md
             rc=$?
+            worst=$((worst | rc))
             cat report.md
             echo "::endgroup::"
             # Stop once fully green. Retry on any failure, bit 1 (real)
             # or bit 2 (transient), so an upstream hiccup gets its
             # retries to recover before we judge the final state.
             if [ $((rc & 3)) -eq 0 ]; then
+              green=1
               break
             fi
             if [ "$i" -lt "$attempts" ]; then
@@ -51,10 +61,15 @@ jobs:
               sleep "$sleep_for"
             fi
           done
-          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          if [ "$green" -eq 1 ]; then
+            worst=0
+          fi
+          echo "rc=$worst" >> "$GITHUB_OUTPUT"
           # Only a real failure (bit 1) opens an issue; a transient-only
-          # result (bit 2) is an upstream hiccup, not a regression.
-          if [ $((rc & 1)) -ne 0 ]; then
+          # result (bit 2) is an upstream hiccup, not a regression. The
+          # bit is read off the latched value, so a real failure seen in
+          # any attempt still counts even if the last one only timed out.
+          if [ $((worst & 1)) -ne 0 ]; then
             echo "real_fail=1" >> "$GITHUB_OUTPUT"
           else
             echo "real_fail=0" >> "$GITHUB_OUTPUT"
