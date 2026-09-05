@@ -132,9 +132,19 @@ def test_knokke_heist_postcodes_resolve_to_agso() -> None:
 
 
 def test_aquaduin_westkust_postcodes_resolve_to_aquaduin() -> None:
-    # Koksijde, De Panne, Veurne, Nieuwpoort, Bredene, Middelkerke.
-    for pc in ("8670", "8660", "8630", "8620", "8450", "8430"):
+    # Koksijde, De Panne, Veurne, Nieuwpoort and both Alveringem codes.
+    for pc in ("8670", "8660", "8630", "8620", "8690", "8691"):
         assert _resolve_postcode(pc) == "aquaduin", pc
+
+
+def test_middelkerke_and_bredene_are_not_aquaduin() -> None:
+    # Aquaduin's own publication names Alveringem, De Panne, Nieuwpoort
+    # and Veurne; neither Middelkerke nor Bredene is on that list.
+    # Farys serves Middelkerke (8431/8433/8434 already resolve to it)
+    # and De Watergroep serves Bredene.
+    assert _resolve_postcode("8430") == "farys"
+    assert _resolve_postcode("8450") == "de_watergroep"
+    assert _resolve_candidates("8450") == ("de_watergroep",)
 
 
 def test_west_oost_vlaanderen_postcodes_resolve_to_farys() -> None:
@@ -212,9 +222,11 @@ def test_internal_range_edges_are_pinned_against_shadowing_regressions() -> None
     # AGSO Knokke carve-outs sit inside the Farys 8000-9999 range:
     assert _resolve_postcode("8300") == "agso_knokke"
     assert _resolve_postcode("8301") == "agso_knokke"
-    # Aquaduin carve-out neighbours:
-    assert _resolve_postcode("8430") == "aquaduin"
+    # Aquaduin carve-out neighbours: the whole Middelkerke block is
+    # Farys, and Alveringem is the Aquaduin edge.
+    assert _resolve_postcode("8430") == "farys"
     assert _resolve_postcode("8431") == "farys"
+    assert _resolve_postcode("8691") == "aquaduin"
 
 
 def test_dwg_only_after_farys_filter_includes_new_carve_outs() -> None:
@@ -240,7 +252,6 @@ def test_resolve_candidates_returns_multiple_for_split_postcodes() -> None:
     assert _resolve_candidates("1770") == ("de_watergroep", "farys")  # Liedekerke
     assert _resolve_candidates("8020") == ("farys", "de_watergroep")  # Oostkamp
     assert _resolve_candidates("8400") == ("farys", "de_watergroep")  # Oostende
-    assert _resolve_candidates("8450") == ("aquaduin", "de_watergroep")  # Bredene
     assert _resolve_candidates("8490") == ("farys", "de_watergroep")  # Jabbeke
     assert _resolve_candidates("9080") == ("farys", "de_watergroep")  # Lochristi
     assert _resolve_candidates("9550") == ("farys", "de_watergroep")  # Herzele
@@ -254,7 +265,6 @@ def test_resolve_returns_dominant_candidate_for_splits() -> None:
     # resolver would have picked before split-awareness landed).
     assert _resolve_postcode("1770") == "de_watergroep"
     assert _resolve_postcode("8020") == "farys"
-    assert _resolve_postcode("8450") == "aquaduin"
 
 
 def test_resolve_candidates_empty_for_invalid() -> None:
