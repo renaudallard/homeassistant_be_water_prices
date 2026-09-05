@@ -117,3 +117,53 @@ async def test_read_text_capped_falls_back_on_unknown_charset() -> None:
     resp = _FakeResp([b"75,00 euro"], content_length=10, charset="utf8mb4")
     text = await _pdf._read_text_capped(resp, "u")  # type: ignore[arg-type]
     assert "75,00 euro" in text
+
+
+def test_a_bom_prefixed_pdf_is_read_rather_than_silently_empty() -> None:
+    """The BOM was accepted and then handed to a reader that cannot skip it.
+
+    pdfplumber and pypdf both look for %PDF at byte zero, so tolerating
+    the prefix without removing it turned a clear "not a PDF" into an
+    empty extraction and a parser failure blamed on the regex.
+    """
+    from custom_components.be_water_prices.providers._pdf import (
+        _is_pdf_payload,
+        _strip_bom,
+        extract_pdf_text_layout,
+    )
+    from tests import fixture_bytes
+
+    real = fixture_bytes("aquaduin_2026.pdf")
+    with_bom = b"\xef\xbb\xbf" + real
+    assert _is_pdf_payload(with_bom)
+    assert _strip_bom(with_bom) == real
+    assert extract_pdf_text_layout(with_bom) == extract_pdf_text_layout(real)
+
+
+def test_a_pdf_with_no_text_layer_says_so() -> None:
+    """An empty extraction has to be an error, not an empty string."""
+    import pytest
+
+    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
+    from custom_components.be_water_prices.providers.base import ExtractorError
+
+    blank = (
+        b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+        b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+        b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n"
+        b"trailer<</Root 1 0 R>>"
+    )
+    with pytest.raises(ExtractorError):
+        extract_pdf_text_layout(blank)
+
+
+def test_an_argless_exception_still_produces_a_message() -> None:
+    """str() of an argless exception is "", which truncates the message.
+
+    That message reaches users through the last_error attribute and the
+    stale-snapshot Repair card, where it ended at the colon.
+    """
+    from custom_components.be_water_prices.providers._pdf import error_text
+
+    assert error_text(TimeoutError()) == "TimeoutError"
+    assert error_text(ValueError("boom")) == "boom"
