@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/github/actions/workflow/status/renaudallard/homeassistant_be_water_prices/test.yml?style=flat-square&label=tests" alt="Tests"/>
   </a>
   <a href="https://www.home-assistant.io/">
-    <img src="https://img.shields.io/badge/Home%20Assistant-2026.4%2B-41BDF5?logo=home-assistant&logoColor=white&style=flat-square" alt="Home Assistant"/>
+    <img src="https://img.shields.io/badge/Home%20Assistant-2026.2.3%2B-41BDF5?logo=home-assistant&logoColor=white&style=flat-square" alt="Home Assistant"/>
   </a>
   <a href="https://hacs.xyz">
     <img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square" alt="HACS"/>
@@ -39,7 +39,9 @@ PDF. **No EUR values are hardcoded in the source.** Add a utility by
 writing one Python module that knows where to find that utility's
 publication and how to parse it.
 
-> Targets Home Assistant **2026.4 or newer**.
+> Targets Home Assistant **2026.2.3 or newer** -- the version the test
+> matrix installs, so the floor is one CI proves rather than one nobody
+> has run.
 
 ## Highlights
 

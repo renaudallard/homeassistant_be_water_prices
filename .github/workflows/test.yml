@@ -26,6 +26,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+      # The pinned homeassistant version is also the floor hacs.json
+      # declares. Moving one without the other leaves the integration
+      # claiming support for releases nothing ever runs it on.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
