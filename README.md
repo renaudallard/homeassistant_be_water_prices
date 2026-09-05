@@ -35,7 +35,10 @@ structure of each operator: Brussels linear, Flemish *integrale
 waterprijs* (basis/comfort blocks), and Walloon CWaPE tiers.
 
 Tariffs are fetched **live** from each utility's own published page or
-PDF. **No EUR values are hardcoded in the source.** Add a utility by
+PDF. **Every per-distributor rate is fetched, none is hardcoded.** The
+components that are uniform by decree are carried as constants and
+reviewed annually: the flat-Wallonia SPGE CVA and FSE, and the Flemish
+vastrecht and korting (50+30+20 and 10+6+4 EUR). Add a utility by
 writing one Python module that knows where to find that utility's
 publication and how to parse it.
 
@@ -58,7 +61,7 @@ publication and how to parse it.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
-- **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured.
+- **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so it cannot notice a move in the decreed constants above; SWDE, CILE and inBW publish the CVA and FSE and their parsers now fail outright if the published figure leaves the constant behind, which is what puts that move on the live check instead.
 
 ## Supported utilities
 
