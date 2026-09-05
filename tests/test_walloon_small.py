@@ -107,6 +107,22 @@ def test_the_cva_decoy_cannot_win_the_generic_scan() -> None:
     assert parse_cvd(without_anchor) != WALLONIA_CVA_EUR_PER_M3
 
 
+def test_the_actuelle_anchor_wins_over_a_larger_example() -> None:
+    """The anchor has to be what picks the value, not max() by luck.
+
+    On the real AIEM page the example is exactly half the CVD, so the
+    max-of-plausible fallback lands on the right number whether the
+    anchor matched or not -- which is why the AIEM assertion held with
+    the anchor deleted. Put a larger figure in the example and only the
+    anchor can still get it right.
+    """
+    page = (
+        "<html><body><p>Exemple : 2 x CVD (soit 5,740€) pour deux m³. "
+        "Valeur actuelle du CVD : 2,870€.</p></body></html>"
+    )
+    assert parse_cvd(page) == 2.87
+
+
 def test_an_example_only_page_raises_rather_than_publishing_the_example() -> None:
     """AIEM prints "0,5 x CVD (soit 1,435 EUR)" before the real value.
 
