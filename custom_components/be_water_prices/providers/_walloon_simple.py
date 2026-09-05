@@ -191,7 +191,18 @@ def parse_cvd(html: str) -> float:
     matches = [to_float(m) for m in _CVD_RE.findall(text)]
     if not matches:
         raise ExtractorError("could not find CVD on the published page")
-    plausible = [v for v in matches if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD]
+    # Callmepower renders the CVA card right next to the CVD one, and the
+    # CVA is flat across Wallonia and larger than several distributors'
+    # CVD -- so it sits in the window and wins a max() every time. It is
+    # a known number, so drop it rather than let it stand in for a rate
+    # it is not. A distributor whose real CVD lands on the same figure
+    # loses the fallback and raises, which is the visible failure.
+    plausible = [
+        v
+        for v in matches
+        if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD
+        and abs(v - WALLONIA_CVA_EUR_PER_M3) > 1e-9
+    ]
     if plausible:
         return max(plausible)
     # Every match fell outside the plausibility window. Surface the

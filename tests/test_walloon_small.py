@@ -89,6 +89,24 @@ def test_callmepower_parser_ignores_the_summary_card_cva_value() -> None:
     assert parse_iden(fixture_html("iden_callmepower_2026.html"), year=2026).cvd_eur_per_m3 == 3.555
 
 
+def test_the_cva_decoy_cannot_win_the_generic_scan() -> None:
+    """With the prose anchor gone, the fallback must still skip the CVA.
+
+    The anchor is one phrasing change away from not matching, and the
+    generic scan then picks the largest plausible number on the page.
+    On a Callmepower page that is the CVA card, which is flat across
+    Wallonia and larger than several distributors' own CVD.
+    """
+    page = fixture_html("aiec_callmepower_2026.html")
+    without_anchor = page.replace(
+        "<strong>Co\u00fbt v\u00e9rit\u00e9 distribution</strong> (CVD)",
+        "<strong>Kostprijs distributie</strong> (CVD)",
+    )
+    assert without_anchor != page, "the prose anchor was not neutralised"
+    assert parse_cvd(without_anchor) == 2.46
+    assert parse_cvd(without_anchor) != WALLONIA_CVA_EUR_PER_M3
+
+
 def test_parse_cvd_raises_on_garbage() -> None:
     with pytest.raises(ExtractorError):
         parse_cvd("<html><body>nothing about water here</body></html>")
