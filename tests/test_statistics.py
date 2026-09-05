@@ -207,3 +207,62 @@ async def test_orphan_clear_keeps_a_key_that_has_older_history(hass: HomeAssista
         await _async_clear_orphan_backfill_keys(hass, entry)
 
     assert cleared == []
+
+
+async def test_backfill_stops_at_the_snapshot_s_validity(hass: HomeAssistant) -> None:
+    """Last year's rates must not be flat-lined across the new year.
+
+    Only the near end of the window was clamped to the tariff, so a
+    rollover against a page that has not published the new year yet
+    extended the old rate forward as though it still applied -- and the
+    auto-once gate then stopped any later run correcting it.
+    """
+    from datetime import date, datetime
+
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    entry = _entry(hass)
+    expired = WaterTariff(
+        utility="vivaqua",
+        region="brussels",
+        valid_from=date(2020, 1, 1),
+        valid_until=date(2020, 12, 31),
+        publication_label="VIVAQUA 2020",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=40.0,
+        linear_eur_per_m3=2.0,
+    )
+    coordinator = MagicMock()
+    coordinator.data = CoordinatorData(
+        tariff=expired,
+        fetched_at=None,
+        snapshot_age_hours=0.0,
+        snapshot_stale=True,
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    ent_reg = er.async_get(hass)
+    ent_reg.async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
+    )
+
+    recorder = MagicMock()
+    hass.data[DATA_INSTANCE] = recorder
+    imported: list[Any] = []
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch(
+            "homeassistant.components.recorder.statistics.async_import_statistics",
+            side_effect=lambda *a, **k: imported.append(a),
+        ),
+    ):
+        rows = await async_backfill_prices(hass, entry, start=datetime(2020, 1, 1))
+
+    # The window closes at the tariff's own valid_until: one leap year of
+    # hourly rows, not every hour from 2020 until now.
+    hours_in_2020 = 366 * 24
+    assert rows <= hours_in_2020 + 1
+    unclamped = (datetime.now() - datetime(2020, 1, 1)).days * 24
+    assert rows < unclamped / 2
