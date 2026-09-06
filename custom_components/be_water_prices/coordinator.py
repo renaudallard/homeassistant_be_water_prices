@@ -1330,6 +1330,8 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     guard in this module was re-deriving one call later.
     """
     total = 0.0
+    # A register drop waiting for the bucket after it, see below.
+    pending_drop = 0.0
     for index, row in enumerate(await _recorder_daily_rows(hass, entity_id, start, end)):
         delta = row.get("change")
         if delta is None:
@@ -1353,6 +1355,24 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 start,
             )
             continue
+        if delta < 0:
+            # A register that went backwards is not consumption, and
+            # subtracting it from the rest of the year would erase months
+            # of water that was really used. It is held against the bucket
+            # that follows it instead: a dip that recovers the next day (a
+            # `total` meter rebooting across midnight) nets to the water
+            # actually used, while a genuine swap or a lost run-up leaves
+            # the pair negative and is dropped whole.
+            pending_drop += float(delta)
+            continue
+        if pending_drop < 0.0:
+            netted = float(delta) + pending_drop
+            pending_drop = 0.0
+            if netted <= 0.0:
+                _LOGGER.debug("%s: dropping a register drop and its follow-up bucket", entity_id)
+                continue
+            total += netted
+            continue
         if _change_exceeds_the_register(row):
             # A register cannot consume more than it reads. Home Assistant
             # treats a numeric dip on a total_increasing meter as a reset
@@ -1366,15 +1386,6 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 delta,
                 row.get("state"),
             )
-            continue
-        if delta < 0:
-            # A bucket whose register went backwards is not consumption
-            # and cannot be netted against the rest of the year. It is a
-            # meter swap, or a gap long enough that the recorder lost the
-            # run-up and rebuilt the sum from a lower base. Either way the
-            # water in the other buckets was really used, and subtracting
-            # this from it would quietly erase months of it.
-            _LOGGER.debug("%s: dropping a negative bucket of %s m³", entity_id, delta)
             continue
         total += float(delta)
     # Nothing above can push the total below zero any more, but the floor

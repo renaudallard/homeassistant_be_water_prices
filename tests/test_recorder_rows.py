@@ -82,3 +82,32 @@ async def test_a_metered_year_carrying_the_register_as_one_day_is_not_offered() 
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await co._recorder_full_year_m3(None, "sensor.m", 2026) is None  # type: ignore[arg-type]
+
+
+async def test_a_dip_that_recovers_across_midnight_nets_to_the_water_used() -> None:
+    """A `total` meter that rebooted at 23:59 and came back at 00:01.
+
+    The drop and the recovery land in two buckets. Dropping only the
+    negative half billed the whole register into the year.
+    """
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=-4050.0, state=0.0, total=-3949.7),
+        _row(date(2026, 3, 3), change=4050.2, state=4050.2, total=100.5),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+    assert round(total, 3) == 0.5
+
+
+async def test_a_genuine_swap_is_dropped_whole() -> None:
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=-4000.0, state=0.3, total=-3899.7),
+        _row(date(2026, 3, 3), change=0.4, state=0.7, total=-3899.3),
+        _row(date(2026, 3, 4), change=0.5, state=1.2, total=-3898.8),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 4))  # type: ignore[arg-type]
+    # The drop swallows the day after it; the water from then on counts.
+    assert round(total, 3) == 0.8
