@@ -1303,7 +1303,10 @@ async def _recorder_daily_rows(
             # class. Without this a litre-reporting meter would be summed
             # as if it were already cubic metres -- ~1000× too high.
             {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS},
-            {"change", "sum"},
+            # ``state`` is the register at the end of the bucket, which is
+            # what a day's change is measured against: see
+            # :func:`_change_exceeds_the_register`.
+            {"change", "sum", "state"},
         )
     except Exception as err:
         _LOGGER.debug("recorder query for %s failed: %s", entity_id, err)
@@ -1350,6 +1353,20 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 start,
             )
             continue
+        if _change_exceeds_the_register(row):
+            # A register cannot consume more than it reads. Home Assistant
+            # treats a numeric dip on a total_increasing meter as a reset
+            # and then adds the whole recovered reading to the sum, so a
+            # meter that briefly reported 0 leaves a day whose change is
+            # its entire register. Billed into the year that became the
+            # high-water mark and pinned both sensors until January.
+            _LOGGER.debug(
+                "%s: dropping a bucket whose change %s exceeds the register %s",
+                entity_id,
+                delta,
+                row.get("state"),
+            )
+            continue
         if delta < 0:
             # A bucket whose register went backwards is not consumption
             # and cannot be netted against the rest of the year. It is a
@@ -1363,6 +1380,20 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     # Nothing above can push the total below zero any more, but the floor
     # stays: it costs nothing and the sensor must never read negative.
     return max(0.0, total)
+
+
+def _change_exceeds_the_register(row: Any) -> bool:
+    """Whether ``row`` claims more consumption than its register shows.
+
+    True when the bucket's change is at least the register reading at its
+    end, which no monotonic meter can produce in a day: it is the shape
+    the recorder's reset arithmetic leaves behind after a dip.
+    """
+    change = row.get("change")
+    state = row.get("state")
+    if change is None or state is None:
+        return False
+    return float(change) > 0.0 and float(change) >= float(state)
 
 
 def _change_is_the_whole_register(row: Any) -> bool:
@@ -1433,6 +1464,10 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
         if delta is None:
             continue
         if delta < 0:
+            return None
+        if _change_exceeds_the_register(row):
+            # The same reset arithmetic as above; a year that carries the
+            # whole register as one day's water is not a year to offer.
             return None
         total += float(delta)
     if not (before_year and into_december):
