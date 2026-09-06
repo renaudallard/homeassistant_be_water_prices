@@ -1428,7 +1428,7 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
     _hass, _start, _end, ids, period, units, types = stats.call_args.args
     assert ids == {"sensor.wm"}
     assert period == "day"
-    assert types == {"change", "sum"}
+    assert types == {"change", "sum", "state"}
     assert units == {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS}
 
 
