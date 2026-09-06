@@ -1238,12 +1238,12 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
         # household with two water meters gets the first and no hint that
         # the rest are missing from the bill, so say so once per tick at
         # a level that reaches the log by default.
+        # Without the entity ids: diagnostics redact the meter, and this
+        # line reaches the default log that users attach to issues.
         _LOGGER.warning(
-            "Energy dashboard lists %d water meters; billing %s and ignoring %s. "
+            "Energy dashboard lists %d water meters; billing the first one listed. "
             "Set the water meter explicitly in the integration options to choose.",
             len(stats),
-            stats[0],
-            ", ".join(stats[1:]),
         )
     return stats[0]
 
