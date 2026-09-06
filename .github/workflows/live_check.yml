@@ -45,6 +45,12 @@ jobs:
             python scripts/live_check.py > report.md
             rc=$?
             worst=$((worst | rc))
+            if [ $((rc & 1)) -ne 0 ]; then
+              # Keep the report that carried the real failure. A later
+              # attempt that only timed out overwrites report.md, and
+              # the issue then opened with a body saying nothing broke.
+              cp report.md fail_report.md
+            fi
             cat report.md
             echo "::endgroup::"
             # Stop once fully green. Retry on any failure, bit 1 (real)
@@ -89,9 +95,9 @@ jobs:
             echo
             echo "$run_url"
             echo
-            echo "## Last report"
+            echo "## Report of the failing attempt"
             echo
-            cat report.md
+            cat fail_report.md
           } > issue_body.md
 
           existing=$(gh issue list \
