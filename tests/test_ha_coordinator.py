@@ -43,6 +43,7 @@ import pytest
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import storage
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -3023,3 +3024,38 @@ async def test_unreadable_cycle_store_does_not_block_setup(hass: HomeAssistant) 
 
     # Bootstrapped fresh from the recorder rather than failing setup.
     assert coordinator.data.ytd_consumption_m3 == 20.0
+
+
+@pytest.mark.asyncio
+async def test_unload_stops_listening_to_the_meter_before_the_flush(hass: HomeAssistant) -> None:
+    """A meter event during the unload flush must not schedule another save.
+
+    The flush awaits the executor, and a reading handled in that window
+    went through the live path and scheduled a debounced save on the
+    coordinator's own Store, which wrote the file back thirty seconds
+    after the entry had been removed.
+    """
+    coordinator = await _setup_metered_entry(hass)
+    entry = coordinator.entry
+    own_store = coordinator._store
+    injected = {"done": False}
+    original_write = storage.Store._async_write_data
+
+    async def _write_with_meter_event(self: Any, data: Any) -> None:
+        if self.key == own_store.key and not injected["done"]:
+            injected["done"] = True
+            hass.states.async_set("sensor.water_meter", "140")
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+        await original_write(self, data)
+
+    hass.states.async_set("sensor.water_meter", "130")
+    await hass.async_block_till_done()
+    assert coordinator._cycle_dirty is True
+
+    with patch.object(storage.Store, "_async_write_data", _write_with_meter_event):
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert injected["done"], "the meter event was not injected into the write window"
+    assert own_store._delay_handle is None

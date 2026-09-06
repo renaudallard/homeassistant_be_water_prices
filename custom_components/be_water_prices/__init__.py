@@ -140,6 +140,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         domain_data = hass.data.get(DOMAIN, {})
         coordinator = domain_data.pop(entry.entry_id, None)
         if coordinator is not None:
+            # Stop listening to the meter before the flush, not after it in
+            # the on_unload callbacks: the flush awaits the executor, and a
+            # meter event handled in that window scheduled a debounced save
+            # on this coordinator's Store, which wrote the file back thirty
+            # seconds after the entry had been removed.
+            coordinator.async_unsub_live_tracking()
             # Persist a pending YTD cycle change before the coordinator is
             # dropped so a reload / restart keeps the climbing high-water
             # mark instead of reverting to the last daily-tick value.
