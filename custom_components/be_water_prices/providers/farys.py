@@ -172,7 +172,19 @@ def parse_tariff(
         text, _BASIS_BOVENGEMEENTELIJK_RE, "bovengemeentelijke saneringsbijdrage"
     )
 
-    target = year or _active_period_year(soup) or date.today().year
+    active = _active_period_year(soup)
+    clock = date.today().year
+    if year is None and active is not None and active > clock:
+        # The page dates the card, so a card served early is applied as
+        # published. Nothing downstream checks valid_from, so say so: the
+        # alternative, refusing it, would blank every entity after a
+        # restart in that window, since the cached snapshot is in memory.
+        _LOGGER.warning(
+            "Farys is serving its %d card while the calendar says %d; pricing on it",
+            active,
+            clock,
+        )
+    target = year or active or clock
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,

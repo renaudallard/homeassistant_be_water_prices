@@ -211,3 +211,19 @@ async def test_post_for_commune_4xx_stays_permanent() -> None:
     with pytest.raises(ExtractorError) as exc:
         await farys._post_for_commune(_FakePostSession(status=404), "x")  # type: ignore[arg-type]
     assert not isinstance(exc.value, TransientFetchError)
+
+
+def test_a_card_served_ahead_of_the_calendar_is_priced_and_flagged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The page dates the card; a card published early is applied, and said so."""
+    import logging
+
+    raw = fixture_html("farys_gent_2026.json")
+    needle = "value=\\u00222026\\u0022\\u003E2026"
+    assert raw.count(needle) == 1, "the active period button moved; the test needs updating"
+    early = raw.replace(needle, "value=\\u00222027\\u0022\\u003E2027")
+    with caplog.at_level(logging.WARNING):
+        t = parse_tariff(early)
+    assert t.valid_from.year == 2027
+    assert "2027 card while the calendar says" in caplog.text
