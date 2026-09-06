@@ -27,10 +27,11 @@
 
 Initial setup walks three steps:
 
-  1. ``user``     -- ask for a postcode. Brussels (1000-1299) → VIVAQUA,
-                     Antwerp (2000-2999) → Pidpa, the rest of Flanders
-                     → De Watergroep, Wallonia (4000-7999) → SWDE.
-                     Anything else falls through to ``manual``.
+  1. ``user``     -- ask for a postcode and resolve it through
+                     ``providers/_postcodes`` (the ranges, the Walloon
+                     per-postcode table and the Flemish carve-outs). A
+                     postcode no supported operator serves falls through
+                     to ``manual``.
   2. ``manual``   -- shown when the postcode does not resolve. User
                      picks a utility from the dropdown built from the
                      registry.
@@ -196,7 +197,7 @@ def _options_schema(
             )
         ] = BooleanSelector()
 
-    # Per-commune utilities (De Watergroep, Farys, Water-link) get a
+    # Per-commune utilities (De Watergroep, Farys, Pidpa, Water-link) get a
     # commune dropdown. The id is the utility's internal opaque
     # identifier (GUID for DWG, integer for Farys, name for Water-link).
     if communes:

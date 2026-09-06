@@ -220,10 +220,13 @@ manifest.
 The UI walks **two or three steps**, depending on whether your postcode
 auto-resolves cleanly.
 
-1. **Postcode** — 4-digit Belgian postcode. Brussels (1000-1299),
-   Antwerp (2000-2999), most of Flanders (1500-1999 + 3000-3999) and
-   most of Wallonia (1300-1499 + 4000-7999) auto-resolve to their
-   dominant utility. Anything else falls through to step 2.
+1. **Postcode** — 4-digit Belgian postcode. Every postcode a supported
+   operator serves auto-resolves: Brussels (1000-1299) to VIVAQUA, the
+   Antwerp province (2000-2999) to Pidpa, the rest of Flanders
+   (1500-1999, 3000-3999 and 8000-9999) to De Watergroep, Farys,
+   Aquaduin or AGSO Knokke-Heist by commune, and Wallonia (1300-1499
+   and 4000-7999) per the regulator's distribution zones. A postcode no
+   supported operator serves falls through to step 2.
 2. **Utility** *(only if step 1 didn't resolve)* — pick from the dropdown
    of registered utilities. For the seven postcodes genuinely split
    between two or three operators at street level (1770 Liedekerke,
@@ -427,7 +430,7 @@ the next setup extends the line into the new year, unless the snapshot
 is stale -- then it waits, so a year is never filled in with rates that
 had already expired. The window also stops at the tariff's own
 `valid_until`. The YTD sensors
-(`current_year_cost`, `ytd_consumption`) are intentionally excluded
+(`current_year_cost`, `year_to_date_consumption`) are intentionally excluded
 because their values come from the user's actual meter history.
 
 To re-run the backfill on demand (e.g. after fixing a wrong tariff
@@ -516,6 +519,7 @@ reporting an issue.
 ruff check .
 ruff format --check .
 mypy --strict custom_components/be_water_prices
+mypy --strict scripts
 pytest tests/
 python scripts/live_check.py    # hits real utility endpoints
 ```
