@@ -294,3 +294,16 @@ def test_split_postcodes_first_candidate_matches_legacy_resolution() -> None:
             f"_SPLIT_POSTCODES[{pc!r}][0] is {candidates[0]!r} "
             f"but _resolve_single({pc}) returns {legacy!r}"
         )
+
+
+def test_every_table_answer_is_a_registered_extractor() -> None:
+    """The resolver's tables hold literal ids; the flow calls get() on them at once."""
+    from custom_components.be_water_prices.providers import _postcodes, all_extractors
+
+    ids = {extractor.id for extractor in all_extractors()}
+    answers = set(_postcodes._PER_POSTCODE.values())
+    answers |= {c for candidates in _postcodes._SPLIT_POSTCODES.values() for c in candidates}
+    answers |= {
+        _postcodes.resolve(str(pc)) for pc in range(1000, 10000) if _postcodes.resolve(str(pc))
+    }
+    assert answers <= ids, sorted(answers - ids)
