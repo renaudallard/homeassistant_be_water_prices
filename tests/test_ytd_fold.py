@@ -765,3 +765,20 @@ def test_the_figure_never_decreases_and_never_exceeds_the_truth() -> None:
             if (r := _honest_run(s, dropouts=dropouts, catchups=catchups))
         ]
         assert not failures, (dropouts, catchups, failures[:3])
+
+
+def test_a_refuted_spike_does_not_raise_the_high_water_mark() -> None:
+    """Only an admitted reading says where the register has been.
+
+    A held spike raised the mark for the life of the process, and since
+    the frame correction requires the next reading to reach that mark, no
+    real reading could ever satisfy it again until a restart.
+    """
+    spike = _round(_anchored(25.0, 80.0), reading=999_999.0, high_m3=105.0)
+    assert spike.hold_m3 == 999_999.0
+    assert spike.high_m3 == 105.0
+
+    # A normal reading afterwards is admitted and does raise it.
+    normal = _round(spike.cycle, reading=106.0, hold_m3=spike.hold_m3, high_m3=spike.high_m3)
+    assert normal.m3 == 26.0
+    assert normal.high_m3 == 106.0

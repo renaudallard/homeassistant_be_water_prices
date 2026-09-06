@@ -323,13 +323,13 @@ def _fold(
         hold_run = 0
         hold_span_s = 0.0
         high_m3 = None
-    # The highest reading the meter has shown this cycle, whether or not it
-    # was admitted. Held and rejected readings still say where the register
-    # has been, and that is the only thing that tells a meter climbing past a
-    # stale frame from one dipping below a sound one.
+    # The highest reading the meter has shown this cycle, and what tells a
+    # meter climbing past a stale frame from one dipping below a sound one.
+    # Only an admitted reading raises it (see the end of the round): a spike
+    # that was held and then refuted used to set it for the life of the
+    # process, and no real reading could clear it again, so the frame
+    # correction below was switched off until the next restart.
     was_high = high_m3
-    if reading is not None and (high_m3 is None or reading > high_m3):
-        high_m3 = reading
     # A record still carrying a stamp has history on this meter, so a
     # reading it cannot place comes from a meter that has been running all
     # along. A cleared record has no such history and must wait for the
@@ -424,6 +424,9 @@ def _fold(
         else:
             candidate = framed
             hold_m3 = None
+
+    if candidate is not None and reading is not None and (high_m3 is None or reading > high_m3):
+        high_m3 = reading
 
     if swapped:
         # The year restarts on the new meter, so a recorder total spanning
