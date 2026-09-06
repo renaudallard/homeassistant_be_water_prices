@@ -665,7 +665,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 )
                 self._sync_repair_issue(cached)
                 return cached
-            raise UpdateFailed(str(err)) from err
+            # Same scrub as the cached path: on a first refresh this
+            # becomes the entry's "not ready" reason and a log line, and a
+            # per-commune URL carries the town name.
+            raise UpdateFailed(
+                scrub_tokens(str(err), sensitive_tokens(self.entry), placeholder="**redacted**")
+            ) from err
 
         now = datetime.now(UTC)
         ytd_m3, ytd_cost = await self._compute_ytd(tariff)
