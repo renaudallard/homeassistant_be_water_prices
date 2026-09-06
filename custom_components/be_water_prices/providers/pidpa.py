@@ -58,8 +58,8 @@ PDF rows::
     huishoudelijk       4,0924 4,1696 4,2466 4,3238 4,4008 4,478
     (€/m³)
 
-The vastrecht / korting numbers are the standard VMM structure -- we
-cross-check that the PDF still publishes them and warn on drift.
+The vastrecht / korting numbers are the standard VMM structure, carried
+as constants; the PDF's own lines for them are not read.
 
 Saneringsbijdragen (afvoer + zuivering) come from a separate paragraph
 near the top of the PDF::
