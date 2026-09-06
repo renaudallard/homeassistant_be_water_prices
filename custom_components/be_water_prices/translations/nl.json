@@ -72,7 +72,9 @@
     },
     "abort": {
       "already_configured": "Deze watermaatschappij is al geconfigureerd.",
-      "invalid_flow_state": "Configuratie werd onderbroken; herstart vanaf het begin."
+      "already_in_progress": "Deze watermaatschappij wordt al in een ander venster ingesteld.",
+      "invalid_flow_state": "Configuratie werd onderbroken; herstart vanaf het begin.",
+      "reconfigure_successful": "De invoer werd bijgewerkt en herladen."
     }
   },
   "options": {

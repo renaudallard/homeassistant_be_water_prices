@@ -72,7 +72,9 @@
     },
     "abort": {
       "already_configured": "Cette compagnie est déjà configurée.",
-      "invalid_flow_state": "La configuration a été interrompue ; recommencez depuis le début."
+      "already_in_progress": "Cette compagnie est déjà en cours de configuration dans une autre fenêtre.",
+      "invalid_flow_state": "La configuration a été interrompue ; recommencez depuis le début.",
+      "reconfigure_successful": "L'entrée a été mise à jour et rechargée."
     }
   },
   "options": {
