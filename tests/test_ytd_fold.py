@@ -199,6 +199,35 @@ def test_a_run_that_lasts_is_still_a_swap() -> None:
     assert out.m3 == 0.0
 
 
+def test_the_quiet_before_a_run_does_not_count_as_persistence() -> None:
+    """An hour of silence, then three low readings inside a second: a glitch.
+
+    The span measures how long the run has lasted, so the gap before its
+    first reading is not evidence. Counting it made any burst after an
+    ordinary reporting interval look like a replacement.
+    """
+    first = _round(_anchored(25.0, 80.0), reading=10.0, elapsed_s=3600.0)
+    assert first.hold_run == 1
+    assert first.hold_span_s == 0.0
+    second = _round(
+        first.cycle,
+        reading=11.0,
+        hold_run=first.hold_run,
+        hold_span_s=first.hold_span_s,
+        elapsed_s=0.2,
+    )
+    third = _round(
+        second.cycle,
+        reading=12.0,
+        hold_run=second.hold_run,
+        hold_span_s=second.hold_span_s,
+        elapsed_s=0.2,
+    )
+
+    assert third.cycle.offset_m3 == 80.0
+    assert third.m3 == 25.0
+
+
 def test_a_confirmed_swap_takes_the_mark_with_it() -> None:
     """The old meter's high-water mark must not outlive the old meter.
 

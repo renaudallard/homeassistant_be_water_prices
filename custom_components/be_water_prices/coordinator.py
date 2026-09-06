@@ -357,7 +357,12 @@ def _fold(
         # persistence: a lone low reading is held rather than flooring the
         # year, and only a sustained run re-anchors.
         hold_run += 1
-        hold_span_s += max(0.0, elapsed_s)
+        if hold_run > 1:
+            # The span is how long the run itself has lasted. The gap
+            # before its first reading is the meter's ordinary silence,
+            # and counting it let three readings inside a second pass
+            # for ten minutes after any quiet hour.
+            hold_span_s += max(0.0, elapsed_s)
         # A reading under the bar says nothing about a jump held above it,
         # so the hold lapses here too rather than standing until some
         # later spike walks straight past it.

@@ -33,6 +33,7 @@ fresh fetch and on entry unload).
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
@@ -1357,7 +1358,11 @@ async def test_live_ytd_burst_of_subbaseline_readings_does_not_reanchor(
     coordinator = await _setup_metered_entry(hass)
     before = coordinator._ytd.offset_m3
 
-    clock = [0.0]
+    # Start the fake clock an hour past the real one, so the first low
+    # reading arrives after an ordinary reporting gap. A clock that
+    # started at zero handed the fold a negative gap, clamped to nothing,
+    # and the test passed without ever exercising the span.
+    clock = [time.monotonic() + 3600.0]
     with patch(
         "custom_components.be_water_prices.coordinator.time.monotonic",
         side_effect=lambda: clock[0],
