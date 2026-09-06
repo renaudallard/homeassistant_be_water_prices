@@ -272,3 +272,18 @@ def test_the_prose_pages_print_the_constants_the_engine_uses() -> None:
         assert parse_cva(text) == WALLONIA_CVA_EUR_PER_M3, name
         if name != "ciesac_callmepower_2026.html":
             assert parse_fse(text) == WALLONIA_FSE_EUR_PER_M3, name
+
+
+def test_a_forward_looking_sentence_does_not_date_the_card_ahead() -> None:
+    """ "Tarifs 2026" dates the card; "en 2027" is prose and must not outrank it."""
+    from datetime import date
+
+    from custom_components.be_water_prices.providers._walloon_simple import (
+        detect_published_year,
+    )
+
+    today = date(2026, 9, 6)
+    text = "Tarifs 2026 en vigueur. Prochaine indexation en 2027."
+    assert detect_published_year(text, today=today) == 2026
+    # With nothing stronger on the page, the prose year still counts.
+    assert detect_published_year("Le prix en 2026 est inchangé.", today=today) == 2026
