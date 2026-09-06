@@ -380,6 +380,15 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
         last = data.get("last_native")
         if isinstance(last, (int, float)) and not isinstance(last, bool):
             self._last_native = float(last)
+        # The platform writes the first state straight after this returns,
+        # without a coordinator update, so the guard has to judge that
+        # value here. Left to the next update, a drop over the restart went
+        # out under last year's last_reset and the reset then moved a
+        # second time inside the same cycle, which the statistics engine
+        # counts as another whole year.
+        value = self.native_value
+        if value is not None:
+            self._note_value(value)
 
     def _note_value(self, value: float | None) -> None:
         # A TOTAL sensor (current_year_cost / ytd_consumption) can legitimately

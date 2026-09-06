@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 from homeassistant.util import dt as dt_util
 
@@ -103,15 +103,61 @@ async def test_the_drop_guard_survives_a_restart() -> None:
             "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
             AsyncMock(),
         ),
+        # The value the platform is about to write as the first state.
+        patch.object(WaterSensor, "native_value", new_callable=PropertyMock, return_value=1.0),
+    ):
+        await sensor.async_added_to_hass()
+
+    # The platform's first write follows straight away with no coordinator
+    # update in between, so the drop over the restart has to be recorded
+    # here rather than on the next update, or the reset moves twice.
+    assert sensor._reset_at is not None and sensor._reset_at > earlier
+    assert sensor._last_native == 1.0
+
+
+async def test_a_restart_without_a_drop_keeps_the_recorded_reset() -> None:
+    sensor = _sensor("ytd_consumption")
+    earlier = dt_util.now() - timedelta(days=3)
+
+    class _Stored:
+        def as_dict(self) -> dict[str, Any]:
+            return {"reset_at": earlier.isoformat(), "last_native": 42.0}
+
+    with (
+        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=_Stored())),
+        patch(
+            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
+            AsyncMock(),
+        ),
+        patch.object(WaterSensor, "native_value", new_callable=PropertyMock, return_value=50.0),
     ):
         await sensor.async_added_to_hass()
 
     assert sensor._reset_at == earlier
+    assert sensor._last_native == 50.0
+
+
+async def test_a_restart_with_no_value_yet_keeps_the_restored_comparison_point() -> None:
+    sensor = _sensor("ytd_consumption")
+    earlier = dt_util.now() - timedelta(days=3)
+
+    class _Stored:
+        def as_dict(self) -> dict[str, Any]:
+            return {"reset_at": earlier.isoformat(), "last_native": 42.0}
+
+    with (
+        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=_Stored())),
+        patch(
+            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
+            AsyncMock(),
+        ),
+    ):
+        await sensor.async_added_to_hass()
+
+    # Nothing to compare yet (no coordinator data): the restored value must
+    # survive so the first real figure is still measured against it.
+    assert sensor._reset_at == earlier
     assert sensor._last_native == 42.0
-    # The restored value is a real comparison point straight away, so a
-    # drop over the restart is caught on the first update.
-    sensor._note_value(1.0)
-    assert sensor._reset_at is not None and sensor._reset_at > earlier
 
 
 def test_the_guard_is_handed_out_for_storage() -> None:
