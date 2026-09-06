@@ -30,6 +30,7 @@ from __future__ import annotations
 from datetime import date
 
 import aiohttp
+import pytest
 
 from custom_components.be_water_prices.providers.base import (
     ExtractorError,
@@ -104,12 +105,16 @@ async def test_transient_skip_marks_the_run_incomplete() -> None:
     assert result.transient is True
 
 
-async def test_ci_blocked_skip_does_not_mark_the_run_incomplete() -> None:
+async def test_ci_blocked_skip_does_not_mark_the_run_incomplete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The permanently blocked utility is expected, so it stays quiet.
 
     Treating it as incomplete would suppress the cleared comment forever.
     """
     from scripts.fixture_drift import CI_BLOCKED
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
 
     async def _never_called(_session: aiohttp.ClientSession) -> WaterTariff:
         raise AssertionError("must not fetch a CI-blocked utility")
@@ -124,6 +129,31 @@ async def test_ci_blocked_skip_does_not_mark_the_run_incomplete() -> None:
     result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
     assert result.skipped is not None
     assert result.transient is False
+
+
+async def test_a_ci_blocked_check_runs_off_the_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The skip message says to rerun locally, so a local run must not skip too."""
+    from scripts.fixture_drift import CI_BLOCKED
+
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    fetched = False
+
+    async def _fetch(_session: aiohttp.ClientSession) -> WaterTariff:
+        nonlocal fetched
+        fetched = True
+        return _dummy_tariff(b"")
+
+    chk = FixtureCheck(
+        label=next(iter(CI_BLOCKED)),
+        fixture="vivaqua_linear_2026.html",
+        parse_fixture=_dummy_tariff,
+        fetch_live=_fetch,
+    )
+    result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
+    assert fetched
+    assert result.skipped is None
+    assert result.error is None
+    assert result.deltas == []
 
 
 def test_every_ci_blocked_label_matches_a_real_check() -> None:

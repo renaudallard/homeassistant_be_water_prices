@@ -52,6 +52,7 @@ is set and opens the broken-extractor issue only when bit 1 is set.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import traceback
 from dataclasses import dataclass
@@ -91,7 +92,9 @@ MAX_RATE_EUR_M3 = 20.0
 # (residential IPs work fine). Skipping in CI keeps the workflow's
 # signal-to-noise clean -- the fixture-based unit tests still cover
 # these parsers, and a maintainer can rerun this script from a
-# residential IP on demand.
+# residential IP on demand. The skip only applies on a runner, which
+# sets GITHUB_ACTIONS; a shell that follows the "rerun locally" advice
+# used to skip the same utility and check nothing.
 CI_BLOCKED: dict[str, str] = {
     "water_link": (
         "Water-link's CDN blocks GitHub Actions IP ranges (HTTP 403). "
@@ -141,7 +144,7 @@ def _validate(tariff: WaterTariff, extractor: WaterExtractor) -> str | None:
 
 
 async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
-    if extractor.id in CI_BLOCKED:
+    if extractor.id in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
         return CheckResult(
             extractor.id, extractor.label, extractor.region, "SKIP", CI_BLOCKED[extractor.id]
         )

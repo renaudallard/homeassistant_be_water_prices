@@ -54,6 +54,7 @@ workflow opens or updates a single GitHub issue with this report.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import traceback
 from collections.abc import Awaitable, Callable
@@ -276,6 +277,9 @@ class DriftResult:
 # proxy attempt). Skipping in CI keeps the workflow's signal-to-noise
 # clean -- the fixture-based unit tests still cover these parsers, and
 # a maintainer can re-run the script from a residential IP on demand.
+# The skip only applies on a runner, which sets GITHUB_ACTIONS; a shell
+# that follows the "rerun locally" advice used to skip the same utility
+# and check nothing.
 CI_BLOCKED: dict[str, str] = {
     "Water-link (Antwerpen default)": (
         "Water-link's CDN blocks GitHub Actions IP ranges (HTTP 403). "
@@ -320,7 +324,7 @@ async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> Drift
     except Exception:
         return DriftResult(chk, [], error=f"fixture parse failed:\n{traceback.format_exc()}")
 
-    if chk.label in CI_BLOCKED:
+    if chk.label in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
         return DriftResult(chk, [], error=None, skipped=CI_BLOCKED[chk.label])
 
     try:

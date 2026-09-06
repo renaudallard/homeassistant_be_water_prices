@@ -550,7 +550,8 @@ Two cron workflows guard against silent regressions:
 
 Both scripts skip Water-link in CI: its CDN HTTP-403s GitHub
 Actions IP ranges. Reachable from residential IPs; rerun either
-script locally to drift-check Water-link.
+script locally to drift-check Water-link. The skip is keyed on the
+runner's `GITHUB_ACTIONS` variable, so a local run does check it.
 
 ## License
 

@@ -196,11 +196,14 @@ def test_every_ci_blocked_key_matches_a_real_extractor() -> None:
     )
 
 
-async def test_a_ci_blocked_extractor_is_skipped_without_fetching() -> None:
+async def test_a_ci_blocked_extractor_is_skipped_without_fetching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The skip has to happen before the fetch, not after it fails."""
     from custom_components.be_water_prices.providers import WaterExtractor, WaterTariff
     from scripts.live_check import CI_BLOCKED, _check_one
 
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
     blocked_id = next(iter(CI_BLOCKED))
 
     async def _never_called(_session: aiohttp.ClientSession) -> WaterTariff:
@@ -211,3 +214,36 @@ async def test_a_ci_blocked_extractor_is_skipped_without_fetching() -> None:
     )
     result = await _check_one(session=None, extractor=extractor)  # type: ignore[arg-type]
     assert result.status == "SKIP"
+
+
+async def test_a_ci_blocked_extractor_is_checked_off_the_runner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The skip message says to rerun locally, so a local run must not skip too."""
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import WaterExtractor, WaterTariff
+    from scripts.live_check import CI_BLOCKED, _check_one
+
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    blocked_id = next(iter(CI_BLOCKED))
+    fetched = False
+
+    async def _fetch(_session: aiohttp.ClientSession) -> WaterTariff:
+        nonlocal fetched
+        fetched = True
+        return WaterTariff(
+            utility=blocked_id,
+            region="flanders",
+            valid_from=date(date.today().year, 1, 1),
+            valid_until=date(date.today().year, 12, 31),
+            publication_label="local",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=100.0,
+            basis_eur_per_m3=2.0,
+        )
+
+    extractor = WaterExtractor(id=blocked_id, label="blocked", region="flanders", fetch=_fetch)
+    result = await _check_one(session=None, extractor=extractor)  # type: ignore[arg-type]
+    assert fetched
+    assert result.status == "OK"
