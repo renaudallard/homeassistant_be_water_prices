@@ -108,3 +108,13 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
     t = parse_tariff(fixture_html("inasep_2026.html"))
     assert t.valid_from == date(2026, 4, 27)
     assert t.valid_until == date(2026, 12, 31)
+
+
+def test_a_moved_cva_or_fonds_social_fails_the_fetch() -> None:
+    """The docstring promised these checks for a long time before they existed."""
+    page = fixture_html("inasep_2026.html")
+    assert page.count("2,748") == 1 and page.count("0,0339") == 1
+    with pytest.raises(ExtractorError, match="CVA published value"):
+        parse_tariff(page.replace("2,748", "2,900"), year=2026)
+    with pytest.raises(ExtractorError, match="FSE published value"):
+        parse_tariff(page.replace("0,0339", "0,0400"), year=2026)

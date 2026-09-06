@@ -47,9 +47,9 @@ the EUR value::
     <p>The current Social Water Fund amounts to <strong>€ 0.0339/m³</strong>.</p>
 
 CVA and FSE are flat-Wallonia constants (set by SPGE / CWaPE) and live
-in :mod:`const`; we cross-check the parsed values against them and
-warn on drift -- the const value wins so the same SWDE refresh also
-catches a CILE / inBW drift downstream.
+in :mod:`const`; the parsed values are held to them and a move fails
+the fetch, so the stale-snapshot Repair and the live check carry the
+news rather than a log line.
 
 The redevance (annual fixed fee) is the regulator-defined
 ``20·CVD + 30·CVA`` formula; we materialise it into

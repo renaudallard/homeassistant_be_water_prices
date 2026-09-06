@@ -77,3 +77,11 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
     t = parse_tariff(fixture_html("inbw_2026.html"))
     assert t.valid_from == date(2026, 1, 1)
     assert t.valid_until == date(2026, 12, 31)
+
+
+def test_a_moved_cva_fails_the_fetch_rather_than_logging() -> None:
+    """The 30 x CVA row is the page's own statement of the CVA."""
+    page = fixture_html("inbw_2026.html")
+    assert "82,440 €" in page
+    with pytest.raises(ExtractorError, match="CVA published value"):
+        parse_tariff(page.replace("82,440 €", "87,000 €"), year=2026)

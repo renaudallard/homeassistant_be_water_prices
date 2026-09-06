@@ -33,7 +33,7 @@ unit price ("Prix unitaire" column), so we read CVD straight off the
 "Consommation entre 30 et 5000 m³" row (= full CVD) and cross-check
 against the "Redevance annuelle (20 x CVD)" row. CVA / FSE come from
 the SPGE flat-Wallonia constants (:mod:`const`) and are cross-checked
-against their published values; drift > 0.005 logs a warning.
+against their published values; a move fails the fetch.
 
 inBW's TLS chain is misconfigured -- the server does not send the
 GoDaddy intermediate certificate, so the default Python trust path
@@ -151,16 +151,16 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 
     # Drift checks against the SPGE flat-Wallonia constants. Both values
     # appear in the table (CVA in the "30 x CVA" row's Prix unitaire,
-    # FSE in the "Fonds Social" row's Prix unitaire).
-    cva_published = _row_amount_after_label(table, ("redevance", "30", "cva"))
-    if cva_published is not None and abs(cva_published / 30.0 - WALLONIA_CVA_EUR_PER_M3) > 0.005:
-        # The redevance cell shows 30·CVA, not CVA itself.
-        _LOGGER.warning(
-            "inBW published CVA (30·CVA = %s, so CVA = %s) differs from constant %s",
-            cva_published,
-            cva_published / 30.0,
-            WALLONIA_CVA_EUR_PER_M3,
-        )
+    # FSE in the "Fonds Social" row's Prix unitaire). The redevance cell
+    # shows 30 x CVA, not the CVA itself. A moved CVA fails the fetch like
+    # a moved FSE does; it used to log and price on the old figure.
+    cva_row = _row_amount_after_label(table, ("redevance", "30", "cva"))
+    warn_constant_drift(
+        published=cva_row / 30.0 if cva_row is not None else None,
+        constant=WALLONIA_CVA_EUR_PER_M3,
+        label="inBW CVA",
+        logger=_LOGGER,
+    )
     warn_constant_drift(
         published=_row_amount_after_label(table, ("fonds social",)),
         constant=WALLONIA_FSE_EUR_PER_M3,

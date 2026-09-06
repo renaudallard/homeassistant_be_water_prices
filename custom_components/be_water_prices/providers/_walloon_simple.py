@@ -139,11 +139,10 @@ def warn_constant_drift(
     ``"SWDE CVA"`` or ``"CILE FSE"``. No-op when ``published`` is ``None``
     (the row was not present on the page).
 
-    Only SWDE, CILE and inBW publish CVA / FSE values on their pages and
-    call this helper. The six small Walloon extractors do not, so they
-    have nothing to compare against -- unimplemented rather than
-    impossible, and worth revisiting if a page redesign exposes the
-    components.
+    Every Walloon page prints the CVA and most print the FSE: the
+    table-based extractors read them off their rows, the prose-based
+    ones through :func:`parse_cva` and :func:`parse_fse`. A page that
+    stops printing one simply stops being checked for it.
     """
     if published is None:
         return
@@ -159,6 +158,71 @@ def warn_constant_drift(
             f"constant {constant}; the SPGE component has moved and every Walloon "
             f"tariff is priced on the old figure until the constant is updated"
         )
+
+
+# Where the prose pages print the two SPGE components. Each pattern binds
+# the amount to its own label, so Callmepower's summary cards, which put
+# the value before the label and the CVD card right next to the CVA one,
+# cannot answer for each other. Every gap is bounded.
+_CVA_RES = (
+    # AIEM: "Valeur actuelle du CVA : 2,748€"
+    re.compile(r"actuelle\s+du\s+CVA[^\d€]{0,40}(\d+,\d{1,5})\s*€", re.IGNORECASE),
+    # Callmepower prose and INASEP: "assainissement (CVA) : 2,748 €", "(CVA) = 2,748 €"
+    re.compile(r"assainissement\s*\(\s*CVA\s*\)\s*[:=]?\s*(\d+,\d{1,5})\s*€", re.IGNORECASE),
+    # IEG: "CVA : Coût Vérité d'Assainissement : 2,7480€"
+    re.compile(
+        r"CVA\s*:\s*Co[ûu]t\s+V[ée]rit[ée]\s+d.Assainissement\s*:\s*(\d+,\d{1,5})\s*€",
+        re.IGNORECASE,
+    ),
+)
+_FSE_RES = (
+    # Callmepower and INASEP: "Fonds social de l'eau : 0,0339 €", "= 0,0339 €"
+    re.compile(r"fonds\s+social\s+de\s+l.eau\s*[:=]\s*(\d+,\d{1,5})\s*€", re.IGNORECASE),
+    # IEG: "fonds social de l'eau de 0,0339€"
+    re.compile(r"fonds\s+social\s+de\s+l.eau\s+de\s+(\d+,\d{1,5})\s*€", re.IGNORECASE),
+    # AIEM: "Fonds social de l'eau ... Nombre de m³ x 0,0339€"
+    re.compile(r"fonds\s+social\s+de\s+l.eau[^€]{0,80}?x\s*(\d+,\d{1,5})\s*€", re.IGNORECASE),
+)
+
+
+def _first_amount(text: str, patterns: tuple[re.Pattern[str], ...]) -> float | None:
+    for pattern in patterns:
+        match = pattern.search(text)
+        if match is not None:
+            return to_float(match.group(1))
+    return None
+
+
+def parse_cva(text: str) -> float | None:
+    """The CVA a prose page prints, or ``None`` when it prints none."""
+    return _first_amount(text, _CVA_RES)
+
+
+def parse_fse(text: str) -> float | None:
+    """The Fonds social contribution a prose page prints, or ``None``."""
+    return _first_amount(text, _FSE_RES)
+
+
+def check_spge_constants(text: str, *, utility_id: str, logger: logging.Logger) -> None:
+    """Hold the CVA and FSE a page prints to the SPGE constants.
+
+    A page that has moved on from the constant is priced wrong for every
+    entry on it; see :func:`warn_constant_drift` for why that fails the
+    fetch rather than logging.
+    """
+    warn_constant_drift(
+        published=parse_cva(text),
+        constant=WALLONIA_CVA_EUR_PER_M3,
+        label=f"{utility_id} CVA",
+        logger=logger,
+    )
+    warn_constant_drift(
+        published=parse_fse(text),
+        constant=WALLONIA_FSE_EUR_PER_M3,
+        label=f"{utility_id} FSE",
+        logger=logger,
+        threshold=0.001,
+    )
 
 
 def parse_cvd(html: str) -> float:
@@ -302,7 +366,9 @@ def parse_tariff(
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style"]):
         tag.decompose()
-    target = year or detect_published_year(soup.get_text(" ", strip=True)) or date.today().year
+    text = soup.get_text(" ", strip=True)
+    check_spge_constants(text, utility_id=utility_id, logger=_LOGGER)
+    target = year or detect_published_year(text) or date.today().year
     return build_tariff(
         utility_id=utility_id,
         cvd=cvd,

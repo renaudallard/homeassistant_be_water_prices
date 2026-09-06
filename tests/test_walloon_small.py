@@ -206,3 +206,69 @@ def test_a_page_stuck_on_last_year_is_dated_last_year() -> None:
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
     )
     assert tariff.valid_from.year in (2025, 2026)
+
+
+@pytest.mark.parametrize(
+    ("fixture", "utility_id"),
+    [
+        ("ieg_2026.html", "ieg"),
+        ("aiem_2026.html", "aiem"),
+        ("aiec_callmepower_2026.html", "aiec"),
+        ("ciesac_callmepower_2026.html", "ciesac"),
+        ("iden_callmepower_2026.html", "iden"),
+    ],
+)
+def test_a_moved_cva_on_a_prose_page_fails_the_fetch(fixture: str, utility_id: str) -> None:
+    """Seven of nine Walloon pages print the CVA and none of them checked it."""
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    page = fixture_html(fixture)
+    assert "2,748" in page
+    moved = page.replace("2,748", "2,900").replace("2,7480", "2,9000")
+    with pytest.raises(ExtractorError, match="CVA published value"):
+        parse_tariff(
+            moved, utility_id=utility_id, source_url="https://example.invalid/", label_prefix="X"
+        )
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    ["ieg_2026.html", "aiem_2026.html", "aiec_callmepower_2026.html", "iden_callmepower_2026.html"],
+)
+def test_a_moved_fonds_social_on_a_prose_page_fails_the_fetch(fixture: str) -> None:
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    page = fixture_html(fixture)
+    assert "0,0339" in page
+    with pytest.raises(ExtractorError, match="FSE published value"):
+        parse_tariff(
+            page.replace("0,0339", "0,0400"),
+            utility_id="x",
+            source_url="https://example.invalid/",
+            label_prefix="X",
+        )
+
+
+def test_the_prose_pages_print_the_constants_the_engine_uses() -> None:
+    """The regexes bind to every real page, so the checks are not vacuous."""
+    from bs4 import BeautifulSoup
+
+    from custom_components.be_water_prices.const import (
+        WALLONIA_CVA_EUR_PER_M3,
+        WALLONIA_FSE_EUR_PER_M3,
+    )
+    from custom_components.be_water_prices.providers._walloon_simple import parse_cva, parse_fse
+
+    for name in (
+        "ieg_2026.html",
+        "aiem_2026.html",
+        "aiec_callmepower_2026.html",
+        "ciesac_callmepower_2026.html",
+        "iden_callmepower_2026.html",
+        "inasep_2026.html",
+    ):
+        soup = BeautifulSoup(fixture_html(name), "html.parser")
+        text = soup.get_text(" ", strip=True)
+        assert parse_cva(text) == WALLONIA_CVA_EUR_PER_M3, name
+        if name != "ciesac_callmepower_2026.html":
+            assert parse_fse(text) == WALLONIA_FSE_EUR_PER_M3, name

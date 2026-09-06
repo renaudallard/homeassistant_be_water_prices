@@ -37,9 +37,9 @@ The page exposes a clean 4-row table::
     Fonds social     | 0,0339 €/m³
     TVA 6%           |
 
-CVA / FSE come from the SPGE flat-Wallonia constants (and are
-cross-checked here -- a divergence > 0.005 €/m³ between page and
-constant logs a warning).
+CVA / FSE come from the SPGE flat-Wallonia constants and are
+cross-checked here: a divergence between page and constant fails the
+fetch.
 
 Stores tariff like SWDE / inBW: ``cvd_eur_per_m3`` for the
 distributor's value, ``cva_eur_per_m3`` and ``fse_eur_per_m3`` for
