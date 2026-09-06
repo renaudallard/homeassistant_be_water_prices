@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
@@ -35,6 +37,7 @@ from custom_components.be_water_prices.providers.aquaduin import parse_tariff
 from tests import fixture_bytes
 
 
+@functools.cache
 def _pdf_text() -> str:
     return extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
 
@@ -129,7 +132,7 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
 
     from custom_components.be_water_prices.providers import aquaduin
 
-    text = extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
+    text = _pdf_text()
     with (
         patch.object(aquaduin, "_discover_pdf_url", new=AsyncMock(return_value="http://x/y.pdf")),
         patch.object(

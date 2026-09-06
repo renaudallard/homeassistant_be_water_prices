@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 
 import pytest
@@ -41,6 +42,7 @@ from custom_components.be_water_prices.providers.pidpa import (
 from tests import fixture_bytes, fixture_html
 
 
+@functools.cache
 def _pdf_text() -> str:
     return extract_pdf_text_layout(fixture_bytes("pidpa_tariefplan_2025-2030.pdf"))
 

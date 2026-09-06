@@ -37,6 +37,8 @@ than shipping the plausible wrong answer.
 
 from __future__ import annotations
 
+import functools
+
 import pytest
 
 from custom_components.be_water_prices.providers import (
@@ -54,6 +56,7 @@ from custom_components.be_water_prices.providers.base import ExtractorError
 from tests import fixture_bytes, fixture_html
 
 
+@functools.cache
 def _pdf(name: str) -> str:
     return extract_pdf_text_layout(fixture_bytes(name))
 

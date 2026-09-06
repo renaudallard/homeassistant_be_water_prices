@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+import functools
+
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
@@ -35,6 +37,7 @@ from custom_components.be_water_prices.providers.water_link import EXTRACTOR, pa
 from tests import fixture_bytes
 
 
+@functools.cache
 def _pdf_text() -> str:
     return extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
 
@@ -64,11 +67,10 @@ def test_raises_when_pdf_text_is_garbage() -> None:
 
 def test_extractor_supports_communes_and_lists_them() -> None:
     # Per-commune support is what unlocks the OptionsFlow commune dropdown.
-    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
     from custom_components.be_water_prices.providers.water_link import _COMMUNE_LINE_RE
 
     assert EXTRACTOR.supports_communes
-    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    text = _pdf_text()
     cut = text.find("BASISTARIEF")
     end = text.find("COMFORTTARIEF", cut)
     block = text[cut:end]
@@ -79,9 +81,8 @@ def test_extractor_supports_communes_and_lists_them() -> None:
 
 
 def test_parse_tariff_with_specific_commune_returns_ring_sanering() -> None:
-    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
 
-    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    text = _pdf_text()
     edegem = parse_tariff(text, year=2026, commune="Edegem")
     assert edegem.sanering_gemeentelijk_eur_per_m3 == 1.9572  # ring rate
 
@@ -211,7 +212,7 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
 
     from custom_components.be_water_prices.providers import _html, water_link
 
-    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    text = _pdf_text()
     with (
         patch.object(_html, "fetch_html", new=AsyncMock(return_value=_tariff_page(2026))),
         patch.object(
