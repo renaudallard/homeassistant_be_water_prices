@@ -211,7 +211,7 @@ Download the latest [release zip](https://github.com/renaudallard/homeassistant_
 extract it under `<config>/custom_components/be_water_prices/`, and
 restart Home Assistant.
 
-`pypdf`, `pdfplumber` and `beautifulsoup4` are the only extra runtime
+`pdfplumber` and `beautifulsoup4` are the only extra runtime
 dependencies; Home Assistant installs them automatically from the
 manifest.
 

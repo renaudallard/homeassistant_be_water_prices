@@ -38,8 +38,6 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
-    "pypdf",
-    "pypdf.*",
     "pdfplumber",
     "pdfplumber.*",
     "bs4",

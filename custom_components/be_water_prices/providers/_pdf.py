@@ -44,7 +44,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import aiohttp
-import pypdf
 
 from .base import ExtractorError, TransientFetchError
 
@@ -170,7 +169,7 @@ _UTF8_BOM = b"\xef\xbb\xbf"
 def _strip_bom(payload: bytes) -> bytes:
     """Drop a leading UTF-8 BOM some publishers put in front of %PDF.
 
-    pdfplumber and pypdf both look for %PDF at byte zero, so the BOM has
+    pdfplumber looks for %PDF at byte zero, so the BOM has
     to come off rather than merely be tolerated: accepting it and then
     handing the reader bytes it cannot open turned a clear "this is not
     a PDF" into an empty extraction with no error at all.
@@ -184,49 +183,6 @@ def _is_pdf_payload(payload: bytes) -> bool:
     PDFs start with ``%PDF``; some publishers prepend a UTF-8 BOM.
     """
     return _strip_bom(payload).startswith(b"%PDF")
-
-
-async def fetch_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
-    """Download ``url`` and return concatenated extracted text."""
-    try:
-        async with session.get(
-            url,
-            headers={"User-Agent": USER_AGENT},
-            timeout=aiohttp.ClientTimeout(total=30),
-        ) as resp:
-            if resp.status >= 400:
-                raise _http_error(url, resp.status)
-            _guard_redirect(url, resp)
-            content_type = resp.content_type
-            payload = await _read_capped(resp, url)
-    except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
-
-    if not _is_pdf_payload(payload):
-        raise ExtractorError(f"expected a PDF at {url}, got {content_type}")
-    return await asyncio.to_thread(extract_pdf_text, payload)
-
-
-def extract_pdf_text(payload: bytes) -> str:
-    try:
-        reader = pypdf.PdfReader(BytesIO(payload))
-        pages = list(reader.pages)
-        chunks: list[str] = []
-        failures = 0
-        for idx, page in enumerate(pages):
-            text = page.extract_text()
-            if text is None:
-                _LOGGER.warning("pypdf returned None for page %d/%d", idx + 1, len(pages))
-                failures += 1
-                continue
-            chunks.append(text)
-        if pages and failures == len(pages):
-            raise ExtractorError("PDF parse error: every page failed to decode")
-        return "\n".join(chunks)
-    except ExtractorError:
-        raise
-    except Exception as err:
-        raise ExtractorError(f"PDF parse error: {error_text(err)}") from err
 
 
 # What the streams inside one PDF may inflate to, in total. The three
@@ -304,7 +260,7 @@ def extract_pdf_text_layout(payload: bytes) -> str:
 
 
 async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str:
-    """Layout-preserving variant of :func:`fetch_pdf_text`."""
+    """Download ``url`` and return its text with the table layout kept."""
     try:
         async with session.get(
             url,
