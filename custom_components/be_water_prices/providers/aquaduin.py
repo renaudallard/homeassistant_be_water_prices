@@ -107,8 +107,10 @@ def _find_pdf_href(html: str, year: int) -> str:
     prior-year pages keep the numbers as inline HTML only), which lets the
     caller fall back a year or surface a real failure.
     """
+    # A re-uploaded file gets a "_0", "_1", ... suffix from the CMS; a
+    # corrected card would arrive that way, so the suffix is accepted.
     m = re.search(
-        rf'href=["\']?([^"\'>\s]*overzicht-tarieven-{year}\.pdf[^"\'>\s]*)',
+        rf'href=["\']?([^"\'>\s]*overzicht-tarieven-{year}(?:_\d+)?\.pdf[^"\'>\s]*)',
         html,
         re.IGNORECASE,
     )

@@ -276,3 +276,14 @@ def test_the_commune_scan_still_reads_multi_word_and_hyphenated_names() -> None:
         "Beveren-Kruibeke-Zwijndrecht",
         "Sint Niklaas Oost",
     ]
+
+
+def test_find_pdf_href_accepts_the_cms_dedupe_suffix() -> None:
+    """A corrected card re-uploaded as "2026 HH_0.pdf" must be found."""
+    from custom_components.be_water_prices.providers.water_link import _find_pdf_href
+
+    href = "/sites/default/files/2026-02/2026%20HH_0.pdf"
+    assert _find_pdf_href(f'<a href="{href}">x</a>', 2026) == href
+    # The non-household card carries the same suffix and stays excluded.
+    with pytest.raises(ExtractorError):
+        _find_pdf_href('<a href="/sites/default/files/2026-01/2026%20NHH_0.pdf">x</a>', 2026)

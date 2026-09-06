@@ -96,7 +96,11 @@ _PDF_HOST = "water-link.be"
 # ".../2026-12/2027 HH.pdf" as the 2026 card and serve next year's rates.
 # The page also links "<year> andere.pdf" and "<year> NHH_0.pdf" (non-
 # household), which the required "<year><sep>HH.pdf" shape excludes.
-_PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}(?:%20|[\s_-])?HH\.pdf[^"\'>\s]*)'
+# Drupal appends "_0", "_1", ... when a file is re-uploaded under the
+# same name, which is how a corrected card would arrive; the suffix is
+# allowed so that card is found rather than the January template or
+# last year's.
+_PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}(?:%20|[\s_-])?HH(?:_\d+)?\.pdf[^"\'>\s]*)'
 
 # Commune to anchor the rate row on. Antwerpen is the largest customer
 # block; ring communes share the same drinkwater/zuivering numbers but

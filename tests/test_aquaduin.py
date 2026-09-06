@@ -142,3 +142,10 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
     assert mock.await_count == 2
     # Prior-year fallback pushes valid_until to March 31 of the target year.
     assert tariff.valid_until == date(date.today().year, 3, 31)
+
+
+def test_find_pdf_href_accepts_the_cms_dedupe_suffix() -> None:
+    from custom_components.be_water_prices.providers.aquaduin import _find_pdf_href
+
+    href = "/volumes/general/Paginas/Zelf-regelen/Tarieven/overzicht-tarieven-2026_1.pdf?v=2"
+    assert _find_pdf_href(f'<a href="{href}">t</a>', 2026) == href
