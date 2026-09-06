@@ -155,11 +155,12 @@ async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
     charset = resp.charset or "utf-8"
     try:
         return payload.decode(charset, errors="replace")
-    except LookupError:
+    except (LookupError, UnicodeError):
         # An unknown charset label (a typo, or a vendor token like
-        # "utf8mb4"): errors="replace" only covers malformed bytes, not an
-        # unknown codec name, so decode() raises LookupError before
-        # decoding. Fall back to UTF-8, mirroring aiohttp's get_encoding.
+        # "utf8mb4") raises LookupError before decoding, and a codec that
+        # exists but has no "replace" handler (idna is one) raises
+        # UnicodeError on the first non-ASCII byte. Neither is a page we
+        # cannot read: fall back to UTF-8, mirroring aiohttp's get_encoding.
         return payload.decode("utf-8", errors="replace")
 
 

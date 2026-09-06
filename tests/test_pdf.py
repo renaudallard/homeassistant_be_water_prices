@@ -274,3 +274,9 @@ def test_the_real_cards_pass_the_stream_guard() -> None:
 
     for name in ("aquaduin_2026.pdf", "water_link_2026.pdf", "pidpa_tariefplan_2025-2030.pdf"):
         _pdf.guard_pdf_streams(fixture_bytes(name))
+
+
+async def test_read_text_capped_survives_a_codec_without_a_replace_handler() -> None:
+    """idna passes the codec lookup and then refuses errors="replace"."""
+    resp = _FakeResp([b"caf\xc3\xa9 75,00 euro"], content_length=None, charset="idna")
+    assert await _pdf._read_text_capped(resp, "u") == "café 75,00 euro"  # type: ignore[arg-type]
