@@ -35,7 +35,7 @@ Initial setup walks three steps:
                      picks a utility from the dropdown built from the
                      registry.
   3. ``options``  -- annual consumption (m³/yr) for everyone, plus
-                     Flanders-only ``gedomicilieerd_persons`` (1-5)
+                     Flanders-only ``gedomicilieerd_persons`` (0-20)
                      and ``social_tariff`` (boolean) when the chosen
                      utility is Flemish. Block-tariff math relies on
                      persons; social tariff applies the VMM 80 %
