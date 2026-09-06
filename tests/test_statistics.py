@@ -320,3 +320,47 @@ async def test_orphan_entities_are_removed_after_the_statistics_cleanup(
         await hass.async_block_till_done()
 
     assert calls == ["backfill", "remove_entities"], calls
+
+
+async def test_orphan_cleanup_runs_before_a_stale_snapshot_defers_the_backfill(
+    hass: HomeAssistant,
+) -> None:
+    """The cleanup finds the rows through a registry entry setup removes next.
+
+    Deferring the whole run on a stale snapshot skipped the cleanup too,
+    and by the next setup the entry was gone, so the previous operator's
+    comfort_rate line was stranded for good.
+    """
+    from types import SimpleNamespace
+
+    from custom_components.be_water_prices.statistics import (
+        DATA_BACKFILL_YEAR,
+        async_maybe_backfill_once,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua", DATA_BACKFILL_YEAR: "2026:farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    stale = SimpleNamespace(data=SimpleNamespace(snapshot_stale=True))
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = stale
+
+    with (
+        patch(
+            "custom_components.be_water_prices.statistics._async_clear_orphan_backfill_keys",
+            new=AsyncMock(),
+        ) as clear,
+        patch(
+            "custom_components.be_water_prices.statistics.async_backfill_prices",
+            new=AsyncMock(return_value=0),
+        ) as backfill,
+    ):
+        await async_maybe_backfill_once(hass, entry)
+
+    clear.assert_awaited_once()
+    backfill.assert_not_awaited()
+    assert entry.data[DATA_BACKFILL_YEAR] == "2026:farys"

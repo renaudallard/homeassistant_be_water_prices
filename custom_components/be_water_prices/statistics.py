@@ -352,6 +352,21 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     if previous_gate == current_gate:
         return
 
+    # On operator change, any LTS rows the previous operator wrote for
+    # sensor keys that the new operator does not produce (e.g.
+    # comfort_rate after Flanders -> Wallonia) become orphans: the
+    # entity may be removed from the registry but its historical rows
+    # persist forever because the new backfill loop skips them. Detect
+    # the orphans by checking each backfill key's value_fn against the
+    # current tariff and clear the stale rows. This runs before the
+    # stale-snapshot deferral below: the cleanup finds the rows through
+    # the registry entry that setup removes right after this, so a
+    # deferred cleanup never got a second chance.
+    if isinstance(previous_gate, str) and ":" in previous_gate:
+        previous_utility = previous_gate.split(":", 1)[1]
+        if previous_utility != str(current_utility):
+            await _async_clear_orphan_backfill_keys(hass, entry)
+
     coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if coordinator is not None and coordinator.data is not None and coordinator.data.snapshot_stale:
         # The snapshot cannot cover the window we are about to fill, and
@@ -361,18 +376,6 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
         # line. Leave it unstamped and retry on the next setup.
         _LOGGER.debug("snapshot is stale; deferring the auto-once backfill for %s", entry.entry_id)
         return
-
-    # On operator change, any LTS rows the previous operator wrote for
-    # sensor keys that the new operator does not produce (e.g.
-    # comfort_rate after Flanders -> Wallonia) become orphans: the
-    # entity may be removed from the registry but its historical rows
-    # persist forever because the new backfill loop skips them. Detect
-    # the orphans by checking each backfill key's value_fn against the
-    # current tariff and clear the stale rows.
-    if isinstance(previous_gate, str) and ":" in previous_gate:
-        previous_utility = previous_gate.split(":", 1)[1]
-        if previous_utility != str(current_utility):
-            await _async_clear_orphan_backfill_keys(hass, entry)
 
     # ``clear=False`` is sufficient: async_import_statistics overwrites
     # rows at matching (statistic_id, bucket_start) timestamps, so
