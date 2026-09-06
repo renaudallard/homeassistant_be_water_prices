@@ -55,6 +55,7 @@ import asyncio
 import os
 import sys
 import traceback
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -70,6 +71,8 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterExtractor,
     WaterTariff,
     all_extractors,
+    de_watergroep,
+    pidpa,
 )
 from custom_components.be_water_prices.providers.base import (  # noqa: E402
     ExtractorError,
@@ -112,12 +115,10 @@ class CheckResult:
     detail: str
 
 
-def _validate(tariff: WaterTariff, extractor: WaterExtractor) -> str | None:
+def _validate(tariff: WaterTariff, region: str) -> str | None:
     """Return ``None`` if sane, a complaint string if not."""
-    if tariff.region != extractor.region:
-        return (
-            f"region mismatch: extractor says {extractor.region!r}, tariff says {tariff.region!r}"
-        )
+    if tariff.region != region:
+        return f"region mismatch: extractor says {region!r}, tariff says {tariff.region!r}"
     if not (MIN_FEE_EUR_YEAR <= tariff.yearly_fixed_fee <= MAX_FEE_EUR_YEAR):
         return f"yearly_fixed_fee {tariff.yearly_fixed_fee:.2f} EUR outside [{MIN_FEE_EUR_YEAR}, {MAX_FEE_EUR_YEAR}]"
 
@@ -143,39 +144,93 @@ def _validate(tariff: WaterTariff, extractor: WaterExtractor) -> str | None:
     return None
 
 
+async def _check_fetch(
+    session: aiohttp.ClientSession,
+    *,
+    check_id: str,
+    label: str,
+    region: str,
+    fetch: Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]],
+) -> CheckResult:
+    """Run one fetch and classify what it did."""
+    try:
+        tariff = await fetch(session)
+    except TransientFetchError as err:
+        # Upstream hiccup (timeout / connection reset / HTTP 5xx): not a
+        # regression, so it must not open an issue. Checked before the
+        # ExtractorError branch because it is a subclass of it.
+        return CheckResult(check_id, label, region, "TRANSIENT", str(err))
+    except ExtractorError as err:
+        return CheckResult(check_id, label, region, "FAIL", str(err))
+    except Exception:  # top-level: report anything unexpected as a failure row
+        return CheckResult(check_id, label, region, "FAIL", traceback.format_exc())
+
+    complaint = _validate(tariff, region)
+    if complaint is not None:
+        return CheckResult(check_id, label, region, "FAIL", complaint)
+    return CheckResult(
+        check_id,
+        label,
+        region,
+        "OK",
+        f"valid {tariff.valid_from} → {tariff.valid_until}, fee {tariff.yearly_fixed_fee:.2f} EUR/yr ex-VAT",
+    )
+
+
 async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
     if extractor.id in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
         return CheckResult(
             extractor.id, extractor.label, extractor.region, "SKIP", CI_BLOCKED[extractor.id]
         )
+    return await _check_fetch(
+        session,
+        check_id=extractor.id,
+        label=extractor.label,
+        region=extractor.region,
+        fetch=extractor.fetch,
+    )
 
-    try:
-        tariff = await extractor.fetch(session)
-    except TransientFetchError as err:
-        # Upstream hiccup (timeout / connection reset / HTTP 5xx): not a
-        # regression, so it must not open an issue. Checked before the
-        # ExtractorError branch because it is a subclass of it.
-        return CheckResult(extractor.id, extractor.label, extractor.region, "TRANSIENT", str(err))
-    except ExtractorError as err:
-        return CheckResult(extractor.id, extractor.label, extractor.region, "FAIL", str(err))
-    except Exception:  # top-level: report anything unexpected as a failure row
-        return CheckResult(
-            extractor.id,
-            extractor.label,
-            extractor.region,
-            "FAIL",
-            traceback.format_exc(),
-        )
 
-    complaint = _validate(tariff, extractor)
-    if complaint is not None:
-        return CheckResult(extractor.id, extractor.label, extractor.region, "FAIL", complaint)
-    return CheckResult(
-        extractor.id,
-        extractor.label,
-        extractor.region,
-        "OK",
-        f"valid {tariff.valid_from} → {tariff.valid_until}, fee {tariff.yearly_fixed_fee:.2f} EUR/yr ex-VAT",
+@dataclass(frozen=True)
+class PrimaryPathProbe:
+    """A page a no-commune fetch reads first, checked without its fallback.
+
+    De Watergroep and Pidpa answer a no-commune install from a default
+    commune page and fall back to a stand-in when that page cannot be
+    read, so probing ``fetch`` alone reported OK while every such
+    household was billed on the fallback. These read the page itself and
+    fail loudly.
+    """
+
+    check_id: str
+    label: str
+    region: str
+    fetch: Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]]
+
+
+PRIMARY_PATH_PROBES: tuple[PrimaryPathProbe, ...] = (
+    PrimaryPathProbe(
+        "de_watergroep:default-page",
+        "De Watergroep (default commune page)",
+        "flanders",
+        lambda s: de_watergroep.fetch_for_commune(s, de_watergroep._DEFAULT_COMMUNE_GUID),
+    ),
+    PrimaryPathProbe(
+        "pidpa:default-page",
+        "Pidpa (default commune page)",
+        "flanders",
+        lambda s: pidpa.fetch_for_commune(s, pidpa._DEFAULT_COMMUNE_SLUG),
+    ),
+)
+
+
+async def _check_probe(session: aiohttp.ClientSession, probe: PrimaryPathProbe) -> CheckResult:
+    return await _check_fetch(
+        session,
+        check_id=probe.check_id,
+        label=probe.label,
+        region=probe.region,
+        fetch=probe.fetch,
     )
 
 
@@ -199,6 +254,7 @@ def _exit_code(results: list[CheckResult]) -> int:
 async def _run() -> tuple[list[CheckResult], int]:
     async with aiohttp.ClientSession() as session:
         results = [await _check_one(session, e) for e in all_extractors()]
+        results += [await _check_probe(session, p) for p in PRIMARY_PATH_PROBES]
     return results, _exit_code(results)
 
 

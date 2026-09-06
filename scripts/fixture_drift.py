@@ -152,7 +152,9 @@ CHECKS: list[FixtureCheck] = [
         lambda b: de_watergroep.parse_commune_tariff(
             _t(b), year=2026, commune_label="Halle (DWG-served default)"
         ),
-        lambda s: get("de_watergroep").fetch(s),
+        # The endpoint itself, for the same reason as Pidpa below: the
+        # default fetch falls back to the news article when it fails.
+        lambda s: de_watergroep.fetch_for_commune(s, de_watergroep._DEFAULT_COMMUNE_GUID),
     ),
     FixtureCheck(
         # The no-commune fetch reads the Geel page; the PDF is only its
@@ -164,10 +166,14 @@ CHECKS: list[FixtureCheck] = [
         lambda s: pidpa.fetch_tariefplan(s),
     ),
     FixtureCheck(
+        # Read the page itself, not the default fetch: that falls back to
+        # the PDF projection when the page cannot be read, and the
+        # fallback's numbers then showed up here as four drifted rates
+        # instead of an unreadable page.
         "Pidpa (Geel default)",
         "pidpa_geel_2026.html",
         lambda b: pidpa.parse_commune_tariff(_t(b), commune_slug="geel", year=2026),
-        lambda s: get("pidpa").fetch(s),
+        lambda s: pidpa.fetch_for_commune(s, "geel"),
     ),
     FixtureCheck(
         "Water-link (Antwerpen default)",

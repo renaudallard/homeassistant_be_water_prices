@@ -537,7 +537,10 @@ Two cron workflows guard against silent regressions:
   HTTP 5xx / 429) are reported as a `TRANSIENT` row and retried but
   never open an issue — only a real regression (parse / shape error,
   HTTP 4xx) does, so a brief outage at a utility is not mistaken for a
-  broken extractor.
+  broken extractor. De Watergroep and Pidpa answer a no-commune install
+  from a default commune page and fall back to a stand-in when that page
+  cannot be read, so the check also probes those two pages directly:
+  a broken page fails the run even though users keep getting a tariff.
 - [`.github/workflows/fixture_drift.yml`](./.github/workflows/fixture_drift.yml)
   runs weekly, parses each utility's live publication and diffs
   the result against the parser's output on the committed test
