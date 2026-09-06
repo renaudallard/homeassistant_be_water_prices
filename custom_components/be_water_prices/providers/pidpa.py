@@ -27,19 +27,20 @@
 
 Two ingestion paths:
 
-  1. **Default**: a multi-year "Tariefplan" PDF (covering 2025-2030)
-     at ``/sites/default/files/2024-05/Tariefplan_2025-2030_simulatie_type_gezin.pdf``.
-     Drinkwater rates per year + a saneringsbijdragen paragraph that
-     was published in May 2024; subsequent rate revisions only land
-     on the per-commune HTML pages, so the PDF leg drifts mid-cycle.
+  1. **Per-commune** page at ``/ons-aanbod/je-gemeente/<slug>``, one
+     ``<table>`` per year (2018-2026) inside a tabbed widget, carrying
+     the current published rates. Pidpa charges one rate province-wide,
+     so with no commune configured the fetch reads the same page for a
+     fixed default commune (Geel) and the numbers are the household's
+     regardless; picking a commune only changes the citation.
 
-  2. **Per-commune** (when a commune is selected via the OptionsFlow):
-     the per-commune page at ``/ons-aanbod/je-gemeente/<slug>``
-     carries one ``<table>`` per year (2018-2026) inside a tabbed
-     widget. Pidpa serves uniform rates province-wide today, but the
-     numbers there are the *current* published values rather than the
-     2024-frozen PDF projection. Picking a commune is therefore a
-     way to opt into the up-to-date numbers.
+  2. **Tariefplan PDF** (covering 2025-2030) at
+     ``/sites/default/files/2024-05/Tariefplan_2025-2030_simulatie_type_gezin.pdf``,
+     the fallback when the commune page cannot be read. It is a May-2024
+     projection: the drinkwater column was never indexed and the
+     saneringsbijdragen paragraph is frozen at 2024, so its 2026 column
+     sits about 14 % under the rate the commune pages publish. It used
+     to be the default, which is how that gap shipped for months.
 
 PDF rows::
 
@@ -101,7 +102,7 @@ from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, fetch_html
 from ._pdf import fetch_pdf_text_layout, to_float
-from .base import CommuneOption, ExtractorError, WaterExtractor, WaterTariff
+from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,6 +117,12 @@ SOURCE_URL = (
 )
 COMMUNE_URL_FMT = "https://www.pidpa.be/ons-aanbod/je-gemeente/{slug}"
 SITEMAP_URL = "https://www.pidpa.be/sitemap.xml"
+
+# Default commune for the no-commune fetch. Any served commune's page
+# carries the province-wide household rate; Geel is the one the test
+# fixture captures, and the fixture_drift check already watches it.
+_DEFAULT_COMMUNE_SLUG = "geel"
+_DEFAULT_COMMUNE_LABEL = "Geel (province-wide default)"
 
 # The PDF text extraction yields "Drinkwatertarief\n2025 2026 2027 2028 2029 2030\n(excl. BTW)\n…",
 # i.e. the year header sits between the section title and "(excl. BTW)". We
@@ -227,7 +234,8 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     )
 
 
-async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+async def fetch_tariefplan(session: aiohttp.ClientSession) -> WaterTariff:
+    """The Tariefplan PDF projection. Fallback only; see the module docstring."""
     text = await fetch_pdf_text_layout(session, SOURCE_URL)
     return parse_tariff(text)
 
@@ -308,8 +316,18 @@ def _find_latest_year_table(soup: BeautifulSoup) -> tuple[Tag, int] | None:
     return best
 
 
-def parse_commune_tariff(html: str, *, commune_slug: str, year: int | None = None) -> WaterTariff:
-    """Parse a captured Pidpa per-commune page for ``year``."""
+def parse_commune_tariff(
+    html: str,
+    *,
+    commune_slug: str,
+    year: int | None = None,
+    commune_label: str | None = None,
+) -> WaterTariff:
+    """Parse a captured Pidpa per-commune page for ``year``.
+
+    ``commune_label`` replaces the slug in the publication label; the
+    no-commune fetch uses it to say the page stands in for the province.
+    """
     target = year or date.today().year
     soup = BeautifulSoup(html, "html.parser")
     table = _find_year_table(soup, year=target)
@@ -362,7 +380,7 @@ def parse_commune_tariff(html: str, *, commune_slug: str, year: int | None = Non
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,
-        publication_label=f"Pidpa per-commune tarieven {target} ({commune_slug})",
+        publication_label=f"Pidpa per-commune tarieven {target} ({commune_label or commune_slug})",
         source_url=COMMUNE_URL_FMT.format(slug=commune_slug),
         basis=drink_basis,
         comfort=drink_comfort,
@@ -378,6 +396,34 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
         parse_commune_tariff,
         commune_slug=commune,
     )
+
+
+async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+    """No-commune fetch: the province-wide rate off the default commune page.
+
+    Falls back to the Tariefplan PDF when the page cannot be read, so the
+    integration keeps producing a tariff, and says so, since that
+    projection runs well under the published rate. A transient blip
+    propagates instead, so the live check classifies it rather than the
+    projection quietly standing in for the outage.
+    """
+    try:
+        return await fetch_and_parse(
+            session,
+            COMMUNE_URL_FMT.format(slug=_DEFAULT_COMMUNE_SLUG),
+            parse_commune_tariff,
+            commune_slug=_DEFAULT_COMMUNE_SLUG,
+            commune_label=_DEFAULT_COMMUNE_LABEL,
+        )
+    except TransientFetchError:
+        raise
+    except ExtractorError as err:
+        _LOGGER.warning(
+            "Pidpa default commune page unavailable (%s); serving the Tariefplan "
+            "PDF projection, which runs below the published rates",
+            err,
+        )
+        return await fetch_tariefplan(session)
 
 
 def _slug_to_label(slug: str) -> str:

@@ -79,7 +79,7 @@ publication and how to parse it.
 | **IEG** | Wallonia (Mouscron) | ~50 k | [`providers/ieg.py`](./custom_components/be_water_prices/providers/ieg.py) — operator's own page at `ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/`. Uses the shared CWaPE residential tier math via [`_walloon_simple.py`](./custom_components/be_water_prices/providers/_walloon_simple.py) |
 | **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP lists the CVD on the *Prix de l'eau et évolution* page under the heading "Coût-Vérité Distribution (CVD) = N,NNNN €/m³". Parser anchors on that heading (tolerating accent-stripped variants) |
 | **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py) — bs4 walker over the per-tier facture table on [eau.inbw.be/prix-de-leau](https://eau.inbw.be/prix-de-leau). The server's TLS chain is misconfigured (GoDaddy intermediate not sent). The fetch verifies first and only retries with `verify_ssl=False` after a TLS-specific failure, logging a warning when it does; risk note in the module docstring |
-| **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — two paths: the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber` for the no-commune fallback (sanering frozen at the May-2024 publication), and the per-commune `/ons-aanbod/je-gemeente/<slug>` HTML page for current rates. Pick a commune in the OptionsFlow to switch to the live HTML path; commune list comes from Pidpa's public sitemap (63 communes) |
+| **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — two paths: the per-commune `/ons-aanbod/je-gemeente/<slug>` HTML page, which carries the current published rates and which the no-commune fetch also reads for a fixed default commune (Geel) since Pidpa charges one rate province-wide; and the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`, a May-2024 projection kept only as the fallback when that page cannot be read. Commune list comes from Pidpa's public sitemap (63 communes) |
 | **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py) — bs4-anchored on the `<h3>` headings of [swde.be/en/water-prices-swde](https://www.swde.be/en/water-prices-swde) (the FR slug 4xxs, the EN one works). CVA / FSE come from the SPGE flat-Wallonia constants and drift-warn on divergence |
 | **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
 | **Water-link** | Flanders (Antwerp city + ring) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py) — the per-year PDF `water-link.be/sites/default/files/<YYYY>-<MM>/<YYYY>%20HH.pdf` parsed via `pdfplumber`, its link discovered from the Antwerpen tariff page since the upload directory carries the publication month. Drinkwater + zuivering are uniform across the service area; gemeentelijke afvoer differs per commune (Antwerpen at 1.3345 €/m³, ring communes at 1.9572). Defaults to Antwerpen; pick your commune in the OptionsFlow (Edegem, Hove, Mortsel, Beveren-Kruibeke-Zwijndrecht, …) to get the right sanering |
@@ -93,7 +93,7 @@ Adding another utility is a self-contained PR: drop a new module under
 register it in [`providers/__init__.py`](./custom_components/be_water_prices/providers/__init__.py),
 extend the postcode resolver in [`providers/_postcodes.py`](./custom_components/be_water_prices/providers/_postcodes.py),
 and ship a fixture-based unit test. SWDE is the cleanest reference for a
-single-page HTML utility; Pidpa is the reference for a PDF-only utility.
+single-page HTML utility; Aquaduin is the reference for a PDF-based one.
 
 ### Postcode auto-resolution
 
@@ -247,10 +247,10 @@ auto-resolves cleanly.
      the exact per-commune integrale waterprijs. Without a commune,
      each of those four utilities falls back to a representative
      default (Halle for De Watergroep, Gent-centrum for Farys,
-     Antwerpen for Water-link, the May-2024 Tariefplan PDF for
-     Pidpa); the projected-cost sensor is still in the right
-     ballpark but saneringsbijdragen and current-year drinkwater
-     rates may drift from your actual bill.
+     Antwerpen for Water-link, Geel for Pidpa). Pidpa charges one
+     rate province-wide, so its default is exact; for the other
+     three the projected-cost sensor is in the right ballpark but
+     the saneringsbijdragen may differ from your actual bill.
 
    All entries can additionally point at:
    - **Water meter sensor** *(optional override)* — any
@@ -474,14 +474,17 @@ reporting an issue.
   numbers. If the cookie endpoint fails the integration falls back to
   the news-article snapshot (drinkwater leg only) so it never goes
   completely dark.
-- **Pidpa no-commune fallback uses the May-2024 Tariefplan PDF.** The
-  PDF's saneringsbijdragen line prints 2024 numbers and the drinkwater
-  rates are 2024-published projections. Pick your commune in the
-  OptionsFlow to switch to the per-commune HTML page, which carries
-  the current published rates. The province-wide numbers on the
-  per-commune pages are uniform today (Pidpa charges the same rate
-  everywhere); the OptionsFlow exposes the full sitemap-derived
-  commune list anyway in case Pidpa starts varying rates per commune.
+- **Pidpa falls back to the May-2024 Tariefplan PDF** when the default
+  commune page cannot be read. That PDF is a projection: its drinkwater
+  column was never indexed and its saneringsbijdragen are frozen at
+  2024, so its 2026 column sits about 14 % under the published rate
+  (606 vs 705 EUR/year at 80 m³ for one resident). The fallback logs a
+  warning and labels the snapshot `Tariefplan 2025-2030`. It was the
+  default up to v0.7.3, and the weekly drift check could not see the
+  gap because the PDF never changes. Pidpa charges the same rate in
+  every commune, so the Geel default is exact; the OptionsFlow exposes
+  the full sitemap-derived commune list anyway in case Pidpa starts
+  varying rates per commune.
 - **Wallonia régies communales** (~30 small operators -- Chimay,
   Theux, Libramont, ...) are deferred indefinitely. They have no
   central publication channel and the dev-hours / customer ratio

@@ -154,16 +154,19 @@ CHECKS: list[FixtureCheck] = [
         lambda s: get("de_watergroep").fetch(s),
     ),
     FixtureCheck(
+        # The no-commune fetch reads the Geel page; the PDF is only its
+        # fallback and a 2024 projection, so it is checked against
+        # itself here and never against what the default fetch serves.
         "Pidpa (PDF fallback)",
         "pidpa_tariefplan_2025-2030.pdf",
         lambda b: pidpa.parse_tariff(extract_pdf_text_layout(b), year=2026),
-        lambda s: get("pidpa").fetch(s),
+        lambda s: pidpa.fetch_tariefplan(s),
     ),
     FixtureCheck(
-        "Pidpa (per-commune Geel)",
+        "Pidpa (Geel default)",
         "pidpa_geel_2026.html",
         lambda b: pidpa.parse_commune_tariff(_t(b), commune_slug="geel", year=2026),
-        lambda s: pidpa.fetch_for_commune(s, "geel"),
+        lambda s: get("pidpa").fetch(s),
     ),
     FixtureCheck(
         "Water-link (Antwerpen default)",
