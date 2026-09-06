@@ -38,6 +38,7 @@ import pytest
 import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
@@ -364,3 +365,47 @@ async def test_orphan_cleanup_runs_before_a_stale_snapshot_defers_the_backfill(
     clear.assert_awaited_once()
     backfill.assert_not_awaited()
     assert entry.data[DATA_BACKFILL_YEAR] == "2026:farys"
+
+
+async def test_backfill_writes_the_card_s_last_hour(hass: HomeAssistant) -> None:
+    """The window closes at the midnight after valid_until, not at 23:00 of it."""
+    from datetime import date, datetime
+
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    entry = _entry(hass)
+    expired = WaterTariff(
+        utility="vivaqua",
+        region="brussels",
+        valid_from=date(2020, 1, 1),
+        valid_until=date(2020, 12, 31),
+        publication_label="VIVAQUA 2020",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=40.0,
+        linear_eur_per_m3=2.0,
+    )
+    coordinator = MagicMock()
+    coordinator.data = CoordinatorData(
+        tariff=expired, fetched_at=None, snapshot_age_hours=0.0, snapshot_stale=True
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
+    )
+    hass.data[DATA_INSTANCE] = MagicMock()
+    imported: list[Any] = []
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=MagicMock()),
+        patch(
+            "homeassistant.components.recorder.statistics.async_import_statistics",
+            side_effect=lambda *a, **k: imported.append(a),
+        ),
+    ):
+        rows = await async_backfill_prices(hass, entry, start=datetime(2020, 1, 1))
+
+    assert rows == 366 * 24
+    last = imported[-1][2][-1]["start"]
+    assert last.astimezone(dt_util.DEFAULT_TIME_ZONE).hour == 23

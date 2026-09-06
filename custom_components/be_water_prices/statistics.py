@@ -171,12 +171,17 @@ async def async_backfill_prices(
     # published the new year yet, last year's rates were flat-lined
     # across January as though they still applied.
     if tariff.valid_until is not None:
-        valid_until_dt = datetime(
-            tariff.valid_until.year,
-            tariff.valid_until.month,
-            tariff.valid_until.day,
-            23,
-            tzinfo=tz,
+        # The card runs to the end of its last day, so the exclusive end
+        # is the midnight after it. Clamping at 23:00 left the last hour
+        # of every card unwritten.
+        valid_until_dt = (
+            datetime(
+                tariff.valid_until.year,
+                tariff.valid_until.month,
+                tariff.valid_until.day,
+                tzinfo=tz,
+            )
+            + timedelta(days=1)
         ).astimezone(dt_util.UTC)
         end_utc = min(end_utc, valid_until_dt.replace(minute=0, second=0, microsecond=0))
     if end_utc <= start_utc:
