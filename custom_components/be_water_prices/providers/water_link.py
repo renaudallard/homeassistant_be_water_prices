@@ -65,6 +65,7 @@ Comforttarief is exactly 2× basis per VMM mandate; we cross-check.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import date
@@ -250,15 +251,19 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
 # column 0 followed by 5 EUR amounts (Water, Afvoer, Zuivering, Total ex,
 # Total incl). We extract the commune name token (everything before the
 # first run of digits-comma) and use it as both the id and the label.
+# The name is words joined by single spaces. A space inside the lazy
+# class, followed by `\s+`, let the engine split a run of spaces every
+# way it could before giving up, which is quadratic in the run, and this
+# scan used to run on the event loop from the config flow.
 _COMMUNE_LINE_RE = re.compile(
-    r"^([A-Z][A-Za-zÀ-ÿ\- ]+?)\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s*$",
+    r"^([A-Z][A-Za-zÀ-ÿ-]*(?: [A-Za-zÀ-ÿ-]+)*)"
+    r"\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s+\d+,\d{3,5}\s*$",
     re.MULTILINE,
 )
 
 
-async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
-    """Discover the communes Water-link serves from the BASISTARIEF block."""
-    text, _year, _url = await _fetch_pdf_text(session)
+def _parse_commune_lines(text: str) -> tuple[CommuneOption, ...]:
+    """The communes named in the BASISTARIEF block of a household card."""
     cut = text.find("BASISTARIEF")
     end = text.find("COMFORTTARIEF", cut) if cut >= 0 else -1
     if cut < 0 or end < 0:
@@ -275,6 +280,16 @@ async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, 
     if not communes:
         raise ExtractorError("Water-link BASISTARIEF block had no commune rows")
     return tuple(communes)
+
+
+async def list_communes(session: aiohttp.ClientSession) -> tuple[CommuneOption, ...]:
+    """Discover the communes Water-link serves from the BASISTARIEF block.
+
+    Reached from the config flow on the event loop, so the scan goes to a
+    thread like every other parse in this package.
+    """
+    text, _year, _url = await _fetch_pdf_text(session)
+    return await asyncio.to_thread(_parse_commune_lines, text)
 
 
 EXTRACTOR = WaterExtractor(

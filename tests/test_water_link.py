@@ -243,3 +243,36 @@ async def test_tariff_cites_the_pdf_it_actually_read() -> None:
     ):
         tariff = await water_link.fetch(session=None)  # type: ignore[arg-type]
     assert tariff.source_url == ("https://water-link.be/sites/default/files/2026-02/2026%20HH.pdf")
+
+
+@pytest.mark.timeout(5)
+def test_the_commune_scan_stays_linear_on_a_run_of_whitespace() -> None:
+    """A padded line must fail fast, not hold the loop for minutes.
+
+    The old pattern kept a space inside the lazy name class and followed
+    it with `\\s+`, so a name-like line with thousands of spaces and no
+    amounts backtracked quadratically, and the config flow ran that scan
+    on the event loop.
+    """
+    from custom_components.be_water_prices.providers.water_link import _parse_commune_lines
+
+    text = "BASISTARIEF\nB" + " " * 50_000 + "\nCOMFORTTARIEF"
+    with pytest.raises(ExtractorError, match="no commune rows"):
+        _parse_commune_lines(text)
+
+
+def test_the_commune_scan_still_reads_multi_word_and_hyphenated_names() -> None:
+    from custom_components.be_water_prices.providers.water_link import _parse_commune_lines
+
+    text = (
+        "BASISTARIEF\n"
+        "Antwerpen 1,6692 1,3345 1,7019 4,7056 4,9879\n"
+        "Beveren-Kruibeke-Zwijndrecht 1,6692 1,9572 1,7019 5,3283 5,6480\n"
+        "Sint Niklaas Oost 1,6692 1,9572 1,7019 5,3283 5,6480\n"
+        "COMFORTTARIEF\n"
+    )
+    assert [c.id for c in _parse_commune_lines(text)] == [
+        "Antwerpen",
+        "Beveren-Kruibeke-Zwijndrecht",
+        "Sint Niklaas Oost",
+    ]
