@@ -1354,3 +1354,54 @@ async def test_failed_first_refresh_leaves_no_meter_listener(hass: HomeAssistant
         assert entry.state is ConfigEntryState.SETUP_ERROR
 
     assert hass.bus.async_listeners().get("state_changed", 0) == before
+
+
+@pytest.mark.asyncio
+async def test_a_failed_setup_leaves_no_coordinator_and_no_service(hass: HomeAssistant) -> None:
+    """Home Assistant skips async_unload_entry for an entry that never loaded."""
+    from datetime import date
+    from typing import Any
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+    from custom_components.be_water_prices.statistics import SERVICE_BACKFILL_PRICES
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return WaterTariff(
+            utility="vivaqua",
+            region="brussels",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="VIVAQUA 2026",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=40.0,
+            linear_eur_per_m3=2.0,
+        )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=None),
+        ),
+        patch.object(
+            hass.config_entries, "async_forward_entry_setups", side_effect=RuntimeError("boom")
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id) is False
+        await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.entry_id not in hass.data.get(DOMAIN, {})
+    assert not hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)

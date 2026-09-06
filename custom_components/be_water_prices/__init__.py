@@ -89,6 +89,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.config_entries.async_update_entry(entry, options=original_options)
         raise
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    # Home Assistant runs the on_unload callbacks when setup fails further
+    # down as well, and never calls async_unload_entry for an entry that
+    # did not load, so this is what keeps a failed setup from leaving the
+    # coordinator in the bucket and the service registered for good.
+    entry.async_on_unload(lambda: _forget_coordinator(hass, entry.entry_id))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Update the running-cost / YTD sensors live on each meter reading,
     # not just on the daily tick. Subscribes to the resolved meter entity
@@ -155,6 +160,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not domain_data:
             async_unregister_services(hass)
     return unloaded
+
+
+def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
+    """Drop the entry's coordinator, and the service once no entry is left.
+
+    Shared by the normal unload and the failed-setup path; both are
+    harmless when the other has already run.
+    """
+    from .statistics import async_unregister_services
+
+    domain_data = hass.data.get(DOMAIN, {})
+    domain_data.pop(entry_id, None)
+    if not domain_data:
+        async_unregister_services(hass)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
