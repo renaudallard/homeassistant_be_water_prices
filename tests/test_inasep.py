@@ -118,3 +118,10 @@ def test_a_moved_cva_or_fonds_social_fails_the_fetch() -> None:
         parse_tariff(page.replace("2,748", "2,900"), year=2026)
     with pytest.raises(ExtractorError, match="FSE published value"):
         parse_tariff(page.replace("0,0339", "0,0400"), year=2026)
+
+
+def test_a_rate_rounded_to_two_decimals_is_still_a_rate() -> None:
+    """The anchor makes the match unambiguous; the decimal count was doing no work."""
+    page = fixture_html("inasep_2026.html")
+    assert page.count("3,6734") == 1
+    assert parse_tariff(page.replace("3,6734", "3,70"), year=2026).cvd_eur_per_m3 == 3.7

@@ -89,7 +89,7 @@ SOURCE_URL = "https://www.inasep.be/prix-de-leau-et-evolution"
 # a page with a few thousand spaces after the date held the parser for
 # seconds, and the body cap allows millions.
 _CVD_RE = re.compile(
-    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*(?:=\s*)?([\d]+,\d{3,5})\s*€"
+    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*(?:=\s*)?([\d]+,\d{1,5})\s*€"
     r"(?:\s*€)?(?:\s*/\s*m\s*[³3]?)?"
     r"(?:\s*depuis\s+le\s+(\d{1,2})(?:\s*er)?\s+([a-zéû]+)\s+(20\d\d))?",
     re.IGNORECASE | re.DOTALL,
