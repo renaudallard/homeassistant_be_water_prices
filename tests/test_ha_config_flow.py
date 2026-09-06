@@ -436,9 +436,10 @@ async def test_reconfigure_flow_swaps_utility_and_clears_commune(
     # entries, so the reconfigure scrubs it too rather than persist a
     # silently-ignored option.
     assert CONF_SOCIAL_TARIFF not in entry.options
-    # Non-commune, non-Flemish-only options preserved verbatim.
+    # Non-commune, non-Flemish-only options preserved verbatim; the
+    # household size is Flemish-only and goes the way of the social tariff.
     assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
-    assert entry.options[CONF_PERSONS] == 2
+    assert CONF_PERSONS not in entry.options
 
 
 @pytest.mark.asyncio
