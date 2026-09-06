@@ -54,13 +54,15 @@ on behalf of Hydria). Their sum equals the variable-charge total.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date
 
 import aiohttp
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from ..const import DEFAULT_VAT_RATE, REGION_BRUSSELS
-from ._html import extract_amounts, fetch_and_parse, find_table
+from ._html import extract_amounts, fetch_and_parse
+from ._pdf import fold_accents
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +76,24 @@ def _label_for_year(year: int) -> str:
     return f"Price from January 1st {year} (VAT included 6 %)"
 
 
+# The 6 % that marks the residential card, wherever the header puts it.
+# Matching the literal "VAT included 6" meant any rewording of the header
+# ("6 % VAT included", "incl. 6% VAT") read as "card not published yet",
+# and the parser then served last year's rates until 31 March with only a
+# warning, which is exactly the outcome the fallback exists to avoid on a
+# card that IS there.
+_RESIDENTIAL_VAT_RE = re.compile(r"\b6\s*%")
+
+
+def _residential_table(soup: BeautifulSoup, year: int) -> Tag | None:
+    """The ``<table>`` for ``year`` that carries the 6 % VAT marker."""
+    for table in soup.find_all("table"):
+        text = fold_accents(table.get_text(" ", strip=True))
+        if str(year) in text and "vat" in text and _RESIDENTIAL_VAT_RE.search(text):
+            return table
+    return None
+
+
 def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
     """Try to parse the ``<table>`` for ``year``; return None if absent.
 
@@ -85,7 +105,7 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
     # Pin to the residential 6 % card. A non-residential 21 % card on
     # the same page would also contain "vat" + the year and silently
     # bind to the wrong rate.
-    table = find_table(soup, must_contain=(str(year), "vat included 6"))
+    table = _residential_table(soup, year)
     if table is None:
         return None
 

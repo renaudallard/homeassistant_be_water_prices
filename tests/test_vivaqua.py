@@ -94,3 +94,31 @@ async def test_fetch_parses_off_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     tariff = await vivaqua.fetch(session=None)  # type: ignore[arg-type]
     assert tariff.utility == "vivaqua"
     assert round(tariff.linear_eur_per_m3 * 1.06, 2) == 2.62
+
+
+def test_a_reworded_header_still_finds_the_residential_card() -> None:
+    """Only the 6 % marker pins the card; the header wording is not a contract.
+
+    Matching "VAT included 6" literally read any rewording as "card not
+    published" and served last year's rates until 31 March.
+    """
+    page = fixture_html("vivaqua_linear_2026.html")
+    needle = "Price from January 1st 2026 (VAT included 6 %)"
+    assert page.count(needle) == 1
+    t = parse_tariff(
+        page.replace(needle, "Price from January 1st 2026 (6 % VAT included)"), year=2026
+    )
+    assert t.valid_from.year == 2026
+    assert round(t.linear_eur_per_m3 or 0, 4) == round(2.62 / 1.06, 4)
+
+
+def test_a_21_percent_card_for_the_same_year_is_not_the_residential_one() -> None:
+    page = fixture_html("vivaqua_linear_2026.html")
+    needle = "Price from January 1st 2026 (VAT included 6 %)"
+    assert page.count(needle) == 1
+    # Turn the 2026 card into a non-residential one: the parser must not
+    # bind to it and falls back to the 2025 card, as for a missing card.
+    t = parse_tariff(
+        page.replace(needle, "Price from January 1st 2026 (VAT included 21 %)"), year=2026
+    )
+    assert t.valid_from.year == 2025
