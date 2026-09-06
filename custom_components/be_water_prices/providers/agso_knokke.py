@@ -62,7 +62,7 @@ from bs4 import BeautifulSoup, Tag
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import extract_amounts, fetch_and_parse
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import ExtractorError, WaterExtractor, WaterTariff, carry_prior_year_card
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -183,7 +183,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         raise ExtractorError(
             "AGSO Knokke chosen table missing drinkwater / afvoer / zuivering rows"
         )
-    return parsed
+    return carry_prior_year_card(parsed, target)
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:

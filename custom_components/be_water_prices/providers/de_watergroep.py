@@ -70,7 +70,14 @@ from ..const import (
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, fetch_html
 from ._pdf import USER_AGENT, _http_error, _read_text_capped, to_float
-from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
+from .base import (
+    CommuneOption,
+    ExtractorError,
+    TransientFetchError,
+    WaterExtractor,
+    WaterTariff,
+    carry_prior_year_card,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -273,9 +280,10 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             _LOGGER.info(
                 "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1
             )
-            return await fetch_and_parse(
+            prior = await fetch_and_parse(
                 session, NEWS_URL_FMT.format(year=target - 1), parse_news_tariff, year=target - 1
             )
+            return carry_prior_year_card(prior, target)
 
 
 async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> tuple[str, int]:

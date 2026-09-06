@@ -150,6 +150,20 @@ class TransientFetchError(ExtractorError):
     """
 
 
+def carry_prior_year_card(tariff: WaterTariff, target_year: int) -> WaterTariff:
+    """Let last year's card stand in until 31 March of ``target_year``.
+
+    Publishers run weeks late in January, and every extractor serves the
+    prior card in that window rather than going blank. Served with its
+    own 31 December it counted as stale from the first day of the year,
+    so the Repair card stood for however long the utility took. The
+    grace period ends on 31 March, after which staleness is real.
+    """
+    if tariff.valid_from.year >= target_year:
+        return tariff
+    return dataclasses.replace(tariff, valid_until=date(target_year, 3, 31))
+
+
 def relabel_with_human_commune(
     tariff: WaterTariff, *, commune_id: str, commune_label: str | None
 ) -> WaterTariff:

@@ -102,7 +102,14 @@ from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, fetch_html
 from ._pdf import fetch_pdf_text_layout, to_float
-from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
+from .base import (
+    CommuneOption,
+    ExtractorError,
+    TransientFetchError,
+    WaterExtractor,
+    WaterTariff,
+    carry_prior_year_card,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -194,6 +201,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     if not basis_row or not comfort_row:
         raise ExtractorError("could not locate basistarief / comforttarief row in Pidpa PDF")
 
+    asked = target
     basis = _column_for_year(years, basis_row, target)
     comfort = _column_for_year(years, comfort_row, target)
     if basis is None or comfort is None:
@@ -202,9 +210,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
         basis = basis_row[-1]
         comfort = comfort_row[-1]
         target = years[-1]
-        _LOGGER.warning(
-            "Pidpa PDF does not list %d, falling back to %d", year or date.today().year, target
-        )
+        _LOGGER.warning("Pidpa PDF does not list %d, falling back to %d", asked, target)
 
     if abs(comfort - 2.0 * basis) > 0.01:
         raise ExtractorError(
@@ -222,7 +228,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     gemeentelijk = sanering["afvoer"]
     bovengemeentelijk = sanering["zuivering"]
 
-    return build_flanders_tariff(
+    tariff = build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,
         publication_label=f"Pidpa Tariefplan 2025-2030 column {target}",
@@ -232,6 +238,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
         sanering_gemeentelijk=gemeentelijk,
         sanering_bovengemeentelijk=bovengemeentelijk,
     )
+    return carry_prior_year_card(tariff, asked)
 
 
 async def fetch_tariefplan(session: aiohttp.ClientSession) -> WaterTariff:
@@ -329,6 +336,7 @@ def parse_commune_tariff(
     no-commune fetch uses it to say the page stands in for the province.
     """
     target = year or date.today().year
+    asked = target
     soup = BeautifulSoup(html, "html.parser")
     table = _find_year_table(soup, year=target)
     if table is None and year is None:
@@ -377,7 +385,7 @@ def parse_commune_tariff(
             f" {drink_basis} for {commune_slug!r} {target} (VMM 2× rule)"
         )
 
-    return build_flanders_tariff(
+    tariff = build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,
         publication_label=f"Pidpa per-commune tarieven {target} ({commune_label or commune_slug})",
@@ -387,6 +395,7 @@ def parse_commune_tariff(
         sanering_gemeentelijk=afvoer_basis,
         sanering_bovengemeentelijk=zuivering_basis,
     )
+    return carry_prior_year_card(tariff, asked)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:

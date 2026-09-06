@@ -64,7 +64,13 @@ from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse
 from ._pdf import fetch_pdf_text_layout, to_float
-from .base import ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
+from .base import (
+    ExtractorError,
+    TransientFetchError,
+    WaterExtractor,
+    WaterTariff,
+    carry_prior_year_card,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -163,8 +169,6 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    from dataclasses import replace
-
     target = date.today().year
     try:
         pdf_url = await _discover_pdf_url(session, target)
@@ -179,10 +183,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
         _LOGGER.info("Aquaduin %d tariff unavailable (%s); trying %d", target, err, target - 1)
         pdf_url = await _discover_pdf_url(session, target - 1)
         text = await fetch_pdf_text_layout(session, pdf_url)
-        # Extend valid_until to March 31 of the target year so the
-        # snapshot_stale Repair does not fire immediately on Jan 1
-        # for Aquaduin's typical mid-Q1 publication delay.
-        return replace(parse_tariff(text, year=target - 1), valid_until=date(target, 3, 31))
+        return carry_prior_year_card(parse_tariff(text, year=target - 1), target)
 
 
 EXTRACTOR = WaterExtractor(

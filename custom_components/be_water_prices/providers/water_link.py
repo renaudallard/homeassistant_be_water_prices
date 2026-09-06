@@ -77,7 +77,14 @@ from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse
 from ._pdf import fetch_pdf_text_layout, to_float
-from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
+from .base import (
+    CommuneOption,
+    ExtractorError,
+    TransientFetchError,
+    WaterExtractor,
+    WaterTariff,
+    carry_prior_year_card,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -225,29 +232,15 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int, str
         return await fetch_pdf_text_layout(session, url), target - 1, url
 
 
-def _maybe_extend_valid_until(tariff: WaterTariff, parsed_year: int) -> WaterTariff:
-    """Push valid_until forward to March 31 of the *current* year when
-    we fell back to last year's PDF, so the snapshot_stale Repair does
-    not fire on Jan 1 just because Water-link is a few weeks late with
-    the new card.
-    """
-    from dataclasses import replace
-
-    current = date.today().year
-    if parsed_year >= current:
-        return tariff
-    return replace(tariff, valid_until=date(current, 3, 31))
-
-
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     text, year, url = await _fetch_pdf_text(session)
-    return _maybe_extend_valid_until(parse_tariff(text, year=year, source_url=url), year)
+    return carry_prior_year_card(parse_tariff(text, year=year, source_url=url), date.today().year)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     text, year, url = await _fetch_pdf_text(session)
-    return _maybe_extend_valid_until(
-        parse_tariff(text, year=year, commune=commune, source_url=url), year
+    return carry_prior_year_card(
+        parse_tariff(text, year=year, commune=commune, source_url=url), date.today().year
     )
 
 

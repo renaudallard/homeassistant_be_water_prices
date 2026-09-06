@@ -66,7 +66,14 @@ from .._phantom_blocklists import (
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._pdf import USER_AGENT, _http_error, _read_text_capped, fetch_text, to_float
-from .base import CommuneOption, ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
+from .base import (
+    CommuneOption,
+    ExtractorError,
+    TransientFetchError,
+    WaterExtractor,
+    WaterTariff,
+    carry_prior_year_card,
+)
 
 # Re-exported so ``async_migrate_entry`` and the test suite can read
 # them under their existing names without knowing about the dep-free
@@ -185,7 +192,7 @@ def parse_tariff(
             clock,
         )
     target = year or active or clock
-    return build_flanders_tariff(
+    tariff = build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,
         publication_label=f"Farys watertarieven {target} ({municipality_label})",
@@ -195,6 +202,7 @@ def parse_tariff(
         sanering_gemeentelijk=sanering_gem,
         sanering_bovengemeentelijk=sanering_bov,
     )
+    return carry_prior_year_card(tariff, year or clock)
 
 
 async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> str:
