@@ -34,9 +34,9 @@ from custom_components.be_water_prices.providers.agso_knokke import parse_tariff
 from tests import fixture_html
 
 
-def test_picks_the_higher_year_table() -> None:
-    # The fixture has both 2025 and 2026 tables; we pick the table with
-    # the highest "Integrale waterprijs" total -- the 2026 one.
+def test_picks_the_table_the_page_labels_with_the_year() -> None:
+    # The fixture has both 2025 and 2026 tables, each under its own
+    # "OVERZICHT TARIEVEN" heading; the requested year's table wins.
     t = parse_tariff(fixture_html("agso_knokke_2026.html"), year=2026)
     assert t.basis_eur_per_m3 == 2.3295  # drinkwater 2026
     assert t.comfort_eur_per_m3 == 2.0 * 2.3295  # VMM 2× rule
@@ -49,3 +49,38 @@ def test_picks_the_higher_year_table() -> None:
 def test_raises_when_table_missing() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>")
+
+
+def test_asking_for_last_year_returns_last_years_table() -> None:
+    t = parse_tariff(fixture_html("agso_knokke_2026.html"), year=2025)
+    assert t.basis_eur_per_m3 == 2.2602
+    assert t.valid_from.year == 2025
+
+
+def test_in_january_the_newest_started_year_is_served(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The branch every AGSO user hits on 1 January had no test."""
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import agso_knokke
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2027, 1, 5)
+
+    monkeypatch.setattr(agso_knokke, "date", _FakeDate)
+    t = parse_tariff(fixture_html("agso_knokke_2026.html"))
+    assert t.basis_eur_per_m3 == 2.3295
+    assert t.valid_from.year == 2026
+
+
+def test_without_headings_the_dearest_table_is_served_as_this_years() -> None:
+    """No heading to date the tables: fall back to the higher integrale price."""
+    import re
+
+    page = fixture_html("agso_knokke_2026.html")
+    stripped = re.sub(r"OVERZICHT\s+TARIEVEN", "OVERZICHT", page, flags=re.IGNORECASE)
+    assert stripped != page
+    t = parse_tariff(stripped, year=2026)
+    assert t.basis_eur_per_m3 == 2.3295
+    assert t.valid_from.year == 2026
