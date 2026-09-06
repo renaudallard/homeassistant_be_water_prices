@@ -40,6 +40,7 @@ from __future__ import annotations
 import pytest
 
 from custom_components.be_water_prices.providers import (
+    agso_knokke,
     aquaduin,
     de_watergroep,
     farys,
@@ -61,6 +62,24 @@ def test_aquaduin_comfort_must_be_twice_the_basis() -> None:
     text = _pdf("aquaduin_2026.pdf").replace("11,9816", "9,9999")
     with pytest.raises(ExtractorError, match="2× basistarief"):
         aquaduin.parse_tariff(text, year=2026)
+
+
+def test_agso_comfort_must_be_twice_the_basis() -> None:
+    """Read by position alone, a swapped basis / comfort cell shipped 2x silently."""
+    page = fixture_html("agso_knokke_2026.html")
+    assert page.count("€ 4,6590") == 1
+    with pytest.raises(ExtractorError, match="2× basistarief"):
+        agso_knokke.parse_tariff(page.replace("€ 4,6590", "€ 4,0000"), year=2026)
+
+
+def test_agso_swapped_cells_do_not_ship_a_doubled_rate() -> None:
+    page = fixture_html("agso_knokke_2026.html")
+    assert page.count("€ 2,3295") == 1 and page.count("€ 4,6590") == 1
+    swapped = (
+        page.replace("€ 2,3295", "€ X").replace("€ 4,6590", "€ 2,3295").replace("€ X", "€ 4,6590")
+    )
+    with pytest.raises(ExtractorError, match="2× basistarief"):
+        agso_knokke.parse_tariff(swapped, year=2026)
 
 
 def test_farys_comfort_must_be_twice_the_basis() -> None:

@@ -71,17 +71,18 @@ LABEL = "AGSO Knokke-Heist"
 SOURCE_URL = "https://www.agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers"
 
 
-def _row_first_amount(table: Tag, row_label: str) -> float | None:
-    """Return the basis (column index 1) amount for the row whose first
-    cell contains ``row_label`` (case-insensitive substring match).
+def _row_first_amount(table: Tag, row_label: str, column: int = 1) -> float | None:
+    """Return the amount in ``column`` (the basis column by default) for the
+    row whose first cell contains ``row_label`` (case-insensitive substring
+    match).
     """
     needle = row_label.lower()
     for tr in table.find_all("tr"):
         cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
-        if len(cells) < 2:
+        if len(cells) <= column:
             continue
         if needle in cells[0].lower():
-            amounts = extract_amounts(cells[1])
+            amounts = extract_amounts(cells[column])
             if amounts:
                 return amounts[0]
     return None
@@ -98,15 +99,25 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
     zuivering = _row_first_amount(table, "zuivering")
     if drinkwater is None or afvoer is None or zuivering is None:
         return None
-    # Comforttarief = 2× basis per VMM. Verify drinkwater specifically;
-    # the other two are computed by the cost engine.
+    # The page prints the comforttarief right next to the basis column.
+    # Reading it and holding it to the VMM 2x rule is what tells a column
+    # reorder, an inserted incl-BTW column or a swapped cell from a real
+    # rate: read by position alone, a swap shipped twice the drinkwater
+    # rate with no error. The sanering comfort rates are still derived.
+    comfort = _row_first_amount(table, "drinkwater", column=2)
+    if comfort is None:
+        raise ExtractorError("AGSO Knokke drinkwater row carries no comforttarief cell")
+    if abs(comfort - 2.0 * drinkwater) > 0.01:
+        raise ExtractorError(
+            f"AGSO Knokke comforttarief {comfort} is not 2× basistarief {drinkwater} (VMM 2× rule)"
+        )
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=year,
         publication_label=f"AGSO Knokke-Heist tarieven {year}",
         source_url=SOURCE_URL,
         basis=drinkwater,
-        comfort=2.0 * drinkwater,
+        comfort=comfort,
         sanering_gemeentelijk=afvoer,
         sanering_bovengemeentelijk=zuivering,
     )
