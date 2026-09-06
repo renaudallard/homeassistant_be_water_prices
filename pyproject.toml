@@ -1,4 +1,7 @@
 [tool.pytest.ini_options]
+# A bare `pytest` otherwise walks into tmp/, where a repo copy kept for
+# recovery carries its own conftest and aborts collection.
+testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 # Default per-test timeout (pytest-timeout is already a dev dep). A
