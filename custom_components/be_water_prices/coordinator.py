@@ -36,7 +36,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import (
     ATTR_UNIT_OF_MEASUREMENT,
     STATE_UNAVAILABLE,
@@ -723,6 +723,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         or the parsed valid_until is in the past. Auto-clears on the
         next successful, fresh fetch.
         """
+        if self.entry.state not in (ConfigEntryState.SETUP_IN_PROGRESS, ConfigEntryState.LOADED):
+            # A refresh started from the Repair card runs in the flow's own
+            # task, which an unload neither cancels nor waits for. When its
+            # fetch lands after the entry is gone it would re-create the
+            # card for an entry that no longer exists.
+            return
         if data.snapshot_stale:
             ir.async_create_issue(
                 self.hass,
