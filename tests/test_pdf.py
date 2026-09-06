@@ -167,3 +167,60 @@ def test_an_argless_exception_still_produces_a_message() -> None:
 
     assert error_text(TimeoutError()) == "TimeoutError"
     assert error_text(ValueError("boom")) == "boom"
+
+
+class _RedirectedResp(_FakeResp):
+    """A 200 that arrived through a redirect."""
+
+    def __init__(self, final: str, body: bytes = b"hello") -> None:
+        from yarl import URL
+
+        super().__init__([body], content_length=len(body))
+        self.status = 200
+        self.url = URL(final)
+        self.history = (object(),)
+        self.content_type = "text/plain"
+
+
+class _FakeSession:
+    def __init__(self, resp: _RedirectedResp) -> None:
+        self._resp = resp
+
+    def get(self, *_a: object, **_k: object) -> _FakeSession:
+        return self
+
+    async def __aenter__(self) -> _RedirectedResp:
+        return self._resp
+
+    async def __aexit__(self, *_a: object) -> None:
+        return None
+
+
+async def test_a_redirect_off_the_requested_site_is_refused() -> None:
+    """The href checks validate the link, aiohttp then follows a 30x anywhere."""
+    session = _FakeSession(_RedirectedResp("http://127.0.0.1:8123/admin"))
+    with pytest.raises(ExtractorError, match="redirected"):
+        await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
+    with pytest.raises(ExtractorError, match="redirected"):
+        await _pdf.fetch_pdf_text_layout(session, "https://water-link.be/x.pdf")  # type: ignore[arg-type]
+
+
+async def test_a_redirect_that_drops_https_is_refused() -> None:
+    session = _FakeSession(_RedirectedResp("http://water-link.be/x"))
+    with pytest.raises(ExtractorError, match="dropping https"):
+        await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
+
+
+async def test_a_redirect_within_the_site_is_followed() -> None:
+    session = _FakeSession(_RedirectedResp("https://www.water-link.be/x"))
+    assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]
+
+
+async def test_a_non_pdf_answer_is_named_by_type_not_quoted() -> None:
+    """The first bytes of a stranger's page must not reach last_error."""
+    resp = _RedirectedResp("https://water-link.be/x.pdf", body=b"INTERNAL token=abc")
+    resp.history = ()
+    with pytest.raises(ExtractorError) as err:
+        await _pdf.fetch_pdf_text_layout(_FakeSession(resp), "https://water-link.be/x.pdf")  # type: ignore[arg-type]
+    assert "token=abc" not in str(err.value)
+    assert "text/plain" in str(err.value)

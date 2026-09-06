@@ -39,6 +39,7 @@ import logging
 import unicodedata
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlparse
 
 import aiohttp
 import pypdf
@@ -113,6 +114,32 @@ async def _read_capped(resp: aiohttp.ClientResponse, url: str) -> bytes:
     return bytes(payload)
 
 
+def _site(host: str) -> str:
+    """The registrable part of ``host``: its last two labels."""
+    return ".".join(host.lower().rstrip(".").split(".")[-2:])
+
+
+def _guard_redirect(url: str, resp: aiohttp.ClientResponse) -> None:
+    """Refuse a response that a redirect carried off the requested site.
+
+    The PDF extractors validate the href they read off a page, but
+    aiohttp follows 30x replies wherever they point, so a redirect from
+    the validated URL reached any host or scheme, addresses only the
+    Home Assistant host can see included, and the target's first bytes
+    then landed in the last_error attribute. Staying on the requested
+    site and never dropping from https are the two things the href
+    checks exist for, so they hold for the final URL too.
+    """
+    if not resp.history:
+        return
+    requested = urlparse(url)
+    final = resp.url
+    if requested.scheme == "https" and final.scheme != "https":
+        raise ExtractorError(f"{url} redirected to {final.scheme}://{final.host}, dropping https")
+    if _site(final.host or "") != _site(requested.hostname or ""):
+        raise ExtractorError(f"{url} redirected off-site to {final.scheme}://{final.host}")
+
+
 async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
     """Read a text body under the size cap, decoding leniently.
 
@@ -166,13 +193,14 @@ async def fetch_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
         ) as resp:
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
+            _guard_redirect(url, resp)
+            content_type = resp.content_type
             payload = await _read_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
 
     if not _is_pdf_payload(payload):
-        snippet = payload[:80]
-        raise ExtractorError(f"expected a PDF at {url}, payload starts with {snippet!r}")
+        raise ExtractorError(f"expected a PDF at {url}, got {content_type}")
     return await asyncio.to_thread(extract_pdf_text, payload)
 
 
@@ -225,11 +253,16 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
         ) as resp:
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
+            _guard_redirect(url, resp)
+            content_type = resp.content_type
             payload = await _read_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
     if not _is_pdf_payload(payload):
-        raise ExtractorError(f"expected a PDF at {url}, payload starts with {payload[:80]!r}")
+        # The content type, not the first bytes: whatever answered is not
+        # the tariff card, and quoting it put a stranger's page into a
+        # sensor attribute and the diagnostics dump.
+        raise ExtractorError(f"expected a PDF at {url}, got {content_type}")
     return await asyncio.to_thread(extract_pdf_text_layout, payload)
 
 
@@ -258,6 +291,7 @@ async def fetch_text(
         async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
             if resp.status >= 400:
                 raise _http_error(url, resp.status)
+            _guard_redirect(url, resp)
             return await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
