@@ -71,6 +71,7 @@ from ..const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_and_parse
+from ._pdf import fold_accents
 from ._walloon_simple import build_tariff, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
@@ -114,7 +115,7 @@ def _find_component(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | N
     return the first € amount in the section that follows.
     """
     for heading in soup.find_all(["h2", "h3", "h4"]):
-        text = heading.get_text(" ", strip=True).lower()
+        text = fold_accents(heading.get_text(" ", strip=True))
         if any(k in text for k in keywords):
             value = _amount_after(heading)
             if value is not None:

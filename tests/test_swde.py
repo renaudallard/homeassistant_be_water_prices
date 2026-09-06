@@ -105,3 +105,16 @@ def test_cvd_section_without_a_figure_does_not_borrow_the_cva() -> None:
     html = fixture_html("swde_2026.html").replace("€ 3.24/m³", "EUR 3.24/m3")
     with pytest.raises(ExtractorError):
         parse_tariff(html, year=2026)
+
+
+def test_headings_are_matched_with_their_accents_folded() -> None:
+    """The comment promised folding; the code only lowercased."""
+    from bs4 import BeautifulSoup
+
+    from custom_components.be_water_prices.providers.swde import _find_component
+
+    soup = BeautifulSoup(
+        "<h3>Coût-vérité de distribution</h3><p>Le montant est <strong>€ 3.24/m³</strong>.</p>",
+        "html.parser",
+    )
+    assert _find_component(soup, ("cout-verite de distribution",)) == 3.24
