@@ -87,8 +87,18 @@ async def fetch_and_parse[T](
     return await asyncio.to_thread(parser, html, *args, **kwargs)
 
 
-_AMOUNT_BEFORE_EURO = re.compile(r"€\s*([0-9]+(?:[.,][0-9]+)?)")
-_AMOUNT_AFTER_EURO = re.compile(r"([0-9]+(?:[.,][0-9]+)?)\s*€")
+# The integer part is either a plain digit run or groups of three split
+# by one of the space-family thousands separators Belgian publications
+# use, which ``to_float`` strips. Dot-grouped thousands are left alone on
+# purpose: SWDE prints dot decimals with three digits ("€ 2.748"), and no
+# rule can tell that from a grouped thousand. The digit guards on both
+# sides keep "Tarif 2025 100,00 €" from reading as 25100.
+_NUMBER = (
+    r"(?<![0-9])((?:[0-9]{1,3}(?:[     ][0-9]{3})+|[0-9]+)"
+    r"(?:[.,][0-9]+)?)(?![0-9])"
+)
+_AMOUNT_BEFORE_EURO = re.compile(r"€\s*" + _NUMBER)
+_AMOUNT_AFTER_EURO = re.compile(_NUMBER + r"\s*€")
 
 
 def extract_amounts(text: str) -> list[float]:
@@ -96,8 +106,9 @@ def extract_amounts(text: str) -> list[float]:
 
     Accepts both Dutch / English layout (``€ 12,34``) and French layout
     (``12,34 €``); some Walloon utility pages publish the symbol after
-    the number. Hits are de-duplicated by start position so a string
-    like "€ 12,34 €" reports 12.34 once.
+    the number. A space-grouped thousand (``€ 1 234,56``, with any of
+    the space variants) is one amount. Hits are de-duplicated by start
+    position so a string like "€ 12,34 €" reports 12.34 once.
     """
     seen: dict[int, float] = {}
     for pattern in (_AMOUNT_BEFORE_EURO, _AMOUNT_AFTER_EURO):

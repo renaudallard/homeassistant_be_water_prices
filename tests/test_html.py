@@ -44,6 +44,21 @@ def test_extract_amounts_handles_dot_decimals() -> None:
     assert extract_amounts("€ 0.102 / kWh") == [0.102]
 
 
+def test_extract_amounts_reads_a_space_grouped_thousand_as_one_amount() -> None:
+    # "€ 1 234,56" used to stop at the separator and report 1.0.
+    assert extract_amounts("€ 1 234,56") == [1234.56]
+    assert extract_amounts("€ 1 234,56") == [1234.56]
+    assert extract_amounts("1 234,56 €") == [1234.56]
+
+
+def test_extract_amounts_does_not_glue_a_year_onto_the_amount() -> None:
+    assert extract_amounts("Tarif 2025 100,00 €") == [100.0]
+
+
+def test_extract_amounts_reports_a_double_signed_amount_once() -> None:
+    assert extract_amounts("€ 12,34 €") == [12.34]
+
+
 def test_extract_amounts_returns_empty_for_no_match() -> None:
     assert extract_amounts("no euros here, just pesos $5.00") == []
 
