@@ -264,6 +264,11 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             return await fetch_and_parse(
                 session, NEWS_URL_FMT.format(year=target), parse_news_tariff, year=target
             )
+        except TransientFetchError:
+            # A blip on this year's article is an outage, not a missing
+            # article; serving last year's rate for it would hide the
+            # outage from the live check as well.
+            raise
         except ExtractorError as err:
             _LOGGER.info(
                 "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1

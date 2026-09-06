@@ -129,3 +129,26 @@ async def test_fetch_reraises_transient_instead_of_news_fallback() -> None:
         await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
     # The drinkwater-only news fallback must NOT run on a transient blip.
     news.assert_not_awaited()
+
+
+async def test_a_blip_on_this_years_article_is_not_answered_with_last_years() -> None:
+    """The news fallback must not turn an outage into last year's rate."""
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import _html, de_watergroep
+    from custom_components.be_water_prices.providers.base import ExtractorError, TransientFetchError
+
+    with (
+        patch.object(
+            de_watergroep,
+            "_fetch_commune_ajax",
+            new=AsyncMock(side_effect=ExtractorError("empty body")),
+        ),
+        patch.object(
+            _html, "fetch_html", new=AsyncMock(side_effect=TransientFetchError("HTTP 503"))
+        ) as news,
+        pytest.raises(TransientFetchError),
+    ):
+        await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
+    # Only this year's article was asked for; last year's was not tried.
+    assert news.await_count == 1
