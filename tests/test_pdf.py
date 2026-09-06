@@ -224,3 +224,53 @@ async def test_a_non_pdf_answer_is_named_by_type_not_quoted() -> None:
         await _pdf.fetch_pdf_text_layout(_FakeSession(resp), "https://water-link.be/x.pdf")  # type: ignore[arg-type]
     assert "token=abc" not in str(err.value)
     assert "text/plain" in str(err.value)
+
+
+def _pdf_with_stream(dictionary: bytes, body: bytes) -> bytes:
+    objs = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R"
+        b"/Resources<</Font<</F1 5 0 R>>>>>>",
+        dictionary + b"stream\n" + body + b"\nendstream",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    for index, obj in enumerate(objs, 1):
+        out += b"%d 0 obj\n" % index + obj + b"\nendobj\n"
+    out += b"trailer<</Root 1 0 R>>\n%%EOF\n"
+    return bytes(out)
+
+
+def test_a_deflate_bomb_is_refused_before_pdfminer_inflates_it() -> None:
+    """Seventy megabytes of spaces travel as seventy kilobytes."""
+    import zlib
+
+    body = zlib.compress(b"BT /F1 12 Tf 10 100 Td (hello) Tj ET\n" + b" " * (70 << 20), 9)
+    payload = _pdf_with_stream(b"<</Length %d/Filter/FlateDecode>>" % len(body), body)
+    assert len(payload) < 200_000
+    with pytest.raises(ExtractorError, match="inflate past"):
+        _pdf.extract_pdf_text_layout(payload)
+
+
+def test_a_filter_chain_is_refused() -> None:
+    """A doubly-deflated stream is invisible to a single inflate pass."""
+    import zlib
+
+    body = zlib.compress(zlib.compress(b"BT (hello) Tj ET", 9), 9)
+    payload = _pdf_with_stream(b"<</Length %d/Filter[/FlateDecode/FlateDecode]>>" % len(body), body)
+    with pytest.raises(ExtractorError, match="filter chain"):
+        _pdf.extract_pdf_text_layout(payload)
+
+
+def test_an_unexpected_filter_is_refused() -> None:
+    payload = _pdf_with_stream(b"<</Length 5/Filter/ASCII85Decode>>", b"87cUR")
+    with pytest.raises(ExtractorError, match="ASCII85Decode"):
+        _pdf.extract_pdf_text_layout(payload)
+
+
+def test_the_real_cards_pass_the_stream_guard() -> None:
+    from tests import fixture_bytes
+
+    for name in ("aquaduin_2026.pdf", "water_link_2026.pdf", "pidpa_tariefplan_2025-2030.pdf"):
+        _pdf.guard_pdf_streams(fixture_bytes(name))

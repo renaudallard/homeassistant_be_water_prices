@@ -36,7 +36,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import unicodedata
+import zlib
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -226,12 +228,69 @@ def extract_pdf_text(payload: bytes) -> str:
         raise ExtractorError(f"PDF parse error: {error_text(err)}") from err
 
 
+# What the streams inside one PDF may inflate to, in total. The three
+# tariff cards on file inflate to under a megabyte; a card that needs more
+# than this is not a tariff card.
+MAX_INFLATED_BYTES = 64 * 1024 * 1024
+_STREAM_RE = re.compile(rb"stream\r?\n")
+_FILTER_RE = re.compile(rb"/Filter\s*(\[[^\]]*\]|/[A-Za-z0-9]+)")
+_PLAIN_FILTERS = frozenset({b"/FlateDecode", b"/DCTDecode"})
+
+
+def guard_pdf_streams(payload: bytes) -> None:
+    """Refuse a PDF whose streams would inflate past the budget.
+
+    The byte cap bounds what comes off the wire, not what pdfminer
+    inflates: a FlateDecode stream of whitespace compresses about a
+    thousand to one, so a hundred kilobytes on the wire became a hundred
+    megabytes in memory, and the cap left room for tens of gigabytes,
+    which is an OOM kill of the whole process rather than an error. Each
+    stream is inflated here with a bounded decompressor and the total held
+    to :data:`MAX_INFLATED_BYTES`. A filter chain, or a filter other than
+    Flate and JPEG, is refused as well: a doubly-deflated or ASCII85-wrapped
+    stream is invisible to this pass, and no tariff card has used one.
+    """
+    total = 0
+    for match in _STREAM_RE.finditer(payload):
+        # The stream's dictionary sits between its "obj" and "stream".
+        head_start = payload.rfind(b"obj", max(0, match.start() - 4096), match.start())
+        head = payload[max(head_start, 0) : match.start()]
+        filters = _FILTER_RE.findall(head)
+        if filters:
+            spec = filters[-1]
+            if spec.startswith(b"["):
+                raise ExtractorError("PDF stream uses a filter chain, which cannot be bounded")
+            if spec not in _PLAIN_FILTERS:
+                raise ExtractorError(
+                    f"PDF stream uses the {spec.decode('ascii', 'replace')} filter"
+                )
+        end = payload.find(b"endstream", match.end())
+        segment = payload[match.end() : end if end >= 0 else len(payload)]
+        inflater = zlib.decompressobj()
+        try:
+            out = inflater.decompress(segment, MAX_INFLATED_BYTES - total + 1)
+        except zlib.error:
+            # Not a deflated stream (an image, or stored raw): nothing to
+            # inflate, so nothing to bound.
+            continue
+        total += len(out)
+        while inflater.unconsumed_tail and total <= MAX_INFLATED_BYTES:
+            out = inflater.decompress(inflater.unconsumed_tail, MAX_INFLATED_BYTES - total + 1)
+            total += len(out)
+        if total > MAX_INFLATED_BYTES:
+            raise ExtractorError(
+                f"PDF streams inflate past {MAX_INFLATED_BYTES} bytes; refusing to read it"
+            )
+
+
 def extract_pdf_text_layout(payload: bytes) -> str:
     """Extract PDF text via pdfplumber, preserving table layout."""
+    payload = _strip_bom(payload)
+    guard_pdf_streams(payload)
     try:
         import pdfplumber
 
-        with pdfplumber.open(BytesIO(_strip_bom(payload))) as pdf:
+        with pdfplumber.open(BytesIO(payload)) as pdf:
             text = "\n".join((page.dedupe_chars().extract_text() or "") for page in pdf.pages)
     except Exception as err:
         raise ExtractorError(f"PDF layout parse error: {error_text(err)}") from err
