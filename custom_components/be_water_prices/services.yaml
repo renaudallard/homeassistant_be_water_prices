@@ -34,7 +34,7 @@ backfill_prices:
         If on, delete the targeted sensors' long-term statistics
         entirely before importing -- every year of them, not just the
         window being re-imported, because the recorder only deletes a
-        statistic whole. Anything older than the start date below is
+        statistic whole. Anything older than the start date above is
         gone and is not written back. Off by default, which overwrites
         the window and leaves the rest alone; that is enough to correct
         a wrong tariff value. Requires a config entry above, since
