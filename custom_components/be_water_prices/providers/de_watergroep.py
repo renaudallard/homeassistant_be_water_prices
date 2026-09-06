@@ -156,6 +156,13 @@ def parse_news_tariff(html: str, year: int) -> WaterTariff:
     Used as a deeper fallback when the cookie-driven per-commune
     endpoint is unreachable; sanering stays at 0 because the news
     article does not carry per-commune sewerage rates.
+
+    The article is prose, not the tariff card, and the two have been
+    seen to disagree: for 2026 it prints 2,9521 euro per 1.000 liter
+    where the tariff endpoint and De Watergroep's own kraanwater page
+    both print 2,9251. This path keeps a tariff on the board; it is
+    not a cross-check for the endpoint, and its figure must not be
+    used to "correct" the per-commune parser.
     """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)

@@ -473,7 +473,9 @@ reporting an issue.
   EUR/year before). Pick your commune in the OptionsFlow for exact
   numbers. If the cookie endpoint fails the integration falls back to
   the news-article snapshot (drinkwater leg only) so it never goes
-  completely dark.
+  completely dark. That article is also less reliable than the
+  endpoint: its 2026 figure (2,9521 €/m³) disagrees with the 2,9251
+  the tariff pages publish.
 - **Pidpa falls back to the May-2024 Tariefplan PDF** when the default
   commune page cannot be read. That PDF is a projection: its drinkwater
   column was never indexed and its saneringsbijdragen are frozen at
