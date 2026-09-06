@@ -232,12 +232,21 @@ async def test_tariff_cites_the_pdf_it_actually_read() -> None:
     outside January lives under a different path; citing the templated one
     sends anyone verifying the figures to a URL that 404s.
     """
+    from datetime import date
     from unittest.mock import AsyncMock, patch
 
     from custom_components.be_water_prices.providers import _html, water_link
 
+    # The page links the 2026 card only, so the fetch has to ask for 2026
+    # whatever year the test runs in.
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 9, 6)
+
     page = _tariff_page(2026).replace("2026-01", "2026-02")
     with (
+        patch.object(water_link, "date", _FakeDate),
         patch.object(_html, "fetch_html", new=AsyncMock(return_value=page)),
         patch.object(water_link, "fetch_pdf_text_layout", new=AsyncMock(return_value=_pdf_text())),
     ):

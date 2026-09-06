@@ -156,12 +156,21 @@ def test_unservable_slugs_blocklist_includes_antwerpen() -> None:
     assert "antwerpen" in _UNSERVABLE_COMMUNE_SLUGS
 
 
-async def test_default_fetch_reads_the_commune_page() -> None:
+async def test_default_fetch_reads_the_commune_page(monkeypatch: pytest.MonkeyPatch) -> None:
     """The no-commune fetch serves the published rate, not the 2024 projection."""
+    from datetime import date
     from unittest.mock import AsyncMock, patch
 
     from custom_components.be_water_prices.providers import _html, pidpa
 
+    # Pin the clock to the fixture's year: from 2027 this test would only
+    # pass through the rollover fallback, which is not what it checks.
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 9, 6)
+
+    monkeypatch.setattr(pidpa, "date", _FakeDate)
     with (
         patch.object(
             _html, "fetch_html", new=AsyncMock(return_value=fixture_html("pidpa_geel_2026.html"))

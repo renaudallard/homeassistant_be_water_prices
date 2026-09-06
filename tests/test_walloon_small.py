@@ -195,17 +195,30 @@ def test_the_page_dates_the_tariff_when_it_says_so() -> None:
     assert detect_published_year("nothing dated here", today=today) is None
 
 
-def test_a_page_stuck_on_last_year_is_dated_last_year() -> None:
-    """End to end: the parsed tariff carries the page's year, not today's."""
+def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
+    """End to end: the parsed tariff carries the page's year, not today's.
+
+    The clock is pinned: left to the real one, the assertion held whether
+    or not the page was read, and turned red on its own on 1 January 2027.
+    """
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import _walloon_simple
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 9, 6)
+
+    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     page = (
         "<html><body><p>Tarifs 2025. Coût vérité distribution (CVD) : 2,870 €/m³.</p></body></html>"
     )
-    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
-
     tariff = parse_tariff(
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
     )
-    assert tariff.valid_from.year in (2025, 2026)
+    assert tariff.valid_from.year == 2025
 
 
 @pytest.mark.parametrize(
