@@ -155,9 +155,11 @@ with `basis_volume = 30 + 30·persons` for Flanders. The math lives in
 as a pure function so it stays unit-testable without a Home Assistant
 install.
 
-The all-in basis rate sensor reports the per-m³ price you actually
-pay (basis or linear plus sanering, VAT-incl) so a dashboard can
-surface "your water costs you X EUR per cubic metre" at a glance.
+The all-in basis rate sensor reports the first-block tariff per m³
+(basis or linear plus sanering, VAT-incl) so a dashboard can surface
+what a cubic metre costs at a glance. It is the published rate: the
+social tariff and the vastrecht korting only enter the two cost
+sensors.
 
 ## Sensors
 
@@ -185,7 +187,7 @@ with it, again without a restart.
 | `basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
 | `comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
 | `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
-| `all_in_basis_rate` | What you actually pay per m³ inside the first block: `(basis + sanering) × (1 + VAT)`. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
+| `all_in_basis_rate` | The first-block tariff per m³, VAT-incl: `(basis + sanering) × (1 + VAT)`, before any social-tariff reduction. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 | `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
 | `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure is **monotonic within the year**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. Returns `unknown` until a water meter is configured in the options step. |
 | `year_to_date_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark so it never decreases mid-year. Companion to `current_year_cost`. |
