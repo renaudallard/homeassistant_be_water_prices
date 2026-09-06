@@ -829,11 +829,15 @@ async def test_reconfigure_commune_drops_stale_saved_when_no_longer_in_list(
 
 
 @pytest.mark.asyncio
-async def test_phantom_sweep_runs_on_v2_entries_too(hass: HomeAssistant) -> None:
+async def test_phantom_sweep_runs_on_v2_entries_too(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
     """A v2 entry that picked a commune before it was flagged as a
     phantom (later blocklist addition) must still get cleaned on
     subsequent loads -- the sweep is not gated on the schema version.
     """
+    import logging
+
     from custom_components.be_water_prices import _drop_phantom_commune_if_blocked
 
     entry = MockConfigEntry(
@@ -850,10 +854,15 @@ async def test_phantom_sweep_runs_on_v2_entries_too(hass: HomeAssistant) -> None
     )
     entry.add_to_hass(hass)
 
-    _drop_phantom_commune_if_blocked(hass, entry)
+    with caplog.at_level(logging.WARNING):
+        _drop_phantom_commune_if_blocked(hass, entry)
     assert entry.version == 2  # untouched
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
+    # The user is told the bill moved, but the commune stays out of the log.
+    assert "no longer serves" in caplog.text
+    assert "Halle" not in caplog.text
+    assert "25126" not in caplog.text
 
 
 @pytest.mark.asyncio

@@ -201,6 +201,15 @@ def _drop_phantom_commune_if_blocked(hass: HomeAssistant, entry: ConfigEntry) ->
     }
     if commune not in phantom_by_utility.get(utility, frozenset()):
         return
+    # Say so, but without naming the commune: the log is the one surface
+    # this integration keeps it out of. Silently rewriting the options
+    # moved the bill to the operator-wide default with nothing to tell
+    # the user why the figure changed.
+    _LOGGER.warning(
+        "%s: the saved commune is one the operator no longer serves; dropping it and "
+        "pricing on the operator-wide default until a commune is picked again",
+        entry.title,
+    )
     new_options = dict(entry.options)
     new_options.pop(CONF_COMMUNE, None)
     new_options.pop(CONF_COMMUNE_LABEL, None)
