@@ -47,7 +47,7 @@ block into ``custom_components/be_water_prices/providers/_postcodes.py``):
      ``_FARYS_POSTCODES_VLAAMS_BRABANT`` (Farys-served pockets inside
      the otherwise-DWG 1500-1999 block):
      - Scrapes DWG's commune dropdown at /nl-be/drinkwater/tarieven
-       and Farys's commune dropdown at /tarieven/woonklant.
+       and Farys's commune dropdown at /nl/watertarieven.
      - Keeps postcodes that DWG lists but Farys does not (so the
        resolver flips them from "farys" to "de_watergroep");
      - Drops postcodes that both operators list (street-level split;
