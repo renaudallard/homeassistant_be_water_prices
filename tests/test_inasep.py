@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from custom_components.be_water_prices.const import (
@@ -49,3 +51,28 @@ def test_parses_2026_cvd() -> None:
 def test_raises_when_cvd_missing() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>")
+
+
+def test_dates_the_cvd_from_the_day_the_page_says_it_applies() -> None:
+    t = parse_tariff(fixture_html("inasep_2026.html"), year=2026)
+    assert t.valid_from == date(2026, 4, 27)
+    assert t.valid_until == date(2026, 12, 31)
+
+
+def test_a_rate_dated_in_an_earlier_year_keeps_january() -> None:
+    page = fixture_html("inasep_2026.html")
+    html = page.replace("depuis le 27 avril 2026", "depuis le 27 avril 2025")
+    assert html != page
+    assert parse_tariff(html, year=2026).valid_from == date(2026, 1, 1)
+
+
+def test_the_cva_date_does_not_stand_in_for_a_missing_cvd_date() -> None:
+    page = fixture_html("inasep_2026.html")
+    # The CVA is dated 1 January on the real page, which is also the
+    # default, so move it to a day that would show up if it were read.
+    cva_date = "depuis le 1<sup>er</sup> janvier 2026"
+    assert page.count(cva_date) == 1
+    html = page.replace("depuis le 27 avril 2026", "").replace(cva_date, "depuis le 15 mars 2026")
+    t = parse_tariff(html, year=2026)
+    assert t.cvd_eur_per_m3 == 3.6734
+    assert t.valid_from == date(2026, 1, 1)

@@ -262,11 +262,14 @@ def build_tariff(
     source_url: str,
     publication_label: str,
     year: int,
+    valid_from: date | None = None,
 ) -> WaterTariff:
     """Build a Walloon :class:`WaterTariff` from the parsed CVD.
 
     Materialises the redevance as ``20·CVD + 30·CVA`` and pulls CVA /
-    FSE from the SPGE flat-Wallonia constants.
+    FSE from the SPGE flat-Wallonia constants. ``valid_from`` dates a
+    rate that took effect inside ``year``; it defaults to 1 January,
+    which is when the CWaPE cards normally turn over.
     """
     cva = WALLONIA_CVA_EUR_PER_M3
     fse = WALLONIA_FSE_EUR_PER_M3
@@ -274,7 +277,7 @@ def build_tariff(
     return WaterTariff(
         utility=utility_id,
         region=REGION_WALLONIA,
-        valid_from=date(year, 1, 1),
+        valid_from=valid_from or date(year, 1, 1),
         valid_until=date(year, 12, 31),
         publication_label=publication_label,
         source_url=source_url,

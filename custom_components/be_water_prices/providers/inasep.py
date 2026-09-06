@@ -41,6 +41,13 @@ cross-checked. The parser anchors the CVD on the literal phrase
 ``Coût-Vérité Distribution (CVD)`` so the unrelated euros amounts
 elsewhere on the page (annual-impact figures, per-glass examples)
 can't win.
+
+INASEP revises its CVD mid-year: the 2026 card dates it from 27 April.
+The tariff is stamped from that day rather than from 1 January, so the
+sensor attribute and the price backfill do not claim the rate for
+months it did not apply to. The previous rate is not published, so the
+year-to-date cost still bills the whole year's volume at the current
+one.
 """
 
 from __future__ import annotations
@@ -68,10 +75,53 @@ SOURCE_URL = "https://www.inasep.be/prix-de-leau-et-evolution"
 # but bs4's text extraction drops the accents on some passes and the
 # superscript ``³`` becomes a plain ``3``. Tolerate accent-stripped
 # spellings of "Coût" and "Vérité".
+#
+# The day the rate took effect follows the unit: "3,6734 €/m³ depuis le
+# 27 avril 2026" (bs4 renders the unit as "€ €/m 3"). It is captured as
+# part of the same match so only a date glued to the CVD counts; the
+# CVA's own "depuis le 1er janvier" a few words later cannot answer for
+# it.
 _CVD_RE = re.compile(
-    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*=?\s*([\d]+,\d{3,5})\s*€",
+    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*=?\s*([\d]+,\d{3,5})\s*€"
+    r"(?:\s*€)?(?:\s*/\s*m\s*[³3]?)?"
+    r"(?:\s*depuis\s+le\s+(\d{1,2})\s*(?:er)?\s+([a-zéû]+)\s+(20\d\d))?",
     re.IGNORECASE | re.DOTALL,
 )
+_FR_MONTHS = {
+    "janvier": 1,
+    "fevrier": 2,
+    "février": 2,
+    "mars": 3,
+    "avril": 4,
+    "mai": 5,
+    "juin": 6,
+    "juillet": 7,
+    "aout": 8,
+    "août": 8,
+    "septembre": 9,
+    "octobre": 10,
+    "novembre": 11,
+    "decembre": 12,
+    "décembre": 12,
+}
+
+
+def _cvd_effective_date(match: re.Match[str], year: int) -> date | None:
+    """The day the CVD applies from, when the page dates it inside ``year``.
+
+    A date in an earlier year means the rate has been in force since
+    before the card, and the card itself then runs from 1 January.
+    """
+    day, month_name, since_year = match.group(2), match.group(3), match.group(4)
+    if day is None:
+        return None
+    month = _FR_MONTHS.get(month_name.lower())
+    if month is None or int(since_year) != year:
+        return None
+    try:
+        return date(year, month, int(day))
+    except ValueError:
+        return None
 
 
 def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
@@ -92,6 +142,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         source_url=SOURCE_URL,
         publication_label=f"INASEP votre eau au coût-vérité {target}",
         year=target,
+        valid_from=_cvd_effective_date(match, target),
     )
 
 

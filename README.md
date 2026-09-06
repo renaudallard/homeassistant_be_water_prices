@@ -77,7 +77,7 @@ publication and how to parse it.
 | **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Pick a different commune in the OptionsFlow to switch (~265 options; 23 phantom entries that Farys lists but doesn't actually serve are filtered out so users can't pick a crashing option) |
 | **IDEN** | Wallonia (Nandrin / Tinlot / Modave) | 3 communes | [`providers/iden.py`](./custom_components/be_water_prices/providers/iden.py) — same Callmepower path; the operator's own site (`iden-eau.be`) carries CVD/CVA explainers but no numbers |
 | **IEG** | Wallonia (Mouscron) | ~50 k | [`providers/ieg.py`](./custom_components/be_water_prices/providers/ieg.py) — operator's own page at `ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/`. Uses the shared CWaPE residential tier math via [`_walloon_simple.py`](./custom_components/be_water_prices/providers/_walloon_simple.py) |
-| **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP lists the CVD on the *Prix de l'eau et évolution* page under the heading "Coût-Vérité Distribution (CVD) = N,NNNN €/m³". Parser anchors on that heading (tolerating accent-stripped variants) |
+| **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP lists the CVD on the *Prix de l'eau et évolution* page under the heading "Coût-Vérité Distribution (CVD) = N,NNNN €/m³". Parser anchors on that heading (tolerating accent-stripped variants) and dates the tariff from the day the page says the CVD applies (27 April for the 2026 card) |
 | **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py) — bs4 walker over the per-tier facture table on [eau.inbw.be/prix-de-leau](https://eau.inbw.be/prix-de-leau). The server's TLS chain is misconfigured (GoDaddy intermediate not sent). The fetch verifies first and only retries with `verify_ssl=False` after a TLS-specific failure, logging a warning when it does; risk note in the module docstring |
 | **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — two paths: the per-commune `/ons-aanbod/je-gemeente/<slug>` HTML page, which carries the current published rates and which the no-commune fetch also reads for a fixed default commune (Geel) since Pidpa charges one rate province-wide; and the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`, a May-2024 projection kept only as the fallback when that page cannot be read. Commune list comes from Pidpa's public sitemap (63 communes) |
 | **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py) — bs4-anchored on the `<h3>` headings of [swde.be/en/water-prices-swde](https://www.swde.be/en/water-prices-swde) (the FR slug 4xxs, the EN one works). CVA / FSE come from the SPGE flat-Wallonia constants and drift-warn on divergence |
@@ -487,6 +487,12 @@ reporting an issue.
   every commune, so the Geel default is exact; the OptionsFlow exposes
   the full sitemap-derived commune list anyway in case Pidpa starts
   varying rates per commune.
+- **Mid-year tariff revisions are billed for the whole year.** A
+  snapshot carries one rate and the previous one is not published, so
+  when a utility changes a rate mid-year (INASEP moved its CVD on
+  27 April 2026) the year-to-date cost bills the whole year's volume at
+  the current rate. The tariff's `valid_from` attribute and the price
+  backfill do follow the published date.
 - **Wallonia régies communales** (~30 small operators -- Chimay,
   Theux, Libramont, ...) are deferred indefinitely. They have no
   central publication channel and the dev-hours / customer ratio
