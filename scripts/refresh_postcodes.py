@@ -72,6 +72,7 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 # Pull the runtime Farys phantom blocklist so the carve-out we compute
 # here matches what the integration's list_communes() actually surfaces
@@ -110,6 +111,26 @@ POSTCODE_DATASET_URL = (
 ZDE_QUERY_URL = (
     "https://geoservices.wallonie.be/arcgis/rest/services/INDUSTRIES_SERVICES/ZDE/MapServer/1/query"
 )
+
+
+def _load_json_with_retry(req: urllib.request.Request, *, attempts: int = 3) -> Any:
+    """GET ``req`` and decode its JSON, retrying a failed request.
+
+    The Walloon pass is about 540 sequential queries against a public
+    ArcGIS endpoint, and one timeout or reset used to abort the whole walk
+    with nothing to resume from. A request that fails ``attempts`` times
+    still raises, since a partial map must never be committed.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.load(resp)
+        except Exception as err:
+            if attempt == attempts:
+                raise ZdeQueryError(f"ZDE query failed after {attempts} attempts: {err}") from err
+            print(f"ZDE query failed ({err}); retrying", file=sys.stderr)
+            time.sleep(2.0 * attempt)
+    raise ZdeQueryError("unreachable")
 
 
 def fetch_postcodes() -> list[dict[str, object]]:
@@ -159,11 +180,7 @@ def query_zde_for_centroid(lon: float, lat: float) -> str | None:
     }
     url = ZDE_QUERY_URL + "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={"User-Agent": "be_water_prices"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.load(resp)
-    except Exception as err:
-        raise ZdeQueryError(f"ZDE query failed: {err}") from err
+    data = _load_json_with_retry(req)
     # ArcGIS reports a bad layer id, a renamed service or a failed query as
     # HTTP 200 with an {"error": ...} body, which urlopen does not raise on.
     # Without this it would read as an empty feature list, i.e. exactly the

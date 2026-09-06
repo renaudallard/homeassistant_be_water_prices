@@ -155,3 +155,35 @@ def test_both_carveouts_share_one_pair_of_fetches() -> None:
         R._DROPDOWN_CACHE = None
 
     assert len(calls) == 2, f"expected one fetch per dropdown, got {calls}"
+
+
+def test_a_flaky_zde_query_is_retried_before_it_aborts_the_walk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One reset in ~540 sequential requests used to throw the whole pass away."""
+    import scripts.refresh_postcodes as rp
+
+    calls = {"n": 0}
+    good = _urlopen_returning({"features": [{"attributes": {"DISTRIBUTEUR": "SWDE"}}]})
+
+    def _flaky(*args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise TimeoutError("timed out")
+        return good(*args, **kwargs)
+
+    monkeypatch.setattr(rp.time, "sleep", lambda _s: None)
+    with patch("urllib.request.urlopen", _flaky):
+        assert query_zde_for_centroid(4.5, 50.5) == "SWDE"
+    assert calls["n"] == 3
+
+
+def test_a_query_that_keeps_failing_still_aborts(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scripts.refresh_postcodes as rp
+
+    def _down(*_args: Any, **_kwargs: Any) -> Any:
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(rp.time, "sleep", lambda _s: None)
+    with patch("urllib.request.urlopen", _down), pytest.raises(ZdeQueryError, match="3 attempts"):
+        query_zde_for_centroid(4.5, 50.5)
