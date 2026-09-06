@@ -53,6 +53,7 @@ is unavoidable without per-component publication.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import date
@@ -173,7 +174,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     try:
         pdf_url = await _discover_pdf_url(session, target)
         text = await fetch_pdf_text_layout(session, pdf_url)
-        return parse_tariff(text, year=target)
+        return await asyncio.to_thread(parse_tariff, text, year=target)
     except ExtractorError as err:
         if isinstance(err, TransientFetchError):
             # A transient blip (5xx / 429 / timeout) fetching this year's
@@ -183,7 +184,8 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
         _LOGGER.info("Aquaduin %d tariff unavailable (%s); trying %d", target, err, target - 1)
         pdf_url = await _discover_pdf_url(session, target - 1)
         text = await fetch_pdf_text_layout(session, pdf_url)
-        return carry_prior_year_card(parse_tariff(text, year=target - 1), target)
+        prior = await asyncio.to_thread(parse_tariff, text, year=target - 1)
+        return carry_prior_year_card(prior, target)
 
 
 EXTRACTOR = WaterExtractor(

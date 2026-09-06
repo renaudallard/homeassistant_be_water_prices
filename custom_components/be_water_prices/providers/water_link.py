@@ -234,14 +234,14 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int, str
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     text, year, url = await _fetch_pdf_text(session)
-    return carry_prior_year_card(parse_tariff(text, year=year, source_url=url), date.today().year)
+    tariff = await asyncio.to_thread(parse_tariff, text, year=year, source_url=url)
+    return carry_prior_year_card(tariff, date.today().year)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     text, year, url = await _fetch_pdf_text(session)
-    return carry_prior_year_card(
-        parse_tariff(text, year=year, commune=commune, source_url=url), date.today().year
-    )
+    tariff = await asyncio.to_thread(parse_tariff, text, year=year, commune=commune, source_url=url)
+    return carry_prior_year_card(tariff, date.today().year)
 
 
 # Anchored on the start-of-line: each commune row in the PDF starts at

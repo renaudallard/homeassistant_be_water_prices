@@ -90,6 +90,7 @@ Zuivering columns.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import date
@@ -244,7 +245,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
 async def fetch_tariefplan(session: aiohttp.ClientSession) -> WaterTariff:
     """The Tariefplan PDF projection. Fallback only; see the module docstring."""
     text = await fetch_pdf_text_layout(session, SOURCE_URL)
-    return parse_tariff(text)
+    return await asyncio.to_thread(parse_tariff, text)
 
 
 # --- per-commune ingestion ---------------------------------------------------
