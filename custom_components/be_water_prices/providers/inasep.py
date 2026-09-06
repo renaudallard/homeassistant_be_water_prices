@@ -81,10 +81,16 @@ SOURCE_URL = "https://www.inasep.be/prix-de-leau-et-evolution"
 # part of the same match so only a date glued to the CVD counts; the
 # CVA's own "depuis le 1er janvier" a few words later cannot answer for
 # it.
+#
+# Every optional piece of whitespace is tied to its literal. A shape
+# like `\s*X?\s+` lets the engine split one run of spaces two ways and
+# try every split when the match fails, which is quadratic in the run:
+# a page with a few thousand spaces after the date held the parser for
+# seconds, and the body cap allows millions.
 _CVD_RE = re.compile(
-    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*=?\s*([\d]+,\d{3,5})\s*€"
+    r"Co[ûu]t.{0,3}V[ée]rit[ée]\s+Distribution\s*\(CVD\)\s*(?:=\s*)?([\d]+,\d{3,5})\s*€"
     r"(?:\s*€)?(?:\s*/\s*m\s*[³3]?)?"
-    r"(?:\s*depuis\s+le\s+(\d{1,2})\s*(?:er)?\s+([a-zéû]+)\s+(20\d\d))?",
+    r"(?:\s*depuis\s+le\s+(\d{1,2})(?:\s*er)?\s+([a-zéû]+)\s+(20\d\d))?",
     re.IGNORECASE | re.DOTALL,
 )
 _FR_MONTHS = {

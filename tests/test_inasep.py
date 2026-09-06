@@ -53,6 +53,22 @@ def test_raises_when_cvd_missing() -> None:
         parse_tariff("<html><body>nothing here</body></html>")
 
 
+@pytest.mark.timeout(5)
+def test_the_cvd_regex_stays_linear_on_a_run_of_whitespace() -> None:
+    """A page padded with spaces after the day must not hold the parser.
+
+    The date tail once read `\\s*(?:er)?\\s+`, which backtracks over every
+    way of splitting the run; 8 000 spaces cost seconds and 100 KB never
+    returned. The same page has to parse in well under the timeout.
+    """
+    page = fixture_html("inasep_2026.html")
+    assert page.count("depuis le 27 avril 2026") == 1
+    padded = page.replace("depuis le 27 avril 2026", "depuis le 27" + " " * 50_000 + "X")
+    t = parse_tariff(padded, year=2026)
+    assert t.cvd_eur_per_m3 == 3.6734
+    assert t.valid_from == date(2026, 1, 1)
+
+
 def test_dates_the_cvd_from_the_day_the_page_says_it_applies() -> None:
     t = parse_tariff(fixture_html("inasep_2026.html"), year=2026)
     assert t.valid_from == date(2026, 4, 27)
