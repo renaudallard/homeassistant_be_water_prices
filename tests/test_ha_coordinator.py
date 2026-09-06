@@ -3059,3 +3059,16 @@ async def test_unload_stops_listening_to_the_meter_before_the_flush(hass: HomeAs
 
     assert injected["done"], "the meter event was not injected into the write window"
     assert own_store._delay_handle is None
+
+
+def test_a_snapshot_from_the_future_is_stale() -> None:
+    """Clock skew or a restored container: a future fetch time is suspect."""
+    from datetime import UTC, datetime, timedelta
+
+    from custom_components.be_water_prices.coordinator import WaterCoordinator
+
+    tariff = _fresh_tariff()
+    now = datetime.now(UTC)
+    assert WaterCoordinator._is_stale(tariff, now + timedelta(hours=1)) is True
+    assert WaterCoordinator._is_stale(tariff, now - timedelta(hours=1)) is False
+    assert WaterCoordinator._is_stale(tariff, now - timedelta(days=40)) is True

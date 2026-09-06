@@ -276,3 +276,32 @@ async def test_a_probe_that_cannot_read_its_page_is_a_failure_row() -> None:
     result = await _check_probe(session=None, probe=probe)  # type: ignore[arg-type]
     assert result.status == "FAIL"
     assert result.extractor_id == "pidpa:default-page"
+
+
+def test_validate_refuses_an_implausible_tariff() -> None:
+    """The plausibility windows were never exercised by anything."""
+    from dataclasses import replace
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import WaterTariff
+    from scripts.live_check import _validate
+
+    sane = WaterTariff(
+        utility="x",
+        region="flanders",
+        valid_from=date(date.today().year, 1, 1),
+        valid_until=date(date.today().year, 12, 31),
+        publication_label="x",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=100.0,
+        basis_eur_per_m3=2.0,
+    )
+    assert _validate(sane, "flanders") is None
+    assert "region mismatch" in (_validate(sane, "wallonia") or "")
+    assert "yearly_fixed_fee" in (
+        _validate(replace(sane, yearly_fixed_fee=900.0), "flanders") or ""
+    )
+    assert "volumetric rate" in (_validate(replace(sane, basis_eur_per_m3=50.0), "flanders") or "")
+    assert "no volumetric" in (_validate(replace(sane, basis_eur_per_m3=None), "flanders") or "")
+    far = replace(sane, valid_from=date(2000, 1, 1))
+    assert "too far" in (_validate(far, "flanders") or "")

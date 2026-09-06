@@ -172,3 +172,51 @@ def test_every_ci_blocked_label_matches_a_real_check() -> None:
     assert set(CI_BLOCKED) <= labels, (
         f"CI_BLOCKED names labels no check carries: {sorted(set(CI_BLOCKED) - labels)}"
     )
+
+
+def test_diff_reports_a_rate_that_moved_and_nothing_that_did_not() -> None:
+    from dataclasses import replace
+
+    from scripts.fixture_drift import _diff
+
+    fixture = _dummy_tariff(b"")
+    assert _diff(fixture, fixture) == []
+    moved = replace(fixture, basis_eur_per_m3=2.0)
+    deltas = _diff(replace(fixture, basis_eur_per_m3=2.0111), moved)
+    assert [d.field for d in deltas] == ["basis_eur_per_m3"]
+    # A move inside the rounding threshold is noise.
+    assert _diff(replace(fixture, basis_eur_per_m3=2.0005), moved) == []
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected_rc"),
+    [("clean", 0), ("transient", 2), ("hard", 1)],
+)
+async def test_run_exit_code_follows_the_worst_outcome(
+    monkeypatch: pytest.MonkeyPatch, outcome: str, expected_rc: int
+) -> None:
+    """Exit 2 keeps a blip from either opening or closing an issue."""
+    from scripts import fixture_drift
+
+    async def _fetch(_session: aiohttp.ClientSession) -> WaterTariff:
+        if outcome == "transient":
+            raise TransientFetchError("HTTP 503")
+        if outcome == "hard":
+            raise ExtractorError("gone")
+        return _dummy_tariff(b"")
+
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(
+        fixture_drift,
+        "CHECKS",
+        [
+            FixtureCheck(
+                label="TEST",
+                fixture="vivaqua_linear_2026.html",
+                parse_fixture=_dummy_tariff,
+                fetch_live=_fetch,
+            )
+        ],
+    )
+    _results, rc = await fixture_drift._run()
+    assert rc == expected_rc

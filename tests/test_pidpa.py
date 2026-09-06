@@ -44,6 +44,7 @@ from tests import fixture_bytes, fixture_html
 
 @functools.cache
 def _pdf_text() -> str:
+    # Twelve seconds per extraction on this hardware, nine tests: once is enough.
     return extract_pdf_text_layout(fixture_bytes("pidpa_tariefplan_2025-2030.pdf"))
 
 
@@ -235,3 +236,54 @@ async def test_default_fetch_reraises_transient_instead_of_the_pdf() -> None:
         await pidpa.fetch(session=None)  # type: ignore[arg-type]
     # The projection must not stand in for an outage the live check should see.
     pdf.assert_not_awaited()
+
+
+async def test_list_communes_drops_the_blocklisted_slug() -> None:
+    """The blocklist is only useful if the filter that applies it exists."""
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import pidpa
+
+    sitemap = (
+        "<urlset><url><loc>https://www.pidpa.be/ons-aanbod/je-gemeente/antwerpen</loc></url>"
+        "<url><loc>https://www.pidpa.be/ons-aanbod/je-gemeente/geel</loc></url></urlset>"
+    )
+    with patch.object(pidpa, "fetch_html", new=AsyncMock(return_value=sitemap)):
+        communes = await pidpa.list_communes(session=None)  # type: ignore[arg-type]
+    assert [c.id for c in communes] == ["geel"]
+
+
+def test_a_year_tab_outside_the_household_tab_is_not_used() -> None:
+    """The walk-up to the outer tab is what keeps the business table out."""
+    from bs4 import BeautifulSoup
+
+    from custom_components.be_water_prices.providers.pidpa import _is_huishoudelijk_year_tab
+
+    household = BeautifulSoup(
+        '<div class="tariff-tab-content" id="tabid-1-tab-0">'
+        '<div class="tariff-tab-content" id="tabid-1-tab-2026"></div></div>',
+        "html.parser",
+    )
+    business = BeautifulSoup(
+        '<div class="tariff-tab-content" id="tabid-1-tab-1">'
+        '<div class="tariff-tab-content" id="tabid-1-tab-2026"></div></div>',
+        "html.parser",
+    )
+    inner = household.find("div", id="tabid-1-tab-2026")
+    assert inner is not None and _is_huishoudelijk_year_tab(inner, year=2026)
+    inner = business.find("div", id="tabid-1-tab-2026")
+    assert inner is not None and not _is_huishoudelijk_year_tab(inner, year=2026)
+
+
+def test_a_table_short_of_columns_is_refused() -> None:
+    rows = "".join(
+        f"<tr><td>{label}</td><td>1 euro excl. btw</td></tr>"
+        for label in ("", "Vastrecht", "Korting", "Basistarief", "Comforttarief")
+    )
+    html = (
+        '<div class="tariff-tab-content" id="t-tab-0"><div class="tariff-tab-content" '
+        f'id="t-tab-2026"><table><tr><td>Integrale waterprijs</td></tr>{rows}</table>'
+        "</div></div>"
+    )
+    with pytest.raises(ExtractorError, match="malformed"):
+        parse_commune_tariff(html, commune_slug="x", year=2026)
