@@ -71,18 +71,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ steps.version.outputs.tag }}"
+          # GitHub guesses the previous release when it writes the notes,
+          # and guessed wrong here twice: no start at all for v0.7.3 and
+          # v0.7.2 for v0.7.4. Hand it the highest tag below this one.
+          git fetch --tags --quiet origin
+          prev=$(git tag --list 'v*' --sort=-v:refname | grep -vx "$tag" | head -n 1 || true)
+          args=(--title "$tag" --generate-notes)
+          if [ -n "$prev" ]; then
+            args+=(--notes-start-tag "$prev")
+          fi
           set +e
           for delay in 10 30 90; do
-            gh release create "$tag" \
-              --title "$tag" \
-              --generate-notes \
-              dist/be_water_prices.zip && exit 0
+            gh release create "$tag" "${args[@]}" dist/be_water_prices.zip && exit 0
             echo "release create failed, sleeping ${delay}s..." >&2
             sleep "$delay"
           done
           # Final attempt; surface its exit code so the run fails if it still
           # returns non-zero after the three retries.
-          gh release create "$tag" \
-            --title "$tag" \
-            --generate-notes \
-            dist/be_water_prices.zip
+          gh release create "$tag" "${args[@]}" dist/be_water_prices.zip
