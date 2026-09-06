@@ -64,7 +64,7 @@ from ..const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_html
-from ._walloon_simple import build_tariff, warn_constant_drift
+from ._walloon_simple import build_tariff, detect_published_year, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -169,7 +169,10 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         threshold=0.001,
     )
 
-    target = year or date.today().year
+    # The page says "Tarifs YYYY": date the card from that rather than the
+    # clock, so a page still on last year's card in January looks stale
+    # instead of being relabelled as this year's.
+    target = year or detect_published_year(soup.get_text(" ", strip=True)) or date.today().year
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,

@@ -49,3 +49,22 @@ def test_parses_2026_components() -> None:
 def test_raises_when_table_missing() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>")
+
+
+def test_a_page_still_on_last_years_card_is_dated_last_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """In January the clock says the new year; the page says which card it shows."""
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import cile
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2027, 1, 5)
+
+    monkeypatch.setattr(cile, "date", _FakeDate)
+    t = parse_tariff(fixture_html("cile_2026.html"))
+    assert t.valid_from == date(2026, 1, 1)
+    assert t.valid_until == date(2026, 12, 31)

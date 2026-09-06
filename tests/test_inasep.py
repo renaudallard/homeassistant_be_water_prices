@@ -92,3 +92,19 @@ def test_the_cva_date_does_not_stand_in_for_a_missing_cvd_date() -> None:
     t = parse_tariff(html, year=2026)
     assert t.cvd_eur_per_m3 == 3.6734
     assert t.valid_from == date(2026, 1, 1)
+
+
+def test_a_page_still_on_last_years_card_is_dated_last_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from custom_components.be_water_prices.providers import inasep
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2027, 1, 5)
+
+    monkeypatch.setattr(inasep, "date", _FakeDate)
+    t = parse_tariff(fixture_html("inasep_2026.html"))
+    assert t.valid_from == date(2026, 4, 27)
+    assert t.valid_until == date(2026, 12, 31)

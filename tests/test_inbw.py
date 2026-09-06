@@ -59,3 +59,21 @@ def test_matches_published_facture_for_100_m3() -> None:
 def test_raises_when_table_missing() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>no table here</body></html>")
+
+
+def test_a_page_still_on_last_years_card_is_dated_last_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import inbw
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2027, 1, 5)
+
+    monkeypatch.setattr(inbw, "date", _FakeDate)
+    t = parse_tariff(fixture_html("inbw_2026.html"))
+    assert t.valid_from == date(2026, 1, 1)
+    assert t.valid_until == date(2026, 12, 31)
