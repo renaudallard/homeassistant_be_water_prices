@@ -596,6 +596,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         super().__init__(
             hass,
             _LOGGER,
+            # Explicit rather than the setup-context fallback Home Assistant
+            # flags: the entry is what registers the shutdown and makes the
+            # daily tick an entry task.
+            config_entry=entry,
             name=f"{DOMAIN}_{entry.entry_id}",
             update_interval=timedelta(hours=UPDATE_INTERVAL_HOURS),
         )
