@@ -48,7 +48,7 @@ from ..const import (
     FLANDERS_VASTRECHT_TOTAL,
     REGION_FLANDERS,
 )
-from .base import WaterTariff
+from .base import ExtractorError, WaterTariff
 
 
 def build_flanders_tariff(
@@ -62,7 +62,22 @@ def build_flanders_tariff(
     sanering_gemeentelijk: float = 0.0,
     sanering_bovengemeentelijk: float = 0.0,
 ) -> WaterTariff:
-    """Build a Flemish :class:`WaterTariff` with the standard VMM totals."""
+    """Build a Flemish :class:`WaterTariff` with the standard VMM totals.
+
+    A rate of zero or less is not a rate: the 2x check passed 0 against
+    0 and a card of nothing went to the sensors. A sanering component of
+    zero is legitimate (Aquaduin folds it into the basis, and a commune
+    can levy none), a negative one is not.
+    """
+    if basis <= 0 or comfort <= 0:
+        raise ExtractorError(
+            f"{utility_id} {year}: drinkwater rate {basis} / {comfort} is not a price"
+        )
+    if sanering_gemeentelijk < 0 or sanering_bovengemeentelijk < 0:
+        raise ExtractorError(
+            f"{utility_id} {year}: negative sanering {sanering_gemeentelijk} / "
+            f"{sanering_bovengemeentelijk}"
+        )
     return WaterTariff(
         utility=utility_id,
         region=REGION_FLANDERS,
