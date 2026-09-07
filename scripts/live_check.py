@@ -29,8 +29,9 @@
 Walks every registered :class:`WaterExtractor`, hits the utility's real
 publication, parses the result, and verifies the snapshot is structurally
 sane (region matches, fee in plausible range, at least one volumetric
-component populated). Prints a markdown report to stdout and exits
-non-zero on the first failure.
+component populated). Checks every extractor rather than stopping at
+the first failure, prints a markdown report to stdout and folds the
+outcomes into the exit code below.
 
 Run by ``.github/workflows/live_check.yml`` daily; on persistent failure
 the workflow opens or updates a GitHub issue with this report attached.
