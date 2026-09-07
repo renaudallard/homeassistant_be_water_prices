@@ -779,6 +779,68 @@ async def test_phantom_strip_is_rolled_back_when_the_first_fetch_fails(
 
 
 @pytest.mark.asyncio
+async def test_the_phantom_warning_is_said_once_when_the_drop_sticks(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Retries put the commune back and said it again each time, naming the entry."""
+    import logging
+    from unittest.mock import patch
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.be_water_prices.providers.base import (
+        ExtractorError,
+        WaterExtractor,
+        WaterTariff,
+    )
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    outage = True
+
+    async def _fetch(_session: object) -> WaterTariff:
+        if outage:
+            raise ExtractorError("HTTP 503 from upstream")
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water at the Halle house",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "25126",  # 1500 - Halle (Halle) -- phantom
+            CONF_COMMUNE_LABEL: "1500 - Halle (Halle)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="farys", label="Farys", region="flanders", fetch=_fetch)
+    caplog.set_level(logging.WARNING)
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        assert await hass.config_entries.async_setup(entry.entry_id) is False
+        await hass.async_block_till_done()
+        # Two retries, as Home Assistant's backoff runs them, then the outage ends.
+        for _ in range(2):
+            entry.async_cancel_retry_setup()
+            async with entry.setup_lock:
+                await entry.async_setup(hass)
+            await hass.async_block_till_done()
+        outage = False
+        entry.async_cancel_retry_setup()
+        async with entry.setup_lock:
+            await entry.async_setup(hass)
+        await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert CONF_COMMUNE not in entry.options
+    lines = [r.getMessage() for r in caplog.records if "no longer serves" in r.getMessage()]
+    assert len(lines) == 1
+    assert lines[0].startswith("Farys:")
+    assert "Halle" not in lines[0]
+
+
+@pytest.mark.asyncio
 async def test_reconfigure_commune_drops_stale_saved_when_no_longer_in_list(
     hass: HomeAssistant,
 ) -> None:
@@ -859,10 +921,9 @@ async def test_phantom_sweep_runs_on_v2_entries_too(
     assert entry.version == 2  # untouched
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
-    # The user is told the bill moved, but the commune stays out of the log.
-    assert "no longer serves" in caplog.text
-    assert "Halle" not in caplog.text
-    assert "25126" not in caplog.text
+    # The sweep says nothing itself: setup speaks once the drop sticks, and
+    # a setup retry would put the commune back first.
+    assert "no longer serves" not in caplog.text
 
 
 @pytest.mark.asyncio

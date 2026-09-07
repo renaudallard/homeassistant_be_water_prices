@@ -49,8 +49,10 @@ PLATFORMS = ["sensor"]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.exceptions import ConfigEntryNotReady
 
+    from .const import CONF_UTILITY
     from .coordinator import WaterCoordinator
     from .providers import async_load as async_load_providers
+    from .providers import get as get_extractor
     from .statistics import (
         async_maybe_backfill_once,
         async_register_services,
@@ -88,6 +90,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if options_changed:
             hass.config_entries.async_update_entry(entry, options=original_options)
         raise
+    if options_changed:
+        # Once it sticks, and once: said before the refresh it was repeated
+        # on every retry, since the rollback above put the commune back.
+        # Silently rewriting the options moved the bill to the operator-wide
+        # default with nothing to tell the user why the figure changed. The
+        # commune stays out of the log, and so does the entry title, which
+        # users rename after their town.
+        _LOGGER.warning(
+            "%s: the saved commune is one the operator no longer serves; dropping it and "
+            "pricing on the operator-wide default until a commune is picked again",
+            get_extractor(entry.data[CONF_UTILITY]).label,
+        )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     # Home Assistant runs the on_unload callbacks when setup fails further
     # down as well, and never calls async_unload_entry for an entry that
@@ -226,15 +240,8 @@ def _drop_phantom_commune_if_blocked(hass: HomeAssistant, entry: ConfigEntry) ->
     }
     if commune not in phantom_by_utility.get(utility, frozenset()):
         return
-    # Say so, but without naming the commune: the log is the one surface
-    # this integration keeps it out of. Silently rewriting the options
-    # moved the bill to the operator-wide default with nothing to tell
-    # the user why the figure changed.
-    _LOGGER.warning(
-        "%s: the saved commune is one the operator no longer serves; dropping it and "
-        "pricing on the operator-wide default until a commune is picked again",
-        entry.title,
-    )
+    # The caller says so once the drop sticks; the log is the one surface
+    # this integration keeps the commune out of.
     new_options = dict(entry.options)
     new_options.pop(CONF_COMMUNE, None)
     new_options.pop(CONF_COMMUNE_LABEL, None)
