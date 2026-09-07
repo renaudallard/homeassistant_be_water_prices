@@ -493,6 +493,13 @@ when reporting an issue.
   is also less reliable than the
   endpoint: its 2026 figure (2,9521 €/m³) disagrees with the 2,9251
   the tariff pages publish.
+- **Aquaduin's January fallback depends on last year's page.** When the
+  new year's tariff page is not up yet, the extractor reads the PDF
+  link off last year's page, and Aquaduin strips that link once a year
+  is over (the 2025 page carried none by September 2026). If the link
+  is already gone when the new page is late, the fetch fails and the
+  cached card keeps serving with the stale-snapshot Repair up until the
+  new card is published.
 - **Pidpa falls back to the May-2024 Tariefplan PDF** when the default
   commune page cannot be read. That PDF is a projection: its drinkwater
   column was never indexed and its saneringsbijdragen are frozen at

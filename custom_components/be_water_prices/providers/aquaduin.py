@@ -170,6 +170,15 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+    """This year's card, or last year's until 31 March.
+
+    The fallback reads the PDF link off last year's page, and Aquaduin
+    strips that link once a year is over: on 2026-09-07 the 2025 page
+    carried none. The fallback therefore only helps while the previous
+    year's page still links its card, and when it does not, the fetch
+    fails and the coordinator keeps serving the cached card with the
+    stale-snapshot Repair up until the new card is published.
+    """
     target = date.today().year
     try:
         pdf_url = await _discover_pdf_url(session, target)
