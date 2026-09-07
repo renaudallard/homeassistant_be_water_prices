@@ -49,7 +49,6 @@ jobs:
           fi
 
       - name: Build release zip
-        if: steps.check.outputs.release_exists == 'false'
         run: |
           mkdir -p dist
           cd custom_components/be_water_prices
@@ -64,6 +63,21 @@ jobs:
           tag="${{ steps.version.outputs.tag }}"
           git tag "$tag"
           git push origin "$tag"
+
+      - name: Add the zip to a release that exists without one
+        if: steps.check.outputs.release_exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          # A run that created the release and died before the upload
+          # left it without its asset, and a re-run saw the release and
+          # did nothing. Upload the missing asset; leave a present one.
+          if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx 'be_water_prices.zip'; then
+            echo "release $tag already carries be_water_prices.zip"
+          else
+            gh release upload "$tag" dist/be_water_prices.zip
+          fi
 
       - name: Create release (with retry on transient API errors)
         if: steps.check.outputs.release_exists == 'false'
