@@ -238,6 +238,20 @@ def test_a_card_served_ahead_of_the_calendar_is_priced_and_flagged(
     assert "2027 card while the calendar says" in caplog.text
 
 
+def test_a_row_without_its_ex_vat_cell_is_refused_not_read_from_the_vat_column() -> None:
+    raw = fixture_html("farys_gent_2026.json")
+    assert raw.count("3,0058") == 1
+    with pytest.raises(ExtractorError, match="drinkwater basistarief"):
+        parse_tariff(raw.replace("\\u0026euro; 3,0058", ""))
+
+
+def test_a_vat_column_that_disagrees_with_the_rate_is_refused() -> None:
+    raw = fixture_html("farys_gent_2026.json")
+    assert raw.count("3,1861") == 1
+    with pytest.raises(ExtractorError, match="do not agree"):
+        parse_tariff(raw.replace("3,1861", "3,2861"))
+
+
 def test_a_period_switcher_that_names_no_year_is_said_so(caplog: pytest.LogCaptureFixture) -> None:
     import logging
 

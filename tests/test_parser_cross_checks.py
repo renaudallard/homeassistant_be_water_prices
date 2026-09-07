@@ -86,7 +86,10 @@ def test_agso_swapped_cells_do_not_ship_a_doubled_rate() -> None:
 
 
 def test_farys_comfort_must_be_twice_the_basis() -> None:
-    raw = fixture_html("farys_gent_2026.json").replace("6,0116", "5,5000")
+    # The VAT-inclusive figure moves with the rate, so only the 2x rule is broken.
+    raw = fixture_html("farys_gent_2026.json")
+    assert raw.count("6,0116") == 1 and raw.count("6,3723") == 1
+    raw = raw.replace("6,0116", "5,5000").replace("6,3723", "5,8300")
     with pytest.raises(ExtractorError, match="2× basistarief"):
         farys.parse_tariff(raw, year=2026)
 

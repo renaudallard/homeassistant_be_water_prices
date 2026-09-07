@@ -63,7 +63,7 @@ from .._phantom_blocklists import (
 from .._phantom_blocklists import (
     FARYS_UNSERVABLE_LABELS as _UNSERVABLE_COMMUNE_LABELS,
 )
-from ..const import REGION_FLANDERS
+from ..const import DEFAULT_VAT_RATE, REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, fetch_text, to_float
 from .base import (
@@ -93,11 +93,13 @@ _CURRENT_PAGE_NID = "20471"
 # Match "Basistarief drinkwater (per m³) € N,NNNN" and the matching
 # comforttarief / sanering rows. The HTML has the labels broken across
 # inline tags but the text-collapsed version is stable.
-_BASIS_DRINKWATER_RE = re.compile(
-    r"Basistarief\s+drinkwater\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})", re.IGNORECASE
-)
+# Each row prints the rate twice, ex-VAT then with 6 % VAT, and both are
+# read: a row that lost its ex-VAT cell would otherwise hand the VAT
+# figure over as the rate, six percent high and shaped like a price.
+_PAIR = r"\s*€\s*([\d]+,\d{3,5})\s*€\s*([\d]+,\d{3,5})"
+_BASIS_DRINKWATER_RE = re.compile(r"Basistarief\s+drinkwater\s*\(per\s*m³\)" + _PAIR, re.IGNORECASE)
 _COMFORT_DRINKWATER_RE = re.compile(
-    r"Comforttarief\s+drinkwater\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})", re.IGNORECASE
+    r"Comforttarief\s+drinkwater\s*\(per\s*m³\)" + _PAIR, re.IGNORECASE
 )
 # Spelled out to the closing "(per m³)" rather than bridged with a
 # permissive gap. "[^€]+" only stops at the first euro sign, so a row
@@ -105,11 +107,11 @@ _COMFORT_DRINKWATER_RE = re.compile(
 # return the comforttarief on the next line -- exactly twice the right
 # number, and plausible enough to ship.
 _BASIS_GEMEENTELIJK_RE = re.compile(
-    r"Basistarief\s+gemeentelijke\s+bijdrage\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})",
+    r"Basistarief\s+gemeentelijke\s+bijdrage\s*\(per\s*m³\)" + _PAIR,
     re.IGNORECASE,
 )
 _BASIS_BOVENGEMEENTELIJK_RE = re.compile(
-    r"Basistarief\s+bovengemeentelijke\s+bijdrage\s*\(per\s*m³\)\s*€\s*([\d]+,\d{3,5})",
+    r"Basistarief\s+bovengemeentelijke\s+bijdrage\s*\(per\s*m³\)" + _PAIR,
     re.IGNORECASE,
 )
 
@@ -161,7 +163,12 @@ def _amount(text: str, pattern: re.Pattern[str], label: str) -> float:
     match = pattern.search(text)
     if match is None:
         raise ExtractorError(f"Farys: could not find {label} in the AJAX HTML payload")
-    return to_float(match.group(1))
+    rate, with_vat = to_float(match.group(1)), to_float(match.group(2))
+    if abs(rate * (1.0 + DEFAULT_VAT_RATE) - with_vat) > 0.001:
+        raise ExtractorError(
+            f"Farys: {label} {rate} and its VAT-inclusive figure {with_vat} do not agree"
+        )
+    return rate
 
 
 def parse_tariff(
