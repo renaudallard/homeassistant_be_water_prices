@@ -32,23 +32,31 @@
       },
       "reconfigure_postcode": {
         "title": "Update your postcode",
-        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator and are dropped when the new operator is not Flemish; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs).",
+        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs).",
         "data": {
           "postcode": "Postcode"
         }
       },
       "reconfigure_manual": {
         "title": "Pick your water utility",
-        "description": "Pick the utility that serves you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator and are dropped when the new operator is not Flemish; the saved commune is cleared if you pick a different operator (their commune IDs are not interchangeable). Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) ask for the commune next.",
+        "description": "Pick the utility that serves you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if you pick a different operator (their commune IDs are not interchangeable). Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) ask for the commune next.",
         "data": {
           "utility": "Utility"
         }
       },
       "reconfigure_choose": {
         "title": "Pick your water utility",
-        "description": "Your postcode is shared by more than one utility -- they each serve different streets in your area. Pick the one that bills you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator and are dropped when the new operator is not Flemish; the saved commune is cleared if you pick a different operator.",
+        "description": "Your postcode is shared by more than one utility -- they each serve different streets in your area. Pick the one that bills you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if you pick a different operator.",
         "data": {
           "utility": "Utility"
+        }
+      },
+      "reconfigure_household": {
+        "title": "Household for the Flemish tariff",
+        "description": "The new operator is Flemish, and the Flemish tariff depends on the number of registered residents at the address and on the social tariff. Enter them here; both can be changed later in the entry's options.",
+        "data": {
+          "gedomicilieerd_persons": "Registered residents",
+          "social_tariff": "Social tariff (80% reduction)"
         }
       },
       "reconfigure_commune": {

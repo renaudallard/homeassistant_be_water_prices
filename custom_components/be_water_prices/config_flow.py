@@ -289,6 +289,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # to drop the stale commune even if the user submits the form
         # without picking a replacement.
         self._drop_stale_reconfigure_commune: bool = False
+        # Residents and social tariff, asked for on a move into Flanders.
+        self._household: dict[str, Any] | None = None
         # Cache the live commune list across form-render / form-submit
         # within one flow instance. Without this each step makes two
         # HTTP calls to the operator's dropdown page, and a transient
@@ -423,6 +425,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         self._reconfigure_commune_label = None
         self._reconfigure_commune_submitted = False
         self._drop_stale_reconfigure_commune = False
+        self._household = None
         return self.async_show_menu(
             step_id="reconfigure",
             menu_options=["reconfigure_postcode", "reconfigure_manual"],
@@ -561,6 +564,34 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         )
         return self.async_show_form(step_id="reconfigure_commune", data_schema=schema)
 
+    async def async_step_reconfigure_household(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for the Flemish household settings on a move into Flanders.
+
+        The Flemish tariff prices on the number of registered residents
+        and the social tariff, which an entry moving in from Brussels or
+        Wallonia has never been asked for. Left unasked, the projection
+        priced on a household of one with nothing saying so.
+        """
+        if user_input is not None:
+            self._household = {
+                CONF_PERSONS: int(user_input[CONF_PERSONS]),
+                CONF_SOCIAL_TARIFF: bool(user_input[CONF_SOCIAL_TARIFF]),
+            }
+            return await self._async_finish_reconfigure()
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_PERSONS, default=DEFAULT_PERSONS): NumberSelector(
+                    NumberSelectorConfig(
+                        min=MIN_PERSONS, max=MAX_PERSONS, step=1, mode=NumberSelectorMode.BOX
+                    )
+                ),
+                vol.Required(CONF_SOCIAL_TARIFF, default=False): BooleanSelector(),
+            }
+        )
+        return self.async_show_form(step_id="reconfigure_household", data_schema=schema)
+
     def _entry_under_reconfigure(self) -> ConfigEntry | None:
         """The entry this flow reconfigures, or None once it has been removed.
 
@@ -591,6 +622,13 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return self.async_abort(reason="entry_removed")
         new_utility = self._utility
         old_utility = entry.data[CONF_UTILITY]
+        if (
+            _is_flanders(new_utility)
+            and not _is_flanders(old_utility)
+            and CONF_PERSONS not in entry.options
+            and self._household is None
+        ):
+            return await self.async_step_reconfigure_household()
 
         new_unique_id = f"{DOMAIN}_{new_utility}"
         existing = await self.async_set_unique_id(new_unique_id)
@@ -611,6 +649,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # operator. Strip both, as the reconfigure text promises.
             new_options.pop(CONF_SOCIAL_TARIFF, None)
             new_options.pop(CONF_PERSONS, None)
+        if self._household is not None:
+            new_options.update(self._household)
         if self._reconfigure_commune is not None:
             new_options[CONF_COMMUNE] = self._reconfigure_commune
             if self._reconfigure_commune_label is not None:

@@ -1124,6 +1124,11 @@ async def test_reconfigure_flow_postcode_swap_to_per_commune_chains_into_commune
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_COMMUNE: "44021"}
         )
+        # A move into Flanders asks for the household next.
+        assert result["step_id"] == "reconfigure_household"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PERSONS: 1, CONF_SOCIAL_TARIFF: False}
+        )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "farys"
@@ -1296,6 +1301,10 @@ async def test_reconfigure_flow_postcode_split_lands_on_choose_step(
 
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_COMMUNE: "x"}
+        )
+        assert result["step_id"] == "reconfigure_household"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PERSONS: 1, CONF_SOCIAL_TARIFF: False}
         )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
@@ -1560,3 +1569,47 @@ async def test_a_reconfigure_dialog_outliving_the_entry_aborts_cleanly(hass: Hom
             )
         assert result["type"] == data_entry_flow.FlowResultType.ABORT
         assert result["reason"] == "entry_removed"
+
+
+@pytest.mark.asyncio
+async def test_a_move_into_flanders_asks_for_the_household(hass: HomeAssistant) -> None:
+    """The Flemish tariff prices on residents and social tariff; a Brussels entry has neither."""
+    from unittest.mock import patch
+
+    from custom_components.be_water_prices.const import CONF_PERSONS, CONF_SOCIAL_TARIFF
+    from custom_components.be_water_prices.providers.base import CommuneOption
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 120},
+        unique_id=f"{DOMAIN}_vivaqua",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=(CommuneOption(id="25071", label="9000 - Gent"),),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "25071"}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reconfigure_household"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PERSONS: 3, CONF_SOCIAL_TARIFF: True}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "farys"
+    assert entry.options[CONF_PERSONS] == 3
+    assert entry.options[CONF_SOCIAL_TARIFF] is True
+    assert entry.options[CONF_COMMUNE] == "25071"

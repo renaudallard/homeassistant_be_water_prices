@@ -32,23 +32,31 @@
       },
       "reconfigure_postcode": {
         "title": "Mettre à jour le code postal",
-        "description": "Entrez le nouveau code postal pour cette entrée. Nous identifierons à nouveau la compagnie et rechargerons l'intégration. La consommation annuelle et le capteur de compteur d'eau sont conservés. Les personnes domiciliées et le tarif social ne valent qu'en Flandre : ils survivent à un passage vers une autre compagnie flamande et sont supprimés si la nouvelle compagnie ne l'est pas ; la commune enregistrée est effacée si la compagnie identifiée change (la nouvelle compagnie utilise des identifiants de commune différents).",
+        "description": "Entrez le nouveau code postal pour cette entrée. Nous identifierons à nouveau la compagnie et rechargerons l'intégration. La consommation annuelle et le capteur de compteur d'eau sont conservés. Les personnes domiciliées et le tarif social ne valent qu'en Flandre : ils survivent à un passage vers une autre compagnie flamande, sont supprimés si la nouvelle compagnie ne l'est pas, et sont demandés lors d'un passage vers la Flandre ; la commune enregistrée est effacée si la compagnie identifiée change (la nouvelle compagnie utilise des identifiants de commune différents).",
         "data": {
           "postcode": "Code postal"
         }
       },
       "reconfigure_manual": {
         "title": "Choisissez votre compagnie",
-        "description": "Sélectionnez la compagnie qui vous dessert. La consommation annuelle et le capteur de compteur d'eau sont conservés. Les personnes domiciliées et le tarif social ne valent qu'en Flandre : ils survivent à un passage vers une autre compagnie flamande et sont supprimés si la nouvelle compagnie ne l'est pas ; la commune enregistrée est effacée si vous choisissez une autre compagnie (les identifiants de commune ne sont pas interchangeables). Les compagnies à tarif par commune (De Watergroep / Farys / Pidpa / Water-link) vous demandent ensuite la commune.",
+        "description": "Sélectionnez la compagnie qui vous dessert. La consommation annuelle et le capteur de compteur d'eau sont conservés. Les personnes domiciliées et le tarif social ne valent qu'en Flandre : ils survivent à un passage vers une autre compagnie flamande, sont supprimés si la nouvelle compagnie ne l'est pas, et sont demandés lors d'un passage vers la Flandre ; la commune enregistrée est effacée si vous choisissez une autre compagnie (les identifiants de commune ne sont pas interchangeables). Les compagnies à tarif par commune (De Watergroep / Farys / Pidpa / Water-link) vous demandent ensuite la commune.",
         "data": {
           "utility": "Compagnie"
         }
       },
       "reconfigure_choose": {
         "title": "Choisissez votre compagnie",
-        "description": "Votre code postal est desservi par plusieurs compagnies -- chacune couvre des rues différentes. Sélectionnez celle qui vous facture. La consommation annuelle et le capteur de compteur d'eau sont conservés. Les personnes domiciliées et le tarif social ne valent qu'en Flandre : ils survivent à un passage vers une autre compagnie flamande et sont supprimés si la nouvelle compagnie ne l'est pas ; la commune enregistrée est effacée si vous choisissez une autre compagnie.",
+        "description": "Votre code postal est desservi par plusieurs compagnies -- chacune couvre des rues différentes. Sélectionnez celle qui vous facture. La consommation annuelle et le capteur de compteur d'eau sont conservés. Les personnes domiciliées et le tarif social ne valent qu'en Flandre : ils survivent à un passage vers une autre compagnie flamande, sont supprimés si la nouvelle compagnie ne l'est pas, et sont demandés lors d'un passage vers la Flandre ; la commune enregistrée est effacée si vous choisissez une autre compagnie.",
         "data": {
           "utility": "Compagnie"
+        }
+      },
+      "reconfigure_household": {
+        "title": "Ménage pour le tarif flamand",
+        "description": "La nouvelle compagnie est flamande, et le tarif flamand dépend du nombre de personnes domiciliées à l'adresse et du tarif social. Indiquez-les ici ; les deux peuvent être modifiés plus tard dans les options de l'entrée.",
+        "data": {
+          "gedomicilieerd_persons": "Personnes domiciliées",
+          "social_tariff": "Tarif social (réduction 80%)"
         }
       },
       "reconfigure_commune": {

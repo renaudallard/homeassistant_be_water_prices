@@ -299,8 +299,10 @@ current commune so you can submit as-is to just refresh.
 Either path reloads the integration in place. Annual consumption and the
 water-meter sensor carry over. Registered residents and the social
 tariff are Flemish-only settings: they survive a move to another Flemish
-operator and are dropped when the new one is not Flemish, since the
-options step stops offering them. The saved commune is cleared when the
+operator, are dropped when the new one is not Flemish, since the
+options step stops offering them, and are asked for on a move into
+Flanders from Brussels or Wallonia, since the Flemish tariff prices on
+them. The saved commune is cleared when the
 utility changes (the new operator uses different commune IDs, so a stale
 value would silently fail at fetch time).
 

@@ -32,23 +32,31 @@
       },
       "reconfigure_postcode": {
         "title": "Postleitzahl aktualisieren",
-        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten und werden verworfen, wenn der neue Versorger nicht flämisch ist; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs).",
+        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs).",
         "data": {
           "postcode": "Postleitzahl"
         }
       },
       "reconfigure_manual": {
         "title": "Wasserversorger wählen",
-        "description": "Wählen Sie den Versorger, der Sie beliefert. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten und werden verworfen, wenn der neue Versorger nicht flämisch ist; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen (Gemeinde-IDs sind zwischen Versorgern nicht austauschbar). Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) fragen anschließend die Gemeinde ab.",
+        "description": "Wählen Sie den Versorger, der Sie beliefert. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen (Gemeinde-IDs sind zwischen Versorgern nicht austauschbar). Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) fragen anschließend die Gemeinde ab.",
         "data": {
           "utility": "Versorger"
         }
       },
       "reconfigure_choose": {
         "title": "Wasserversorger wählen",
-        "description": "Ihre Postleitzahl wird von mehreren Versorgern bedient -- jeder beliefert andere Straßen. Wählen Sie den Versorger, der Sie abrechnet. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten und werden verworfen, wenn der neue Versorger nicht flämisch ist; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen.",
+        "description": "Ihre Postleitzahl wird von mehreren Versorgern bedient -- jeder beliefert andere Straßen. Wählen Sie den Versorger, der Sie abrechnet. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen.",
         "data": {
           "utility": "Versorger"
+        }
+      },
+      "reconfigure_household": {
+        "title": "Haushalt für den flämischen Tarif",
+        "description": "Der neue Versorger ist flämisch, und der flämische Tarif hängt von der Zahl der gemeldeten Bewohner an der Adresse und vom Sozialtarif ab. Geben Sie beide hier an; sie lassen sich später in den Optionen des Eintrags ändern.",
+        "data": {
+          "gedomicilieerd_persons": "Gemeldete Bewohner",
+          "social_tariff": "Sozialtarif (80% Ermäßigung)"
         }
       },
       "reconfigure_commune": {
