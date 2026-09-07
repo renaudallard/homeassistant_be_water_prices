@@ -446,3 +446,40 @@ async def test_a_start_past_the_window_says_so(
     assert rows == 0
     recorder.async_clear_statistics.assert_not_called()
     assert "nothing written or cleared" in caplog.text
+
+
+async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: HomeAssistant) -> None:
+    """Deleting the gate re-ran the backfill on every setup and nothing noticed."""
+    from custom_components.be_water_prices.statistics import (
+        DATA_BACKFILL_YEAR,
+        async_maybe_backfill_once,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua", DATA_BACKFILL_YEAR: f"{dt_util.now().year}:vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.be_water_prices.statistics.async_backfill_prices",
+        new=AsyncMock(return_value=0),
+    ) as backfill:
+        await async_maybe_backfill_once(hass, entry)
+    backfill.assert_not_awaited()
+
+
+async def test_an_unreadable_history_counts_as_history(hass: HomeAssistant) -> None:
+    """The orphan cleanup deletes whole statistics; a failed read must keep them."""
+    from datetime import datetime
+
+    from custom_components.be_water_prices.statistics import _async_has_statistics_before
+
+    instance = MagicMock()
+    instance.async_add_executor_job = AsyncMock(side_effect=RuntimeError("db locked"))
+    with patch("homeassistant.components.recorder.get_instance", return_value=instance):
+        assert await _async_has_statistics_before(
+            hass, "sensor.x", datetime(2026, 1, 1, tzinfo=dt_util.UTC)
+        )
