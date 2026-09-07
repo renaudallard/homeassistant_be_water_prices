@@ -263,6 +263,9 @@ def render_dict(mapping: dict[str, str]) -> str:
 # elements. All of those answer HTTP 200, so only the count catches them.
 MIN_PLAUSIBLE_DWG_POSTCODES = 100
 MIN_PLAUSIBLE_FARYS_POSTCODES = 100
+# The Walloon ZDE maps about 540 postcodes; a short map is a walk that
+# ended early, not a smaller Wallonia.
+MIN_PLAUSIBLE_WALLOON_POSTCODES = 400
 
 DWG_DROPDOWN_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
 FARYS_DROPDOWN_URL = "https://www.farys.be/nl/watertarieven"
@@ -426,6 +429,15 @@ def main() -> int:
         # Abort rather than print (and let the maintainer commit) a map left
         # incomplete by a transient ZDE outage. Rerun once the endpoint is back.
         print(f"aborting: {err}", file=sys.stderr)
+        return 1
+    if len(mapping) < MIN_PLAUSIBLE_WALLOON_POSTCODES:
+        # The same floor the dropdown scrapes have: a short map pasted in
+        # drops every postcode it lacks into the manual picker.
+        print(
+            f"aborting: the Walloon map holds {len(mapping)} postcodes, expected at least "
+            f"{MIN_PLAUSIBLE_WALLOON_POSTCODES}",
+            file=sys.stderr,
+        )
         return 1
     try:
         carve = build_dwg_flanders_carveout()

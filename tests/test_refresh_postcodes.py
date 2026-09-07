@@ -187,3 +187,21 @@ def test_a_query_that_keeps_failing_still_aborts(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(rp.time, "sleep", lambda _s: None)
     with patch("urllib.request.urlopen", _down), pytest.raises(ZdeQueryError, match="3 attempts"):
         query_zde_for_centroid(4.5, 50.5)
+
+
+def test_a_short_walloon_map_aborts_instead_of_being_printed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Two postcodes with exit 0 would have been pasted in as the whole of Wallonia."""
+    from unittest.mock import patch
+
+    from scripts import refresh_postcodes as R
+
+    with (
+        patch.object(R, "fetch_postcodes", lambda: []),
+        patch.object(R, "build_wallonia_map", lambda _f: {"1300": "inbw", "4000": "cile"}),
+        patch.object(R, "build_dwg_flanders_carveout", lambda: frozenset()),
+        patch.object(R, "build_farys_vlaams_brabant_carveout", lambda: frozenset()),
+    ):
+        assert R.main() == 1
+    assert "expected at least" in capsys.readouterr().err
