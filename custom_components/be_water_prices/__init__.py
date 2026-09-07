@@ -261,6 +261,15 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     future patch release catches already-v2 entries too.
     """
     if entry.version > 2:
+        # Home Assistant marks the entry as failed to migrate and says
+        # no more; the version it found and the one this release knows
+        # are what a user sees after a downgrade.
+        _LOGGER.error(
+            "cannot load the %s entry: it was written by a newer release (version %d, "
+            "this release knows 2); upgrade the integration again or remove and re-add it",
+            entry.data.get("utility", "water"),
+            entry.version,
+        )
         return False
     if entry.version == 1:
         hass.config_entries.async_update_entry(entry, version=2)
