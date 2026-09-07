@@ -63,6 +63,7 @@ def _round(
     hold_m3: float | None = None,
     hold_run: int = 0,
     hold_span_s: float = 0.0,
+    run_m3: float | None = None,
     elapsed_s: float = 86400.0,
     high_m3: float | None = None,
     now_year: int = _YEAR,
@@ -79,6 +80,7 @@ def _round(
         hold_m3=hold_m3,
         hold_run=hold_run,
         hold_span_s=hold_span_s,
+        run_m3=run_m3,
         elapsed_s=elapsed_s,
         high_m3=high_m3,
         cost_of=cost_of,
@@ -182,7 +184,9 @@ def test_a_burst_of_low_readings_is_not_a_swap() -> None:
     and reconnects can produce a whole confirmation run in no time at
     all. A real replacement keeps reading low for far longer.
     """
-    out = _round(_anchored(25.0, 80.0), reading=3.0, hold_run=2, hold_span_s=0.4, elapsed_s=0.3)
+    out = _round(
+        _anchored(25.0, 80.0), reading=3.0, hold_run=2, run_m3=3.0, hold_span_s=0.4, elapsed_s=0.3
+    )
 
     assert out.cycle.offset_m3 == 80.0
     assert out.m3 == 25.0
@@ -192,11 +196,59 @@ def test_a_burst_of_low_readings_is_not_a_swap() -> None:
 def test_a_run_that_lasts_is_still_a_swap() -> None:
     """Spread over hours, the same three readings do re-anchor the year."""
     out = _round(
-        _anchored(25.0, 80.0), reading=3.0, hold_run=2, hold_span_s=3600.0, elapsed_s=3600.0
+        _anchored(25.0, 80.0),
+        reading=3.0,
+        hold_run=2,
+        run_m3=3.0,
+        hold_span_s=3600.0,
+        elapsed_s=3600.0,
     )
 
     assert out.cycle.offset_m3 == 3.0
     assert out.m3 == 0.0
+
+
+def test_readings_that_disagree_do_not_confirm_a_replacement() -> None:
+    """A run is readings that stand together, not merely readings under the bar.
+
+    A replaced register climbs from where the last reading left it. Two
+    honest readings at the meter's position with one dropout between them
+    used to count as three, and the frame was rebuilt on whichever came
+    last: a dropout at the end put the frame far below the meter, and the
+    year over-reported by the whole register from then on.
+    """
+    out = _round(_anchored(3.978, 1967.457), reading=3.009, hold_run=2, run_m3=1520.514)
+
+    assert out.cycle.offset_m3 == 1967.457
+    assert out.m3 == 3.978
+    assert out.hold_run == 1
+    assert out.run_m3 == 3.009
+
+
+def test_a_new_run_is_anchored_on_its_own_first_reading() -> None:
+    """A run that has ended leaves its value behind, and it must not anchor
+    the next one. The reading that starts a run is what the run stands at,
+    or a stale value from an earlier one decides which readings may join it.
+    """
+    out = _round(_anchored(25.0, 80.0), reading=30.0, hold_run=0, run_m3=60.0)
+
+    assert out.hold_run == 1
+    assert out.run_m3 == 30.0
+
+
+def test_a_new_run_does_not_inherit_the_persistence_of_the_last() -> None:
+    """The span says how long this run has lasted, so it starts again with it.
+
+    Carried over, ten minutes a previous run had earned would be waiting
+    for the next dropout, and two readings that have nothing to do with
+    each other would re-anchor the year between them.
+    """
+    out = _round(_anchored(5.0, 1500.0), reading=3.0, hold_run=2, run_m3=1400.0, hold_span_s=3600.0)
+
+    assert out.hold_run == 1
+    assert out.hold_span_s == 0.0
+    assert out.cycle.offset_m3 == 1500.0
+    assert out.m3 == 5.0
 
 
 def test_the_quiet_before_a_run_does_not_count_as_persistence() -> None:
@@ -235,7 +287,7 @@ def test_a_confirmed_swap_takes_the_mark_with_it() -> None:
     behind sits above every reading it will ever produce and the frame
     can never be corrected again this year.
     """
-    out = _round(_anchored(25.0, 80.0), reading=3.0, hold_run=2, high_m3=105.0)
+    out = _round(_anchored(25.0, 80.0), reading=3.0, hold_run=2, run_m3=3.0, high_m3=105.0)
 
     assert out.cycle.offset_m3 == 3.0
     assert out.high_m3 == 3.0
@@ -305,7 +357,7 @@ def test_a_reading_back_above_the_frame_clears_the_swap_run() -> None:
 
 def test_a_sustained_run_below_the_frame_is_a_meter_swap() -> None:
     """The new meter climbs from ~0, so the year restarts on it."""
-    out = _round(_anchored(25.0, 80.0, cost=500.0), reading=12.0, hold_run=2)
+    out = _round(_anchored(25.0, 80.0, cost=500.0), reading=12.0, hold_run=2, run_m3=12.0)
 
     assert out.m3 == 0.0
     # The cost floor restarts with the cycle, or the new meter's first
@@ -316,7 +368,7 @@ def test_a_sustained_run_below_the_frame_is_a_meter_swap() -> None:
 
 
 def test_a_swap_ignores_a_recorder_total_spanning_the_old_meter() -> None:
-    out = _round(_anchored(25.0, 80.0), reading=12.0, hold_run=2, recorder_m3=30.0)
+    out = _round(_anchored(25.0, 80.0), reading=12.0, hold_run=2, run_m3=12.0, recorder_m3=30.0)
 
     assert out.m3 == 0.0
     assert out.cycle.offset_m3 == 12.0
@@ -329,7 +381,7 @@ def test_a_run_below_a_frame_built_too_high_rebuilds_the_frame() -> None:
     frame is what is wrong, and it is rebuilt under the reading rather than
     the year being started over.
     """
-    out = _round(_anchored(5.0, 1500.0), reading=1400.0, hold_run=2)
+    out = _round(_anchored(5.0, 1500.0), reading=1400.0, hold_run=2, run_m3=1400.0)
 
     assert out.m3 == 5.0
     assert out.cycle.offset_m3 == 1395.0
@@ -339,7 +391,7 @@ def test_a_run_below_a_frame_built_too_high_rebuilds_the_frame() -> None:
 
 def test_a_rebuilt_frame_measures_the_next_reading() -> None:
     """The point of rebuilding is that the live path starts working again."""
-    out = _round(_anchored(5.0, 1500.0), reading=1400.0, hold_run=2)
+    out = _round(_anchored(5.0, 1500.0), reading=1400.0, hold_run=2, run_m3=1400.0)
     later = _round(out.cycle, reading=1407.0, high_m3=out.high_m3)
 
     assert later.m3 == 12.0
@@ -352,7 +404,13 @@ def test_a_rebuilt_frame_keeps_the_recorder_figure_and_the_cost_floor() -> None:
     frame that was merely too high is a correction to the frame alone, and
     the bill has to stay where the year had already taken it.
     """
-    out = _round(_anchored(5.0, 1500.0, cost=500.0), reading=1400.0, hold_run=2, recorder_m3=8.0)
+    out = _round(
+        _anchored(5.0, 1500.0, cost=500.0),
+        reading=1400.0,
+        hold_run=2,
+        run_m3=1400.0,
+        recorder_m3=8.0,
+    )
 
     assert out.m3 == 8.0
     assert out.cycle.offset_m3 == 1392.0
@@ -365,8 +423,8 @@ def test_the_years_consumption_tells_a_new_register_from_a_high_frame() -> None:
     them could have measured the water the year has already used. That is
     what separates a replaced meter from a frame that needs correcting.
     """
-    replaced = _round(_anchored(20.0, 1500.0), reading=19.0, hold_run=2)
-    corrected = _round(_anchored(20.0, 1500.0), reading=21.0, hold_run=2)
+    replaced = _round(_anchored(20.0, 1500.0), reading=19.0, hold_run=2, run_m3=19.0)
+    corrected = _round(_anchored(20.0, 1500.0), reading=21.0, hold_run=2, run_m3=21.0)
 
     assert replaced.m3 == 0.0
     assert replaced.cycle.offset_m3 == 19.0
@@ -382,7 +440,7 @@ def test_a_meter_reading_exactly_the_years_consumption_was_framed_at_zero() -> N
     part way through the year cannot show that: the year would hold what
     the old one measured on top of it.
     """
-    out = _round(_anchored(20.0, 1500.0), reading=20.0, hold_run=2)
+    out = _round(_anchored(20.0, 1500.0), reading=20.0, hold_run=2, run_m3=20.0)
 
     assert out.m3 == 20.0
     assert out.cycle.offset_m3 == 0.0
@@ -411,11 +469,18 @@ def _replay(
     published: list[float | None] = []
     hold_m3: float | None = None
     hold_run = 0
+    run_m3: float | None = None
     for reading, recorder_m3 in rounds:
         out = _round(
-            cycle, reading=reading, recorder_m3=recorder_m3, hold_m3=hold_m3, hold_run=hold_run
+            cycle,
+            reading=reading,
+            recorder_m3=recorder_m3,
+            hold_m3=hold_m3,
+            hold_run=hold_run,
+            run_m3=run_m3,
         )
         cycle, hold_m3, hold_run = out.cycle, out.hold_m3, out.hold_run
+        run_m3 = out.run_m3
         published.append(out.m3)
     return published
 
@@ -512,10 +577,12 @@ def test_a_sustained_run_below_a_served_figure_is_a_meter_swap() -> None:
     cycle = _served(70.0, cost=_bill(70.0))
     hold_m3: float | None = None
     hold_run = 0
+    run_m3: float | None = None
     published = []
     for reading in (5.0, 6.0, 7.0, 8.0):
-        out = _round(cycle, reading=reading, hold_m3=hold_m3, hold_run=hold_run)
+        out = _round(cycle, reading=reading, hold_m3=hold_m3, hold_run=hold_run, run_m3=run_m3)
         cycle, hold_m3, hold_run = out.cycle, out.hold_m3, out.hold_run
+        run_m3 = out.run_m3
         published.append(out.m3)
 
     assert published == [70.0, 70.0, 0.0, 1.0]

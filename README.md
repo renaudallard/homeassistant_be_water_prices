@@ -342,8 +342,10 @@ you paid is worth more than a tidy chart.
   options change that would lower the bill is never published as a
   decrease. The baseline only re-anchors on a genuine reset: the Jan 1
   rollover, a meter swap confirmed by several consecutive readings below
-  the water the year has already used (a single low reading is held as a
-  glitch), or pointing the integration at a different meter, which restarts
+  the water the year has already used that also agree with each other (a
+  single low reading is held as a glitch, and a reading standing nowhere
+  near the ones before it begins a fresh run rather than completing
+  theirs), or pointing the integration at a different meter, which restarts
   the year's figure because the new meter's reading says nothing about the
   old one's. A sustained run of readings that stay above the year's own
   consumption but below the baseline is read the other way round: no
