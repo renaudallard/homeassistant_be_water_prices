@@ -69,6 +69,7 @@ import voluptuous as vol
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import (
     ConfigEntry,
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -617,12 +618,21 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # A branch that changes something leaves the reload to the update
         # listener __init__ registers. Asking for one here as well ran
         # async_setup_entry twice over, each time re-fetching the tariff
-        # live, on top of the one the backfill gate already costs.
+        # live, on top of the one the backfill gate already costs. An
+        # entry that is not loaded has no listener, so it is reloaded
+        # here: written and left alone, an entry whose setup had failed
+        # kept its failed state with the new data, while the text said
+        # "updated and reloaded".
+        update = (
+            self.async_update_and_abort
+            if entry.state is ConfigEntryState.LOADED
+            else self.async_update_reload_and_abort
+        )
         if new_utility == old_utility:
             # Same utility but commune changed via the manual flow.
-            return self.async_update_and_abort(entry, options=new_options)
+            return update(entry, options=new_options)
 
-        return self.async_update_and_abort(
+        return update(
             entry,
             unique_id=new_unique_id,
             title=get(new_utility).label,

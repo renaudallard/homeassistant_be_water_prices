@@ -1466,3 +1466,61 @@ async def test_a_failed_setup_leaves_no_coordinator_and_no_service(hass: HomeAss
     assert entry.state is ConfigEntryState.SETUP_ERROR
     assert entry.entry_id not in hass.data.get(DOMAIN, {})
     assert not hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)
+
+
+@pytest.mark.asyncio
+async def test_reconfiguring_an_entry_whose_setup_failed_reloads_it(hass: HomeAssistant) -> None:
+    """No update listener exists for an entry that never loaded, so nothing reloaded it."""
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    async def _fetch(_session: object) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    patches = (
+        patch(
+            "custom_components.be_water_prices.coordinator.get",
+            return_value=WaterExtractor(id="x", label="X", region="brussels", fetch=_fetch),
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=None),
+        ),
+    )
+    with (
+        patches[0],
+        patches[1],
+        patch.object(
+            hass.config_entries, "async_forward_entry_setups", side_effect=RuntimeError("boom")
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id) is False
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+
+    with patches[0], patches[1]:
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "1000"}
+        )
+        assert result["reason"] == "reconfigure_successful"
+        await hass.async_block_till_done()
+        assert entry.data[CONF_UTILITY] == "vivaqua"
+        assert entry.state is ConfigEntryState.LOADED
+        await hass.config_entries.async_unload(entry.entry_id)
