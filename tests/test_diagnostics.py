@@ -160,3 +160,47 @@ async def test_dump_carries_no_postcode_commune_or_meter(hass) -> None:  # type:
         assert secret not in blob, f"{secret!r} leaked into the diagnostics dump"
     # The dump is still useful: the tariff block survived, dates included.
     assert dump["snapshot"]["tariff"]["valid_from"] == "2026-01-01"
+
+
+async def test_the_dump_of_an_entry_that_did_not_load_carries_its_config(hass) -> None:  # type: ignore[no-untyped-def]
+    """The dump raised KeyError for an entry with no coordinator."""
+    from unittest.mock import patch
+
+    from homeassistant.config_entries import ConfigEntryState
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.be_water_prices.const import (
+        CONF_CONSUMPTION_M3_PER_YEAR,
+        CONF_UTILITY,
+        DOMAIN,
+    )
+    from custom_components.be_water_prices.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+    from custom_components.be_water_prices.providers.base import (
+        ExtractorError,
+        WaterExtractor,
+        WaterTariff,
+    )
+
+    async def _fail(_session: object) -> WaterTariff:
+        raise ExtractorError("HTTP 503 fetching https://example.invalid/")
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fail)
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        assert await hass.config_entries.async_setup(entry.entry_id) is False
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    dump = await async_get_config_entry_diagnostics(hass, entry)
+    assert dump["entry"]["state"] == "setup_retry"
+    assert dump["entry"]["data"][CONF_UTILITY] == "vivaqua"
+    assert dump["snapshot"] is None
+    await hass.config_entries.async_unload(entry.entry_id)

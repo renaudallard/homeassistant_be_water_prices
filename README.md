@@ -474,8 +474,9 @@ and clears nothing, and says so in the log at info level.
 **Settings → Devices & services → Belgian Water Prices →** three-dot
 menu **→ Download diagnostics** dumps the active config, the last
 parsed `WaterTariff` (every component plus validity window), the
-fetch metadata, and the projected annual cost. Attach it when
-reporting an issue.
+fetch metadata, and the projected annual cost. An entry that has not
+loaded dumps its state and config with an empty snapshot. Attach it
+when reporting an issue.
 
 ## Known limitations
 

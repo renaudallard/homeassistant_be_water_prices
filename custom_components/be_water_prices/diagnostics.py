@@ -53,8 +53,10 @@ _REDACT_KEYS = {CONF_POSTCODE, CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_WATER_METE
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
-    coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
-    data = coordinator.data
+    # The dump can be asked for on an entry that never loaded, or is
+    # retrying: no coordinator then, and the config alone is the answer.
+    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    data = coordinator.data if coordinator is not None else None
     snapshot = (
         {
             "tariff": _serialise(asdict(data.tariff)),
@@ -71,6 +73,7 @@ async def async_get_config_entry_diagnostics(
     )
     return {
         "entry": {
+            "state": entry.state.value,
             "data": async_redact_data(dict(entry.data), _REDACT_KEYS),
             "options": async_redact_data(dict(entry.options), _REDACT_KEYS),
         },
