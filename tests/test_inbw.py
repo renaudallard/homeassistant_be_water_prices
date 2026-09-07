@@ -85,3 +85,45 @@ def test_a_moved_cva_fails_the_fetch_rather_than_logging() -> None:
     assert "82,440 €" in page
     with pytest.raises(ExtractorError, match="CVA published value"):
         parse_tariff(page.replace("82,440 €", "87,000 €"), year=2026)
+
+
+async def test_only_a_tls_failure_earns_the_unverified_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Any other error retried without verification would hand an on-path attacker the hint."""
+    import ssl
+    from unittest.mock import AsyncMock
+
+    from custom_components.be_water_prices.providers import inbw
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    def _failing(cause: BaseException) -> AsyncMock:
+        async def _fetch(*_a: object, **_k: object) -> str:
+            try:
+                raise cause
+            except BaseException as err:
+                raise TransientFetchError("network error fetching inBW") from err
+
+        return AsyncMock(side_effect=_fetch)
+
+    timeout = _failing(TimeoutError())
+    monkeypatch.setattr(inbw, "fetch_html", timeout)
+    with pytest.raises(TransientFetchError):
+        await inbw.fetch(None)  # type: ignore[arg-type]
+    assert timeout.await_count == 1
+
+    calls: list[dict[str, object]] = []
+
+    async def _tls_then_page(*_a: object, **kwargs: object) -> str:
+        calls.append(kwargs)
+        if not kwargs.get("verify_ssl", True):
+            return fixture_html("inbw_2026.html")
+        try:
+            raise ssl.SSLError("certificate verify failed")
+        except ssl.SSLError as err:
+            raise TransientFetchError("network error fetching inBW") from err
+
+    monkeypatch.setattr(inbw, "fetch_html", _tls_then_page)
+    tariff = await inbw.fetch(None)  # type: ignore[arg-type]
+    assert tariff.utility == "inbw"
+    assert [c.get("verify_ssl", True) for c in calls] == [True, False]
