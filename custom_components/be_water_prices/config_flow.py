@@ -259,6 +259,21 @@ async def _async_communes(hass: HomeAssistant, utility_id: str) -> tuple[Commune
         return ()
 
 
+def _warn_stale_commune(utility_id: str) -> None:
+    """Say that a saved commune is being dropped, without naming it.
+
+    The setup-time sweep says so when a blocklisted commune goes; the
+    two flow-side drops, a saved commune no longer in the operator's
+    live list, moved the bill to the operator-wide default in silence.
+    The commune stays out of the log, as everywhere else.
+    """
+    _LOGGER.warning(
+        "%s: the saved commune is no longer in the operator's list; it is dropped and "
+        "the operator-wide default is priced until a commune is picked again",
+        get(utility_id).label,
+    )
+
+
 class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg, unused-ignore]
     VERSION = 2
 
@@ -547,6 +562,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # _async_finish_reconfigure to drop the stale commune even
             # if the user submits the form unchanged.
             self._drop_stale_reconfigure_commune = True
+            _warn_stale_commune(self._utility)
         commune_field = (
             vol.Optional(CONF_COMMUNE, description={"suggested_value": suggested})
             if suggested
@@ -780,6 +796,7 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
             # user re-picks, mirroring the reconfigure flow's stale drop.
             current.pop(CONF_COMMUNE, None)
             current.pop(CONF_COMMUNE_LABEL, None)
+            _warn_stale_commune(utility_id)
         return self.async_show_form(
             step_id="init",
             data_schema=_options_schema(

@@ -1613,3 +1613,69 @@ async def test_a_move_into_flanders_asks_for_the_household(hass: HomeAssistant) 
     assert entry.options[CONF_PERSONS] == 3
     assert entry.options[CONF_SOCIAL_TARIFF] is True
     assert entry.options[CONF_COMMUNE] == "25071"
+
+
+@pytest.mark.asyncio
+async def test_the_flow_side_stale_commune_drops_are_said(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Both drops moved the bill to the operator-wide default in silence."""
+    import logging
+    from unittest.mock import patch
+
+    from custom_components.be_water_prices.const import CONF_PERSONS, CONF_SOCIAL_TARIFF
+    from custom_components.be_water_prices.providers.base import CommuneOption
+
+    caplog.set_level(logging.WARNING)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water at Old Town",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_COMMUNE: "99999",
+            CONF_COMMUNE_LABEL: "Old Town (gone)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    live = (CommuneOption(id="25071", label="9000 - Gent (Centrum)"),)
+    communes = "custom_components.be_water_prices.config_flow._async_communes"
+
+    def _said() -> list[str]:
+        return [
+            r.getMessage() for r in caplog.records if "no longer in the operator" in r.getMessage()
+        ]
+
+    with patch(communes, return_value=live):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False},
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert CONF_COMMUNE not in entry.options
+    assert len(_said()) == 1
+
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_COMMUNE: "99999", CONF_COMMUNE_LABEL: "Old Town"}
+    )
+    with patch(communes, return_value=live):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["reason"] == "reconfigure_successful"
+    assert CONF_COMMUNE not in entry.options
+    lines = _said()
+    assert len(lines) == 2
+    assert all(line.startswith("Farys:") for line in lines)
+    assert "Old Town" not in caplog.text and "99999" not in caplog.text
