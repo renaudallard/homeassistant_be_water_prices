@@ -129,7 +129,7 @@ async def test_read_text_capped_falls_back_on_unknown_charset() -> None:
 def test_a_bom_prefixed_pdf_is_read_rather_than_silently_empty() -> None:
     """The BOM was accepted and then handed to a reader that cannot skip it.
 
-    pdfplumber and pypdf both look for %PDF at byte zero, so tolerating
+    pdfplumber looks for %PDF at byte zero, so tolerating
     the prefix without removing it turned a clear "not a PDF" into an
     empty extraction and a parser failure blamed on the regex.
     """
