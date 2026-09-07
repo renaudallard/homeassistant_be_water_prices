@@ -154,10 +154,37 @@ _HEADER_RE = re.compile(
 # "bovengemeentelijke"). The PDF has stray whitespace ("(afvoer )" with a
 # trailing space, "(zuivering) :" with a gap before the colon) so we
 # tolerate spaces around the punctuation.
+# The year between the label and the colon is optional on the page and
+# is kept: a line for another year must not win over this year's, and
+# the last line no longer wins by default.
 _SAN_RE = re.compile(
-    r"\(\s*(afvoer|zuivering)\s*\)\s*(?:\d{4}\s*)?:\s*([\d.,]+)\s*€/m³",
+    r"\(\s*(afvoer|zuivering)\s*\)\s*(\d{4})?\s*:\s*([\d.,]+)\s*€/m³",
     re.IGNORECASE,
 )
+
+
+def _sanering_for_year(text: str, year: int) -> dict[str, float]:
+    """The afvoer / zuivering rates for ``year``.
+
+    This year's line first, an undated one next, else the latest line
+    dated up to this year: the Tariefplan PDF dates its sanering 2024
+    and freezes it there, which is the frozen figure the fallback card
+    documents.
+    """
+    found: dict[str, dict[int | None, float]] = {}
+    for match in _SAN_RE.finditer(text):
+        dated = int(match.group(2)) if match.group(2) else None
+        found.setdefault(match.group(1).lower(), {})[dated] = to_float(match.group(3))
+    chosen: dict[str, float] = {}
+    for kind, by_year in found.items():
+        past = [dated for dated in by_year if dated is not None and dated <= year]
+        if year in by_year:
+            chosen[kind] = by_year[year]
+        elif None in by_year:
+            chosen[kind] = by_year[None]
+        elif past:
+            chosen[kind] = by_year[max(past)]
+    return chosen
 
 
 def _column_for_year(years: list[int], values: list[float], year: int) -> float | None:
@@ -218,9 +245,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
             f"Pidpa comforttarief {comfort} is not 2× basistarief {basis} for {target}"
         )
 
-    sanering: dict[str, float] = {}
-    for match in _SAN_RE.finditer(text):
-        sanering[match.group(1).lower()] = to_float(match.group(2))
+    sanering = _sanering_for_year(text, target)
     if "afvoer" not in sanering or "zuivering" not in sanering:
         raise ExtractorError(
             "could not parse Pidpa saneringsbijdragen (afvoer / zuivering); "

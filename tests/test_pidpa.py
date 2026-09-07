@@ -287,3 +287,20 @@ def test_a_table_short_of_columns_is_refused() -> None:
     )
     with pytest.raises(ExtractorError, match="malformed"):
         parse_commune_tariff(html, commune_slug="x", year=2026)
+
+
+def test_a_sanering_line_for_another_year_does_not_win() -> None:
+    """The last line used to win; the year printed between the label and the colon is read now."""
+    from custom_components.be_water_prices.providers.pidpa import _sanering_for_year
+
+    text = (
+        "Tarief gemeentelijke sanering (afvoer) : 1,0000 €/m³ basistarief\n"
+        "Tarief gemeentelijke sanering (afvoer) 2030 : 9,9999 €/m³ basistarief\n"
+        "Tarief bovengemeentelijke sanering (zuivering) 2026 : 1,1809 €/m³\n"
+        "Tarief bovengemeentelijke sanering (zuivering) 2025 : 1,1000 €/m³\n"
+    )
+    assert _sanering_for_year(text, 2026) == {"afvoer": 1.0, "zuivering": 1.1809}
+    # The Tariefplan PDF dates its sanering 2024 and never moves it.
+    frozen = "Tarief gemeentelijke sanering (afvoer ) 2024: 1,6533 €/m³ basistarief\n"
+    assert _sanering_for_year(frozen, 2026) == {"afvoer": 1.6533}
+    assert _sanering_for_year(frozen + text, 2026)["afvoer"] == 1.0
