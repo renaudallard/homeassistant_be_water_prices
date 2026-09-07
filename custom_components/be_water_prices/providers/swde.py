@@ -55,6 +55,11 @@ The redevance (annual fixed fee) is the regulator-defined
 ``20·CVD + 30·CVA`` formula; we materialise it into
 :attr:`WaterTariff.yearly_fixed_fee` here so the cost engine doesn't
 re-derive it.
+
+The page states no year. The card is dated by the clock, so a page
+left on last year's rates in January is served as this year's and is
+never stale by date; the CVA / FSE hold and the daily live check are
+what notice a page that has stopped moving.
 """
 
 from __future__ import annotations
