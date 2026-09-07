@@ -322,6 +322,72 @@ def test_a_swap_ignores_a_recorder_total_spanning_the_old_meter() -> None:
     assert out.cycle.offset_m3 == 12.0
 
 
+def test_a_run_below_a_frame_built_too_high_rebuilds_the_frame() -> None:
+    """A spike can frame the year far above the meter, and every honest
+    reading then falls under a bar it can never reach. The meter still shows
+    more water than the year has used, so nothing has been replaced: the
+    frame is what is wrong, and it is rebuilt under the reading rather than
+    the year being started over.
+    """
+    out = _round(_anchored(5.0, 1500.0), reading=1400.0, hold_run=2)
+
+    assert out.m3 == 5.0
+    assert out.cycle.offset_m3 == 1395.0
+    assert out.hold_run == 0
+    assert out.high_m3 == 1400.0
+
+
+def test_a_rebuilt_frame_measures_the_next_reading() -> None:
+    """The point of rebuilding is that the live path starts working again."""
+    out = _round(_anchored(5.0, 1500.0), reading=1400.0, hold_run=2)
+    later = _round(out.cycle, reading=1407.0, high_m3=out.high_m3)
+
+    assert later.m3 == 12.0
+
+
+def test_a_rebuilt_frame_keeps_the_recorder_figure_and_the_cost_floor() -> None:
+    """Nothing about the year itself changed, so neither may be discarded.
+
+    A replacement drops both, because the year restarts on the new meter. A
+    frame that was merely too high is a correction to the frame alone, and
+    the bill has to stay where the year had already taken it.
+    """
+    out = _round(_anchored(5.0, 1500.0, cost=500.0), reading=1400.0, hold_run=2, recorder_m3=8.0)
+
+    assert out.m3 == 8.0
+    assert out.cycle.offset_m3 == 1392.0
+    assert out.cost == 500.0
+    assert out.cycle.cost == 500.0
+
+
+def test_the_years_consumption_tells_a_new_register_from_a_high_frame() -> None:
+    """Both readings sit far below the same too-high frame, and only one of
+    them could have measured the water the year has already used. That is
+    what separates a replaced meter from a frame that needs correcting.
+    """
+    replaced = _round(_anchored(20.0, 1500.0), reading=19.0, hold_run=2)
+    corrected = _round(_anchored(20.0, 1500.0), reading=21.0, hold_run=2)
+
+    assert replaced.m3 == 0.0
+    assert replaced.cycle.offset_m3 == 19.0
+    assert corrected.m3 == 20.0
+    assert corrected.cycle.offset_m3 == 1.0
+
+
+def test_a_meter_reading_exactly_the_years_consumption_was_framed_at_zero() -> None:
+    """The boundary belongs to the frame, not to a replacement.
+
+    A meter showing precisely the water the year has used is one that has
+    been measuring since January from an empty register. A meter replaced
+    part way through the year cannot show that: the year would hold what
+    the old one measured on top of it.
+    """
+    out = _round(_anchored(20.0, 1500.0), reading=20.0, hold_run=2)
+
+    assert out.m3 == 20.0
+    assert out.cycle.offset_m3 == 0.0
+
+
 def test_a_recorder_figure_above_the_mark_is_published() -> None:
     """The meter is down and the recorder knows more than the mark does.
 

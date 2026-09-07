@@ -341,10 +341,16 @@ you paid is worth more than a tidy chart.
   low meter reading, a transiently lower tariff fetch, or a mid-year
   options change that would lower the bill is never published as a
   decrease. The baseline only re-anchors on a genuine reset: the Jan 1
-  rollover, a meter swap confirmed by several consecutive readings too low
-  to belong to the year (a single low reading is held as a glitch), or
-  pointing the integration at a different meter, which restarts the year's
-  figure because the new meter's reading says nothing about the old one's.
+  rollover, a meter swap confirmed by several consecutive readings below
+  the water the year has already used (a single low reading is held as a
+  glitch), or pointing the integration at a different meter, which restarts
+  the year's figure because the new meter's reading says nothing about the
+  old one's. A sustained run of readings that stay above the year's own
+  consumption but below the baseline is read the other way round: no
+  replacement register could show that much water, so the baseline is what
+  is wrong. It was set too high by an overstated reading, and it is rebuilt
+  under the meter with the year's figure left untouched, which puts live
+  tracking back to work instead of restarting the year at zero.
   The same applies upward: a reading that climbs more than 100 m³ in one
   report is held until the next reading confirms it, so one garbage value
   cannot pin the year's figure while a real catch-up after a long outage

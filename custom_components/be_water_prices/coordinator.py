@@ -375,21 +375,40 @@ def _fold(
         # later spike walks straight past it.
         hold_m3 = None
         if hold_run >= _SWAP_CONFIRM_READINGS and hold_span_s >= _SWAP_CONFIRM_SPAN_S:
-            # Zero the record before the figures are compared below, or the
-            # old mark resurrects itself through the comparison and the swap
-            # never takes effect.
-            swapped = True
-            offset = reading
-            mark = 0.0
-            floor = None
-            candidate = 0.0
-            hold_m3 = None
-            hold_run = 0
-            hold_span_s = 0.0
-            # The mark belongs to the meter that has just been replaced,
-            # and the new one starts far below it. Leaving it behind would
-            # keep every later reading under a mark it cannot reach, and
-            # the frame could never be corrected again this year.
+            base = max(seen) if seen else None
+            if base is not None and reading >= base:
+                # The run is sustained, but the meter still shows more water
+                # than the year has used, so it cannot be the fresh register a
+                # replacement leaves behind. What it sits below is a frame
+                # built too high, from a reading that overstated the meter,
+                # and the frame is the part that has to give: rebuild it under
+                # this reading so the year carries on from the figure it has
+                # already published instead of starting over. The figure the
+                # frame is rebuilt against is the one standing, so the round
+                # publishes what it already published; the recorder answer is
+                # kept, because it is still about this meter.
+                offset = reading - base
+                hold_m3 = None
+                hold_run = 0
+                hold_span_s = 0.0
+            else:
+                # Reading below what the year has already used: no meter that
+                # measured that water can show this, so the register is a new
+                # one. Zero the record before the figures are compared below,
+                # or the old mark resurrects itself through the comparison and
+                # the swap never takes effect.
+                swapped = True
+                offset = reading
+                mark = 0.0
+                floor = None
+                candidate = 0.0
+                hold_m3 = None
+                hold_run = 0
+                hold_span_s = 0.0
+            # Whichever way it went, the reading is where the meter stands
+            # now. Leaving an older mark behind would keep every later reading
+            # under a mark it cannot reach, and the frame could never be
+            # corrected again this year.
             high_m3 = reading
     elif offset is None:
         # No frame this year yet, and the reading clears the bar. Build the
