@@ -226,13 +226,13 @@ async def test_a_non_pdf_answer_is_named_by_type_not_quoted() -> None:
     assert "text/plain" in str(err.value)
 
 
-def _pdf_with_stream(dictionary: bytes, body: bytes) -> bytes:
+def _pdf_with_stream(dictionary: bytes, body: bytes, keyword: bytes = b"stream\n") -> bytes:
     objs = [
         b"<</Type/Catalog/Pages 2 0 R>>",
         b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
         b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R"
         b"/Resources<</Font<</F1 5 0 R>>>>>>",
-        dictionary + b"stream\n" + body + b"\nendstream",
+        dictionary + keyword + body + b"\nendstream",
         b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
     ]
     out = bytearray(b"%PDF-1.4\n")
@@ -267,6 +267,90 @@ def test_an_unexpected_filter_is_refused() -> None:
     payload = _pdf_with_stream(b"<</Length 5/Filter/ASCII85Decode>>", b"87cUR")
     with pytest.raises(ExtractorError, match="ASCII85Decode"):
         _pdf.extract_pdf_text_layout(payload)
+
+
+def _stored_block(raw: bytes) -> bytes:
+    """One stored deflate block: ``raw`` travels verbatim, "endstream" included."""
+    size = len(raw)
+    return b"\x00" + size.to_bytes(2, "little") + (0xFFFF ^ size).to_bytes(2, "little") + raw
+
+
+@pytest.mark.parametrize("keyword", [b"stream\r", b"stream \n", b"stream"])
+def test_a_bomb_behind_an_unusual_stream_keyword_is_refused(
+    keyword: bytes, monkeypatch: Any
+) -> None:
+    """pdfminer starts the data after a bare CR, a trailing blank, or at once."""
+    import zlib
+
+    monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
+    body = zlib.compress(b" " * (2 << 20), 9)
+    payload = _pdf_with_stream(b"<</Length %d/Filter/FlateDecode>>" % len(body), body, keyword)
+    with pytest.raises(ExtractorError, match="inflate past"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_an_endstream_inside_the_data_does_not_end_the_count(monkeypatch: Any) -> None:
+    """A stored block spells "endstream" long before the stream is done."""
+    import zlib
+
+    monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
+    content = b" " * (2 << 20)
+    body = (
+        b"\x78\x9c"
+        + _stored_block(b"endstream ")
+        + zlib.compress(content, 9)[2:-4]
+        + zlib.adler32(b"endstream " + content).to_bytes(4, "big")
+    )
+    assert len(zlib.decompress(body)) == len(content) + 10
+    payload = _pdf_with_stream(b"<</Length %d/Filter/FlateDecode>>" % len(body), body)
+    with pytest.raises(ExtractorError, match="inflate past"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_a_filter_held_in_another_object_is_refused() -> None:
+    payload = _pdf_with_stream(b"<</Length 5/Filter 9 0 R>>", b"hello")
+    with pytest.raises(ExtractorError, match="by reference"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_an_obj_token_inside_the_dictionary_does_not_hide_the_filter() -> None:
+    """The dictionary starts at "N G obj", not at the last "obj" spelled anywhere."""
+    import zlib
+
+    body = zlib.compress(zlib.compress(b"BT (hello) Tj ET", 9), 9)
+    payload = _pdf_with_stream(
+        b"<</Filter[/FlateDecode/FlateDecode]/K/obj/Length %d>>" % len(body), body
+    )
+    with pytest.raises(ExtractorError, match="filter chain"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_streams_that_share_their_bytes_are_refused() -> None:
+    """Every keyword starts a stream whose blocks run to the end of the file.
+
+    Each start would inflate the whole tail again, for nothing but a few
+    bytes of output, so the pass would be quadratic in the file.
+    """
+    unit = _stored_block(b"stream\n\x78\x9c") + _stored_block(b"") * 200
+    payload = b"%PDF-1.4\nstream\n\x78\x9c" + unit * 64
+    with pytest.raises(ExtractorError, match="overlap"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_many_stream_keywords_are_scanned_in_linear_time() -> None:
+    """A megabyte of keywords with no stream behind them, and every
+    "endstream" of two hundred images, once cost a rescan of the whole
+    prefix each."""
+    import time
+
+    junk = b"%PDF-1.4\n1 0 obj\n" + b"stream\n" * 150_000
+    image = b"<</Type/XObject/Subtype/Image/Filter/DCTDecode/Length 65536>>stream\n"
+    image += b"\xff\xd8\xff\xe0" + bytes(range(256)) * 256 + b"\nendstream\n"
+    images = b"%PDF-1.4\n" + b"".join(b"%d 0 obj\n" % n + image for n in range(1, 201))
+    started = time.perf_counter()
+    _pdf.guard_pdf_streams(junk)
+    _pdf.guard_pdf_streams(images)
+    assert time.perf_counter() - started < 5
 
 
 def test_the_real_cards_pass_the_stream_guard() -> None:

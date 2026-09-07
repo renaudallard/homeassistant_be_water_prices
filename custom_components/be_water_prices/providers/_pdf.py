@@ -189,9 +189,58 @@ def _is_pdf_payload(payload: bytes) -> bool:
 # tariff cards on file inflate to under a megabyte; a card that needs more
 # than this is not a tariff card.
 MAX_INFLATED_BYTES = 64 * 1024 * 1024
-_STREAM_RE = re.compile(rb"stream\r?\n")
-_FILTER_RE = re.compile(rb"/Filter\s*(\[[^\]]*\]|/[A-Za-z0-9]+)")
+# pdfminer starts a stream's data after the keyword and whatever ends its
+# line: a bare CR, a trailing blank, or nothing at all when the data
+# follows the keyword directly. "endstream" is not a stream.
+_STREAM_RE = re.compile(rb"(?<!end)stream[ \t]*(?:\r\n|\r|\n)?")
+_OBJ_HEADER_RE = re.compile(rb"(?<![0-9])[0-9]+[ \t\r\n]+[0-9]+[ \t\r\n]+\Z")
+_FILTER_RE = re.compile(rb"/Filter\s*(\[[^\]]*\]|/[A-Za-z0-9]+|[0-9]+\s+[0-9]+\s+R)")
 _PLAIN_FILTERS = frozenset({b"/FlateDecode", b"/DCTDecode"})
+_HEAD_BYTES = 4096
+_INFLATE_CHUNK = 65536
+
+
+def _inflated_size(data: memoryview, budget: int) -> tuple[int, int]:
+    """Inflate the deflate stream at the start of ``data``.
+
+    Returns the bytes produced and the bytes consumed, stopping once the
+    output passes ``budget``, the stream reaches its own end, or the
+    bytes stop being deflate (pdfminer keeps what a corrupt stream
+    yielded before the error, so that much counts too). The data is fed
+    in chunks: handed the whole tail at once, the decompressor copies
+    everything past the stream's end into its unconsumed tail, which is
+    the rest of the file for every stream.
+    """
+    if len(data) < 2 or data[0] & 0x0F != 8 or (data[0] << 8 | data[1]) % 31:
+        # Not a zlib header, so pdfminer would not inflate it either;
+        # cheaper than raising through the decompressor.
+        return 0, 0
+    inflater = zlib.decompressobj()
+    produced = consumed = 0
+    for start in range(0, len(data), _INFLATE_CHUNK):
+        chunk: bytes | memoryview = data[start : start + _INFLATE_CHUNK]
+        while chunk:
+            try:
+                out = inflater.decompress(chunk, budget - produced + 1)
+            except zlib.error:
+                return produced, consumed
+            produced += len(out)
+            consumed += len(chunk) - len(inflater.unconsumed_tail) - len(inflater.unused_data)
+            if produced > budget or inflater.eof:
+                return produced, consumed
+            chunk = inflater.unconsumed_tail
+    return produced, consumed
+
+
+def _object_start(payload: bytes, low: int, high: int) -> int:
+    """Where the last "N G obj" header between ``low`` and ``high`` starts, else ``low``."""
+    position = payload.rfind(b"obj", low, high)
+    while position >= 0:
+        header = _OBJ_HEADER_RE.search(payload, max(low, position - 40), position)
+        if header is not None:
+            return header.start()
+        position = payload.rfind(b"obj", low, position)
+    return low
 
 
 def guard_pdf_streams(payload: bytes) -> None:
@@ -203,41 +252,50 @@ def guard_pdf_streams(payload: bytes) -> None:
     megabytes in memory, and the cap left room for tens of gigabytes,
     which is an OOM kill of the whole process rather than an error. Each
     stream is inflated here with a bounded decompressor and the total held
-    to :data:`MAX_INFLATED_BYTES`. A filter chain, or a filter other than
-    Flate and JPEG, is refused as well: a doubly-deflated or ASCII85-wrapped
-    stream is invisible to this pass, and no tariff card has used one.
+    to :data:`MAX_INFLATED_BYTES`. The stream's own end marks where the
+    count stops, never the "endstream" keyword: stored deflate blocks
+    carry any bytes verbatim, so a stream can spell "endstream" long
+    before it is done. A filter chain, a filter held in another object,
+    or a filter other than Flate and JPEG, is refused as well: a doubly
+    deflated or ASCII85-wrapped stream is invisible to this pass, and no
+    tariff card has used one.
+
+    The pass is linear in the file: a keyword inside a stream's data is
+    tried as a stream start and stops at the first byte that is not
+    deflate, and the bytes fed to the decompressor over the whole pass may
+    not exceed the file by more than a chunk, which is what any set of
+    streams that do not overlap consumes.
     """
-    total = 0
+    view = memoryview(payload)
+    inflated = consumed = previous_end = 0
     for match in _STREAM_RE.finditer(payload):
-        # The stream's dictionary sits between its "obj" and "stream".
-        head_start = payload.rfind(b"obj", max(0, match.start() - 4096), match.start())
-        head = payload[max(head_start, 0) : match.start()]
+        # The stream's dictionary sits between its "N G obj" and "stream",
+        # after the previous keyword since streams do not nest.
+        head_start = max(previous_end, match.start() - _HEAD_BYTES)
+        previous_end = match.end()
+        head = payload[_object_start(payload, head_start, match.start()) : match.start()]
         filters = _FILTER_RE.findall(head)
         if filters:
             spec = filters[-1]
             if spec.startswith(b"["):
                 raise ExtractorError("PDF stream uses a filter chain, which cannot be bounded")
+            if spec.endswith(b"R"):
+                raise ExtractorError(
+                    "PDF stream names its filter by reference; refusing to read it"
+                )
             if spec not in _PLAIN_FILTERS:
                 raise ExtractorError(
                     f"PDF stream uses the {spec.decode('ascii', 'replace')} filter"
                 )
-        end = payload.find(b"endstream", match.end())
-        segment = payload[match.end() : end if end >= 0 else len(payload)]
-        inflater = zlib.decompressobj()
-        try:
-            out = inflater.decompress(segment, MAX_INFLATED_BYTES - total + 1)
-        except zlib.error:
-            # Not a deflated stream (an image, or stored raw): nothing to
-            # inflate, so nothing to bound.
-            continue
-        total += len(out)
-        while inflater.unconsumed_tail and total <= MAX_INFLATED_BYTES:
-            out = inflater.decompress(inflater.unconsumed_tail, MAX_INFLATED_BYTES - total + 1)
-            total += len(out)
-        if total > MAX_INFLATED_BYTES:
+        produced, used = _inflated_size(view[match.end() :], MAX_INFLATED_BYTES - inflated)
+        inflated += produced
+        consumed += used
+        if inflated > MAX_INFLATED_BYTES:
             raise ExtractorError(
                 f"PDF streams inflate past {MAX_INFLATED_BYTES} bytes; refusing to read it"
             )
+        if consumed > len(payload) + _INFLATE_CHUNK:
+            raise ExtractorError("PDF streams overlap; refusing to read it")
 
 
 def extract_pdf_text_layout(payload: bytes) -> str:
