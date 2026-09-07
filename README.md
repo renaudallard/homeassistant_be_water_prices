@@ -397,9 +397,10 @@ meter, never this setting.
 
 ### Failure mode
 
-If a refresh fails, the coordinator keeps serving the last known
-snapshot and surfaces `snapshot_age_hours`, `snapshot_stale` and
-`last_error` as attributes on every sensor. Snapshots older than
+If a refresh fails, or does not finish within three minutes, the
+coordinator keeps serving the last known snapshot and surfaces
+`snapshot_age_hours`, `snapshot_stale` and `last_error` as attributes
+on every sensor. Snapshots older than
 **35 days**, or where the parsed `valid_until` has already passed,
 flip `snapshot_stale` to `true` and raise a Repair issue under
 **Settings → Repairs**. The Repair card carries a **Retry** button

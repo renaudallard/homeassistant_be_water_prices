@@ -85,6 +85,12 @@ from .providers.base import WaterExtractor, relabel_with_human_commune
 
 _LOGGER = logging.getLogger(__name__)
 
+# How long one tariff fetch may take, parse included. The per-request
+# timeouts bound the network, not the parse: a page-long content stream
+# kept pdfplumber busy for ten minutes past the inflate guard, and the
+# refresh it wedged never re-armed the daily tick.
+_FETCH_BUDGET_S = 180
+
 # Bumped only if the persisted YTD cycle dict changes shape incompatibly.
 # The minor version carries shape changes so a rollback degrades to a
 # re-bootstrap instead of a failed setup; see _YtdStore.
@@ -610,16 +616,18 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _async_update_data(self) -> CoordinatorData:
         session = async_get_clientsession(self.hass)
         commune = self.entry.options.get(CONF_COMMUNE)
+        budget = asyncio.timeout(_FETCH_BUDGET_S)
         try:
-            if commune and self._extractor.fetch_for_commune is not None:
-                tariff = await self._extractor.fetch_for_commune(session, str(commune))
-                tariff = relabel_with_human_commune(
-                    tariff,
-                    commune_id=str(commune),
-                    commune_label=self.entry.options.get(CONF_COMMUNE_LABEL),
-                )
-            else:
-                tariff = await self._extractor.fetch(session)
+            async with budget:
+                if commune and self._extractor.fetch_for_commune is not None:
+                    tariff = await self._extractor.fetch_for_commune(session, str(commune))
+                    tariff = relabel_with_human_commune(
+                        tariff,
+                        commune_id=str(commune),
+                        commune_label=self.entry.options.get(CONF_COMMUNE_LABEL),
+                    )
+                else:
+                    tariff = await self._extractor.fetch(session)
         except Exception as err:
             # Catch broader than ExtractorError so a future extractor
             # that forgets to wrap (asyncio.TimeoutError, ssl.SSLError,
@@ -637,6 +645,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
             if isinstance(err, asyncio.CancelledError | ConfigEntryAuthFailed | ConfigEntryError):
                 raise
+            if budget.expired():
+                # A bare TimeoutError, whose str() is empty. The parse
+                # thread it gave up on runs to completion on its own.
+                err = ExtractorError(f"fetch did not finish within {_FETCH_BUDGET_S} s")
             # On fetch failure keep serving the last good snapshot
             # rather than blanking every sensor; snapshot_age_hours and
             # last_error are surfaced as attributes so dashboards can
