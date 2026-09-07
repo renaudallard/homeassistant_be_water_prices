@@ -226,6 +226,21 @@ def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.Monkey
     assert tariff.valid_from.year == 2025
 
 
+@pytest.mark.parametrize("cvd", [0.0, 0.5, 12.0])
+def test_the_builder_refuses_a_cvd_outside_the_plausible_window(cvd: float) -> None:
+    """SWDE, CILE, inBW and INASEP hand it their own CVD, unchecked until here."""
+    from custom_components.be_water_prices.providers._walloon_simple import build_tariff
+
+    with pytest.raises(ExtractorError, match="outside"):
+        build_tariff(
+            utility_id="swde",
+            cvd=cvd,
+            source_url="https://example.invalid/",
+            publication_label="test",
+            year=2026,
+        )
+
+
 @pytest.mark.parametrize(
     ("today", "valid_until"),
     [(date(2027, 1, 15), date(2027, 3, 31)), (date(2026, 9, 6), date(2026, 12, 31))],

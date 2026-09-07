@@ -347,6 +347,13 @@ def build_tariff(
     every other utility's, rather than counting as stale from the first
     day of the year.
     """
+    if not _MIN_PLAUSIBLE_CVD <= cvd <= _MAX_PLAUSIBLE_CVD:
+        # The shared page scan applies this window; the four extractors
+        # that read the CVD off their own table did not, and a zero cell
+        # went out as a card whose cost sensors then showed nothing.
+        raise ExtractorError(
+            f"{utility_id} CVD {cvd} is outside [{_MIN_PLAUSIBLE_CVD}, {_MAX_PLAUSIBLE_CVD}]"
+        )
     cva = WALLONIA_CVA_EUR_PER_M3
     fse = WALLONIA_FSE_EUR_PER_M3
     redevance = 20.0 * cvd + 30.0 * cva
