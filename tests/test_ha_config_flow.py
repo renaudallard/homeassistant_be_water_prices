@@ -1524,3 +1524,39 @@ async def test_reconfiguring_an_entry_whose_setup_failed_reloads_it(hass: HomeAs
         assert entry.data[CONF_UTILITY] == "vivaqua"
         assert entry.state is ConfigEntryState.LOADED
         await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_a_reconfigure_dialog_outliving_the_entry_aborts_cleanly(hass: HomeAssistant) -> None:
+    """The next submit after a removal raised UnknownEntry out of the flow."""
+    from unittest.mock import patch
+
+    from custom_components.be_water_prices.providers.base import CommuneOption
+
+    for postcode in ("1000", "9000"):
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title="Farys",
+            data={CONF_UTILITY: "farys"},
+            options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+            unique_id=f"{DOMAIN}_farys",
+            version=2,
+        )
+        entry.add_to_hass(hass)
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        flow_id = result["flow_id"]
+        await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
+        # A postcode that finishes at once, and one that renders the commune step.
+        with patch(
+            "custom_components.be_water_prices.config_flow._async_communes",
+            return_value=(CommuneOption(id="25071", label="9000 - Gent"),),
+        ):
+            result = await hass.config_entries.flow.async_configure(
+                flow_id, {CONF_POSTCODE: postcode}
+            )
+        assert result["type"] == data_entry_flow.FlowResultType.ABORT
+        assert result["reason"] == "entry_removed"

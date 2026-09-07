@@ -73,6 +73,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
+    UnknownEntry,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
@@ -524,7 +525,9 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
                         self._reconfigure_commune_label = option.label
                         break
             return await self._async_finish_reconfigure()
-        entry = self._get_reconfigure_entry()
+        entry = self._entry_under_reconfigure()
+        if entry is None:
+            return self.async_abort(reason="entry_removed")
         live_ids = {c.id for c in communes}
         saved = entry.options.get(CONF_COMMUNE)
         # Only suggest the saved commune when it is still in the live
@@ -558,6 +561,17 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         )
         return self.async_show_form(step_id="reconfigure_commune", data_schema=schema)
 
+    def _entry_under_reconfigure(self) -> ConfigEntry | None:
+        """The entry this flow reconfigures, or None once it has been removed.
+
+        The dialog outlives a removal of the entry, and the next submit
+        then raised UnknownEntry out of the flow instead of ending it.
+        """
+        try:
+            return self._get_reconfigure_entry()
+        except UnknownEntry:
+            return None
+
     async def _async_finish_reconfigure(self) -> ConfigFlowResult:
         """Apply the reconfigure to the existing entry and reload it.
 
@@ -572,7 +586,9 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         """
         if self._utility is None:
             return self.async_abort(reason="invalid_flow_state")
-        entry = self._get_reconfigure_entry()
+        entry = self._entry_under_reconfigure()
+        if entry is None:
+            return self.async_abort(reason="entry_removed")
         new_utility = self._utility
         old_utility = entry.data[CONF_UTILITY]
 

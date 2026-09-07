@@ -73,6 +73,7 @@
     "abort": {
       "already_configured": "Deze watermaatschappij is al geconfigureerd.",
       "already_in_progress": "Deze watermaatschappij wordt al in een ander venster ingesteld.",
+      "entry_removed": "Deze invoer werd verwijderd terwijl het venster open stond; er is niets gewijzigd.",
       "invalid_flow_state": "Configuratie werd onderbroken; herstart vanaf het begin.",
       "reconfigure_successful": "De invoer werd bijgewerkt en herladen."
     }
