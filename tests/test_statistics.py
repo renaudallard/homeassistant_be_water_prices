@@ -483,3 +483,33 @@ async def test_an_unreadable_history_counts_as_history(hass: HomeAssistant) -> N
         assert await _async_has_statistics_before(
             hass, "sensor.x", datetime(2026, 1, 1, tzinfo=dt_util.UTC)
         )
+
+
+async def test_a_backfill_that_raises_does_not_take_setup_down(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Narrowing the except around the backfill left the suite green."""
+    import logging
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = _entry(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    caplog.set_level(logging.ERROR)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.statistics.async_maybe_backfill_once",
+            new=AsyncMock(side_effect=RuntimeError("recorder exploded")),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert "backfill failed" in caplog.text
