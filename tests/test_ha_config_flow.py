@@ -1730,3 +1730,47 @@ async def test_reconfiguring_an_entry_that_never_loaded_schedules_no_reload(
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "vivaqua"
     reload.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_move_onto_a_utility_already_configured_aborts_before_the_household_form(
+    hass: HomeAssistant,
+) -> None:
+    from unittest.mock import patch
+
+    from custom_components.be_water_prices.providers.base import CommuneOption
+
+    MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    ).add_to_hass(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 120},
+        unique_id=f"{DOMAIN}_vivaqua",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=(CommuneOption(id="25071", label="9000 - Gent"),),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "25071"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "already_configured"

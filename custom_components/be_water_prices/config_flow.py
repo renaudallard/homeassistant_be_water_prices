@@ -638,6 +638,13 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return self.async_abort(reason="entry_removed")
         new_utility = self._utility
         old_utility = entry.data[CONF_UTILITY]
+
+        new_unique_id = f"{DOMAIN}_{new_utility}"
+        existing = await self.async_set_unique_id(new_unique_id)
+        if existing is not None and existing.entry_id != entry.entry_id:
+            return self.async_abort(reason="already_configured")
+        # After the check above: a household form is not asked of a
+        # move that is about to be refused.
         if (
             _is_flanders(new_utility)
             and not _is_flanders(old_utility)
@@ -645,11 +652,6 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             and self._household is None
         ):
             return await self.async_step_reconfigure_household()
-
-        new_unique_id = f"{DOMAIN}_{new_utility}"
-        existing = await self.async_set_unique_id(new_unique_id)
-        if existing is not None and existing.entry_id != entry.entry_id:
-            return self.async_abort(reason="already_configured")
 
         new_options = dict(entry.options)
         if new_utility != old_utility or self._drop_stale_reconfigure_commune:
