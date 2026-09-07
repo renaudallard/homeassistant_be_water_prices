@@ -304,6 +304,9 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
                 "X-Requested-With": "XMLHttpRequest",
             },
             timeout=aiohttp.ClientTimeout(total=30),
+            # The commune cookie must not travel to wherever a redirect
+            # points; a moved endpoint is a failure to look at.
+            allow_redirects=False,
         ) as resp:
             if not 200 <= resp.status < 300:
                 raise _http_error(url, resp.status)

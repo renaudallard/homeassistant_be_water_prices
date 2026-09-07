@@ -223,6 +223,7 @@ async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> 
                 "Accept": "application/json, text/javascript, */*; q=0.01",
             },
             timeout=aiohttp.ClientTimeout(total=30),
+            allow_redirects=False,
         ) as resp:
             if not 200 <= resp.status < 300:
                 raise _http_error(ENDPOINT_URL, resp.status)
