@@ -1685,6 +1685,8 @@ async def test_energy_dashboard_discovery_and_override(hass: HomeAssistant) -> N
         assert await _discover_energy_water_meter(hass) is None
         manager.data = None
         assert await _discover_energy_water_meter(hass) is None
+        manager.data = {"energy_sources": None}
+        assert await _discover_energy_water_meter(hass) is None
 
     async def _raises(_hass: HomeAssistant) -> Any:
         raise RuntimeError("energy component not set up")

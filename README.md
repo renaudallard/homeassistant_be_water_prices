@@ -329,7 +329,9 @@ you paid is worth more than a tidy chart.
   The January 1 meter reading is anchored once from the recorder and
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the
-  recorder's lagging daily total on every restart or reload. The figure
+  recorder's lagging daily total on every restart or reload. A persisted
+  record that cannot be read is dropped for a fresh anchor rather than
+  blocking the entry. The figure
   is **monotonic within the year**: both the consumption and the EUR
   cost are clamped to their year-to-date high-water mark, so a momentary
   low meter reading, a transiently lower tariff fetch, or a mid-year

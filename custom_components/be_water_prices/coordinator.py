@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import calendar
 import logging
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -896,13 +897,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return
         if not data:
             return
-        self._ytd = _YtdCycle(
-            meter=data.get("meter"),
-            year=data.get("year"),
-            m3=data.get("m3"),
-            cost=data.get("cost"),
-            offset_m3=data.get("offset_m3"),
-        )
+        cycle = _cycle_from_record(data)
+        if cycle is None:
+            _LOGGER.warning("the persisted YTD cycle is not readable; starting a fresh one")
+            return
+        self._ytd = cycle
 
     async def async_save_ytd_state(self) -> None:
         """Flush a pending cycle change to the Store on a clean unload / reload.
@@ -1180,6 +1179,41 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.async_update_listeners()
 
 
+def _figure(value: object) -> float | None:
+    """``value`` as a finite float, or None when it is not a number."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        return None
+    return float(value)
+
+
+def _cycle_from_record(data: object) -> _YtdCycle | None:
+    """The persisted cycle, or None when the record does not describe one.
+
+    The file sits in .storage where anyone can edit it. A field of the
+    wrong type raised out of the fold on every setup attempt, which left
+    the entry retrying for good; a record that was not a mapping failed
+    the setup outright. Either is worth one fresh cycle, not the entry.
+    """
+    if not isinstance(data, dict):
+        return None
+    meter = data.get("meter")
+    year = data.get("year")
+    if meter is not None and not isinstance(meter, str):
+        return None
+    if year is not None and (isinstance(year, bool) or not isinstance(year, int)):
+        return None
+    figures = {key: data.get(key) for key in ("m3", "cost", "offset_m3")}
+    if any(value is not None and _figure(value) is None for value in figures.values()):
+        return None
+    return _YtdCycle(
+        meter=meter,
+        year=year,
+        m3=_figure(figures["m3"]),
+        cost=_figure(figures["cost"]),
+        offset_m3=_figure(figures["offset_m3"]),
+    )
+
+
 def _numeric_state(state: State | None) -> float | None:
     """Return ``state``'s numeric value, or ``None`` if not usable.
 
@@ -1254,7 +1288,7 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
         return None
     stats = [
         str(source["stat_energy_from"])
-        for source in data.get("energy_sources", [])
+        for source in data.get("energy_sources") or []
         if isinstance(source, dict)
         and source.get("type") == "water"
         and source.get("stat_energy_from")
