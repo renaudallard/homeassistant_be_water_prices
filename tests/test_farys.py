@@ -223,11 +223,24 @@ async def test_post_for_commune_4xx_stays_permanent() -> None:
 
 
 def test_a_card_served_ahead_of_the_calendar_is_priced_and_flagged(
-    caplog: pytest.LogCaptureFixture,
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The page dates the card; a card published early is applied, and said so."""
-    import logging
+    """The page dates the card; a card published early is applied, and said so.
 
+    The clock is pinned: on the real one the 2027 card stops being early
+    on 1 January 2027 and the assertion turns red on its own.
+    """
+    import logging
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import farys
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 6, 1)
+
+    monkeypatch.setattr(farys, "date", _FakeDate)
     raw = fixture_html("farys_gent_2026.json")
     needle = "value=\\u00222026\\u0022\\u003E2026"
     assert raw.count(needle) == 1, "the active period button moved; the test needs updating"
