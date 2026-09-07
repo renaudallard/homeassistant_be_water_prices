@@ -577,6 +577,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # in-memory only: a restart simply re-runs the hold, and a real
         # meter swap re-accumulates the run.
         self._ytd_hold_m3: float | None = None
+        self._retired = False
         self._ytd_hold_run = 0
         self._ytd_hold_span_s = 0.0
         self._ytd_last_fold_at: float | None = None
@@ -741,20 +742,34 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._sync_repair_issue(cached)
         return cached
 
+    @callback
+    def async_retire(self) -> None:
+        """Mark this coordinator as no longer speaking for its entry.
+
+        Called when the entry forgets it, on unload and on a failed
+        setup. Read from the entry's state alone, the old coordinator of
+        a reload still looked like the owner while the new setup was in
+        progress and the bucket not yet filled, and took the owner's
+        save path.
+        """
+        self._retired = True
+        self.async_unsub_live_tracking()
+
     def _owns_the_entry(self) -> bool:
         """Whether this coordinator still speaks for its entry.
 
         A refresh started from the Repair card runs in the flow's own
         task, which an unload neither cancels nor waits for. When its
         fetch lands after the entry is unloaded, removed, or set up again
-        with a new coordinator, nothing it learned may reach the Store or
-        the Repairs list: the file a removal deleted came back and the
-        cards were raised for an entry that no longer exists.
+        with a new coordinator, nothing it learned may reach the Store,
+        the Repairs list or the meter subscription: the file a removal
+        deleted came back and the cards were raised for an entry that no
+        longer exists.
         """
-        if self.entry.state not in (ConfigEntryState.SETUP_IN_PROGRESS, ConfigEntryState.LOADED):
-            return False
-        current = self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id)
-        return current is None or current is self
+        return not self._retired and self.entry.state in (
+            ConfigEntryState.SETUP_IN_PROGRESS,
+            ConfigEntryState.LOADED,
+        )
 
     def _sync_repair_issue(self, data: CoordinatorData) -> None:
         """Create or clear the stale-snapshot Repair issue for this entry.
@@ -1108,7 +1123,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         whichever entity was resolved at setup.
         """
         self.async_unsub_live_tracking()
-        if self._meter_entity_id is None:
+        if self._meter_entity_id is None or not self._owns_the_entry():
+            # A late refresh on a retired coordinator resolves the meter
+            # too; subscribed, it would fold readings into a dead cycle
+            # and write the Store of an entry that is gone.
             return
         self._meter_unsub = async_track_state_change_event(
             self.hass, [self._meter_entity_id], self._async_meter_state_event
@@ -1169,7 +1187,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # the midnight fee-proration step) still republishes even when
             # the volume figure is unchanged at ~0.
             return
-        if self._cycle_dirty:
+        if self._cycle_dirty and self._owns_the_entry():
             # The cycle moved. Schedule a debounced flush (the daily tick and
             # the unload save authoritatively; this just bounds how much of
             # the climbing figure a hard crash between ticks can lose).

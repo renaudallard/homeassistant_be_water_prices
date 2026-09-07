@@ -184,6 +184,7 @@ def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
     domain_data = hass.data.get(DOMAIN, {})
     coordinator = domain_data.pop(entry_id, None)
     if coordinator is not None:
+        coordinator.async_retire()
         ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
     if not domain_data:

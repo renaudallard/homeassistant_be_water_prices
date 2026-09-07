@@ -36,7 +36,11 @@ from unittest.mock import AsyncMock, patch
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
@@ -256,3 +260,129 @@ async def test_the_coordinator_a_reload_replaced_no_longer_raises_cards(
 
         previous._sync_repair_issue(replace(previous.data, snapshot_stale=True))
     assert ir.async_get(hass).async_get_issue(DOMAIN, previous.stale_issue_id) is None
+
+
+async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """A late refresh resolved the meter and re-subscribed a dead coordinator to it.
+
+    One reading later its debounced save wrote the deleted YTD file back.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.meter_a", "100")
+    hass.states.async_set("sensor.meter_b", "500")
+    gate = asyncio.Event()
+    calls = 0
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            await gate.wait()
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_WATER_METER_SENSOR: "sensor.meter_a"},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    store_key = f"{DOMAIN}.{entry.entry_id}.ytd"
+    with (
+        patch(_GET, return_value=_extractor(_fetch)),
+        patch(_YTD, new=AsyncMock(return_value=20.0)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        old = hass.data[DOMAIN][entry.entry_id]
+
+        # Retry on the stale card: a refresh in the flow's task, with a slow fetch.
+        refresh = hass.loop.create_task(old.async_refresh())
+        for _ in range(6):
+            await asyncio.sleep(0)
+        assert calls == 2 and not gate.is_set()
+
+        # Meanwhile the meter is changed in Options: the listener reloads.
+        hass.config_entries.async_update_entry(
+            entry,
+            options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_WATER_METER_SENSOR: "sensor.meter_b"},
+        )
+        for _ in range(300):
+            if (
+                entry.state is ConfigEntryState.LOADED
+                and hass.data[DOMAIN].get(entry.entry_id) is not old
+            ):
+                break
+            await asyncio.sleep(0.01)
+        assert hass.data[DOMAIN][entry.entry_id] is not old
+        assert old._meter_unsub is None
+
+        gate.set()
+        await refresh
+        await hass.async_block_till_done()
+        assert not old._owns_the_entry()
+        assert old._meter_unsub is None, "the replaced coordinator re-subscribed to the new meter"
+
+        assert await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
+        assert store_key not in hass_storage
+
+        hass.states.async_set("sensor.meter_b", "510")
+        await hass.async_block_till_done()
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=40))
+        await hass.async_block_till_done()
+    assert store_key not in hass_storage
+
+
+async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
+    hass: HomeAssistant,
+) -> None:
+    """Read from the entry's state alone, the old coordinator still owned the entry
+    while the reload's new setup was in progress and the bucket not yet filled."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    gate = asyncio.Event()
+    calls = 0
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        nonlocal calls
+        calls += 1
+        if calls >= 2:
+            await gate.wait()
+        return _fresh_tariff()
+
+    entry = _metered_entry(hass)
+    with (
+        patch(_GET, return_value=_extractor(_fetch)),
+        patch(_YTD, new=AsyncMock(return_value=20.0)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        old = hass.data[DOMAIN][entry.entry_id]
+
+        refresh = hass.loop.create_task(old.async_refresh())
+        for _ in range(6):
+            await asyncio.sleep(0)
+        assert calls == 2
+
+        reload = hass.loop.create_task(hass.config_entries.async_reload(entry.entry_id))
+        for _ in range(300):
+            if calls == 3:
+                break
+            await asyncio.sleep(0.01)
+        assert calls == 3
+        assert entry.state is ConfigEntryState.SETUP_IN_PROGRESS
+        assert entry.entry_id not in hass.data.get(DOMAIN, {})
+        assert not old._owns_the_entry()
+
+        # The old refresh lands inside the window: no owner save, no card.
+        hass.states.async_set("sensor.water_meter", "130")
+        gate.set()
+        await refresh
+        assert old._cycle_dirty
+        old._sync_repair_issue(replace(old.data, snapshot_stale=True))
+        assert ir.async_get(hass).async_get_issue(DOMAIN, old.stale_issue_id) is None
+        await reload
+        await hass.async_block_till_done()
