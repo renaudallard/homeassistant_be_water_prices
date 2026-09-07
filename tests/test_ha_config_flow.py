@@ -1679,3 +1679,25 @@ async def test_the_flow_side_stale_commune_drops_are_said(
     assert len(lines) == 2
     assert all(line.startswith("Farys:") for line in lines)
     assert "Old Town" not in caplog.text and "99999" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_step_reached_out_of_order_aborts(hass: HomeAssistant) -> None:
+    """None of the five invalid_flow_state aborts was exercised; the choose-step one survived deletion."""
+    from custom_components.be_water_prices.config_flow import BeWaterPricesConfigFlow
+
+    flow = BeWaterPricesConfigFlow()
+    flow.hass = hass
+    flow.handler = DOMAIN
+    flow.context = {}
+    steps = (
+        flow.async_step_choose({CONF_UTILITY: "farys"}),
+        flow.async_step_options({CONF_CONSUMPTION_M3_PER_YEAR: 80}),
+        flow.async_step_reconfigure_choose({CONF_UTILITY: "farys"}),
+        flow.async_step_reconfigure_commune({CONF_COMMUNE: "x"}),
+        flow._async_finish_reconfigure(),
+    )
+    for step in steps:
+        result = await step
+        assert result["type"] == data_entry_flow.FlowResultType.ABORT
+        assert result["reason"] == "invalid_flow_state"
