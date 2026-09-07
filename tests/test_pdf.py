@@ -222,18 +222,30 @@ class _FakeSession:
         return None
 
 
-async def test_a_redirect_off_the_requested_site_is_refused() -> None:
-    """The href checks validate the link, aiohttp then follows a 30x anywhere."""
+async def test_a_redirect_off_the_requested_site_is_refused(caplog: Any) -> None:
+    """The href checks validate the link, aiohttp then follows a 30x anywhere.
+
+    The target stays out of the message, which lands in last_error and
+    the diagnostics dump; a LAN appliance or a captive portal is nobody's
+    business there. An https target on another site is the case the
+    https check cannot catch.
+    """
     session = _FakeSession(_RedirectedResp("http://127.0.0.1:8123/admin"))
-    with pytest.raises(ExtractorError, match="redirected"):
+    with pytest.raises(ExtractorError, match="redirected off https") as err:
         await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
+    assert "127.0.0.1" not in str(err.value)
     with pytest.raises(ExtractorError, match="redirected"):
         await _pdf.fetch_pdf_text_layout(session, "https://water-link.be/x.pdf")  # type: ignore[arg-type]
+    session = _FakeSession(_RedirectedResp("https://evil.test/x"))
+    with pytest.raises(ExtractorError, match="redirected off-site") as err:
+        await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
+    assert "evil.test" not in str(err.value)
+    assert "evil.test" in caplog.text
 
 
 async def test_a_redirect_that_drops_https_is_refused() -> None:
     session = _FakeSession(_RedirectedResp("http://water-link.be/x"))
-    with pytest.raises(ExtractorError, match="dropping https"):
+    with pytest.raises(ExtractorError, match="redirected off https"):
         await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
 
 

@@ -138,10 +138,15 @@ def _guard_redirect(url: str, resp: aiohttp.ClientResponse) -> None:
         return
     requested = urlparse(url)
     final = resp.url
+    # The message lands in last_error and the diagnostics dump, and the
+    # target can be a LAN appliance or a captive portal: it goes to the
+    # debug log only.
     if requested.scheme == "https" and final.scheme != "https":
-        raise ExtractorError(f"{url} redirected to {final.scheme}://{final.host}, dropping https")
+        _LOGGER.debug("%s redirected to %s", url, final)
+        raise ExtractorError(f"{url} redirected off https; refusing to read the answer")
     if _site(final.host or "") != _site(requested.hostname or ""):
-        raise ExtractorError(f"{url} redirected off-site to {final.scheme}://{final.host}")
+        _LOGGER.debug("%s redirected to %s", url, final)
+        raise ExtractorError(f"{url} redirected off-site; refusing to read the answer")
 
 
 async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
