@@ -347,3 +347,12 @@ def test_a_forward_looking_sentence_does_not_date_the_card_ahead() -> None:
     assert detect_published_year(text, today=today) == 2026
     # With nothing stronger on the page, the prose year still counts.
     assert detect_published_year("Le prix en 2026 est inchangé.", today=today) == 2026
+
+
+def test_a_cvd_change_dated_this_year_moves_valid_from() -> None:
+    """AIEM prints the day its CVD took effect; a day in an earlier year is the previous change."""
+    page = fixture_html("aiem_2026.html")
+    assert page.count("partir du 01/02/2025") == 1
+    assert parse_aiem(page, year=2026).valid_from == date(2026, 1, 1)
+    moved = parse_aiem(page.replace("partir du 01/02/2025", "partir du 01/02/2026"), year=2026)
+    assert moved.valid_from == date(2026, 2, 1)

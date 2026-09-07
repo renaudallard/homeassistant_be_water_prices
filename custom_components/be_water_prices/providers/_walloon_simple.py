@@ -395,7 +395,32 @@ def parse_tariff(
         source_url=source_url,
         publication_label=f"{label_prefix} {target}",
         year=target,
+        valid_from=effective_date(text, target),
     )
+
+
+# AIEM prints the day its CVD took effect next to the value:
+# "Valeur actuelle du CVD : 2,87€ HTVA 6% (à partir du 01/02/2025)".
+_EFFECTIVE_FROM_RE = re.compile(
+    r"actuelle\s+du\s+CVD[^()]{0,60}\(\s*à\s+partir\s+du\s+(\d{1,2})/(\d{1,2})/(20\d\d)\s*\)",
+    re.IGNORECASE,
+)
+
+
+def effective_date(text: str, year: int) -> date | None:
+    """The day the page says its CVD took effect, when that day is in ``year``.
+
+    A date in an earlier year is the previous change and says nothing
+    about this card; a date this year moves valid_from off 1 January,
+    the way the INASEP parser already dates a mid-year revision.
+    """
+    match = _EFFECTIVE_FROM_RE.search(text)
+    if match is None or int(match.group(3)) != year:
+        return None
+    try:
+        return date(year, int(match.group(2)), int(match.group(1)))
+    except ValueError:
+        return None
 
 
 async def fetch_tariff(
