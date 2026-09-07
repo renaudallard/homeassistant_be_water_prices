@@ -1649,6 +1649,17 @@ async def test_recorder_ytd_raises_when_the_query_fails(hass: HomeAssistant) -> 
         await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
 
+@pytest.mark.parametrize("raw", ["inf", "-inf", "nan", "1e400"])
+def test_a_non_finite_meter_state_is_not_a_reading(raw: str) -> None:
+    """float() accepts these; the year they build cannot be published."""
+    from homeassistant.core import State
+
+    from custom_components.be_water_prices.coordinator import _numeric_state
+
+    assert _numeric_state(State("sensor.water_meter", raw)) is None
+    assert _numeric_state(State("sensor.water_meter", "12.5")) == 12.5
+
+
 @pytest.mark.asyncio
 async def test_energy_dashboard_discovery_and_override(hass: HomeAssistant) -> None:
     """Auto-discovery reads the Energy dashboard, and the option wins.

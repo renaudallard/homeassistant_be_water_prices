@@ -1223,9 +1223,13 @@ def _numeric_state(state: State | None) -> float | None:
     if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
         return None
     try:
-        return float(state.state)
+        value = float(state.state)
     except (TypeError, ValueError):
         return None
+    # "inf", "nan" and an overflowing exponent all parse. Two infinite
+    # readings pinned the year at infinity, which the sensors refused to
+    # publish until a restart.
+    return value if math.isfinite(value) else None
 
 
 def _state_volume_m3(state: State | None) -> float | None:
