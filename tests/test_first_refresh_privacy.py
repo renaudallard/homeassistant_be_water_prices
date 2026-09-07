@@ -46,6 +46,7 @@ from custom_components.be_water_prices.providers.base import (
     WaterExtractor,
     WaterTariff,
 )
+from tests.test_ha_coordinator import _fresh_tariff
 
 
 async def test_a_failed_first_refresh_does_not_name_the_commune(
@@ -89,3 +90,52 @@ async def test_a_failed_first_refresh_does_not_name_the_commune(
     assert not [r for r in caplog.records if "je-gemeente/mol" in r.getMessage()]
     assert "mol" not in (entry.reason or "")
     assert "**redacted**" in (entry.reason or "")
+
+
+async def test_a_fault_on_the_cached_path_does_not_print_the_raw_fetch_error(
+    hass: HomeAssistant, caplog: Any
+) -> None:
+    """Raised inside the handler, the fault carried the fetch error as its context."""
+    caplog.set_level(logging.DEBUG)
+    outage = False
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        raise AssertionError("not used")
+
+    async def _fetch_for_commune(_session: Any, slug: str) -> WaterTariff:
+        if outage:
+            raise TransientFetchError(
+                f"network error fetching https://www.pidpa.be/ons-aanbod/je-gemeente/{slug}: timeout"
+            )
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_COMMUNE: "mol",
+            CONF_COMMUNE_LABEL: "2400 - Mol",
+        },
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(
+        id="pidpa",
+        label="Pidpa",
+        region="flanders",
+        fetch=_fetch,
+        fetch_for_commune=_fetch_for_commune,
+    )
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        outage = True
+        with patch.object(coordinator, "_compute_ytd", side_effect=RuntimeError("fault")):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+    assert "fault" in caplog.text
+    assert "je-gemeente/mol" not in caplog.text

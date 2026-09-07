@@ -618,6 +618,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         session = async_get_clientsession(self.hass)
         commune = self.entry.options.get(CONF_COMMUNE)
         budget = asyncio.timeout(_FETCH_BUDGET_S)
+        failure: Exception | None = None
         try:
             async with budget:
                 if commune and self._extractor.fetch_for_commune is not None:
@@ -646,47 +647,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
             if isinstance(err, asyncio.CancelledError | ConfigEntryAuthFailed | ConfigEntryError):
                 raise
-            if budget.expired():
-                # A bare TimeoutError, whose str() is empty. The parse
-                # thread it gave up on runs to completion on its own.
-                err = ExtractorError(f"fetch did not finish within {_FETCH_BUDGET_S} s")
-            # On fetch failure keep serving the last good snapshot
-            # rather than blanking every sensor; snapshot_age_hours and
-            # last_error are surfaced as attributes so dashboards can
-            # flag the issue.
-            if self._last_good is not None:
-                # The message quotes the URL it failed on, and a
-                # per-commune URL carries the town name. The sensor
-                # attribute, diagnostics and the Repair card all scrub
-                # that; the log was the one surface left publishing it.
-                scrubbed = scrub_tokens(
-                    str(err), sensitive_tokens(self.entry), placeholder="**redacted**"
-                )
-                _LOGGER.warning(
-                    "water tariff fetch failed (%s), serving cached: %s",
-                    type(err).__name__,
-                    scrubbed,
-                )
-                stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)
-                ytd_m3, ytd_cost = await self._compute_ytd(self._last_good.tariff)
-                cached = CoordinatorData(
-                    tariff=self._last_good.tariff,
-                    fetched_at=self._last_good.fetched_at,
-                    snapshot_age_hours=self._age_hours(self._last_good.fetched_at),
-                    snapshot_stale=stale,
-                    last_error=scrubbed,
-                    projected_annual_cost_eur=self._project_cost(self._last_good.tariff),
-                    current_year_cost_eur=ytd_cost,
-                    ytd_consumption_m3=ytd_m3,
-                )
-                self._sync_repair_issue(cached)
-                return cached
-            # Same scrub as the cached path: on a first refresh this
-            # becomes the entry's "not ready" reason and a log line, and a
-            # per-commune URL carries the town name.
-            raise UpdateFailed(
-                scrub_tokens(str(err), sensitive_tokens(self.entry), placeholder="**redacted**")
-            ) from err
+            failure = err
+        if failure is not None:
+            # Handled outside the except block on purpose: whatever the
+            # cached path below raises would otherwise carry the raw
+            # fetch error as its context, and a traceback logged by the
+            # coordinator would print the URL, town name and all, that
+            # every other surface scrubs.
+            return await self._serve_cached(failure, budget.expired())
 
         now = datetime.now(UTC)
         ytd_m3, ytd_cost = await self._compute_ytd(tariff)
@@ -730,6 +698,48 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def stale_issue_id(self) -> str:
         """Stable Repairs issue id for this entry's stale-snapshot warning."""
         return f"snapshot_stale_{self.entry.entry_id}"
+
+    async def _serve_cached(self, failure: Exception, out_of_time: bool) -> CoordinatorData:
+        """What a refresh publishes when its fetch failed with ``failure``.
+
+        The last good snapshot, with the failure scrubbed into last_error
+        and the stale check re-run, so a dashboard sees the age and the
+        reason rather than every sensor going blank. With no snapshot to
+        fall back on the refresh fails, which on a first refresh is the
+        entry's "not ready" reason.
+        """
+        if out_of_time:
+            # A bare TimeoutError, whose str() is empty. The parse thread
+            # it gave up on runs to completion on its own.
+            failure = ExtractorError(f"fetch did not finish within {_FETCH_BUDGET_S} s")
+        # The message quotes the URL it failed on, and a per-commune URL
+        # carries the town name. The sensor attribute, diagnostics and the
+        # Repair card all scrub that; the log was the one surface left
+        # publishing it.
+        scrubbed = scrub_tokens(
+            str(failure), sensitive_tokens(self.entry), placeholder="**redacted**"
+        )
+        if self._last_good is None:
+            raise UpdateFailed(scrubbed) from failure
+        _LOGGER.warning(
+            "water tariff fetch failed (%s), serving cached: %s",
+            type(failure).__name__,
+            scrubbed,
+        )
+        stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)
+        ytd_m3, ytd_cost = await self._compute_ytd(self._last_good.tariff)
+        cached = CoordinatorData(
+            tariff=self._last_good.tariff,
+            fetched_at=self._last_good.fetched_at,
+            snapshot_age_hours=self._age_hours(self._last_good.fetched_at),
+            snapshot_stale=stale,
+            last_error=scrubbed,
+            projected_annual_cost_eur=self._project_cost(self._last_good.tariff),
+            current_year_cost_eur=ytd_cost,
+            ytd_consumption_m3=ytd_m3,
+        )
+        self._sync_repair_issue(cached)
+        return cached
 
     def _owns_the_entry(self) -> bool:
         """Whether this coordinator still speaks for its entry.
