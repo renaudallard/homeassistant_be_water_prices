@@ -127,7 +127,14 @@ def _active_period_year(soup: BeautifulSoup) -> int | None:
     if active is None:
         return None
     value = str(active.get("value", "")).strip()
-    return int(value) if value.isdigit() and len(value) == 4 else None
+    if value.isdigit() and len(value) == 4:
+        return int(value)
+    # The switcher is there and says something else: the clock takes
+    # over, and a page that changed shape should not do so in silence,
+    # since the clock cannot tell a card stuck on last year from a
+    # current one.
+    _LOGGER.warning("Farys marks its period as %r, not a year; dating the card by the clock", value)
+    return None
 
 
 def _extract_html_payload(ajax_response_text: str) -> str:

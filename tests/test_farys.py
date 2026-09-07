@@ -236,3 +236,18 @@ def test_a_card_served_ahead_of_the_calendar_is_priced_and_flagged(
         t = parse_tariff(early)
     assert t.valid_from.year == 2027
     assert "2027 card while the calendar says" in caplog.text
+
+
+def test_a_period_switcher_that_names_no_year_is_said_so(caplog: pytest.LogCaptureFixture) -> None:
+    import logging
+
+    raw = fixture_html("farys_gent_2026.json")
+    active = "\\u003Cli class=\\u0022active\\u0022\\u003E"
+    assert raw.count(active) == 1
+    head, tail = raw.split(active, 1)
+    year_value = "value=\\u00222026\\u0022"
+    assert tail.count(year_value) >= 1
+    doctored = head + active + tail.replace(year_value, "value=\\u0022current\\u0022", 1)
+    with caplog.at_level(logging.WARNING):
+        parse_tariff(doctored)
+    assert "not a year" in caplog.text
