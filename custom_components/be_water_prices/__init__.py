@@ -131,19 +131,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        from homeassistant.helpers import issue_registry as ir
-
-        from .statistics import async_unregister_services
-
         # ``hass.data[DOMAIN]`` is populated only AFTER the coordinator
         # first refresh succeeds. If async_setup_entry raised before
         # that point (transient first-fetch failure, ImportError, etc.)
-        # the bucket is missing and a naive pop crashes the unload --
+        # the bucket is missing and a naive lookup crashes the unload --
         # blocking the user from removing the entry without an HA
         # restart. Tolerate both the missing bucket and the missing
-        # entry_id.
-        domain_data = hass.data.get(DOMAIN, {})
-        coordinator = domain_data.pop(entry.entry_id, None)
+        # entry_id. The on_unload callbacks that run next drop the
+        # coordinator, its Repair cards and the service.
+        coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
         if coordinator is not None:
             # Stop listening to the meter before the flush, not after it in
             # the on_unload callbacks: the flush awaits the executor, and a
@@ -155,23 +151,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # dropped so a reload / restart keeps the climbing high-water
             # mark instead of reverting to the last daily-tick value.
             await coordinator.async_save_ytd_state()
-            ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
-            ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
-        if not domain_data:
-            async_unregister_services(hass)
     return unloaded
 
 
 def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
-    """Drop the entry's coordinator, and the service once no entry is left.
+    """Drop the entry's coordinator and its Repair cards, and the service
+    once no entry is left.
 
-    Shared by the normal unload and the failed-setup path; both are
-    harmless when the other has already run.
+    Runs from the entry's on_unload callbacks, which Home Assistant fires
+    after a clean unload and after a setup that failed past the first
+    refresh. The cards that refresh raised would otherwise outlive the
+    entry, with a Retry button that has nothing left to refresh.
     """
+    from homeassistant.helpers import issue_registry as ir
+
     from .statistics import async_unregister_services
 
     domain_data = hass.data.get(DOMAIN, {})
-    domain_data.pop(entry_id, None)
+    coordinator = domain_data.pop(entry_id, None)
+    if coordinator is not None:
+        ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
+        ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
     if not domain_data:
         async_unregister_services(hass)
 

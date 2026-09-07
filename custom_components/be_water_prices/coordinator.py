@@ -730,6 +730,21 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         """Stable Repairs issue id for this entry's stale-snapshot warning."""
         return f"snapshot_stale_{self.entry.entry_id}"
 
+    def _owns_the_entry(self) -> bool:
+        """Whether this coordinator still speaks for its entry.
+
+        A refresh started from the Repair card runs in the flow's own
+        task, which an unload neither cancels nor waits for. When its
+        fetch lands after the entry is unloaded, removed, or set up again
+        with a new coordinator, nothing it learned may reach the Store or
+        the Repairs list: the file a removal deleted came back and the
+        cards were raised for an entry that no longer exists.
+        """
+        if self.entry.state not in (ConfigEntryState.SETUP_IN_PROGRESS, ConfigEntryState.LOADED):
+            return False
+        current = self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id)
+        return current is None or current is self
+
     def _sync_repair_issue(self, data: CoordinatorData) -> None:
         """Create or clear the stale-snapshot Repair issue for this entry.
 
@@ -738,11 +753,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         or the parsed valid_until is in the past. Auto-clears on the
         next successful, fresh fetch.
         """
-        if self.entry.state not in (ConfigEntryState.SETUP_IN_PROGRESS, ConfigEntryState.LOADED):
-            # A refresh started from the Repair card runs in the flow's own
-            # task, which an unload neither cancels nor waits for. When its
-            # fetch lands after the entry is gone it would re-create the
-            # card for an entry that no longer exists.
+        if not self._owns_the_entry():
             return
         if data.snapshot_stale:
             ir.async_create_issue(
@@ -807,6 +818,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             _LOGGER.debug("could not read %d for %s: %s", year, meter, err)
             return
         self._projection_checked = (meter, year, configured)
+        if not self._owns_the_entry():
+            # That read yielded to the loop; the entry may be gone by now.
+            return
         offer = round(metered) if metered is not None else None
         if (
             offer is None
@@ -1038,7 +1052,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         ytd_m3, ytd_cost = self._fold_cycle(
             tariff, meter=meter, now_year=now_year, reading=live, recorder_m3=recorder_m3
         )
-        if self._cycle_dirty:
+        if self._cycle_dirty and self._owns_the_entry():
             self._cycle_dirty = False
             folded = self._ytd
             await self._store.async_save(self._cycle_state())
