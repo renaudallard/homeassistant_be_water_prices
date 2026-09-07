@@ -69,7 +69,7 @@ from ..const import (
 )
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, fetch_html
-from ._pdf import USER_AGENT, _http_error, _read_text_capped, to_float
+from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, to_float
 from .base import (
     CommuneOption,
     ExtractorError,
@@ -313,7 +313,7 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
             text = await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(
-            f"network error fetching De Watergroep AJAX endpoint: {err}"
+            f"network error fetching De Watergroep AJAX endpoint: {error_text(err)}"
         ) from err
     if not text.strip() or "Basistarief" not in text:
         raise ExtractorError(

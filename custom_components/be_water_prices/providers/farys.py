@@ -65,7 +65,7 @@ from .._phantom_blocklists import (
 )
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._pdf import USER_AGENT, _http_error, _read_text_capped, fetch_text, to_float
+from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, fetch_text, to_float
 from .base import (
     CommuneOption,
     ExtractorError,
@@ -229,7 +229,9 @@ async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> 
                 raise _http_error(ENDPOINT_URL, resp.status)
             return await _read_text_capped(resp, ENDPOINT_URL)
     except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching Farys AJAX endpoint: {err}") from err
+        raise TransientFetchError(
+            f"network error fetching Farys AJAX endpoint: {error_text(err)}"
+        ) from err
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:

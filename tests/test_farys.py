@@ -195,7 +195,7 @@ async def test_post_for_commune_maps_timeout_to_transient() -> None:
     from custom_components.be_water_prices.providers import farys
     from custom_components.be_water_prices.providers.base import TransientFetchError
 
-    with pytest.raises(TransientFetchError):
+    with pytest.raises(TransientFetchError, match="endpoint: TimeoutError"):
         await farys._post_for_commune(  # type: ignore[arg-type]
             _FakePostSession(exc=TimeoutError()), "x"
         )

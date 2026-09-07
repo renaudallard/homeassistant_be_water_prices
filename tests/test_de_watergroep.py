@@ -111,6 +111,20 @@ async def test_fetch_commune_ajax_maps_5xx_to_transient() -> None:
         )
 
 
+async def test_fetch_commune_ajax_maps_network_errors_to_transient_with_a_message() -> None:
+    """An argless TimeoutError has an empty str(); the message must not end at the colon."""
+    import aiohttp
+
+    from custom_components.be_water_prices.providers import de_watergroep
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    for exc in (TimeoutError(), aiohttp.ClientConnectionError()):
+        with pytest.raises(TransientFetchError, match=f"endpoint: {type(exc).__name__}"):
+            await de_watergroep._fetch_commune_ajax(  # type: ignore[arg-type]
+                _FakeGetSession(exc=exc), "{guid}"
+            )
+
+
 async def test_fetch_commune_ajax_3xx_is_a_moved_endpoint() -> None:
     from custom_components.be_water_prices.providers import de_watergroep
     from custom_components.be_water_prices.providers.base import TransientFetchError
