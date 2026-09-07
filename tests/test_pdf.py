@@ -37,7 +37,7 @@ from custom_components.be_water_prices.providers._pdf import (
     fold_accents,
     to_float,
 )
-from custom_components.be_water_prices.providers.base import ExtractorError
+from custom_components.be_water_prices.providers.base import ExtractorError, TransientFetchError
 
 
 class _FakeContent:
@@ -182,8 +182,18 @@ class _RedirectedResp(_FakeResp):
         self.content_type = "text/plain"
 
 
+class _StatusResp(_FakeResp):
+    """A direct answer with the given status."""
+
+    def __init__(self, status: int, body: bytes = b"<html>") -> None:
+        super().__init__([body], content_length=len(body))
+        self.status = status
+        self.history = ()
+        self.content_type = "text/html"
+
+
 class _FakeSession:
-    def __init__(self, resp: _RedirectedResp) -> None:
+    def __init__(self, resp: _FakeResp) -> None:
         self._resp = resp
 
     def get(self, *_a: object, **_k: object) -> _FakeSession:
@@ -214,6 +224,22 @@ async def test_a_redirect_that_drops_https_is_refused() -> None:
 async def test_a_redirect_within_the_site_is_followed() -> None:
     session = _FakeSession(_RedirectedResp("https://www.water-link.be/x"))
     assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("status", [300, 304, 404])
+async def test_an_answer_outside_2xx_is_an_http_error(status: int) -> None:
+    """A 3xx the client did not follow is a moved page, not a body to parse."""
+    for fetch in (_pdf.fetch_text, _pdf.fetch_pdf_text_layout):
+        session = _FakeSession(_StatusResp(status))
+        with pytest.raises(ExtractorError, match=f"HTTP {status}") as err:
+            await fetch(session, "https://water-link.be/x")  # type: ignore[arg-type]
+        assert not isinstance(err.value, TransientFetchError)
+
+
+async def test_a_5xx_on_the_pdf_fetch_is_transient() -> None:
+    session = _FakeSession(_StatusResp(503))
+    with pytest.raises(TransientFetchError, match="HTTP 503"):
+        await _pdf.fetch_pdf_text_layout(session, "https://water-link.be/x.pdf")  # type: ignore[arg-type]
 
 
 async def test_a_non_pdf_answer_is_named_by_type_not_quoted() -> None:

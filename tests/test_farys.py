@@ -201,6 +201,15 @@ async def test_post_for_commune_maps_timeout_to_transient() -> None:
         )
 
 
+async def test_post_for_commune_3xx_is_a_moved_endpoint() -> None:
+    from custom_components.be_water_prices.providers import farys
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with pytest.raises(ExtractorError, match="HTTP 302") as exc:
+        await farys._post_for_commune(_FakePostSession(status=302), "x")  # type: ignore[arg-type]
+    assert not isinstance(exc.value, TransientFetchError)
+
+
 async def test_post_for_commune_4xx_stays_permanent() -> None:
     from custom_components.be_water_prices.providers import farys
     from custom_components.be_water_prices.providers.base import (

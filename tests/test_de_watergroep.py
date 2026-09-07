@@ -111,6 +111,17 @@ async def test_fetch_commune_ajax_maps_5xx_to_transient() -> None:
         )
 
 
+async def test_fetch_commune_ajax_3xx_is_a_moved_endpoint() -> None:
+    from custom_components.be_water_prices.providers import de_watergroep
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    with pytest.raises(ExtractorError, match="HTTP 302") as exc:
+        await de_watergroep._fetch_commune_ajax(  # type: ignore[arg-type]
+            _FakeGetSession(status=302), "{guid}"
+        )
+    assert not isinstance(exc.value, TransientFetchError)
+
+
 async def test_fetch_reraises_transient_instead_of_news_fallback() -> None:
     from unittest.mock import AsyncMock, patch
 

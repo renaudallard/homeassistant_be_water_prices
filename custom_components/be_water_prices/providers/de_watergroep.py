@@ -305,7 +305,7 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
             },
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
-            if resp.status >= 400:
+            if not 200 <= resp.status < 300:
                 raise _http_error(url, resp.status)
             text = await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:

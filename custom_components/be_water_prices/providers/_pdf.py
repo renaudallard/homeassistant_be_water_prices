@@ -66,7 +66,9 @@ def _http_error(url: str, status: int) -> ExtractorError:
 
     5xx (server error) and 429 (rate limited) are transient upstream
     conditions; 4xx (moved / forbidden / gone) usually means the page
-    changed and is a real failure worth reporting.
+    changed and is a real failure worth reporting. So is a 3xx that
+    reaches the caller: one the client could not follow, or one it was
+    told not to.
     """
     message = f"HTTP {status} fetching {url}"
     if status >= 500 or status == 429:
@@ -325,7 +327,7 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
             headers={"User-Agent": USER_AGENT},
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
-            if resp.status >= 400:
+            if not 200 <= resp.status < 300:
                 raise _http_error(url, resp.status)
             _guard_redirect(url, resp)
             content_type = resp.content_type
@@ -363,7 +365,7 @@ async def fetch_text(
         if not verify_ssl:
             kwargs["ssl"] = False
         async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
-            if resp.status >= 400:
+            if not 200 <= resp.status < 300:
                 raise _http_error(url, resp.status)
             _guard_redirect(url, resp)
             return await _read_text_capped(resp, url)
