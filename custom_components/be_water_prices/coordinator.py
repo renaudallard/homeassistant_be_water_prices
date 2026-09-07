@@ -1010,11 +1010,16 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # figure read together can put it back, so ask for one. The mismatch
         # closes as soon as the frame is rebuilt, which makes this
         # self-terminating: a year whose meter drives it never queries.
+        # A frame is built as reading - published, and subtracting it back
+        # leaves binary residue on about half of all pairs, which read as
+        # the frame trailing the figure by a femtolitre and asked the
+        # recorder on every idle tick.
         stale_frame = (
             self._ytd.m3 is not None
             and self._ytd.offset_m3 is not None
             and live is not None
             and self._ytd.m3 > live - self._ytd.offset_m3
+            and not math.isclose(self._ytd.m3, live - self._ytd.offset_m3, abs_tol=1e-6)
         )
         # Decide before folding, not after: the fold clears the record itself
         # when the meter has been repointed, and a gate reading the cleared
