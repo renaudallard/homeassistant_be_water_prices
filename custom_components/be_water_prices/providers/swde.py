@@ -58,8 +58,9 @@ re-derive it.
 
 The page states no year. The card is dated by the clock, so a page
 left on last year's rates in January is served as this year's and is
-never stale by date; the CVA / FSE hold and the daily live check are
-what notice a page that has stopped moving.
+never stale by date. Nothing detects a CVD left on last year's value:
+the CVA / FSE hold fails the fetch only when those two move, and the
+daily live check only validates ranges.
 """
 
 from __future__ import annotations
