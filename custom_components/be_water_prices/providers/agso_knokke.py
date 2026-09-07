@@ -38,10 +38,11 @@ canonical "Integrale waterprijs" layout::
     Zuivering afvalwater| € 1,7019             | € 3,4038| € 1,9281    | € 1,9281 | € 20,00    | -€ 4,00
     Integrale prijs ex-BTW | €5,9886           | ...
 
-Picks the table whose "Integrale waterprijs" total is the highest --
-operators only ever index up year-on-year, so that's a robust proxy
-for "the latest year present" without relying on a fragile heading
-match. Falls back to the only table when just one is published.
+Picks the table the page labels with the year asked for, or the
+newest year that has already started, as long as every table carries
+a heading with a year. Only when one does not is the table whose
+"Integrale waterprijs" total is the highest taken as the current one,
+since operators only ever index up year-on-year.
 
 Stores all three components separately (drinkwater + afvoer +
 zuivering) the way Pidpa does, so the ``basis_rate`` /
@@ -133,8 +134,15 @@ _YEAR_HEADING_RE = re.compile(
 
 
 def _year_for_table(table: Tag) -> int | None:
-    """The year of the nearest heading above ``table``, if it carries one."""
-    for text in table.find_all_previous(string=_YEAR_HEADING_RE):
+    """The year of the nearest heading above ``table``, if one dates it.
+
+    The walk stops at the previous table: a heading beyond it dated that
+    table, not this one, and reading it here handed a reworded heading's
+    table the older year and served last year's card as the newest.
+    """
+    for text in table.find_all_previous(string=True):
+        if text.find_parent("table") is not None:
+            return None
         match = _YEAR_HEADING_RE.search(str(text))
         if match:
             return int(match.group(1))
@@ -162,17 +170,21 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     # meant a page publishing next year's card early was read as this
     # year's, which also stopped the stale-snapshot check ever firing:
     # the year was stamped from the clock, so it always looked current.
-    dated = [(y, table) for table in tables if (y := _year_for_table(table)) is not None]
-    dated = [(y, table) for y, table in dated if _table_integrale_basis(table) is not None]
-    chosen: Tag | None = next((table for y, table in dated if y == target), None)
+    # Only when every table is dated, though: one whose heading no longer
+    # reads as a year is as likely the newest card as any, and dating the
+    # rest around it served the older card as the newest.
+    dated = [(_year_for_table(table), table) for _, table in ranked]
+    chosen: Tag | None = None
     chosen_year = target
-    if chosen is None and dated:
-        past = sorted((y for y, _ in dated if y <= target), reverse=True)
-        if past:
-            chosen_year = past[0]
-            chosen = next(table for y, table in dated if y == chosen_year)
+    if all(y is not None for y, _ in dated):
+        chosen = next((table for y, table in dated if y == target), None)
+        if chosen is None:
+            past = sorted((y for y, _ in dated if y is not None and y <= target), reverse=True)
+            if past:
+                chosen_year = past[0]
+                chosen = next(table for y, table in dated if y == chosen_year)
     if chosen is None:
-        # No usable heading: fall back to the highest integrale basis,
+        # No usable headings: fall back to the highest integrale basis,
         # since the operator only ever indexes up year on year.
         ranked.sort(key=lambda x: x[0], reverse=True)
         chosen = ranked[0][1]

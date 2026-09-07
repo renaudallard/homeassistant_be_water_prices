@@ -46,6 +46,27 @@ def test_picks_the_table_the_page_labels_with_the_year() -> None:
     assert t.yearly_fixed_fee_per_resident_discount == 20.0  # 10+6+4
 
 
+@pytest.mark.parametrize(
+    "heading", ["TARIEVEN VANAF 1 JANUARI 2026", "Wijziging per 1 januari 2026"]
+)
+def test_a_reworded_heading_does_not_hand_its_table_the_older_year(heading: str) -> None:
+    """The walk-back from the 2026 table found the 2025 heading and served that card."""
+    page = fixture_html("agso_knokke_2026.html")
+    marker = "OVERZICHT TARIEVEN&nbsp; PER 1/1/2026"
+    assert page.count(marker) == 1
+    t = parse_tariff(page.replace(marker, heading), year=2026)
+    assert t.basis_eur_per_m3 == 2.3295
+    assert t.valid_from.year == 2026
+
+
+def test_a_reworded_older_heading_keeps_the_newest_card_dated() -> None:
+    page = fixture_html("agso_knokke_2026.html")
+    assert page.count("OVERZICHT TARIEVEN 2025") == 1
+    t = parse_tariff(page.replace("OVERZICHT TARIEVEN 2025", "TARIEVEN 2025"), year=2026)
+    assert t.basis_eur_per_m3 == 2.3295
+    assert t.valid_from.year == 2026
+
+
 def test_raises_when_table_missing() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("<html><body>nothing here</body></html>")
