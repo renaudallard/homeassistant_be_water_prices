@@ -88,8 +88,11 @@ _NUMBER = (
     r"(?<![0-9])((?:[0-9]{1,3}(?:[     ][0-9]{3})+|[0-9]+)"
     r"(?:[.,][0-9]+)?)(?![0-9])"
 )
-_AMOUNT_BEFORE_EURO = re.compile(r"€\s*" + _NUMBER)
-_AMOUNT_AFTER_EURO = re.compile(_NUMBER + r"\s*€")
+# A minus glued to the euro sign ("-€ 4,00") or to the number ("€ -6,00",
+# "-6,00 €") is a discount; a dash standing on its own between blanks
+# ("2025 - € 10,00") is punctuation and does not touch the sign.
+_AMOUNT_BEFORE_EURO = re.compile(r"(-?)€\s*(-?)" + _NUMBER)
+_AMOUNT_AFTER_EURO = re.compile(r"(-?)" + _NUMBER + r"\s*€")
 
 
 def extract_amounts(text: str) -> list[float]:
@@ -98,11 +101,17 @@ def extract_amounts(text: str) -> list[float]:
     Accepts both Dutch / English layout (``€ 12,34``) and French layout
     (``12,34 €``); some Walloon utility pages publish the symbol after
     the number. A space-grouped thousand (``€ 1 234,56``, with any of
-    the space variants) is one amount. Hits are de-duplicated by start
-    position so a string like "€ 12,34 €" reports 12.34 once.
+    the space variants) is one amount. A minus written against the sign
+    or the number makes it negative, as a discount line prints. Hits are
+    de-duplicated by start position so a string like "€ 12,34 €" reports
+    12.34 once.
     """
     seen: dict[int, float] = {}
     for pattern in (_AMOUNT_BEFORE_EURO, _AMOUNT_AFTER_EURO):
         for m in pattern.finditer(text):
-            seen[m.start(1)] = to_float(m.group(1))
+            number = m.lastindex or 1
+            value = to_float(m.group(number))
+            if "-" in m.groups()[: number - 1]:
+                value = -value
+            seen[m.start(number)] = value
     return [seen[k] for k in sorted(seen)]

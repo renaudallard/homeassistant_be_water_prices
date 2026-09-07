@@ -55,3 +55,9 @@ def test_extract_amounts_reports_a_double_signed_amount_once() -> None:
 
 def test_extract_amounts_returns_empty_for_no_match() -> None:
     assert extract_amounts("no euros here, just pesos $5.00") == []
+
+
+def test_extract_amounts_keeps_a_discount_negative() -> None:
+    """ "-€ 4,00" and "€ -6,00" are discounts; a dash between blanks is punctuation."""
+    assert extract_amounts("Korting -€ 4,00 en € -6,00 en -7,25 €") == [-4.0, -6.0, -7.25]
+    assert extract_amounts("Tarief 2025 - € 10,00") == [10.0]
