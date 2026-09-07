@@ -94,6 +94,8 @@ Coverage:
 
 from __future__ import annotations
 
+import re
+
 # Aquaduin's Westkust communes (Koksijde, De Panne, Nieuwpoort, Veurne,
 # Alveringem). Hand-curated because they're scattered inside the 8000-8999
 # West-Vlaanderen block where Farys would otherwise be the default.
@@ -854,12 +856,12 @@ def resolve_candidates(postcode: str | None) -> tuple[str, ...]:
         Multi-element tuple for postcodes genuinely split between
         operators at street level (see ``_SPLIT_POSTCODES``).
     """
-    if not postcode:
+    # Four ASCII digits and nothing else: int() also accepts "1_000",
+    # fullwidth digits and a sign, and the raw string is what gets
+    # persisted in the entry.
+    if not isinstance(postcode, str) or not re.fullmatch(r"[0-9]{4}", postcode.strip()):
         return ()
-    try:
-        code = int(postcode)
-    except (TypeError, ValueError):
-        return ()
+    code = int(postcode)
     key = str(code).zfill(4)
     if key in _SPLIT_POSTCODES:
         return _SPLIT_POSTCODES[key]

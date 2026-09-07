@@ -33,12 +33,21 @@ of config-flow logic that has to be right before HA hands us a session.
 
 from __future__ import annotations
 
+import pytest
+
 from custom_components.be_water_prices.providers._postcodes import (
     resolve as _resolve_postcode,
 )
 from custom_components.be_water_prices.providers._postcodes import (
     resolve_candidates as _resolve_candidates,
 )
+
+
+@pytest.mark.parametrize("raw", ["1_000", "１０００", "+1000", "1000.0", "01000", "10 00"])
+def test_a_postcode_is_four_ascii_digits_and_nothing_else(raw: str) -> None:
+    """int() took all of these, and the raw string is what the entry keeps."""
+    assert _resolve_postcode(raw) is None
+    assert _resolve_postcode(" 1000 ") == "vivaqua"
 
 
 def test_brussels_postcodes_resolve_to_vivaqua() -> None:
