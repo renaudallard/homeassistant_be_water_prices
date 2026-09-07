@@ -104,7 +104,10 @@ def test_pidpa_commune_comfort_must_be_twice_the_basis() -> None:
 
 
 def test_water_link_comfort_must_be_twice_the_basis() -> None:
-    text = _pdf("water_link_2026.pdf").replace("3,3384", "3,0000")
+    # The printed total moves with the water rate, so only the 2x rule is broken.
+    text = _pdf("water_link_2026.pdf")
+    assert text.count("3,3384") >= 1 and text.count("9,4112") >= 1
+    text = text.replace("3,3384", "3,0000").replace("9,4112", "9,0728")
     with pytest.raises(ExtractorError, match="2× basistarief"):
         water_link.parse_tariff(text, year=2026)
 

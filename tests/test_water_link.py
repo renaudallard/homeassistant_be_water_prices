@@ -60,6 +60,15 @@ def test_parses_2026_ring_commune_overrides_sanering() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019  # uniform
 
 
+def test_a_row_that_lost_a_column_is_refused() -> None:
+    """Three amounts read off a shifted row passed the 2x check with the wrong rate."""
+    text = _pdf_text()
+    row = "Antwerpen 3,3384 2,6690 3,4038 9,4112 9,9759"
+    assert text.count(row) == 1
+    with pytest.raises(ExtractorError, match="does not add up"):
+        parse_tariff(text.replace(row, "Antwerpen 2,6690 3,4038 9,4112 9,9759"), year=2026)
+
+
 def test_raises_when_pdf_text_is_garbage() -> None:
     with pytest.raises(ExtractorError):
         parse_tariff("nothing here", year=2026)

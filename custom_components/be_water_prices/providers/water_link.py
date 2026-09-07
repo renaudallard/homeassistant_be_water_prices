@@ -116,16 +116,21 @@ _PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}(?:%20|[\s_-])?HH(?:_\d+)?\.pdf
 _DEFAULT_COMMUNE = "Antwerpen"
 
 # Anchored on "<commune>  N,NNNN  N,NNNN  N,NNNN  N,NNNN  N,NNNN" -- five
-# columns: Water, Afvoer, Zuivering, Totaal-ex-BTW, Totaal-incl-BTW.
-_RATE_ROW_RE_FMT = r"^{commune}\s+([\d]+,\d{{3,5}})\s+([\d]+,\d{{3,5}})\s+([\d]+,\d{{3,5}})"
+# columns: Water, Afvoer, Zuivering, Totaal-ex-BTW, Totaal-incl-BTW. The
+# fourth is read too: it is the sum of the first three, so a row that
+# lost or gained a column, which shifts every field, no longer adds up.
+_RATE_ROW_RE_FMT = (
+    r"^{commune}\s+([\d]+,\d{{3,5}})\s+([\d]+,\d{{3,5}})\s+([\d]+,\d{{3,5}})\s+([\d]+,\d{{3,5}})"
+)
 
 
 def _parse_commune_row(
     text: str, commune: str, after_marker: str
 ) -> tuple[float, float, float] | None:
     """Find the first occurrence of ``after_marker`` then the next line
-    that starts with ``commune`` followed by 3 EUR amounts. Returns
-    ``(water, afvoer, zuivering)`` or ``None`` if not found.
+    that starts with ``commune`` followed by the four EUR amounts. Returns
+    ``(water, afvoer, zuivering)`` or ``None`` if not found; raises when
+    the three do not make the printed total.
     """
     cut = text.find(after_marker)
     if cut < 0:
@@ -134,7 +139,13 @@ def _parse_commune_row(
     match = pattern.search(text, cut)
     if match is None:
         return None
-    return (to_float(match.group(1)), to_float(match.group(2)), to_float(match.group(3)))
+    water, afvoer, zuivering, total = (to_float(match.group(i)) for i in range(1, 5))
+    if abs(water + afvoer + zuivering - total) > 5e-5:
+        raise ExtractorError(
+            f"Water-link row for {commune} does not add up: "
+            f"{water} + {afvoer} + {zuivering} != {total}"
+        )
+    return (water, afvoer, zuivering)
 
 
 def parse_tariff(
