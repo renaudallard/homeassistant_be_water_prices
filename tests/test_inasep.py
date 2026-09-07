@@ -69,7 +69,18 @@ def test_the_cvd_regex_stays_linear_on_a_run_of_whitespace() -> None:
     assert t.valid_from == date(2026, 1, 1)
 
 
-def test_dates_the_cvd_from_the_day_the_page_says_it_applies() -> None:
+def test_dates_the_cvd_from_the_day_the_page_says_it_applies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from custom_components.be_water_prices.providers import _walloon_simple
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 9, 6)
+
+    # From 2027 the card stands until 31 March; the year's own end is asserted.
+    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     t = parse_tariff(fixture_html("inasep_2026.html"), year=2026)
     assert t.valid_from == date(2026, 4, 27)
     assert t.valid_until == date(2026, 12, 31)
@@ -97,7 +108,7 @@ def test_the_cva_date_does_not_stand_in_for_a_missing_cvd_date() -> None:
 def test_a_page_still_on_last_years_card_is_dated_last_year(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from custom_components.be_water_prices.providers import inasep
+    from custom_components.be_water_prices.providers import _walloon_simple, inasep
 
     class _FakeDate(date):
         @classmethod
@@ -105,9 +116,11 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
             return date(2027, 1, 5)
 
     monkeypatch.setattr(inasep, "date", _FakeDate)
+    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     t = parse_tariff(fixture_html("inasep_2026.html"))
     assert t.valid_from == date(2026, 4, 27)
-    assert t.valid_until == date(2026, 12, 31)
+    # Dated last year, so it stands until 31 March of this one.
+    assert t.valid_until == date(2027, 3, 31)
 
 
 def test_a_moved_cva_or_fonds_social_fails_the_fetch() -> None:

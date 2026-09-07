@@ -40,7 +40,18 @@ from custom_components.be_water_prices.providers.swde import parse_tariff
 from tests import fixture_html
 
 
-def test_parses_2026_components() -> None:
+def test_parses_2026_components(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import _walloon_simple
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 9, 6)
+
+    # From 2027 the card stands until 31 March; the year's own end is asserted.
+    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     t = parse_tariff(fixture_html("swde_2026.html"), year=2026)
 
     assert t.cvd_eur_per_m3 == 3.24

@@ -66,7 +66,7 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
 ) -> None:
     from datetime import date
 
-    from custom_components.be_water_prices.providers import inbw
+    from custom_components.be_water_prices.providers import _walloon_simple, inbw
 
     class _FakeDate(date):
         @classmethod
@@ -74,9 +74,11 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
             return date(2027, 1, 5)
 
     monkeypatch.setattr(inbw, "date", _FakeDate)
+    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     t = parse_tariff(fixture_html("inbw_2026.html"))
     assert t.valid_from == date(2026, 1, 1)
-    assert t.valid_until == date(2026, 12, 31)
+    # Dated last year, so it stands until 31 March of this one.
+    assert t.valid_until == date(2027, 3, 31)
 
 
 def test_a_moved_cva_fails_the_fetch_rather_than_logging() -> None:
