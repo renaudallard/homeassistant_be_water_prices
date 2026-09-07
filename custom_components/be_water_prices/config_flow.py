@@ -691,14 +691,14 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # listener __init__ registers. Asking for one here as well ran
         # async_setup_entry twice over, each time re-fetching the tariff
         # live, on top of the one the backfill gate already costs. An
-        # entry that is not loaded has no listener, so it is reloaded
-        # here: written and left alone, an entry whose setup had failed
-        # kept its failed state with the new data, while the text said
-        # "updated and reloaded".
+        # entry whose setup failed has no listener, so it is reloaded
+        # here: written and left alone, it kept its failed state with
+        # the new data, while the text said "updated and reloaded". An
+        # entry that was never loaded is left as it is.
         update = (
-            self.async_update_and_abort
-            if entry.state is ConfigEntryState.LOADED
-            else self.async_update_reload_and_abort
+            self.async_update_reload_and_abort
+            if entry.state in (ConfigEntryState.SETUP_ERROR, ConfigEntryState.SETUP_RETRY)
+            else self.async_update_and_abort
         )
         if new_utility == old_utility:
             # Same utility but commune changed via the manual flow.

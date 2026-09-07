@@ -1701,3 +1701,32 @@ async def test_a_step_reached_out_of_order_aborts(hass: HomeAssistant) -> None:
         result = await step
         assert result["type"] == data_entry_flow.FlowResultType.ABORT
         assert result["reason"] == "invalid_flow_state"
+
+
+@pytest.mark.asyncio
+async def test_reconfiguring_an_entry_that_never_loaded_schedules_no_reload(
+    hass: HomeAssistant,
+) -> None:
+    """Reloading every non-loaded entry set the real extractor running in these tests."""
+    from unittest.mock import patch
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "1000"}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "vivaqua"
+    reload.assert_not_called()
