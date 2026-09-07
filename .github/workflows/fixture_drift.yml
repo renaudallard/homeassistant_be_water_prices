@@ -31,6 +31,15 @@ jobs:
           set +e
           python scripts/fixture_drift.py > report.md
           rc=$?
+          if [ ! -s report.md ]; then
+            # No report at all: the script crashed before writing one,
+            # and the issue it opened carried an empty body. Say so.
+            {
+              echo "scripts/fixture_drift.py exited $rc without writing a report: it crashed."
+              echo "The traceback is in the run log."
+            } > report.md
+            rc=1
+          fi
           cat report.md
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           # Exit 0 here so the issue-management step always runs.
