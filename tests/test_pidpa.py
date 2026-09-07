@@ -304,3 +304,21 @@ def test_a_sanering_line_for_another_year_does_not_win() -> None:
     frozen = "Tarief gemeentelijke sanering (afvoer ) 2024: 1,6533 €/m³ basistarief\n"
     assert _sanering_for_year(frozen, 2026) == {"afvoer": 1.6533}
     assert _sanering_for_year(frozen + text, 2026)["afvoer"] == 1.0
+
+
+def test_a_tab_past_the_year_asked_for_is_not_a_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With no 2026 tab, a 2027 tab was served as 2026's card."""
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import pidpa
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 9, 6)
+
+    monkeypatch.setattr(pidpa, "date", _FakeDate)
+    page = fixture_html("pidpa_geel_2026.html")
+    assert page.count("-tab-2026") >= 1
+    with pytest.raises(ExtractorError, match="2026"):
+        pidpa.parse_commune_tariff(page.replace("-tab-2026", "-tab-2027"), commune_slug="geel")

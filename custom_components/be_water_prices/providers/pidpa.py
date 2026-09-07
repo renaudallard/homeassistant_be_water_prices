@@ -325,12 +325,14 @@ def _find_year_table(soup: BeautifulSoup, *, year: int) -> Tag | None:
 _YEAR_TAB_RE = re.compile(r"-tab-(\d{4})$")
 
 
-def _find_latest_year_table(soup: BeautifulSoup) -> tuple[Tag, int] | None:
-    """Return the (table, year) of the highest huishoudelijk year tab present.
+def _find_latest_year_table(soup: BeautifulSoup, *, before: int) -> tuple[Tag, int] | None:
+    """Return the (table, year) of the highest huishoudelijk year tab up to ``before``.
 
     Used as a Jan 1 rollover fallback, mirroring the multi-year PDF path,
     so a per-commune install does not go blank before Pidpa publishes the
-    new-year tab.
+    new-year tab. A tab dated past the year asked for is not a fallback
+    for it: with no tab for this year, next year's card would otherwise
+    be served as this year's.
     """
     best: tuple[Tag, int] | None = None
     for div in soup.find_all("div", class_="tariff-tab-content"):
@@ -338,7 +340,7 @@ def _find_latest_year_table(soup: BeautifulSoup) -> tuple[Tag, int] | None:
         if match is None:
             continue
         year = int(match.group(1))
-        if best is not None and year <= best[1]:
+        if year > before or (best is not None and year <= best[1]):
             continue
         if not _is_huishoudelijk_year_tab(div, year=year):
             continue
@@ -372,7 +374,7 @@ def parse_commune_tariff(
         # still-in-force prior-year rates -- mirroring the PDF path -- so a
         # fresh per-commune install does not go blank. An explicitly
         # requested year that is absent stays an error.
-        fallback = _find_latest_year_table(soup)
+        fallback = _find_latest_year_table(soup, before=target)
         if fallback is not None:
             table, fallback_year = fallback
             # The commune is the household's town: the integration
