@@ -68,3 +68,15 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
     t = parse_tariff(fixture_html("cile_2026.html"))
     assert t.valid_from == date(2026, 1, 1)
     assert t.valid_until == date(2026, 12, 31)
+
+
+@pytest.mark.parametrize("new_first", [True, False])
+def test_a_comparison_column_is_read_by_its_year_not_its_position(new_first: bool) -> None:
+    """With "new | old" the last cell is last year's; the heading with the year is not."""
+    new = ("Tarif au 1er janvier 2026", "3,5552 €/m³", "2,7480 €/m³", "0,0339 €/m³")
+    old = ("Tarif au 1er janvier 2025", "3,3000 €/m³", "2,7480 €/m³", "0,0339 €/m³")
+    first, second = (new, old) if new_first else (old, new)
+    rows = zip(("Poste", "C.V.D", "C.V.A", "Fonds social"), first, second, strict=True)
+    table = "".join(f"<tr><td>{a}</td><td>{b}</td><td>{c}</td></tr>" for a, b, c in rows)
+    tariff = parse_tariff(f"<html><body><table>{table}</table></body></html>", year=2026)
+    assert tariff.cvd_eur_per_m3 == 3.5552

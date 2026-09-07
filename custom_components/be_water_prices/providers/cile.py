@@ -72,14 +72,30 @@ LABEL = "CILE"
 SOURCE_URL = "https://www.cile.be/facturation/le-prix-de-leau"
 
 
-def _row_amount(table: Tag, row_label: str) -> float | None:
+def _value_column(table: Tag, year: int | None) -> int:
+    """The column whose heading names ``year``, else the last one.
+
+    The table has one value column today. Should a comparison column
+    appear, "new | old" or "old | new", the last cell is the right one
+    only half the time; the heading that carries the year is not.
+    """
+    head = table.find("tr")
+    if year is not None and isinstance(head, Tag):
+        cells = [c.get_text(" ", strip=True) for c in head.find_all(["td", "th"])]
+        for index, cell in enumerate(cells):
+            if index > 0 and str(year) in cell:
+                return index
+    return -1
+
+
+def _row_amount(table: Tag, row_label: str, column: int = -1) -> float | None:
     needle = row_label.lower()
     for tr in table.find_all("tr"):
         cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
-        if len(cells) < 2:
+        if len(cells) < 2 or column >= len(cells):
             continue
         if needle in cells[0].lower():
-            amounts = extract_amounts(cells[-1])
+            amounts = extract_amounts(cells[column])
             if amounts:
                 return amounts[0]
     return None
@@ -92,28 +108,30 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if not isinstance(table, Tag):
         raise ExtractorError("could not locate CILE tariff table")
 
-    cvd = _row_amount(table, "c.v.d")
+    # The table is headed "Tarif au 1er janvier YYYY": date the card from
+    # that rather than the clock, so a page still on last year's card in
+    # January looks stale instead of being relabelled as this year's.
+    target = year or detect_published_year(soup.get_text(" ", strip=True)) or date.today().year
+    column = _value_column(table, target)
+
+    cvd = _row_amount(table, "c.v.d", column)
     if cvd is None:
         raise ExtractorError("could not find CILE CVD row")
 
     warn_constant_drift(
-        published=_row_amount(table, "c.v.a"),
+        published=_row_amount(table, "c.v.a", column),
         constant=WALLONIA_CVA_EUR_PER_M3,
         label="CILE CVA",
         logger=_LOGGER,
     )
     warn_constant_drift(
-        published=_row_amount(table, "fonds social"),
+        published=_row_amount(table, "fonds social", column),
         constant=WALLONIA_FSE_EUR_PER_M3,
         label="CILE FSE",
         logger=_LOGGER,
         threshold=0.001,
     )
 
-    # The table is headed "Tarif au 1er janvier YYYY": date the card from
-    # that rather than the clock, so a page still on last year's card in
-    # January looks stale instead of being relabelled as this year's.
-    target = year or detect_published_year(soup.get_text(" ", strip=True)) or date.today().year
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
