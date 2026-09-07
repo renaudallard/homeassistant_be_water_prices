@@ -383,7 +383,10 @@ without you pressing it.
 A year only counts if the meter has statistics on both sides of it: a
 bucket before 1 January proves it was already running when the year
 started, one in that year's December proves it was still running at the
-end. A meter installed in June therefore never produces a prompt. That
+end, and the year needs a bucket on at least two days in three in
+between, so a meter that was unavailable for most of it does not pass
+off what it saw as the year. A meter installed in June therefore never
+produces a prompt. That
 check is also why the prompt can appear the first day you wire up a
 meter that has been recording in Home Assistant since before last
 January, rather than only after a January 1 rollover.

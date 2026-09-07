@@ -34,7 +34,7 @@ the Repair flow that writes the option).
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -137,6 +137,7 @@ async def test_full_year_sums_only_the_year_itself(hass: HomeAssistant) -> None:
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),  # proves the meter predates the year
+            *_quiet_year(2025, date(2025, 1, 5), date(2025, 6, 1), date(2025, 12, 20)),
             (date(2025, 1, 5), 10.0),
             (date(2025, 6, 1), 20.0),
             (date(2025, 12, 20), 5.0),  # proves it ran to the end
@@ -157,6 +158,7 @@ async def test_a_swap_after_the_year_does_not_refuse_it(hass: HomeAssistant) -> 
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),
+            *_quiet_year(2025, date(2025, 6, 1), date(2025, 12, 20)),
             (date(2025, 6, 1), 30.0),
             (date(2025, 12, 20), 5.0),
             (date(2026, 1, 1), -900.0),  # meter replaced on New Year's day
@@ -164,6 +166,58 @@ async def test_a_swap_after_the_year_does_not_refuse_it(hass: HomeAssistant) -> 
     )
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) == 35.0
+
+
+def _quiet_year(year: int, *busy: date) -> list[tuple[date, float]]:
+    """The change-0 bucket Home Assistant compiles for every idle day, ``busy`` days left out."""
+    return _daily(date(year, 1, 1), date(year, 12, 31), 0.0, *((day, day) for day in busy))
+
+
+def _daily(
+    first: date, last: date, m3: float, *skip: tuple[date, date]
+) -> list[tuple[date, float]]:
+    """One bucket a day from ``first`` to ``last``, none inside the ``skip`` spans."""
+    days = []
+    day = first
+    while day <= last:
+        if not any(start <= day <= end for start, end in skip):
+            days.append((day, m3))
+        day += timedelta(days=1)
+    return days
+
+
+@pytest.mark.asyncio
+async def test_history_on_both_sides_of_a_hole_is_not_a_full_year(hass: HomeAssistant) -> None:
+    """Unavailable from January to November, back for December: two sides, no year."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    rows = _buckets(
+        [(date(2024, 12, 15), 3.0), *_daily(date(2025, 12, 1), date(2025, 12, 31), 0.1)]
+    )
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
+
+
+@pytest.mark.asyncio
+async def test_a_summer_away_still_makes_a_full_year(hass: HomeAssistant) -> None:
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    away = (date(2025, 7, 1), date(2025, 8, 31))
+    rows = _buckets(
+        [(date(2024, 12, 15), 3.0), *_daily(date(2025, 1, 1), date(2025, 12, 31), 0.1, away)]
+    )
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        metered = await _recorder_full_year_m3(hass, "sensor.water_meter", 2025)
+    assert metered is not None and round(metered, 1) == 30.3
+
+
+@pytest.mark.asyncio
+async def test_a_meter_off_for_half_the_year_is_not_a_full_year(hass: HomeAssistant) -> None:
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    off = (date(2025, 3, 1), date(2025, 9, 30))
+    rows = _buckets(
+        [(date(2024, 12, 15), 3.0), *_daily(date(2025, 1, 1), date(2025, 12, 31), 0.1, off)]
+    )
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
 
 
 @pytest.mark.asyncio
@@ -214,6 +268,7 @@ async def test_quiet_days_without_a_bucket_still_count(hass: HomeAssistant) -> N
     rows = _buckets(
         [
             (date(2024, 12, 3), 1.0),
+            *_daily(date(2025, 2, 15), date(2025, 12, 30), 0.0),
             (date(2025, 2, 14), 40.0),
             (date(2025, 12, 31), 2.0),
         ]
@@ -228,6 +283,7 @@ async def test_rows_without_a_change_value_are_skipped(hass: HomeAssistant) -> N
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),
+            *_quiet_year(2025, date(2025, 4, 1), date(2025, 4, 2), date(2025, 12, 9)),
             (date(2025, 4, 1), None),
             (date(2025, 4, 2), 12.0),
             (date(2025, 12, 9), 1.0),

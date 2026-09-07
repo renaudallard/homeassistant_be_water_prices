@@ -1517,7 +1517,12 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
     Asking for history on either side rather than for a bucket dated
     1 January is deliberate. A meter reports when water moves, so a quiet
     day has no bucket at all, and a household away over New Year would fail
-    the stricter test while having a perfectly complete year.
+    the stricter test while having a perfectly complete year. The days in
+    between have to be there too: a meter that was unavailable from
+    January to November and came back in December had history on both
+    sides and offered December's water as the year. A bucket on two days
+    in three is the bar, which a household away for the summer clears and
+    a meter installed in June does not.
 
     A negative daily delta means the recorded register went backwards. On a
     ``total`` meter that is what replacing the meter looks like, and the
@@ -1541,6 +1546,7 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
     next_year = dt_util.start_of_local_day(date(year + 1, 1, 1)).timestamp()
     before_year = False
     into_december = False
+    days = 0
     total = 0.0
     for row in rows:
         bucket = row.get("start")
@@ -1562,7 +1568,9 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
             # The same reset arithmetic as above; a year that carries the
             # whole register as one day's water is not a year to offer.
             return None
+        days += 1
         total += float(delta)
-    if not (before_year and into_december):
+    days_in_year = 366 if calendar.isleap(year) else 365
+    if not (before_year and into_december) or 3 * days < 2 * days_in_year:
         return None
     return total
