@@ -63,6 +63,13 @@ def test_to_float_handles_belgian_comma() -> None:
     assert to_float("0.102") == 0.102
 
 
+@pytest.mark.parametrize("digits", ["9" * 309, "1" + "0" * 400 + ",5"])
+def test_to_float_refuses_a_number_past_the_double_range(digits: str) -> None:
+    """Infinity passed the Flemish 2x checks and reached the sensors."""
+    with pytest.raises(ExtractorError, match="finite"):
+        to_float(digits)
+
+
 def test_to_float_strips_unicode_separators() -> None:
     # NBSP-separated thousands: Belgian PDFs use this for "5 029" etc.
     assert to_float("5 029,5") == 5029.5

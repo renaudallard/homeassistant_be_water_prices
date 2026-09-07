@@ -36,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
 import unicodedata
 import zlib
@@ -399,4 +400,10 @@ def to_float(text: str) -> float:
     cleaned = text.strip()
     for sep in _NUMERIC_SEPARATORS:
         cleaned = cleaned.replace(sep, "")
-    return float(cleaned.replace(",", "."))
+    value = float(cleaned.replace(",", "."))
+    if not math.isfinite(value):
+        # A run of a few hundred digits parses to infinity, which then
+        # passes every ratio check (inf / inf is nan, and nan compares
+        # false) and reaches sensors that refuse to publish it.
+        raise ExtractorError(f"{text.strip()!r} is not a finite number")
+    return value
