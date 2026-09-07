@@ -147,6 +147,15 @@ def test_a_bom_prefixed_pdf_is_read_rather_than_silently_empty() -> None:
     assert extract_pdf_text_layout(with_bom) == extract_pdf_text_layout(real)
 
 
+def test_a_blank_line_ahead_of_the_signature_is_not_a_refusal() -> None:
+    """Some servers emit a newline before %PDF; pdfplumber reads the file once it is gone."""
+    from tests import fixture_bytes
+
+    assert _pdf._is_pdf_payload(b"\r\n%PDF-1.4")
+    text = _pdf.extract_pdf_text_layout(b"\n" + fixture_bytes("aquaduin_2026.pdf"))
+    assert "Tarieven" in text or "tarieven" in text
+
+
 def test_a_pdf_with_no_text_layer_says_so() -> None:
     """An empty extraction has to be an error, not an empty string."""
     import pytest

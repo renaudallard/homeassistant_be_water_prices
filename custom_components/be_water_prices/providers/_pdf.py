@@ -170,14 +170,17 @@ _UTF8_BOM = b"\xef\xbb\xbf"
 
 
 def _strip_bom(payload: bytes) -> bytes:
-    """Drop a leading UTF-8 BOM some publishers put in front of %PDF.
+    """Drop a leading UTF-8 BOM, or blank line, in front of %PDF.
 
     pdfplumber looks for %PDF at byte zero, so the BOM has
     to come off rather than merely be tolerated: accepting it and then
     handing the reader bytes it cannot open turned a clear "this is not
-    a PDF" into an empty extraction with no error at all.
+    a PDF" into an empty extraction with no error at all. A newline
+    ahead of the signature, which some servers emit, is the same case.
     """
-    return payload[len(_UTF8_BOM) :] if payload.startswith(_UTF8_BOM) else payload
+    if payload.startswith(_UTF8_BOM):
+        payload = payload[len(_UTF8_BOM) :]
+    return payload.lstrip(b"\r\n\t ")
 
 
 def _is_pdf_payload(payload: bytes) -> bool:
@@ -339,7 +342,7 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
         # The content type, not the first bytes: whatever answered is not
         # the tariff card, and quoting it put a stranger's page into a
         # sensor attribute and the diagnostics dump.
-        raise ExtractorError(f"expected a PDF at {url}, got {content_type}")
+        raise ExtractorError(f"the answer from {url} ({content_type}) has no PDF signature")
     return await asyncio.to_thread(extract_pdf_text_layout, payload)
 
 
