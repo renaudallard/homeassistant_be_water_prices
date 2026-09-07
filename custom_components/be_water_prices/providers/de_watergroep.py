@@ -252,10 +252,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     """
     target = date.today().year
     try:
-        text, year = await _fetch_commune_ajax(session, _DEFAULT_COMMUNE_GUID)
-        return await asyncio.to_thread(
-            parse_commune_tariff, text, year=year, commune_label=_DEFAULT_COMMUNE_LABEL
-        )
+        return await _newest_commune_card(session, _DEFAULT_COMMUNE_GUID, _DEFAULT_COMMUNE_LABEL)
     except ExtractorError as default_err:
         if isinstance(default_err, TransientFetchError):
             # A transient blip (5xx / 429 / timeout) must propagate so
@@ -286,14 +283,38 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             return carry_prior_year_card(prior, target)
 
 
-async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> tuple[str, int]:
+# The year switcher in the answer marks the tab it served, whichever year
+# the URL asked for.
+_SERVED_YEAR_RE = re.compile(
+    r'UpdateDetailTariefJaar/(20\d\d)/hh-tarieven"\s+class="active"\s+'
+    r'title="Huishoudelijke tarieven (20\d\d)"'
+)
+
+
+def _served_year(text: str, asked: int) -> int:
+    """The year the answer's active tab names, else the year asked for.
+
+    Asked for a year it has not published, the endpoint can answer with
+    the newest card it has, and stamping that with the year in the URL
+    served last year's card as this year's, never stale.
+    """
+    match = _SERVED_YEAR_RE.search(text)
+    if match is None or match.group(1) != match.group(2):
+        return asked
+    return int(match.group(1))
+
+
+async def _fetch_commune_ajax(
+    session: aiohttp.ClientSession, commune: str, year: int | None = None
+) -> tuple[str, int]:
     """GET the UpdateDetailTariefJaar AJAX response for ``commune``.
 
-    Returns the response body and the year used in the URL. Raised
+    Returns the response body and the year it carries: the one its
+    active tab names, or failing that the one the URL asked for. Raised
     errors are :class:`ExtractorError`; the caller decides what to
     label the parsed tariff with.
     """
-    target = date.today().year
+    target = year or date.today().year
     url = COMMUNE_DETAIL_URL_FMT.format(year=target)
     try:
         async with session.get(
@@ -320,13 +341,39 @@ async def _fetch_commune_ajax(session: aiohttp.ClientSession, commune: str) -> t
             f"De Watergroep returned an empty body for commune {commune!r} "
             "(probably an invalid GUID)"
         )
-    return text, target
+    return text, _served_year(text, target)
+
+
+async def _commune_card(
+    session: aiohttp.ClientSession, commune: str, label: str, target: int, year: int | None = None
+) -> WaterTariff:
+    text, served = await _fetch_commune_ajax(session, commune, year)
+    tariff = await asyncio.to_thread(parse_commune_tariff, text, year=served, commune_label=label)
+    return carry_prior_year_card(tariff, target)
+
+
+async def _newest_commune_card(
+    session: aiohttp.ClientSession, commune: str, label: str
+) -> WaterTariff:
+    """This year's card for ``commune``, or last year's until 31 March.
+
+    In January the endpoint for the new year can fail outright until the
+    card is published; last year's endpoint still answers, and its card
+    stands in like every other utility's prior-year fallback.
+    """
+    target = date.today().year
+    try:
+        return await _commune_card(session, commune, label, target)
+    except TransientFetchError:
+        raise
+    except ExtractorError as err:
+        _LOGGER.info("De Watergroep %d card unavailable (%s); trying %d", target, err, target - 1)
+        return await _commune_card(session, commune, label, target, year=target - 1)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint."""
-    text, year = await _fetch_commune_ajax(session, commune)
-    return await asyncio.to_thread(parse_commune_tariff, text, year=year, commune_label=commune)
+    return await _newest_commune_card(session, commune, commune)
 
 
 # The gap between the tag and the label is not padded with \\s* on

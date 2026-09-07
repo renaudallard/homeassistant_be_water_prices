@@ -27,6 +27,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock
+
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
@@ -177,3 +180,87 @@ async def test_a_blip_on_this_years_article_is_not_answered_with_last_years() ->
         await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
     # Only this year's article was asked for; last year's was not tried.
     assert news.await_count == 1
+
+
+class _Body:
+    def __init__(self, text: str) -> None:
+        self._chunks = [text.encode("utf-8")]
+
+    async def iter_chunked(self, _n: int) -> AsyncIterator[bytes]:
+        for chunk in self._chunks:
+            yield chunk
+
+
+class _FakeBodyResp:
+    """A 200 with a body, or the status a year's endpoint answers with."""
+
+    def __init__(self, text: str = "", status: int = 200) -> None:
+        self.status = status
+        self.history = ()
+        self.content = _Body(text)
+        self.content_length = None
+        self.charset = "utf-8"
+
+
+class _YearSession:
+    """Answers each UpdateDetailTariefJaar/<year> URL as told; records the years asked."""
+
+    def __init__(self, answers: dict[int, _FakeBodyResp]) -> None:
+        self._answers = answers
+        self.asked: list[int] = []
+
+    def get(self, url: str, **_k: object) -> _YearSession:
+        year = int(url.rsplit("/", 1)[1])
+        self.asked.append(year)
+        self._resp = self._answers[year]
+        return self
+
+    async def __aenter__(self) -> _FakeBodyResp:
+        return self._resp
+
+    async def __aexit__(self, *_a: object) -> None:
+        return None
+
+
+def test_the_served_year_is_read_off_the_active_tab() -> None:
+    from custom_components.be_water_prices.providers.de_watergroep import _served_year
+
+    page = fixture_html("dewatergroep_halle_2026.html")
+    assert _served_year(page, 2027) == 2026
+    assert _served_year("<p>Basistarief</p>", 2027) == 2027
+
+
+@pytest.mark.parametrize("clamped", [True, False])
+async def test_in_january_last_years_commune_card_stands_until_31_march(
+    monkeypatch: pytest.MonkeyPatch, clamped: bool
+) -> None:
+    """Asked for a year it has not published, the endpoint either answers with
+    the newest card it has or fails; both used to end as this year's card or
+    the drinkwater-only article."""
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import _html, de_watergroep
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2027, 1, 5)
+
+    monkeypatch.setattr(de_watergroep, "date", _FakeDate)
+    monkeypatch.setattr(_html, "fetch_html", AsyncMock(side_effect=AssertionError("news ladder")))
+    card = fixture_html("dewatergroep_halle_2026.html")
+    answers = {
+        2027: _FakeBodyResp(card) if clamped else _FakeBodyResp(status=404),
+        2026: _FakeBodyResp(card),
+    }
+    for fetch in (
+        lambda s: de_watergroep.fetch(s),
+        lambda s: de_watergroep.fetch_for_commune(s, "{guid}"),
+    ):
+        session = _YearSession(answers)
+        tariff = await fetch(session)  # type: ignore[arg-type]
+        assert tariff.valid_from.year == 2026
+        assert tariff.valid_until == date(2027, 3, 31)
+        assert "tarieven 2026" in tariff.publication_label
+        assert tariff.sanering_gemeentelijk_eur_per_m3 > 0
+        assert session.asked == ([2027] if clamped else [2027, 2026])
