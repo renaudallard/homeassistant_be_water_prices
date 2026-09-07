@@ -296,8 +296,8 @@ def parse_cvd(html: str) -> float:
 # "au 1er janvier YYYY", INASEP and the Callmepower pages use "Tarifs
 # YYYY" / "en YYYY".
 _PUBLISHED_YEAR_RES = (
-    re.compile(r"1\s*er\s+janvier\s+(20\d\d)", re.IGNORECASE),
     re.compile(r"tarifs?\s+(20\d\d)", re.IGNORECASE),
+    re.compile(r"1\s*er\s+janvier\s+(20\d\d)", re.IGNORECASE),
     re.compile(r"\ben\s+(20\d\d)", re.IGNORECASE),
 )
 
@@ -312,11 +312,14 @@ def detect_published_year(text: str, *, today: date | None = None) -> int | None
     year adjacent to now can be the one in force.
     """
     now = (today or date.today()).year
-    # The patterns are tried in order of how much they say. "1er janvier
-    # YYYY" and "Tarifs YYYY" date a card; a bare "en YYYY" is prose and
-    # counts only when nothing better is on the page, otherwise a
-    # forward-looking sentence ("prochaine indexation en 2027") would
-    # date the card a year ahead of the rate it carries.
+    # The patterns are tried in order of how much they say. "Tarifs YYYY"
+    # names the card; "1er janvier YYYY" dates a rate on it, and the SPGE
+    # lines an INASEP page keeps under a new "Tarifs" heading still carry
+    # last year's date, so it counts only when no heading names the card.
+    # A bare "en YYYY" is prose and counts only when nothing better is on
+    # the page, otherwise a forward-looking sentence ("prochaine
+    # indexation en 2027") would date the card a year ahead of the rate
+    # it carries.
     for pattern in _PUBLISHED_YEAR_RES:
         found = {int(match.group(1)) for match in pattern.finditer(text)}
         plausible = [year for year in found if now - 1 <= year <= now + 1]

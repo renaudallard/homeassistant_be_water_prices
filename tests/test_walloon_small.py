@@ -192,6 +192,9 @@ def test_the_page_dates_the_tariff_when_it_says_so() -> None:
     today = date(2026, 6, 1)
     assert detect_published_year("Tarifs 2026 en vigueur", today=today) == 2026
     assert detect_published_year("Prix au 1er janvier 2025", today=today) == 2025
+    # A page whose heading names the new card while the SPGE lines it
+    # keeps below still carry last year's date.
+    assert detect_published_year("Tarifs 2027. CVA fixée au 1er janvier 2026.", today=today) == 2027
     # Archive references far from now are not the tariff in force.
     assert detect_published_year("Comparez avec les tarifs 2019", today=today) is None
     assert detect_published_year("nothing dated here", today=today) is None
