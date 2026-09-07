@@ -371,21 +371,22 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
         if self.entity_description.last_reset_fn is None:
             return
         stored = await self.async_get_last_extra_data()
-        if stored is None:
-            return
-        data = stored.as_dict()
-        raw = data.get("reset_at")
-        if isinstance(raw, str):
-            self._reset_at = dt_util.parse_datetime(raw)
-        last = data.get("last_native")
-        if isinstance(last, (int, float)) and not isinstance(last, bool):
-            self._last_native = float(last)
+        if stored is not None:
+            data = stored.as_dict()
+            raw = data.get("reset_at")
+            if isinstance(raw, str):
+                self._reset_at = dt_util.parse_datetime(raw)
+            last = data.get("last_native")
+            if isinstance(last, (int, float)) and not isinstance(last, bool):
+                self._last_native = float(last)
         # The platform writes the first state straight after this returns,
         # without a coordinator update, so the guard has to judge that
-        # value here. Left to the next update, a drop over the restart went
-        # out under last year's last_reset and the reset then moved a
-        # second time inside the same cycle, which the statistics engine
-        # counts as another whole year.
+        # value here, restore data or not. Left to the next update, a drop
+        # over the restart went out under last year's last_reset and the
+        # reset then moved a second time inside the same cycle, which the
+        # statistics engine counts as another whole year; and with nothing
+        # restored the first value went unrecorded, so a drop right after
+        # it was not a drop at all.
         value = self.native_value
         if value is not None:
             self._note_value(value)

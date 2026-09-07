@@ -115,6 +115,31 @@ async def test_the_drop_guard_survives_a_restart() -> None:
     assert sensor._last_native == 1.0
 
 
+async def test_a_fresh_entity_judges_its_first_write_too() -> None:
+    """With nothing to restore, the first value went unrecorded.
+
+    A drop right after it, a meter swap on the entity's first day, was
+    then measured against nothing and published under the calendar-year
+    reset as a negative delta.
+    """
+    sensor = _sensor("ytd_consumption")
+    jan1 = _jan_1_local()
+    with (
+        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=None)),
+        patch(
+            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
+            AsyncMock(),
+        ),
+        patch.object(WaterSensor, "native_value", new_callable=PropertyMock, return_value=30.0),
+    ):
+        await sensor.async_added_to_hass()
+
+    assert sensor._last_native == 30.0
+    sensor._note_value(0.0)
+    reset = sensor.last_reset
+    assert reset is not None and reset > jan1
+
+
 async def test_a_restart_without_a_drop_keeps_the_recorded_reset() -> None:
     sensor = _sensor("ytd_consumption")
     earlier = dt_util.now() - timedelta(days=3)
