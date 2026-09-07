@@ -60,7 +60,7 @@ from ..const import (
 )
 from ._html import fetch_and_parse
 from ._pdf import to_float
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import ExtractorError, WaterExtractor, WaterTariff, carry_prior_year_card
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -339,12 +339,15 @@ def build_tariff(
     Materialises the redevance as ``20·CVD + 30·CVA`` and pulls CVA /
     FSE from the SPGE flat-Wallonia constants. ``valid_from`` dates a
     rate that took effect inside ``year``; it defaults to 1 January,
-    which is when the CWaPE cards normally turn over.
+    which is when the CWaPE cards normally turn over. A card dated last
+    year, a page not yet updated in January, stands until 31 March like
+    every other utility's, rather than counting as stale from the first
+    day of the year.
     """
     cva = WALLONIA_CVA_EUR_PER_M3
     fse = WALLONIA_FSE_EUR_PER_M3
     redevance = 20.0 * cvd + 30.0 * cva
-    return WaterTariff(
+    tariff = WaterTariff(
         utility=utility_id,
         region=REGION_WALLONIA,
         valid_from=valid_from or date(year, 1, 1),
@@ -357,6 +360,7 @@ def build_tariff(
         fse_eur_per_m3=fse,
         vat_rate=DEFAULT_VAT_RATE,
     )
+    return carry_prior_year_card(tariff, date.today().year)
 
 
 def parse_tariff(

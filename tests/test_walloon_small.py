@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from custom_components.be_water_prices.const import (
@@ -219,6 +221,33 @@ def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.Monkey
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
     )
     assert tariff.valid_from.year == 2025
+
+
+@pytest.mark.parametrize(
+    ("today", "valid_until"),
+    [(date(2027, 1, 15), date(2027, 3, 31)), (date(2026, 9, 6), date(2026, 12, 31))],
+)
+def test_a_page_still_on_last_years_card_stands_until_31_march(
+    monkeypatch: pytest.MonkeyPatch, today: date, valid_until: date
+) -> None:
+    """The seven page-dated Walloon extractors were stale from 1 January."""
+    from custom_components.be_water_prices.providers import _walloon_simple
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    class _FakeDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return today
+
+    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    page = (
+        "<html><body><p>Tarifs 2026. Coût vérité distribution (CVD) : 2,870 €/m³.</p></body></html>"
+    )
+    tariff = parse_tariff(
+        page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
+    )
+    assert tariff.valid_from == date(2026, 1, 1)
+    assert tariff.valid_until == valid_until
 
 
 @pytest.mark.parametrize(
