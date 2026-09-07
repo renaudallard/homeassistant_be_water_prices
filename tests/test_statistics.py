@@ -409,3 +409,40 @@ async def test_backfill_writes_the_card_s_last_hour(hass: HomeAssistant) -> None
     assert rows == 366 * 24
     last = imported[-1][2][-1]["start"]
     assert last.astimezone(dt_util.DEFAULT_TIME_ZONE).hour == 23
+
+
+async def test_a_start_past_the_window_says_so(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """clear=True on a start past the card's end wrote and cleared nothing, in silence."""
+    import logging
+    from datetime import UTC, date, datetime
+
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from custom_components.be_water_prices.statistics import async_backfill_prices
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    entry = _entry(hass)
+    coordinator = MagicMock()
+    coordinator.data = CoordinatorData(
+        tariff=_fresh_tariff(valid_until=date(2026, 3, 31)),
+        fetched_at=datetime.now(UTC),
+        snapshot_age_hours=0.0,
+        snapshot_stale=False,
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
+    )
+    recorder = MagicMock()
+    hass.data[DATA_INSTANCE] = recorder
+    caplog.set_level(logging.INFO, logger="custom_components.be_water_prices.statistics")
+    with patch("homeassistant.components.recorder.get_instance", return_value=recorder):
+        rows = await async_backfill_prices(
+            hass, entry, start=datetime(2026, 6, 1, tzinfo=UTC), clear=True
+        )
+    assert rows == 0
+    recorder.async_clear_statistics.assert_not_called()
+    assert "nothing written or cleared" in caplog.text

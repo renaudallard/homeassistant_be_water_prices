@@ -465,7 +465,9 @@ call from wiping long-term statistics across every loaded entry.
 You rarely need it: the default gap-fill upserts on
 `(statistic_id, start)`, so re-running without `clear` overwrites the
 window in place and is safely idempotent. Reach for `clear` only when
-rows outside the window are themselves wrong.
+rows outside the window are themselves wrong. A `start_date` at or
+past the end of the window (now, or the card's `valid_until`) writes
+and clears nothing, and says so in the log at info level.
 
 ### Diagnostics
 

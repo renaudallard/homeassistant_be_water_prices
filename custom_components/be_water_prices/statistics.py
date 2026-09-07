@@ -185,6 +185,15 @@ async def async_backfill_prices(
         ).astimezone(dt_util.UTC)
         end_utc = min(end_utc, valid_until_dt.replace(minute=0, second=0, microsecond=0))
     if end_utc <= start_utc:
+        # Nothing to write, and with clear=True nothing was cleared
+        # either: say why, or the service call ends in silence.
+        _LOGGER.info(
+            "be_water_prices backfill for %s: start %s is not before the window's end %s; "
+            "nothing written or cleared",
+            entry.entry_id,
+            start_utc.isoformat(),
+            end_utc.isoformat(),
+        )
         return 0
 
     ent_reg = er.async_get(hass)
