@@ -1774,3 +1774,50 @@ async def test_a_move_onto_a_utility_already_configured_aborts_before_the_househ
         )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+@pytest.mark.asyncio
+async def test_opening_and_cancelling_the_options_dialog_drops_nothing_and_says_nothing(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The warning fired when the form rendered, three times for three cancelled dialogs."""
+    import logging
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers.base import CommuneOption
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 90,
+            CONF_COMMUNE: "99999",
+            CONF_COMMUNE_LABEL: "Gone",
+        },
+        unique_id=f"{DOMAIN}_farys",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    caplog.set_level(logging.WARNING)
+    live = (CommuneOption(id="1", label="Gent"), CommuneOption(id="2", label="Halle"))
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        new=AsyncMock(return_value=live),
+    ):
+        for _ in range(3):
+            result = await hass.config_entries.options.async_init(entry.entry_id)
+            assert result["type"] == data_entry_flow.FlowResultType.FORM
+            hass.config_entries.options.async_abort(result["flow_id"])
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "9000"}
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        hass.config_entries.flow.async_abort(result["flow_id"])
+        await hass.async_block_till_done()
+    assert entry.options[CONF_COMMUNE] == "99999"
+    assert "no longer in the operator" not in caplog.text

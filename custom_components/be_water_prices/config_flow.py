@@ -562,7 +562,6 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # _async_finish_reconfigure to drop the stale commune even
             # if the user submits the form unchanged.
             self._drop_stale_reconfigure_commune = True
-            _warn_stale_commune(self._utility)
         commune_field = (
             vol.Optional(CONF_COMMUNE, description={"suggested_value": suggested})
             if suggested
@@ -657,6 +656,15 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         if new_utility != old_utility or self._drop_stale_reconfigure_commune:
             new_options.pop(CONF_COMMUNE, None)
             new_options.pop(CONF_COMMUNE_LABEL, None)
+        if (
+            new_utility == old_utility
+            and self._drop_stale_reconfigure_commune
+            and self._reconfigure_commune is None
+        ):
+            # Said here, where the drop happens: said when the form was
+            # rendered, opening and cancelling the dialog logged a drop
+            # that never took place.
+            _warn_stale_commune(new_utility)
         if new_utility != old_utility and not _is_flanders(new_utility):
             # ``social_tariff`` and ``gedomicilieerd_persons`` only enter
             # the Flanders pricing branch. The OptionsFlow hides both for
@@ -787,6 +795,11 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
             # the initial and reconfigure flows persist.
             if CONF_POSTCODE not in final and self.config_entry.options.get(CONF_POSTCODE):
                 final[CONF_POSTCODE] = self.config_entry.options[CONF_POSTCODE]
+            saved = self.config_entry.options.get(CONF_COMMUNE)
+            if communes and saved is not None and saved not in {c.id for c in communes}:
+                # The saved commune could not be offered, so this save
+                # drops it; said here rather than when the form rendered.
+                _warn_stale_commune(utility_id)
             return self.async_create_entry(title="", data=final)
         current = dict(self.config_entry.options)
         saved_commune = current.get(CONF_COMMUNE)
@@ -798,7 +811,6 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
             # user re-picks, mirroring the reconfigure flow's stale drop.
             current.pop(CONF_COMMUNE, None)
             current.pop(CONF_COMMUNE_LABEL, None)
-            _warn_stale_commune(utility_id)
         return self.async_show_form(
             step_id="init",
             data_schema=_options_schema(
