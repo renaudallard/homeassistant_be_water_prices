@@ -47,11 +47,13 @@ jobs:
             if [ ! -s report.md ]; then
               # No report at all: the script crashed before writing one.
               # Retrying a crash gets the same crash, and the issue it
-              # opened carried an empty body. Say so and stop.
+              # opened carried an empty body. Say so and stop, under the
+              # report of an earlier attempt that named the extractor.
               {
-                echo "scripts/live_check.py exited $rc without writing a report: it crashed."
+                echo "scripts/live_check.py exited $rc on attempt $i without writing a report: it crashed."
                 echo "The traceback is in the run log."
-              } > fail_report.md
+              } >> fail_report.md
+              echo "::endgroup::"
               worst=1
               break
             fi
