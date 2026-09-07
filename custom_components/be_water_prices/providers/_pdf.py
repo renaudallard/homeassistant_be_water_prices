@@ -200,10 +200,11 @@ def _is_pdf_payload(payload: bytes) -> bool:
 # tariff cards on file inflate to under a megabyte; a card that needs more
 # than this is not a tariff card.
 MAX_INFLATED_BYTES = 64 * 1024 * 1024
-# pdfminer starts a stream's data after the keyword and whatever ends its
-# line: a bare CR, a trailing blank, or nothing at all when the data
-# follows the keyword directly. "endstream" is not a stream.
-_STREAM_RE = re.compile(rb"(?<!end)stream[ \t]*(?:\r\n|\r|\n)?")
+# pdfminer starts a stream's data after the line the keyword is on: it
+# reads to the first CR or LF, whatever else the line holds, and a CR
+# followed by LF counts once. "endstream" is not a stream.
+_STREAM_RE = re.compile(rb"(?<!end)stream")
+_EOL_RE = re.compile(rb"\r\n|\r|\n")
 _OBJ_HEADER_RE = re.compile(rb"(?<![0-9])[0-9]+[ \t\r\n]+[0-9]+[ \t\r\n]+\Z")
 _FILTER_RE = re.compile(rb"/Filter\s*(\[[^\]]*\]|/[A-Za-z0-9]+|[0-9]+\s+[0-9]+\s+R)")
 _PLAIN_FILTERS = frozenset({b"/FlateDecode", b"/DCTDecode"})
@@ -279,7 +280,16 @@ def guard_pdf_streams(payload: bytes) -> None:
     """
     view = memoryview(payload)
     inflated = consumed = previous_end = 0
+    eol: re.Match[bytes] | None = None
     for match in _STREAM_RE.finditer(payload):
+        # The data starts after the keyword's line. The line end is looked
+        # up once per line, not once per keyword, so a line full of
+        # keywords costs one scan; a keyword with no line end after it
+        # reads no data in pdfminer, nor does any keyword behind it.
+        if eol is None or eol.start() < match.end():
+            eol = _EOL_RE.search(payload, match.end())
+            if eol is None:
+                break
         # The stream's dictionary sits between its "N G obj" and "stream",
         # after the previous keyword since streams do not nest.
         head_start = max(previous_end, match.start() - _HEAD_BYTES)
@@ -298,7 +308,7 @@ def guard_pdf_streams(payload: bytes) -> None:
                 raise ExtractorError(
                     f"PDF stream uses the {spec.decode('ascii', 'replace')} filter"
                 )
-        produced, used = _inflated_size(view[match.end() :], MAX_INFLATED_BYTES - inflated)
+        produced, used = _inflated_size(view[eol.end() :], MAX_INFLATED_BYTES - inflated)
         inflated += produced
         consumed += used
         if inflated > MAX_INFLATED_BYTES:

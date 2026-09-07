@@ -329,16 +329,61 @@ def _stored_block(raw: bytes) -> bytes:
     return b"\x00" + size.to_bytes(2, "little") + (0xFFFF ^ size).to_bytes(2, "little") + raw
 
 
-@pytest.mark.parametrize("keyword", [b"stream\r", b"stream \n", b"stream"])
-def test_a_bomb_behind_an_unusual_stream_keyword_is_refused(
+def _pdf_with_xref(dictionary: bytes, body: bytes, keyword: bytes) -> bytes:
+    """The same one-stream document with a cross-reference table, so pdfminer
+    reads /Length like it does on a real card rather than scanning."""
+    objs = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R"
+        b"/Resources<</Font<</F1 5 0 R>>>>>>",
+        dictionary + keyword + body + b"\nendstream",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for index, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % index + obj + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    for offset in offsets:
+        out += b"%010d 00000 n \n" % offset
+    out += b"trailer<</Root 1 0 R/Size %d>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return bytes(out)
+
+
+@pytest.mark.parametrize(
+    "keyword",
+    [
+        b"stream\r",
+        b"stream \n",
+        b"stream\x0c\n",
+        b"stream(\r\n",
+        b"stream junk on the line\n",
+    ],
+)
+def test_every_keyword_line_pdfminer_reads_past_is_counted(
     keyword: bytes, monkeypatch: Any
 ) -> None:
-    """pdfminer starts the data after a bare CR, a trailing blank, or at once."""
+    """pdfminer starts the data after the first CR or LF, whatever precedes it.
+
+    The guard once tolerated only blanks before the line end, so a form
+    feed or any other byte there left the stream uncounted while pdfminer
+    inflated it in full. Each shape is checked against pdfminer itself.
+    """
+    import io
     import zlib
 
+    from pdfminer.pdfdocument import PDFDocument
+    from pdfminer.pdfparser import PDFParser
+
     monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
-    body = zlib.compress(b" " * (2 << 20), 9)
-    payload = _pdf_with_stream(b"<</Length %d/Filter/FlateDecode>>" % len(body), body, keyword)
+    content = b" " * (2 << 20)
+    body = zlib.compress(content, 9)
+    payload = _pdf_with_xref(b"<</Length %d/Filter/FlateDecode>>" % len(body), body, keyword)
+    stream = PDFDocument(PDFParser(io.BytesIO(payload))).getobj(4)
+    assert len(stream.get_data()) == len(content)
     with pytest.raises(ExtractorError, match="inflate past"):
         _pdf.guard_pdf_streams(payload)
 
