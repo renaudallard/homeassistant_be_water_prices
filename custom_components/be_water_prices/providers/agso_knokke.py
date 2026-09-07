@@ -40,9 +40,10 @@ canonical "Integrale waterprijs" layout::
 
 Picks the table the page labels with the year asked for, or the
 newest year that has already started, as long as every table carries
-a heading with a year. Only when one does not is the table whose
-"Integrale waterprijs" total is the highest taken as the current one,
-since operators only ever index up year-on-year.
+a heading with a year. When one does not, or none of the dated tables
+has started yet, the table whose "Integrale waterprijs" total is the
+highest is taken as the current one, since operators only ever index
+up year-on-year.
 
 Stores all three components separately (drinkwater + afvoer +
 zuivering) the way Pidpa does, so the ``basis_rate`` /
