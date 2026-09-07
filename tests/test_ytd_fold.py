@@ -462,6 +462,68 @@ def test_a_recorder_figure_above_the_mark_is_published() -> None:
     assert out.cycle.offset_m3 == 100.0
 
 
+def test_a_confirmed_jump_the_recorder_contradicts_rebuilds_the_frame() -> None:
+    """Two readings agreeing place the meter, never the frame behind it.
+
+    Once the frame has been re-anchored onto a reading the meter never
+    really showed, the meter's return reads as a jump and the reading after
+    it confirms the meter really is up there. What that cannot confirm is
+    that the year used the difference, and the recorder says it did not, so
+    the frame is rebuilt on what the year knows instead of billing it.
+    """
+    out = _round(_anchored(7.0, 3.0), reading=1523.0, recorder_m3=8.0, hold_m3=1520.0)
+
+    assert out.m3 == 8.0
+    assert out.cycle.offset_m3 == 1515.0
+
+
+def test_a_confirmed_catch_up_the_recorder_backs_is_still_billed() -> None:
+    """A meter that really did advance during an outage is not refused.
+
+    The recorder saw the same catch-up, so the frame and the year agree and
+    the jump is the water it says it is. Refusing this would be the cure
+    doing more harm than the disease.
+    """
+    out = _round(_anchored(20.0, 80.0), reading=250.0, recorder_m3=170.0, hold_m3=249.0)
+
+    assert out.m3 == 170.0
+    assert out.cycle.offset_m3 == 80.0
+
+
+def test_the_live_meter_running_ahead_of_the_recorder_keeps_the_frame() -> None:
+    """The recorder's daily total trails the live reading by the day in
+    progress. That gap is ordinary, not a frame sitting under the meter,
+    and a rule without room for it would rebuild the frame every round.
+    """
+    out = _round(_anchored(20.0, 80.0), reading=125.0, recorder_m3=44.0, hold_m3=124.0)
+
+    assert out.m3 == 45.0
+    assert out.cycle.offset_m3 == 80.0
+
+
+def test_a_lagging_recorder_does_not_unseat_a_frame_the_mark_agrees_with() -> None:
+    """What the year knows is its own figure, not only the latest answer.
+
+    A recorder that has fallen behind the mark it once produced must not
+    pull the frame down to itself: the mark is evidence too, and it is the
+    higher of the two.
+    """
+    out = _round(_anchored(150.0, 80.0), reading=225.0, recorder_m3=20.0, hold_m3=224.0)
+
+    assert out.m3 == 150.0
+    assert out.cycle.offset_m3 == 80.0
+
+
+def test_a_confirmed_jump_stands_when_nothing_can_contradict_it() -> None:
+    """A recorder answer is what makes the frame decidable, and this round
+    has none, so the confirmed reading is taken as it has always been.
+    """
+    out = _round(_anchored(7.0, 3.0), reading=1523.0, hold_m3=1520.0)
+
+    assert out.m3 == 1520.0
+    assert out.cycle.offset_m3 == 3.0
+
+
 def _replay(
     cycle: _YtdCycle, rounds: list[tuple[float | None, float | None]]
 ) -> list[float | None]:

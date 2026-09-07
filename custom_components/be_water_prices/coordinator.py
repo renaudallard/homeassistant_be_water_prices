@@ -452,7 +452,19 @@ def _fold(
         # through on the strength of the value it just contradicted.
         corroborated = hold_m3 is not None and reading >= hold_m3 - _IMPLAUSIBLE_JUMP_M3
         if corroborated:
-            candidate = framed
+            if seen and recorder_m3 is not None and framed - max(seen) > _IMPLAUSIBLE_JUMP_M3:
+                # The meter really is up there, but the frame says it has
+                # passed this much water since the cycle began and the
+                # recorder, reading the same meter's own statistics, says the
+                # year used far less. Two readings agreeing only establish
+                # where the meter stands, never where it stood when the cycle
+                # opened, so what they have confirmed is that the frame is
+                # under the meter: that is what a re-anchor onto a reading the
+                # meter never really showed leaves behind. Rebuild it against
+                # what the year knows instead of billing the difference.
+                offset = reading - max(seen)
+            else:
+                candidate = framed
             hold_m3 = None
         elif mark is not None and framed - mark > _IMPLAUSIBLE_JUMP_M3:
             # A step this large in one report is a garbage value far more
