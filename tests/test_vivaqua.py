@@ -96,6 +96,29 @@ async def test_fetch_parses_off_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     assert round(tariff.linear_eur_per_m3 * 1.06, 2) == 2.62
 
 
+@pytest.mark.parametrize(
+    ("printed", "doctored", "passes"),
+    [
+        ("€ 20,54", "€ 20,55", True),  # one cent on the fixed rows, other cents than 2025
+        ("€ 20,54", "€ 20,56", False),
+        ("€ 2,73", "€ 2,74", True),  # one cent on the variable rows
+        ("€ 2,73", "€ 2,75", False),
+    ],
+)
+def test_the_cross_check_allows_one_cent_of_rounding_whatever_the_cents(
+    printed: str, doctored: str, passes: bool
+) -> None:
+    """The real 2025 card passes its one-cent gap only by float noise."""
+    page = fixture_html("vivaqua_linear_2026.html")
+    assert page.count(printed) >= 1
+    edited = page.replace(printed, doctored, 1)
+    if passes:
+        parse_tariff(edited, year=2026)
+    else:
+        with pytest.raises(ExtractorError, match="!= total"):
+            parse_tariff(edited, year=2026)
+
+
 def test_a_reworded_header_still_finds_the_residential_card() -> None:
     """Only the 6 % marker pins the card; the header wording is not a contract.
 

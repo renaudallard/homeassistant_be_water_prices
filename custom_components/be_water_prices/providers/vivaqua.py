@@ -147,9 +147,12 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
     assert var_sanitation is not None
 
     # Cross-check: supply + sanitation must reconstruct the totals to the
-    # cent. Catches a published page where one of the rows was edited but
-    # the headline value was not.
-    if abs(var_supply + var_sanitation - var_total) > 0.005:
+    # cent, one cent of rounding allowed since the rows are rounded on
+    # their own. Catches a published page where one of the rows was
+    # edited but the headline value was not. Compared in whole cents: on
+    # binary floats the real 2025 card's one-cent gap came out as
+    # 0.00999, and the same gap with other cent values came out over.
+    if _cents_apart(var_supply, var_sanitation, var_total) > 1:
         raise ExtractorError(
             f"VIVAQUA variable supply ({var_supply}) + sanitation ({var_sanitation})"
             f" != total ({var_total})"
@@ -157,7 +160,7 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
     if (
         fixed_supply is not None
         and fixed_sanitation is not None
-        and abs(fixed_supply + fixed_sanitation - fixed_total) > 0.01
+        and _cents_apart(fixed_supply, fixed_sanitation, fixed_total) > 1
     ):
         raise ExtractorError(
             f"VIVAQUA fixed supply ({fixed_supply}) + sanitation"
@@ -177,6 +180,11 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
         sanering_gemeentelijk_eur_per_m3=var_sanitation / vat,
         vat_rate=DEFAULT_VAT_RATE,
     )
+
+
+def _cents_apart(part: float, other: float, total: float) -> int:
+    """How many cents the two parts miss the total by."""
+    return abs(round(part * 100) + round(other * 100) - round(total * 100))
 
 
 def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
