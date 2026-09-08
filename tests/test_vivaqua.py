@@ -145,3 +145,15 @@ def test_a_21_percent_card_for_the_same_year_is_not_the_residential_one() -> Non
         page.replace(needle, "Price from January 1st 2026 (VAT included 21 %)"), year=2026
     )
     assert t.valid_from.year == 2025
+
+
+def test_a_wider_row_is_refused_rather_than_read_from_its_last_column() -> None:
+    """A merged multi-year table with this year first would price last year."""
+    html = fixture_html("vivaqua_linear_2026.html")
+    cell = '<td style="width: 50%; height: 24px;">\u20ac 2,62\xa0</td>'
+    assert cell in html
+    mutated = html.replace(
+        cell, cell + '<td style="width: 50%; height: 24px;">\u20ac 2,17\xa0</td>', 1
+    )
+    with pytest.raises(ExtractorError, match="cells"):
+        parse_tariff(mutated, year=2026)

@@ -119,7 +119,21 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
         cells = [td.get_text(" ", strip=True).lower() for td in tr.find_all(["td", "th"])]
         if len(cells) < 2:
             continue
-        label, value = cells[0], cells[-1]
+        if len(cells) > 2:
+            # One label, one value: that is the shape this card has always
+            # had. Reading cells[-1] out of a wider row would silently take
+            # whichever column happens to sit last, and VIVAQUA putting the
+            # current year first in a merged multi-year table would price
+            # the previous one -- 416.54 EUR a year against 468.23 on the
+            # 2025/2026 pair, with the supply-plus-sanitation cross-check
+            # passing, because all three figures would come from the same
+            # wrong column.
+            raise ExtractorError(
+                f"VIVAQUA {year} row {cells[0]!r} has {len(cells)} cells; this card is "
+                "read as one label and one value, so a wider row needs the column "
+                "picking rather than guessing"
+            )
+        label, value = cells[0], cells[1]
         amounts = extract_amounts(value)
         if not amounts:
             continue
