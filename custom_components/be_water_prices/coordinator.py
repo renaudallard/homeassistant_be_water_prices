@@ -1538,6 +1538,13 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> tuple[str | None,
     return stats[0], len(stats)
 
 
+# Units the recorder hands back untouched and which need no conversion,
+# because the figures behind them already are cubic metres. ``None`` is a
+# sensor with no unit, which _state_volume_m3 reads as m3 on the live
+# side; ``m3`` is the ASCII spelling of the same thing.
+_ALREADY_CUBIC_METRES: tuple[str | None, ...] = (None, "m3")
+
+
 async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, entity_id: str) -> None:
     """Stop before reading a statistic Home Assistant cannot put into m³.
 
@@ -1553,6 +1560,14 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
     reachable: with no usable reading, every tick fell through to the
     recorder. So the two halves now agree, and the year reports nothing
     rather than something absurd.
+
+    Agreeing means agreeing on what passes, too. :func:`_state_volume_m3`
+    takes a reading with no unit at all to be cubic metres already, and
+    that is the common case, so refusing it here would blank the year on
+    a meter that has always been read correctly. ASCII ``m3`` is the same
+    story from the other side: the converter does not know it, but the
+    figures behind it already are cubic metres, so there is nothing to
+    convert and nothing to get wrong.
     """
     try:
         from homeassistant.components.recorder.statistics import get_metadata
@@ -1572,11 +1587,12 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
         # misread; the empty answer below is the right one.
         return
     unit = entry[1].get("unit_of_measurement")
-    if unit in VolumeConverter.VALID_UNITS:
+    if unit in VolumeConverter.VALID_UNITS or unit in _ALREADY_CUBIC_METRES:
         return
     raise RecorderUnavailable(
         f"{entity_id} records statistics in {unit!r}, which Home Assistant cannot "
-        f"convert to {UnitOfVolume.CUBIC_METERS}; set the meter's unit to one of "
+        f"convert to {UnitOfVolume.CUBIC_METERS} and which is not cubic metres "
+        f"already; set the meter's unit to one of "
         f"{sorted(str(u) for u in VolumeConverter.VALID_UNITS)}"
     )
 

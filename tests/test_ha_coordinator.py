@@ -3405,3 +3405,98 @@ async def test_the_tick_after_a_swap_asks_the_recorder(hass: HomeAssistant) -> N
         await coordinator._compute_ytd(_fresh_tariff())
     recorder.assert_awaited()
     assert coordinator._ytd_arbitrate is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("unit", [None, "m3", "m\u00b3", "L"])
+async def test_a_unit_the_recorder_needs_no_help_with_is_read(
+    hass: HomeAssistant, unit: str | None
+) -> None:
+    """The guard must accept exactly what the live path accepts.
+
+    _state_volume_m3 reads a unitless meter as cubic metres and calls that
+    the common case, so refusing it here blanked the year on a meter that
+    had always been read correctly. ASCII m3 is the same from the other
+    side: nothing to convert, nothing to get wrong.
+    """
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+
+    def _stats(*_args: Any) -> Any:
+        return {"sensor.wm": [{"change": 0.3, "state": 10.3, "sum": 10.3}]}
+
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": unit})},
+        ),
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=_stats,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
+    assert total == pytest.approx(0.3)
+
+
+@pytest.mark.asyncio
+async def test_first_anchor_keeps_a_floor_it_can_account_for(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """The anchor path must not clear a floor measured for this household.
+
+    Clearing it there lets a tariff fetch that came back cheaper publish a
+    decrease, and after a restart the anchor tick is the path that runs,
+    so the floor persisted to survive restarts was the one thrown away.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        # Cheaper rates than the ones that set the persisted floor.
+        return replace(_fresh_tariff(), linear_eur_per_m3=1.20)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
+        "version": 1,
+        "minor_version": 2,
+        "data": {
+            "meter": "sensor.water_meter",
+            "year": dt_util.now().year,
+            "m3": None,
+            "cost": 177.25,
+            "offset_m3": None,
+            "basis": "vivaqua||1|False",
+        },
+    }
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=30.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 30.0
+        assert coordinator.data.current_year_cost_eur == 177.25
