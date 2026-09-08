@@ -78,12 +78,7 @@ from ..const import (
 )
 from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents
-from ._walloon_simple import (
-    _MAX_PLAUSIBLE_CVD,
-    _MIN_PLAUSIBLE_CVD,
-    build_tariff,
-    warn_constant_drift,
-)
+from ._walloon_simple import build_tariff, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,6 +97,15 @@ _FSE_HEADINGS = ("social water fund", "fonds social de l'eau", "fonds social")
 def _amounts_after(heading: Tag) -> list[float]:
     """Every € amount inside the siblings after ``heading``.
 
+    Callers take the first. Taking the largest instead was tried, to serve
+    the current rate off a section that prints a historic one before it,
+    and reverted: a VAT-inclusive twin of the same rate is only 6 % above
+    it and a year of indexation is a few percent, so no threshold
+    separates them, and reading the TVAC figure makes the cost engine
+    apply the 6 % a second time. An 11 EUR slip on a page shape nobody has
+    seen is the better trade against billing a household 6 % over on one
+    that is ordinary.
+
     Walks forward through siblings until the next heading of the same
     or higher level, so the search is bounded to one section.
 
@@ -119,19 +123,6 @@ def _amounts_after(heading: Tag) -> list[float]:
     return found
 
 
-def _current_cvd(amounts: list[float]) -> float | None:
-    """The CVD a section states, when it states more than one figure.
-
-    A section that prints last year's rate beside this year's, or an
-    example alongside the rate, used to answer with whichever came first
-    in the markup. A CVD only indexes up, so the largest of the plausible
-    figures is the current one, which is the rule parse_cvd already
-    applies to the pages it scans.
-    """
-    plausible = [v for v in amounts if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD]
-    return max(plausible) if plausible else None
-
-
 def _find_component(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | None:
     """Find the first ``<h3>`` whose text contains any of ``keywords``;
     return the first € amount in the section that follows.
@@ -145,21 +136,10 @@ def _find_component(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | N
     return None
 
 
-def _find_cvd(soup: BeautifulSoup, keywords: tuple[str, ...]) -> float | None:
-    """The CVD its section states, taking the current one when several are."""
-    for heading in soup.find_all(["h2", "h3", "h4"]):
-        text = fold_accents(heading.get_text(" ", strip=True))
-        if any(k in text for k in keywords):
-            value = _current_cvd(_amounts_after(heading))
-            if value is not None:
-                return value
-    return None
-
-
 def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     """Parse a captured ``swde.be/en/water-prices-swde`` page."""
     soup = BeautifulSoup(html, "html.parser")
-    cvd = _find_cvd(soup, _CVD_HEADINGS)
+    cvd = _find_component(soup, _CVD_HEADINGS)
     if cvd is None:
         raise ExtractorError("could not find SWDE CVD on the tariff page")
 

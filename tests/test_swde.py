@@ -131,26 +131,25 @@ def test_headings_are_matched_with_their_accents_folded() -> None:
     assert _find_component(soup, ("cout-verite de distribution",)) == 3.24
 
 
-def test_a_cvd_section_printing_two_figures_serves_the_current_one() -> None:
-    """A historic rate printed before the current one used to win."""
+def test_a_cvd_section_printing_two_figures_reads_the_first() -> None:
+    """First-figure-first, deliberately: see _amounts_after on why.
+
+    Taking the largest was tried, to serve the current rate off a section
+    that prints a historic one before it, and reverted, because no
+    threshold separates a 6 % VAT twin from a few percent of indexation
+    and reading the TVAC figure bills the VAT twice.
+    """
     from custom_components.be_water_prices.providers.swde import parse_tariff
 
     page = fixture_html("swde_2026.html")
-    # Put last year's figure ahead of this year's inside the CVD section.
     mutated = page.replace(
-        "The current CVD &nbsp;amounts to <strong>&euro; 3.24/m&sup3;</strong>.",
-        "Until 2025 it was <strong>&euro; 3.11/m&sup3;</strong>. "
-        "The current CVD &nbsp;amounts to <strong>&euro; 3.24/m&sup3;</strong>.",
+        "The current CVD &nbsp;amounts to <strong>\u20ac 3.24/m\u00b3</strong>.",
+        "Until 2025 it was <strong>\u20ac 3.11/m\u00b3</strong>. "
+        "The current CVD &nbsp;amounts to <strong>\u20ac 3.24/m\u00b3</strong>.",
         1,
     )
-    if mutated == page:
-        mutated = page.replace(
-            "The current CVD &nbsp;amounts to",
-            "Until 2025 it was € 3.11/m³. The current CVD amounts to",
-            1,
-        )
     assert mutated != page, "the mutation did not land"
-    assert parse_tariff(mutated, year=2026).cvd_eur_per_m3 == 3.24
+    assert parse_tariff(mutated, year=2026).cvd_eur_per_m3 == 3.11
 
 
 def test_a_cva_section_is_still_read_first_amount_first() -> None:
@@ -168,3 +167,32 @@ def test_a_clock_dated_swde_card_says_so() -> None:
     assert "states no year" in parse_tariff(page).publication_label
     # An explicitly asked-for year is the caller's claim, not the page's.
     assert "states no year" not in parse_tariff(page, year=2026).publication_label
+
+
+def test_a_vat_inclusive_twin_is_not_mistaken_for_a_higher_cvd() -> None:
+    """Taking it would apply the 6 % twice: 3.24 billed as 3.43."""
+    from custom_components.be_water_prices.providers.swde import parse_tariff
+
+    page = fixture_html("swde_2026.html")
+    mutated = page.replace(
+        "The current CVD &nbsp;amounts to <strong>\u20ac 3.24/m\u00b3</strong>.",
+        "The current CVD &nbsp;amounts to <strong>\u20ac 3.24/m\u00b3</strong> "
+        "(\u20ac 3.43/m\u00b3 incl. VAT).",
+        1,
+    )
+    assert mutated != page, "the mutation did not land"
+    assert parse_tariff(mutated, year=2026).cvd_eur_per_m3 == 3.24
+
+
+def test_a_rate_announced_for_next_year_is_not_taken_as_this_one() -> None:
+    from custom_components.be_water_prices.providers.swde import parse_tariff
+
+    page = fixture_html("swde_2026.html")
+    mutated = page.replace(
+        "The current CVD &nbsp;amounts to <strong>\u20ac 3.24/m\u00b3</strong>.",
+        "The current CVD &nbsp;amounts to <strong>\u20ac 3.24/m\u00b3</strong>. "
+        "From 1 January 2027 it becomes <strong>\u20ac 4.10/m\u00b3</strong>.",
+        1,
+    )
+    assert mutated != page, "the mutation did not land"
+    assert parse_tariff(mutated, year=2026).cvd_eur_per_m3 == 3.24
