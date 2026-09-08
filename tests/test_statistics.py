@@ -332,6 +332,7 @@ async def test_orphan_cleanup_runs_before_a_stale_snapshot_defers_the_backfill(
     and by the next setup the entry was gone, so the previous operator's
     comfort_rate line was stranded for good.
     """
+    from datetime import date as _date
     from types import SimpleNamespace
 
     from custom_components.be_water_prices.statistics import (
@@ -342,12 +343,19 @@ async def test_orphan_cleanup_runs_before_a_stale_snapshot_defers_the_backfill(
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="VIVAQUA",
-        data={CONF_UTILITY: "vivaqua", DATA_BACKFILL_YEAR: "2026:farys"},
+        data={CONF_UTILITY: "vivaqua", DATA_BACKFILL_YEAR: "2026:farys:2026"},
         options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
         unique_id=f"{DOMAIN}_vivaqua",
     )
     entry.add_to_hass(hass)
-    stale = SimpleNamespace(data=SimpleNamespace(snapshot_stale=True))
+    # A real CoordinatorData always carries a tariff; the gate reads its
+    # year, so the stub has to as well.
+    stale = SimpleNamespace(
+        data=SimpleNamespace(
+            snapshot_stale=True,
+            tariff=SimpleNamespace(valid_from=_date(2026, 1, 1)),
+        )
+    )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = stale
 
     with (
@@ -364,7 +372,7 @@ async def test_orphan_cleanup_runs_before_a_stale_snapshot_defers_the_backfill(
 
     clear.assert_awaited_once()
     backfill.assert_not_awaited()
-    assert entry.data[DATA_BACKFILL_YEAR] == "2026:farys"
+    assert entry.data[DATA_BACKFILL_YEAR] == "2026:farys:2026"
 
 
 async def test_backfill_writes_the_card_s_last_hour(hass: HomeAssistant) -> None:
@@ -449,7 +457,11 @@ async def test_a_start_past_the_window_says_so(
 
 
 async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: HomeAssistant) -> None:
-    """Deleting the gate re-ran the backfill on every setup and nothing noticed."""
+    """Deleting the gate re-ran the backfill on every setup and nothing noticed.
+
+    No coordinator is registered here, so the card year is None and the
+    stored gate has to say so too.
+    """
     from custom_components.be_water_prices.statistics import (
         DATA_BACKFILL_YEAR,
         async_maybe_backfill_once,
@@ -458,7 +470,10 @@ async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: Home
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="VIVAQUA",
-        data={CONF_UTILITY: "vivaqua", DATA_BACKFILL_YEAR: f"{dt_util.now().year}:vivaqua"},
+        data={
+            CONF_UTILITY: "vivaqua",
+            DATA_BACKFILL_YEAR: f"{dt_util.now().year}:vivaqua:None",
+        },
         options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
         unique_id=f"{DOMAIN}_vivaqua",
     )
@@ -513,3 +528,58 @@ async def test_a_backfill_that_raises_does_not_take_setup_down(
         await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
     assert "backfill failed" in caplog.text
+
+
+async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
+    hass: HomeAssistant,
+) -> None:
+    """January's flat line was written at last year's rate and never corrected."""
+    from datetime import date as _date
+    from types import SimpleNamespace
+
+    from custom_components.be_water_prices.statistics import (
+        DATA_BACKFILL_YEAR,
+        async_maybe_backfill_once,
+    )
+
+    now_year = dt_util.now().year
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={
+            CONF_UTILITY: "vivaqua",
+            DATA_BACKFILL_YEAR: f"{now_year - 1}:vivaqua:{now_year - 1}",
+        },
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+
+    def _coordinator(card_year: int) -> SimpleNamespace:
+        return SimpleNamespace(
+            data=SimpleNamespace(
+                snapshot_stale=False,
+                tariff=SimpleNamespace(valid_from=_date(card_year, 1, 1)),
+            )
+        )
+
+    # January: carry_prior_year_card is serving last year's card.
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = _coordinator(now_year - 1)
+    with patch(
+        "custom_components.be_water_prices.statistics.async_backfill_prices",
+        new=AsyncMock(return_value=99),
+    ) as first:
+        await async_maybe_backfill_once(hass, entry)
+    assert first.await_count == 1
+    assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year - 1}"
+
+    # March: the operator publishes this year's card. The line has to be
+    # rewritten at the rate that actually applied from 1 January.
+    hass.data[DOMAIN][entry.entry_id] = _coordinator(now_year)
+    with patch(
+        "custom_components.be_water_prices.statistics.async_backfill_prices",
+        new=AsyncMock(return_value=99),
+    ) as second:
+        await async_maybe_backfill_once(hass, entry)
+    assert second.await_count == 1
+    assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year}"

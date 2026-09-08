@@ -350,18 +350,30 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
 async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Run the auto-once backfill, gated by ``(year, utility)``.
 
-    The flag records the calendar year the entry was last backfilled
-    AND the utility it was backfilled for. When the year rolls over OR
-    the user reconfigures to a different operator (postcode-resolver
-    move, manual override, split-postcode choice), the gate trips
-    again and the new operator's flat line replaces the old one rather
+    The flag records the calendar year the entry was last backfilled, the
+    utility it was backfilled for, and the year of the card the rates came
+    off. When the year rolls over, OR the user reconfigures to a different
+    operator (postcode-resolver move, manual override, split-postcode
+    choice), OR the operator finally publishes the new year's card, the
+    gate trips again and the fresh flat line replaces the old one rather
     than mixing rates inside the same calendar year.
     """
     from .const import CONF_UTILITY
 
+    coordinator_now: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     current_year = dt_util.now().year
     current_utility = entry.data.get(CONF_UTILITY)
-    current_gate = f"{current_year}:{current_utility}"
+    # The card's own year is part of the gate. Publishers run late, and
+    # carry_prior_year_card lets last year's card stand until 31 March, so
+    # in January the flat line is written at last year's rate and the gate
+    # was stamped for the calendar year: when the real card arrived in
+    # March the gate already matched and nothing ever corrected the line.
+    card_year = (
+        coordinator_now.data.tariff.valid_from.year
+        if coordinator_now is not None and coordinator_now.data is not None
+        else None
+    )
+    current_gate = f"{current_year}:{current_utility}:{card_year}"
     previous_gate = entry.data.get(DATA_BACKFILL_YEAR)
     if previous_gate == current_gate:
         return
@@ -377,7 +389,10 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     # the registry entry that setup removes right after this, so a
     # deferred cleanup never got a second chance.
     if isinstance(previous_gate, str) and ":" in previous_gate:
-        previous_utility = previous_gate.split(":", 1)[1]
+        # "<year>:<utility>" before the card year joined it, "<year>:
+        # <utility>:<card year>" after, and a utility id never contains a
+        # colon, so the second field is the utility either way.
+        previous_utility = previous_gate.split(":")[1]
         if previous_utility != str(current_utility):
             await _async_clear_orphan_backfill_keys(hass, entry)
 

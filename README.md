@@ -471,10 +471,14 @@ with your options rather than with the tariff, so a flat line back to
 January would be fiction. The start is clamped to the
 tariff snapshot's `valid_from` so periods with no published source
 are not invented. The auto-once gate is stamped onto the config
-entry's data; when the calendar year rolls over the gate trips and
-the next setup extends the line into the new year, unless the snapshot
-is stale -- then it waits, so a year is never filled in with rates that
-had already expired. The window also stops at the tariff's own
+entry's data and carries the calendar year, the operator, and the year
+of the card the rates came off. It trips when any of the three changes,
+so the line extends into a new year, follows an operator change, and is
+rewritten once your utility finally publishes the new card: publishers
+run late, last year's card stands until 31 March, and without the card
+year in the gate January's line kept last year's rate for good. If the
+snapshot is stale it waits instead, so a year is never filled in with
+rates that had already expired. The window also stops at the tariff's own
 `valid_until`. The YTD sensors
 (`current_year_cost`, `year_to_date_consumption`) are intentionally excluded
 because their values come from the user's actual meter history.
