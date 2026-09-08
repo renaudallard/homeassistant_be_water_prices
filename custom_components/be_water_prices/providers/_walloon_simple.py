@@ -137,7 +137,16 @@ def warn_constant_drift(
 
     ``label`` should identify both the utility and the component, e.g.
     ``"SWDE CVA"`` or ``"CILE FSE"``. No-op when ``published`` is ``None``
-    (the row was not present on the page).
+    (the row was not present on the page; :func:`check_spge_constants`
+    decides separately whether that absence is itself a failure).
+
+    Failing closed has a cost worth stating plainly: CWaPE moves the CVA
+    on 1 January, every Walloon page picks the new figure up at once, and
+    all nine Walloon extractors then stop until a release carries the new
+    constant. That is the trade, and the message says what clears it. The
+    alternative is worse, because the constant is what the household is
+    actually billed on, so failing open bills everyone on last year's
+    figure with nothing to show for it.
 
     Every Walloon page prints the CVA and most print the FSE: the
     table-based extractors read them off their rows, the prose-based
@@ -156,7 +165,10 @@ def warn_constant_drift(
         raise ExtractorError(
             f"{label} published value {published} differs from the flat-Wallonia "
             f"constant {constant}; the SPGE component has moved and every Walloon "
-            f"tariff is priced on the old figure until the constant is updated"
+            f"tariff is priced on the old figure until the constant is updated. "
+            f"Set it in const.py (WALLONIA_CVA_EUR_PER_M3 / WALLONIA_FSE_EUR_PER_M3) "
+            f"and ship a release: until then every Walloon entry keeps its last good "
+            f"snapshot and raises the stale-snapshot Repair"
         )
 
 
@@ -209,9 +221,27 @@ def check_spge_constants(text: str, *, utility_id: str, logger: logging.Logger) 
     A page that has moved on from the constant is priced wrong for every
     entry on it; see :func:`warn_constant_drift` for why that fails the
     fetch rather than logging.
+
+    A page that stops printing the CVA at all fails too. Every Walloon
+    page these parsers read prints one, so its absence is the label
+    having moved, and a check that has quietly stopped running is worth
+    nothing. The FSE is not held to the same rule: CIESAC's page really
+    does omit it.
     """
+    published_cva = parse_cva(text)
+    if published_cva is None:
+        # Every Walloon page these parsers read prints the CVA, and a
+        # check that quietly stops running is worth nothing: the constant
+        # is what the household is billed on, so an SPGE move would ride
+        # through unseen the moment a page reworded the label the check
+        # binds to. Losing it is a parser problem, and a parser problem
+        # should be visible.
+        raise ExtractorError(
+            f"{utility_id}: the page no longer prints a CVA, so the SPGE constant "
+            f"{WALLONIA_CVA_EUR_PER_M3} cannot be checked against it"
+        )
     warn_constant_drift(
-        published=parse_cva(text),
+        published=published_cva,
         constant=WALLONIA_CVA_EUR_PER_M3,
         label=f"{utility_id} CVA",
         logger=logger,

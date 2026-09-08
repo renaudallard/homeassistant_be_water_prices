@@ -218,7 +218,8 @@ def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     page = (
-        "<html><body><p>Tarifs 2025. Coût vérité distribution (CVD) : 2,870 €/m³.</p></body></html>"
+        "<html><body><p>Tarifs 2025. Coût vérité distribution (CVD) : 2,870 €/m³. "
+        "Coût vérité assainissement (CVA) : 2,748 €/m³.</p></body></html>"
     )
     tariff = parse_tariff(
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
@@ -259,7 +260,8 @@ def test_a_page_still_on_last_years_card_stands_until_31_march(
 
     monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
     page = (
-        "<html><body><p>Tarifs 2026. Coût vérité distribution (CVD) : 2,870 €/m³.</p></body></html>"
+        "<html><body><p>Tarifs 2026. Coût vérité distribution (CVD) : 2,870 €/m³. "
+        "Coût vérité assainissement (CVA) : 2,748 €/m³.</p></body></html>"
     )
     tariff = parse_tariff(
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
@@ -490,3 +492,16 @@ def test_a_cile_table_with_one_value_column_still_reads_it() -> None:
         "html.parser",
     ).find("table")
     assert _value_column(table, 2026) == -1
+
+
+def test_a_page_that_stops_printing_the_cva_fails_rather_than_stops_checking() -> None:
+    """A guard that quietly stops running is worth nothing."""
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    page = fixture_html("ieg_2026.html")
+    without = page.replace("CVA", "C.V.A.")
+    assert without != page, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="no longer prints a CVA"):
+        parse_tariff(
+            without, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
+        )
