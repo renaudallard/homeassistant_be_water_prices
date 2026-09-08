@@ -35,6 +35,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
+from functools import partial
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -1462,6 +1463,49 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
     return stats[0]
 
 
+async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, entity_id: str) -> None:
+    """Stop before reading a statistic Home Assistant cannot put into m³.
+
+    The query below asks the recorder for cubic metres, and the recorder
+    obliges only for a unit its volume converter knows. For anything else
+    it returns the figures untouched and says nothing, so a meter labelled
+    ``l`` rather than ``L`` -- which Home Assistant only warns about, and
+    still records statistics for -- was summed as though litres were
+    cubic metres: a 100 m3 year published 100000 m3 and a bill of about
+    1.04 million EUR.
+
+    The live path already rejects such a meter, which is what made this
+    reachable: with no usable reading, every tick fell through to the
+    recorder. So the two halves now agree, and the year reports nothing
+    rather than something absurd.
+    """
+    try:
+        from homeassistant.components.recorder.statistics import get_metadata
+    except ImportError:
+        return
+    try:
+        metadata = await instance.async_add_executor_job(
+            partial(get_metadata, hass, statistic_ids={entity_id})
+        )
+    except Exception as err:
+        # Unreadable metadata is unreadable, and guessing that the unit is
+        # fine is exactly the guess this exists to stop.
+        raise RecorderUnavailable(f"could not read the unit of {entity_id}: {err}") from err
+    entry = metadata.get(entity_id)
+    if entry is None:
+        # No statistic yet. There is nothing to convert and nothing to
+        # misread; the empty answer below is the right one.
+        return
+    unit = entry[1].get("unit_of_measurement")
+    if unit in VolumeConverter.VALID_UNITS:
+        return
+    raise RecorderUnavailable(
+        f"{entity_id} records statistics in {unit!r}, which Home Assistant cannot "
+        f"convert to {UnitOfVolume.CUBIC_METERS}; set the meter's unit to one of "
+        f"{sorted(str(u) for u in VolumeConverter.VALID_UNITS)}"
+    )
+
+
 async def _recorder_daily_rows(
     hass: HomeAssistant, entity_id: str, start: date, end: date
 ) -> list[Any]:
@@ -1516,6 +1560,8 @@ async def _recorder_daily_rows(
         _LOGGER.debug("no recorder instance for %s: %s", entity_id, err)
         return []
 
+    await _refuse_an_unconvertible_unit(hass, instance, entity_id)
+
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
     try:
@@ -1531,6 +1577,9 @@ async def _recorder_daily_rows(
             # well as m³); the recorder converts via the statistic's unit
             # class. Without this a litre-reporting meter would be summed
             # as if it were already cubic metres -- ~1000× too high.
+            # Asking is not enough on its own: the recorder hands back
+            # whatever it cannot convert, unconverted and unremarked, which
+            # is why the unit is checked above before the query runs.
             {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS},
             # ``state`` is the register at the end of the bucket, which is
             # what a day's change is measured against: see

@@ -37,7 +37,7 @@ import time
 from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import UnitOfVolume
@@ -1418,6 +1418,10 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
     instance.async_add_executor_job = _run
     with (
         patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "m³"})},
+        ),
+        patch(
             "homeassistant.components.recorder.statistics.statistics_during_period",
             autospec=True,
         ) as stats,
@@ -1482,6 +1486,10 @@ async def test_recorder_ytd_drops_a_first_bucket_with_no_baseline(hass: HomeAssi
     instance.async_add_executor_job = _run
     with (
         patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "m³"})},
+        ),
+        patch(
             "homeassistant.components.recorder.statistics.statistics_during_period",
             autospec=True,
         ) as stats,
@@ -1517,6 +1525,10 @@ async def test_recorder_ytd_keeps_a_first_bucket_that_has_a_baseline(
 
     instance.async_add_executor_job = _run
     with (
+        patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "m³"})},
+        ),
         patch(
             "homeassistant.components.recorder.statistics.statistics_during_period",
             autospec=True,
@@ -1557,6 +1569,10 @@ async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
     instance.async_add_executor_job = _run
     with (
         patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "m³"})},
+        ),
+        patch(
             "homeassistant.components.recorder.statistics.statistics_during_period",
             new=_stats,
         ),
@@ -1590,6 +1606,10 @@ async def test_recorder_ytd_reads_no_statistics_as_zero(hass: HomeAssistant) -> 
             return _rows
 
         with (
+            patch(
+                "homeassistant.components.recorder.statistics.get_metadata",
+                return_value={"sensor.wm": (1, {"unit_of_measurement": "m³"})},
+            ),
             patch(
                 "homeassistant.components.recorder.statistics.statistics_during_period",
                 new=_stats,
@@ -1640,6 +1660,10 @@ async def test_recorder_ytd_raises_when_the_query_fails(hass: HomeAssistant) -> 
 
     instance.async_add_executor_job = _run
     with (
+        patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "m³"})},
+        ),
         patch(
             "homeassistant.components.recorder.statistics.statistics_during_period",
             new=_stats,
@@ -3152,3 +3176,70 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
         assert coordinator.data.current_year_cost_eur is not None
         assert coordinator.data.current_year_cost_eur < 999.0
         assert coordinator._ytd.basis == "vivaqua||3|False"
+
+
+@pytest.mark.asyncio
+async def test_a_unit_home_assistant_cannot_convert_is_not_read_as_cubic_metres(
+    hass: HomeAssistant,
+) -> None:
+    """A meter labelled 'l' published 100000 m3 and a bill of 1.04 M EUR."""
+    from custom_components.be_water_prices.coordinator import (
+        RecorderUnavailable,
+        _recorder_ytd_m3,
+    )
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+
+    def _stats(*_args: Any) -> Any:  # pragma: no cover - must not be reached
+        raise AssertionError("the query ran before the unit was checked")
+
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "l"})},
+        ),
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=_stats,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+        pytest.raises(RecorderUnavailable, match="cannot convert"),
+    ):
+        await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
+
+
+@pytest.mark.asyncio
+async def test_a_litre_meter_spelt_the_way_home_assistant_knows_is_read(
+    hass: HomeAssistant,
+) -> None:
+    """'L' is convertible, so the recorder really does hand back cubic metres."""
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+
+    def _stats(*_args: Any) -> Any:
+        return {"sensor.wm": [{"change": 0.3, "state": 10.3, "sum": 10.3}]}
+
+    with (
+        patch(
+            "homeassistant.components.recorder.statistics.get_metadata",
+            return_value={"sensor.wm": (1, {"unit_of_measurement": "L"})},
+        ),
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=_stats,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
+    assert total == pytest.approx(0.3)
