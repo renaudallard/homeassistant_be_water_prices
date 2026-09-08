@@ -436,6 +436,19 @@ def parse_commune_tariff(
             f"Pidpa drinkwater comforttarief {drink_comfort} is not 2× basistarief"
             f" {drink_basis} for {commune_slug!r} {target} (VMM 2× rule)"
         )
+    # The fifth cell of the same row is the page's own sum of the three
+    # before it. Checking against it is the guard that cannot go stale:
+    # the 2x rule holds just as well when a cell has been read from the
+    # wrong column, and a Flanders-wide constant would need re-pinning
+    # every January.
+    if len(basis_cells) >= 5:
+        integrale = _ex_vat_amount(basis_cells[4].get_text(" ", strip=True))
+        if abs(drink_basis + afvoer_basis + zuivering_basis - integrale) > 0.0001:
+            raise ExtractorError(
+                f"Pidpa rows {drink_basis} + {afvoer_basis} + {zuivering_basis} do not add "
+                f"up to the integrale waterprijs {integrale} the page prints for "
+                f"{commune_slug!r} {target}"
+            )
 
     tariff = build_flanders_tariff(
         utility_id=UTILITY_ID,

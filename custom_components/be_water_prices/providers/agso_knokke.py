@@ -113,6 +113,17 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
         raise ExtractorError(
             f"AGSO Knokke comforttarief {comfort} is not 2× basistarief {drinkwater} (VMM 2× rule)"
         )
+    # The page adds the three legs up itself, in the row this module
+    # already reads to rank the tables. Checking against it costs nothing
+    # and is the one guard that does not go stale: the 2x rule holds just
+    # as well when a cell has been read from the wrong column, and a
+    # Flanders-wide constant would have to be re-pinned every January.
+    integrale = _table_integrale_basis(table)
+    if integrale is not None and abs(drinkwater + afvoer + zuivering - integrale) > 0.0001:
+        raise ExtractorError(
+            f"AGSO Knokke rows {drinkwater} + {afvoer} + {zuivering} do not add up to the "
+            f"integrale waterprijs {integrale} the page prints"
+        )
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=year,

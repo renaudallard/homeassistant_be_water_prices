@@ -159,6 +159,16 @@ def _extract_html_payload(ajax_response_text: str) -> str:
     raise ExtractorError("Farys AJAX response has no insert command with tariff data")
 
 
+# Farys prints the three legs added up, two rows below them. Checking
+# against it is the one guard that cannot go stale: the VMM 2x rule holds
+# just as well when a leg has been read from the wrong row, and a
+# Flanders-wide constant would need re-pinning every January.
+_INTEGRALE_BASIS_RE = re.compile(
+    r"Integrale\s+waterprijs\s+basistarief\s*\(per\s*m³\)\s*€\s*([\d.,]+)\s*€\s*([\d.,]+)",
+    re.IGNORECASE,
+)
+
+
 def _amount(text: str, pattern: re.Pattern[str], label: str) -> float:
     match = pattern.search(text)
     if match is None:
@@ -192,6 +202,13 @@ def parse_tariff(
     sanering_bov = _amount(
         text, _BASIS_BOVENGEMEENTELIJK_RE, "bovengemeentelijke saneringsbijdrage"
     )
+
+    integrale = _amount(text, _INTEGRALE_BASIS_RE, "integrale waterprijs basistarief")
+    if abs(basis + sanering_gem + sanering_bov - integrale) > 0.0001:
+        raise ExtractorError(
+            f"Farys rows {basis} + {sanering_gem} + {sanering_bov} do not add up to "
+            f"the integrale waterprijs {integrale} the page prints"
+        )
 
     active = _active_period_year(soup)
     clock = date.today().year

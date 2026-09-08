@@ -403,6 +403,13 @@ you paid is worth more than a tidy chart.
   is not: 80 m³ on Farys/Gent costs € 586,38 at four residents and
   € 791,28 at one.
 
+  Three Flemish operators print the sum of their own three legs next to
+  them (AGSO Knokke's "Integrale waterprijs excl. BTW" row, Pidpa's
+  fifth column, Farys's "Integrale waterprijs basistarief"). The parsers
+  check the legs against that sum, which catches a cell read from the
+  wrong column even when the VMM 2× rule still holds, and never goes
+  stale the way a pinned Flanders-wide constant would.
+
 ### Keeping the projection honest
 
 `projected_annual_cost` runs off the consumption figure you typed at

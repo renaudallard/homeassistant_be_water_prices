@@ -105,3 +105,13 @@ def test_without_headings_the_dearest_table_is_served_as_this_years() -> None:
     t = parse_tariff(stripped, year=2026)
     assert t.basis_eur_per_m3 == 2.3295
     assert t.valid_from.year == 2026
+
+
+def test_a_leg_that_does_not_add_up_to_the_printed_total_is_refused() -> None:
+    """The page sums the three legs itself; reading one wrong is visible."""
+    page = fixture_html("agso_knokke_2026.html")
+    # The neighbouring non-household cell, which a column shift would take.
+    mutated = page.replace("\u20ac 1,9572", "\u20ac 2,2173", 1)
+    assert mutated != page, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="do not add up to the integrale"):
+        parse_tariff(mutated, year=2026)

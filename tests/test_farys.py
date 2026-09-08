@@ -278,3 +278,14 @@ def test_a_period_switcher_that_names_no_year_is_said_so(caplog: pytest.LogCaptu
     with caplog.at_level(logging.WARNING):
         parse_tariff(doctored)
     assert "not a year" in caplog.text
+
+
+def test_a_leg_that_does_not_add_up_to_the_printed_total_is_refused() -> None:
+    """Farys prints the sum two rows below the legs it sums."""
+    raw = fixture_html("farys_gent_2026.json")
+    # Move the gemeentelijke leg, keeping its own incl-VAT twin consistent
+    # so the existing VAT guard is not what catches it.
+    mutated = raw.replace("1,9572", "2,9572", 1).replace("2,0746", "3,1346", 1)
+    assert mutated != raw, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="do not add up to the integrale"):
+        parse_tariff(mutated, year=2026)

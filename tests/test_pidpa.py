@@ -322,3 +322,15 @@ def test_a_tab_past_the_year_asked_for_is_not_a_fallback(monkeypatch: pytest.Mon
     assert page.count("-tab-2026") >= 1
     with pytest.raises(ExtractorError, match="2026"):
         pidpa.parse_commune_tariff(page.replace("-tab-2026", "-tab-2027"), commune_slug="geel")
+
+
+def test_a_pidpa_leg_that_does_not_add_up_to_the_printed_total_is_refused() -> None:
+    """The fifth cell of the row is the page's own sum of the three before it."""
+    from custom_components.be_water_prices.providers.pidpa import parse_commune_tariff
+
+    page = fixture_html("pidpa_geel_2026.html")
+    # The figure the IBA table on the same page carries for that leg.
+    mutated = page.replace("1,9572", "3,6591", 1)
+    assert mutated != page, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="do not add up to the integrale"):
+        parse_commune_tariff(mutated, commune_slug="geel", year=2026)
