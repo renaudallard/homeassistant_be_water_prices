@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 import pytest
@@ -388,35 +389,54 @@ def test_iden_does_not_read_the_rate_out_of_the_explanatory_section() -> None:
         parse_iden(page.replace('VALUE="3,3552', 'VALUE="x'), year=2026)
 
 
-def test_aiec_refuses_an_aggregator_card_the_operator_has_replaced() -> None:
-    """AIEC moved to 3,050 on 1 April 2026; Callmepower stayed on 2,460."""
+def test_aiec_dates_its_card_from_the_operator_s_picture() -> None:
+    """AIEC moved on 1 April 2026; the aggregator prints no date at all."""
     from custom_components.be_water_prices.providers import aiec
 
     card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
-    assert card.cvd_eur_per_m3 == 2.46
+    assert card.valid_from == date(2026, 1, 1)  # build_tariff stamps 1 January
     page = fixture_html("aiec_operator_2026.html")
     assert aiec.published_card_date(page) == date(2026, 4, 1)
-    with pytest.raises(ExtractorError, match="published a card effective 2026-04-01"):
-        aiec.check_against_operator(card, page)
+    assert aiec.date_against_operator(card, page).valid_from == date(2026, 4, 1)
 
 
-def test_aiec_keeps_the_card_when_the_operator_dates_it_no_later() -> None:
-    """A 1 January card and a 1 January aggregator agree; nothing to refuse."""
+def test_aiec_still_serves_a_card_once_the_aggregator_catches_up() -> None:
+    """Refusing the mismatch could never clear: the card is 1 January by construction."""
     from custom_components.be_water_prices.providers import aiec
 
-    card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
-    page = fixture_html("aiec_operator_2026.html").replace("Tarif-2026-04-1", "Tarif-2026-01-1")
-    assert aiec.published_card_date(page) == date(2026, 1, 1)
-    aiec.check_against_operator(card, page)
+    caught_up = parse_aiec(
+        fixture_html("aiec_callmepower_2026.html").replace("2,46", "3,05"), year=2026
+    )
+    assert caught_up.cvd_eur_per_m3 == 3.05
+    dated = aiec.date_against_operator(caught_up, fixture_html("aiec_operator_2026.html"))
+    assert dated.cvd_eur_per_m3 == 3.05
+    assert dated.valid_from == date(2026, 4, 1)
 
 
-def test_aiec_accepts_a_page_that_dates_no_card_at_all() -> None:
-    """Before AIEC dated its pictures there was nothing to check against."""
+def test_aiec_leaves_a_card_alone_when_the_page_dates_none() -> None:
+    """Before AIEC dated its pictures there was nothing to date against."""
     from custom_components.be_water_prices.providers import aiec
 
     card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
     assert aiec.published_card_date("<html><img src='logo.png'></html>") is None
-    aiec.check_against_operator(card, "<html><img src='logo.png'></html>")
+    assert aiec.date_against_operator(card, "<html></html>").valid_from == date(2026, 1, 1)
+
+
+def test_aiec_keeps_its_card_when_the_operator_page_is_unreachable() -> None:
+    """The page dates the card; it does not carry the rate."""
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import aiec
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
+    for boom in (TransientFetchError("DNS"), ExtractorError("HTTP 500")):
+        with (
+            patch.object(aiec, "_fetch_aggregator", new=AsyncMock(return_value=card)),
+            patch.object(aiec, "fetch_html", new=AsyncMock(side_effect=boom)),
+        ):
+            got = asyncio.run(aiec.fetch(session=None))  # type: ignore[arg-type]
+        assert got.cvd_eur_per_m3 == 2.46
 
 
 def test_an_anchor_that_matches_twice_takes_the_current_value() -> None:
