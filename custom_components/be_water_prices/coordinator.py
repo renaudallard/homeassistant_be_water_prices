@@ -1610,9 +1610,19 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     total = 0.0
     # A register drop waiting for the bucket after it, see below.
     pending_drop = 0.0
+    # Asking for a day period makes Home Assistant re-align the end of the
+    # window to the following local midnight, and the end handed over is
+    # already midnight, so the query comes back one day longer than it was
+    # asked for. _recorder_full_year_m3 drops the overshoot by bucket and
+    # this did not: a clock that ran ahead before NTP corrected it leaves a
+    # bucket dated tomorrow, and on 31 December tomorrow is next year.
+    after_end = dt_util.start_of_local_day(end).timestamp() + 86400
     for index, row in enumerate(await _recorder_daily_rows(hass, entity_id, start, end)):
         delta = row.get("change")
         if delta is None:
+            continue
+        bucket = row.get("start")
+        if bucket is not None and bucket >= after_end:
             continue
         if index == 0 and _change_is_the_whole_register(row):
             # The recorder builds ``change`` by subtracting the sum it

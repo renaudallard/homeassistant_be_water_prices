@@ -148,3 +148,15 @@ async def test_a_heavy_but_believable_day_is_still_counted() -> None:
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 6, 2))  # type: ignore[arg-type]
     assert round(total, 3) == 60.3
+
+
+async def test_a_bucket_dated_after_the_window_is_not_billed_into_it() -> None:
+    """The query comes back one day long; on 31 December that day is next year."""
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=100.3, total=100.3),
+        _row(date(2026, 3, 2), change=0.4, state=100.7, total=100.7),
+        _row(date(2026, 3, 3), change=0.5, state=101.2, total=101.2),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        asked = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
+    assert round(asked, 3) == 0.7
