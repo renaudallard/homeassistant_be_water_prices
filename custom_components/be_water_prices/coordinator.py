@@ -178,7 +178,17 @@ def _migrate_cycle_to_v2(old: dict[str, Any]) -> dict[str, Any]:
         # file last, not what shape it holds, so decide by the keys that are
         # actually there. Folding a v2 payload as if it were v1 finds none of
         # the keys it looks for and empties the record.
-        return {key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")}
+        kept: dict[str, Any] = {
+            key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")
+        }
+        if "basis" in old:
+            # Carried when it is there, and not invented when it is not.
+            # Rebuilding the dict without it dropped the floor's own
+            # provenance on every rollback-and-upgrade; adding it as None
+            # to a record that predates it would make this migration
+            # rewrite a record it is meant to hand back untouched.
+            kept["basis"] = old["basis"]
+        return kept
     anchor_year = old.get("year")
     offset = old.get("baseline_m3")
     hwm = old.get("live_hwm_m3")
@@ -247,6 +257,12 @@ class _YtdCycle:
     served straight from the recorder: the year's consumption is known,
     the reading that would produce it is not.
 
+    ``basis`` is who the cost was computed for: the operator, the commune
+    and the options that price them. The floor must not outlive that. A
+    household granted the social tariff in July, or one whose commune is
+    resolved for the first time, gets a cheaper bill for reasons that have
+    nothing to do with a dip.
+
     ``year`` dates the whole record. A stamp from a previous year makes
     ``m3``, ``cost`` and ``offset_m3`` invisible without erasing them,
     because the stamp is what tells a cycle that has merely rolled over
@@ -259,6 +275,10 @@ class _YtdCycle:
     m3: float | None = None
     cost: float | None = None
     offset_m3: float | None = None
+    # What the cost floor was computed under: the tariff's own rates plus
+    # the options that price them. A floor only holds while these hold. An
+    # older record has no basis and simply rebuilds its floor once.
+    basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -289,6 +309,7 @@ def _fold(
     run_m3: float | None,
     elapsed_s: float,
     high_m3: float | None,
+    basis: str,
     cost_of: Callable[[float], float | None],
 ) -> _YtdFold:
     """Fold one round of evidence into the year-to-date cycle.
@@ -326,7 +347,14 @@ def _fold(
 
     current = cycle.year == now_year
     mark = cycle.m3 if current else None
-    floor = cycle.cost if current else None
+    # A floor only speaks for the household it was measured for. Enabling
+    # the social tariff, registering a resident, or resolving the commune
+    # the household actually lives in all lower the bill for the rest of
+    # the year, and clamping those to a figure measured under the old
+    # answer published 437.56 EUR where 87.51 was owed. A cheaper card is
+    # not in that set and is still clamped. Consumption is unaffected: the
+    # m3 mark is monotonic whatever the rates do.
+    floor = cycle.cost if current and cycle.basis == basis else None
     offset = cycle.offset_m3 if current else None
     if not current:
         hold_m3 = None
@@ -536,7 +564,14 @@ def _fold(
         else:
             floor = cost
     return _YtdFold(
-        _YtdCycle(meter=meter, year=now_year, m3=published, cost=floor, offset_m3=offset),
+        _YtdCycle(
+            meter=meter,
+            year=now_year,
+            m3=published,
+            cost=floor,
+            offset_m3=offset,
+            basis=basis,
+        ),
         published,
         cost,
         hold_m3,
@@ -995,6 +1030,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "m3": self._ytd.m3,
             "cost": self._ytd.cost,
             "offset_m3": self._ytd.offset_m3,
+            "basis": self._ytd.basis,
         }
 
     def _fold_cycle(
@@ -1033,6 +1069,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             run_m3=self._ytd_run_m3,
             elapsed_s=elapsed_s,
             high_m3=self._ytd_high_m3,
+            basis=_cost_basis(
+                utility=tariff.utility,
+                commune=self.entry.options.get(CONF_COMMUNE),
+                persons=int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS)),
+                social=bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False)),
+            ),
             cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3),
         )
         if out.cycle != self._ytd:
@@ -1261,6 +1303,25 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.async_update_listeners()
 
 
+def _cost_basis(*, utility: str, commune: str | None, persons: int, social: bool) -> str:
+    """What the household is billed as, rather than what it is billed for.
+
+    The cost floor exists to stop a momentary dip publishing a decrease: a
+    backward clock step, or a tariff fetch that came back cheaper than the
+    one before it. It is not meant to outlive a change in who the bill is
+    for. Enabling the social tariff, registering a resident, or resolving
+    the commune the household actually lives in each lower the bill for
+    the rest of the year, and clamping those to a floor measured under the
+    old answer published 437.56 EUR where 87.51 was owed, until January.
+
+    Only those inputs are here. The tariff's own rates are deliberately
+    absent: a cheaper card is exactly the transient this floor is for, and
+    a real mid-year price cut still waits for the year to turn, which is
+    the behaviour the README documents and four tests pin.
+    """
+    return "|".join(str(part) for part in (utility, commune or "", persons, social))
+
+
 def _figure(value: object) -> float | None:
     """``value`` as a finite float, or None when it is not a number."""
     if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
@@ -1280,7 +1341,10 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         return None
     meter = data.get("meter")
     year = data.get("year")
+    basis = data.get("basis")
     if meter is not None and not isinstance(meter, str):
+        return None
+    if basis is not None and not isinstance(basis, str):
         return None
     if year is not None and (isinstance(year, bool) or not isinstance(year, int)):
         return None
@@ -1293,6 +1357,7 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         m3=_figure(figures["m3"]),
         cost=_figure(figures["cost"]),
         offset_m3=_figure(figures["offset_m3"]),
+        basis=basis,
     )
 
 

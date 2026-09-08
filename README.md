@@ -386,11 +386,22 @@ you paid is worth more than a tidy chart.
   Responsiveness is bounded by how often your meter entity itself pushes
   a new state.
 
-  Because the running cost is a high-water mark, a mid-year change that
-  *lowers* your bill — enabling the social tariff, reducing the
-  household size, or switching to a cheaper commune — is **not**
-  reflected in `current_year_cost` until the next January 1; the
-  `projected_annual_cost` sensor reflects it immediately.
+  The high-water mark is measured for a *household*: your operator, your
+  commune, and the `gedomicilieerd_persons` / `social_tariff` options.
+  Change any of those and the floor is rebuilt from what you owe now, so
+  enabling the social tariff or picking your commune lowers
+  `current_year_cost` straight away.
+
+  What the floor still holds against is a **tariff fetch that comes back
+  cheaper** — a transient bad parse, or a fallback card. A genuine
+  mid-year price cut by your operator therefore only reaches
+  `current_year_cost` on the next January 1, while
+  `projected_annual_cost` reflects it immediately.
+
+  Registering *more* residents raises a Flemish bill rather than lowering
+  it, since the vastrecht korting is capped at five but the basisvolume
+  is not: 80 m³ on Farys/Gent costs € 586,38 at four residents and
+  € 791,28 at one.
 
 ### Keeping the projection honest
 

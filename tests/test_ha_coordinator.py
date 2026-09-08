@@ -49,6 +49,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
+    CONF_PERSONS,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -2285,6 +2286,10 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
             "m3": 100.0,
             "cost": 999.0,
             "offset_m3": 4000.0,
+            # Who the floor was measured for. Without it the record reads
+            # as one written before the basis existed, and the floor is
+            # rebuilt once on upgrade rather than carried.
+            "basis": "vivaqua||1|False",
         },
     }
 
@@ -2775,14 +2780,14 @@ async def test_first_anchor_of_a_running_year_keeps_the_cost_floor(
     # no anchor, but a cost floor stamped with this year.
     hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
         "version": 1,
+        "minor_version": 2,
         "data": {
             "meter": "sensor.water_meter",
-            "year": None,
-            "baseline_m3": None,
-            "live_hwm_m3": None,
-            "cost_hwm": 177.25,
-            "cost_year": dt_util.now().year,
-            "recorder_year": dt_util.now().year,
+            "year": dt_util.now().year,
+            "m3": None,
+            "cost": 177.25,
+            "offset_m3": None,
+            "basis": "vivaqua||1|False",
         },
     }
 
@@ -3085,3 +3090,65 @@ def test_a_snapshot_from_the_future_is_stale() -> None:
     assert WaterCoordinator._is_stale(tariff, now + timedelta(hours=1)) is True
     assert WaterCoordinator._is_stale(tariff, now - timedelta(hours=1)) is False
     assert WaterCoordinator._is_stale(tariff, now - timedelta(days=40)) is True
+
+
+@pytest.mark.asyncio
+async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """Granted in July, the running bill stayed on the old figure until January."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "4100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+            CONF_PERSONS: 1,
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    # A floor a previous run measured for a one-resident household with no
+    # social tariff, far above what the same water costs once it is on.
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
+        "version": 1,
+        "minor_version": 2,
+        "data": {
+            "meter": "sensor.water_meter",
+            "year": dt_util.now().year,
+            "m3": 100.0,
+            "cost": 999.0,
+            "offset_m3": 4000.0,
+            "basis": "vivaqua||1|False",
+        },
+    }
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(side_effect=RecorderUnavailable("database is locked")),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        # Same household as the record: the floor still stands.
+        assert coordinator.data.current_year_cost_eur == 999.0
+
+        # Now a resident is registered. The bill is lower for the rest of
+        # the year and the floor must not hold it up.
+        hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_PERSONS: 3})
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.current_year_cost_eur is not None
+        assert coordinator.data.current_year_cost_eur < 999.0
+        assert coordinator._ytd.basis == "vivaqua||3|False"

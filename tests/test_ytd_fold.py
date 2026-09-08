@@ -54,6 +54,12 @@ def _bill(m3: float) -> float | None:
     return round(40.0 + 2.0 * m3, 2)
 
 
+# What the household fingerprints to. Rounds that mean to keep a floor
+# pass the same one the cycle carries; a round where the household itself
+# changed passes a different one.
+_BASIS = "stand-in"
+
+
 def _round(
     cycle: _YtdCycle,
     *,
@@ -68,6 +74,7 @@ def _round(
     high_m3: float | None = None,
     now_year: int = _YEAR,
     meter: str = _METER,
+    basis: str = _BASIS,
     cost_of: Callable[[float], float | None] = _bill,
 ) -> _YtdFold:
     return _fold(
@@ -83,18 +90,19 @@ def _round(
         run_m3=run_m3,
         elapsed_s=elapsed_s,
         high_m3=high_m3,
+        basis=basis,
         cost_of=cost_of,
     )
 
 
 def _anchored(m3: float, offset_m3: float, cost: float | None = None) -> _YtdCycle:
     """A cycle tracking the live meter: a figure and the frame behind it."""
-    return _YtdCycle(meter=_METER, year=_YEAR, m3=m3, cost=cost, offset_m3=offset_m3)
+    return _YtdCycle(meter=_METER, year=_YEAR, m3=m3, cost=cost, offset_m3=offset_m3, basis=_BASIS)
 
 
 def _served(m3: float, cost: float | None = None) -> _YtdCycle:
     """A cycle fed by the recorder alone: a figure, but no frame."""
-    return _YtdCycle(meter=_METER, year=_YEAR, m3=m3, cost=cost)
+    return _YtdCycle(meter=_METER, year=_YEAR, m3=m3, cost=cost, basis=_BASIS)
 
 
 def test_a_first_reading_is_framed_by_the_recorder_figure() -> None:
@@ -977,3 +985,36 @@ def test_a_refuted_spike_does_not_raise_the_high_water_mark() -> None:
     normal = _round(spike.cycle, reading=106.0, hold_m3=spike.hold_m3, high_m3=spike.high_m3)
     assert normal.m3 == 26.0
     assert normal.high_m3 == 106.0
+
+
+def test_a_floor_measured_for_other_options_does_not_clamp() -> None:
+    """The social tariff granted in July published 437.56 where 87.51 was owed."""
+    cycle = _anchored(60.0, 1000.0, cost=_bill(60.0))
+    assert cycle.cost == 160.0
+    cheaper = _round(
+        cycle,
+        reading=1060.0,
+        basis="social-tariff-on",
+        cost_of=lambda m3: round(0.20 * (40.0 + 2.0 * m3), 2),
+    )
+    assert cheaper.m3 == 60.0
+    assert cheaper.cost == 32.0
+    assert cheaper.cycle.basis == "social-tariff-on"
+    assert cheaper.cycle.cost == 32.0
+
+
+def test_the_floor_still_clamps_for_the_same_household() -> None:
+    """A clock step, or a card that came back cheaper, must not publish a drop."""
+    cycle = _anchored(60.0, 1000.0, cost=_bill(60.0))
+    out = _round(cycle, reading=1060.0, cost_of=lambda m3: 10.0)
+    assert out.cost == 160.0
+    assert out.cycle.cost == 160.0
+
+
+def test_a_record_written_before_the_basis_existed_rebuilds_its_floor_once() -> None:
+    """An upgrade must not carry a floor it cannot account for."""
+    old = _YtdCycle(meter=_METER, year=_YEAR, m3=60.0, cost=999.0, offset_m3=1000.0)
+    assert old.basis is None
+    out = _round(old, reading=1060.0)
+    assert out.cost == _bill(60.0)
+    assert out.cycle.basis == _BASIS
