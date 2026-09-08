@@ -248,23 +248,25 @@ def parse_cvd(html: str) -> float:
         tag.decompose()
     text = soup.get_text(" ", strip=True)
 
-    explicit = _ACTUAL_CVD_RE.search(text)
-    if explicit is not None:
-        candidate = to_float(explicit.group(1))
-        # Keep the explicit match only when it lands in the plausibility
-        # window. If a page ever surfaces "actuelle du CVD" in an
-        # example / historic context (0,5 €, etc.), the fallback
-        # _CVD_RE branch has a better shot at finding the real value.
-        if _MIN_PLAUSIBLE_CVD <= candidate <= _MAX_PLAUSIBLE_CVD:
-            return candidate
-
-    labeled = _LABELED_DIST_CVD_RE.search(text)
-    if labeled is not None:
-        candidate = to_float(labeled.group(1))
-        # Same plausibility gate: a labeled but out-of-window value falls
-        # through to the generic scan rather than riding straight out.
-        if _MIN_PLAUSIBLE_CVD <= candidate <= _MAX_PLAUSIBLE_CVD:
-            return candidate
+    for pattern in (_ACTUAL_CVD_RE, _LABELED_DIST_CVD_RE):
+        # Every plausible match the anchor finds, not the first. Taking
+        # the first meant a page that prints a historic value under the
+        # same label before the current one, or a neighbouring
+        # distributor's, priced the household on whichever came earlier in
+        # the markup: AIEC's 2,46 against 2,90 is 40 EUR a year. The
+        # generic scan below already reasons this way, and for the same
+        # reason: a CVD only indexes up, so the largest of the values a
+        # page presents under a current-value label is the current one.
+        #
+        # The window gate stays: a labelled but out-of-window value falls
+        # through to that scan rather than riding straight out.
+        candidates = [
+            value
+            for value in (to_float(m) for m in pattern.findall(text))
+            if _MIN_PLAUSIBLE_CVD <= value <= _MAX_PLAUSIBLE_CVD
+        ]
+        if candidates:
+            return max(candidates)
 
     matches = [to_float(m) for m in _CVD_RE.findall(text)]
     if not matches:

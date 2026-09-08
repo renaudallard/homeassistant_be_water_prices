@@ -415,3 +415,35 @@ def test_aiec_accepts_a_page_that_dates_no_card_at_all() -> None:
     card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
     assert aiec.published_card_date("<html><img src='logo.png'></html>") is None
     aiec.check_against_operator(card, "<html><img src='logo.png'></html>")
+
+
+def test_an_anchor_that_matches_twice_takes_the_current_value() -> None:
+    """A historic value printed first used to win: 2,46 against 2,90."""
+    from custom_components.be_water_prices.providers._walloon_simple import parse_cvd
+
+    page = (
+        "<html><body><p>Valeur actuelle du CVD : 2,4600 € en 2024</p>"
+        "<p>Valeur actuelle du CVD : 2,9000 €</p></body></html>"
+    )
+    assert parse_cvd(page) == 2.9
+
+
+def test_a_labelled_anchor_that_matches_twice_takes_the_current_value() -> None:
+    from custom_components.be_water_prices.providers._walloon_simple import parse_cvd
+
+    page = (
+        "<html><body><p>distribution (CVD) : 2,4600 €</p>"
+        "<p>distribution (CVD) : 3,0500 €</p></body></html>"
+    )
+    assert parse_cvd(page) == 3.05
+
+
+def test_an_out_of_window_anchor_still_falls_through_to_the_scan() -> None:
+    """The plausibility gate has to survive the change of rule."""
+    from custom_components.be_water_prices.providers._walloon_simple import parse_cvd
+
+    page = (
+        "<html><body><p>Valeur actuelle du CVD : 0,5000 €</p>"
+        "<p>Le CVD applicable est de 3,2400 €</p></body></html>"
+    )
+    assert parse_cvd(page) == 3.24
