@@ -134,6 +134,11 @@ def _t(b: bytes) -> str:
     return b.decode("utf-8")
 
 
+# A De Watergroep commune whose gemeentelijke leg differs from the Halle
+# default, so a move in either is visible.
+_SINAAI_GUID = "{C1F2FD07-A370-4AB2-86C8-8CA9B236DFB3}"
+
+
 CHECKS: list[FixtureCheck] = [
     FixtureCheck(
         "VIVAQUA",
@@ -155,6 +160,17 @@ CHECKS: list[FixtureCheck] = [
         # The endpoint itself, for the same reason as Pidpa below: the
         # default fetch falls back to the news article when it fails.
         lambda s: de_watergroep.fetch_for_commune(s, de_watergroep._DEFAULT_COMMUNE_GUID),
+    ),
+    FixtureCheck(
+        # A second De Watergroep commune, because the default one cannot
+        # show a saneringsbijdrage moving anywhere else. The Sinaai
+        # fixture sat for months carrying a blank afvoer row the live
+        # page did not have, and nothing reported it: it was not on this
+        # list.
+        "De Watergroep (Sinaai)",
+        "dewatergroep_sinaai_2026.html",
+        lambda b: de_watergroep.parse_commune_tariff(_t(b), year=2026, commune_label="Sinaai"),
+        lambda s: de_watergroep.fetch_for_commune(s, _SINAAI_GUID),
     ),
     FixtureCheck(
         # The no-commune fetch reads the Geel page; the PDF is only its

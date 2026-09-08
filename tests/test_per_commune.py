@@ -75,8 +75,8 @@ def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
     assert t.yearly_fixed_fee == 100.0  # full VMM 50+30+20
     assert t.yearly_fixed_fee_per_resident_discount == 20.0  # full VMM 10+6+4
-    # Explicit non-zero guard: the parser tolerates missing afvoer /
-    # zuivering rows (Sinaai-style) by defaulting to 0.0. For a
+    # Explicit non-zero guard: the parser tolerates a bare afvoer /
+    # zuivering label by defaulting to 0.0. For a
     # normally-billed commune like Halle, a future regex regression
     # that silently returns 0,0 would otherwise cause a ~50%
     # under-bill with no error surface; pin both rates strictly > 0.
@@ -84,17 +84,35 @@ def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 > 0
 
 
-def test_dwg_per_commune_handles_missing_afvoer_row() -> None:
-    # Sinaai (postcode 9112) has no gemeentelijke saneringsbijdrage:
-    # DWG renders the "Afvoer van afvalwater" header with no euro
-    # amount. A missing row must be parsed as 0.0 (drinkwater alone is
-    # mandatory) so the integration still loads for these communes
-    # instead of crashing at setup with "could not parse ... rows".
+def test_dwg_per_commune_handles_a_bare_afvoer_label() -> None:
+    # A label with no euro amount and no "kan momenteel niet getoond
+    # worden" sentence reads as a commune that levies nothing, so the
+    # entry still loads instead of failing setup. Driven by a built page:
+    # Sinaai used to be cited as the real example and is not one, it
+    # publishes EUR 1,9114 today.
+    page = (
+        "<html><body>"
+        "<div>Basistarief per m\u00b3</div>"
+        "<div><span>Waterverbruik drinkwater</span><span>\u20ac 2,9251</span></div>"
+        "<div><span>Afvoer van afvalwater</span></div>"
+        "<div><span>Zuivering van afvalwater</span><span>\u20ac 1,7019</span></div>"
+        "<div>Basistarief per liter</div>"
+        "</body></html>"
+    )
+    t = parse_dwg_commune(page, year=2026, commune_label="Elders")
+    assert t.basis_eur_per_m3 == 2.9251
+    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+
+
+def test_the_sinaai_fixture_carries_the_rate_the_operator_publishes() -> None:
+    # The fixture sat for months holding a blank afvoer row that the live
+    # page did not have, and nothing watched it: it was not in
+    # fixture_drift's list. Pin it so a stale recapture is a test failure.
     t = parse_dwg_commune(
         fixture_html("dewatergroep_sinaai_2026.html"), year=2026, commune_label="Sinaai"
     )
-    assert t.basis_eur_per_m3 == 2.9251
-    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
+    assert t.sanering_gemeentelijk_eur_per_m3 == 1.9114
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
 
 
