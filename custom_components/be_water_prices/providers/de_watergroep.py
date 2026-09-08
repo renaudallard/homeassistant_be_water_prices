@@ -126,6 +126,18 @@ _ZUIVERING_RE = re.compile(
     re.IGNORECASE,
 )
 
+# What De Watergroep prints in place of an amount it cannot render. It is
+# a statement that the number is unavailable, not that the leg is free,
+# and reading it as 0.00 EUR/m3 under-states a bill by the whole leg:
+# 3660 Opglabbeek billed 575.26 EUR a year instead of 782.73 on
+# 2026-09-08. The two cases have to be told apart, so the sentence is
+# matched next to the label it replaced.
+_UNAVAILABLE = "de kostprijs kan momenteel niet getoond worden"
+_AFVOER_UNAVAILABLE_RE = re.compile(rf"Afvoer\s+van\s+afvalwater\s*{_UNAVAILABLE}", re.IGNORECASE)
+_ZUIVERING_UNAVAILABLE_RE = re.compile(
+    rf"Zuivering\s+van\s+afvalwater\s*{_UNAVAILABLE}", re.IGNORECASE
+)
+
 
 def _basis_per_m3_block(text: str) -> str | None:
     """Return the slice of ``text`` belonging to the Basistarief per m³ table.
@@ -202,12 +214,21 @@ def parse_commune_tariff(
 ) -> WaterTariff:
     """Parse the per-commune AJAX response (full integrale waterprijs).
 
-    Some communes don't levy a gemeentelijke or bovengemeentelijke
-    saneringsbijdrage (Sinaai is the canonical example: DWG renders the
-    "Afvoer van afvalwater" / "Zuivering van afvalwater" labels with
-    no euro amount). Treat a missing row as 0 instead of raising so
-    these communes still produce a tariff. Drinkwater stays required:
-    without it there's no tariff at all.
+    A leg can be missing for two reasons and they are not the same. When
+    De Watergroep cannot render the amount it says so in words, and
+    reading that as 0.00 EUR/m3 drops the whole leg from the bill: on
+    2026-09-08 that billed 3660 Opglabbeek 575.26 EUR a year against
+    782.73. That case raises, so the coordinator keeps the last good
+    snapshot and the stale-snapshot Repair goes up.
+
+    A bare label with no amount and no such sentence still counts as a
+    commune that levies nothing. Sinaai used to be cited here as the
+    example of one, wrongly: it publishes EUR 1,9114 today, and the
+    committed fixture had merely caught the page in the same state. There
+    is no confirmed example either way, so the reading is left as it was
+    rather than swapped for a guess.
+
+    Drinkwater stays required: without it there is no tariff at all.
     """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)
@@ -219,6 +240,15 @@ def parse_commune_tariff(
     if drinkwater is None:
         raise ExtractorError("could not parse De Watergroep per-commune drinkwater basistarief")
     basis = to_float(drinkwater.group(1))
+    for pattern, leg in (
+        (_AFVOER_UNAVAILABLE_RE, "gemeentelijke"),
+        (_ZUIVERING_UNAVAILABLE_RE, "bovengemeentelijke"),
+    ):
+        if pattern.search(block) is not None:
+            raise ExtractorError(
+                f"De Watergroep says the {leg} saneringsbijdrage cannot be shown "
+                f"for this commune; refusing to bill it as 0.00 EUR/m3"
+            )
     afvoer = _AFVOER_RE.search(block)
     zuivering = _ZUIVERING_RE.search(block)
     san_gem = to_float(afvoer.group(1)) if afvoer is not None else 0.0

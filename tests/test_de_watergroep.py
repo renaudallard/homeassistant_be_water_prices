@@ -264,3 +264,43 @@ async def test_in_january_last_years_commune_card_stands_until_31_march(
         assert "tarieven 2026" in tariff.publication_label
         assert tariff.sanering_gemeentelijk_eur_per_m3 > 0
         assert session.asked == ([2027] if clamped else [2027, 2026])
+
+
+def test_an_unshowable_leg_is_refused_rather_than_billed_as_free() -> None:
+    """3660 Opglabbeek was billed 575.26 EUR/yr instead of 782.73."""
+    from custom_components.be_water_prices.providers.de_watergroep import parse_commune_tariff
+
+    page = fixture_html("dewatergroep_opglabbeek_2026.html")
+    assert "De kostprijs kan momenteel niet getoond worden" in page
+    with pytest.raises(ExtractorError, match="gemeentelijke saneringsbijdrage cannot be shown"):
+        parse_commune_tariff(page, year=2026, commune_label="Opglabbeek")
+
+
+def test_the_zuivering_leg_is_refused_on_the_same_wording() -> None:
+    """Both legs carry the sentence; Opglabbeek only happened to hit one."""
+    from custom_components.be_water_prices.providers.de_watergroep import parse_commune_tariff
+
+    page = (
+        "<html><body>"
+        "<div>Basistarief per m\u00b3</div>"
+        "<div><span>Waterverbruik drinkwater</span><span>\u20ac 2,9251</span></div>"
+        "<div><span>Afvoer van afvalwater</span><span>\u20ac 1,9572</span></div>"
+        "<div><span>Zuivering van afvalwater</span>"
+        "<span>De kostprijs kan momenteel niet getoond worden.</span></div>"
+        "<div>Basistarief per liter</div>"
+        "</body></html>"
+    )
+    with pytest.raises(
+        ExtractorError, match="bovengemeentelijke saneringsbijdrage cannot be shown"
+    ):
+        parse_commune_tariff(page, year=2026, commune_label="Elders")
+
+
+def test_a_commune_card_that_prints_both_legs_is_untouched() -> None:
+    from custom_components.be_water_prices.providers.de_watergroep import parse_commune_tariff
+
+    t = parse_commune_tariff(
+        fixture_html("dewatergroep_halle_2026.html"), year=2026, commune_label="Halle"
+    )
+    assert t.sanering_gemeentelijk_eur_per_m3 == 1.9572
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
