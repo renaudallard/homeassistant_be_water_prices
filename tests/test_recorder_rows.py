@@ -111,3 +111,40 @@ async def test_a_genuine_swap_is_dropped_whole() -> None:
         total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 4))  # type: ignore[arg-type]
     # The drop swallows the day after it; the water from then on counts.
     assert round(total, 3) == 0.8
+
+
+async def test_a_negative_day_does_not_walk_a_reset_into_the_year() -> None:
+    """One -0.1 day let the whole register in: 0.5 m3 became 4050.8."""
+    glitched = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=4000.3),
+        _row(date(2026, 3, 2), change=-0.1, state=4000.2, total=4000.2),
+        _row(date(2026, 3, 3), change=4050.4, state=4050.4, total=4050.4),
+        _row(date(2026, 3, 4), change=0.2, state=4050.6, total=4050.6),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=glitched)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 3, 1), date(2026, 3, 4))  # type: ignore[arg-type]
+    assert total < 5.0
+    assert round(total, 3) == 0.5
+
+
+async def test_a_re_based_counter_does_not_bill_its_whole_register() -> None:
+    """A pulse counter handed the real meter reading climbs, it does not reset."""
+    rows = [
+        _row(date(2026, 2, 14), change=0.3, state=45.2, total=45.2),
+        _row(date(2026, 2, 15), change=1189.6, state=1234.8, total=1234.8),
+        _row(date(2026, 2, 16), change=0.3, state=1235.1, total=1235.1),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 2, 16))  # type: ignore[arg-type]
+    assert round(total, 3) == 0.6
+
+
+async def test_a_heavy_but_believable_day_is_still_counted() -> None:
+    """A pool fill is real water; only a register-sized day is refused."""
+    rows = [
+        _row(date(2026, 6, 1), change=0.3, state=300.3, total=300.3),
+        _row(date(2026, 6, 2), change=60.0, state=360.3, total=360.3),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 6, 2))  # type: ignore[arg-type]
+    assert round(total, 3) == 60.3

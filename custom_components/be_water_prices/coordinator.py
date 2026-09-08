@@ -1600,6 +1600,8 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
             if netted <= 0.0:
                 _LOGGER.debug("%s: dropping a register drop and its follow-up bucket", entity_id)
                 continue
+            if _exceeds_a_day(netted, entity_id, "netted"):
+                continue
             total += netted
             continue
         if _change_exceeds_the_register(row):
@@ -1616,10 +1618,46 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 row.get("state"),
             )
             continue
+        if _exceeds_a_day(float(delta), entity_id, "single"):
+            continue
         total += float(delta)
     # Nothing above can push the total below zero any more, but the floor
     # stays: it costs nothing and the sensor must never read negative.
     return max(0.0, total)
+
+
+def _exceeds_a_day(change: float, entity_id: str, kind: str) -> bool:
+    """Whether one day claims more water than a day can hold.
+
+    The live path holds a single report that climbs more than
+    ``_IMPLAUSIBLE_JUMP_M3`` until the next reading agrees with it. The
+    recorder path had no bound of any kind, so the same physical event was
+    arbitrated when it arrived as a reading and billed on sight when it
+    arrived as a statistics row.
+
+    Two shapes reach here that :func:`_change_exceeds_the_register` cannot
+    see, because it compares a day against its own register rather than
+    against a day. A counter re-based onto the real meter reading leaves a
+    bucket whose change is the whole re-base but whose register is larger
+    still, so the shape test passes it. And a reset bucket that follows a
+    negative day is netted rather than checked, so one glitch day carried
+    4050 m3 into a year that had used half of one.
+
+    A day is dropped rather than held: there is no next reading to confirm
+    it against, and the year's figure is a high-water mark, so admitting
+    one bad day pins the bill until January while losing one real day of a
+    genuinely enormous draw costs that day alone.
+    """
+    if change <= _IMPLAUSIBLE_JUMP_M3:
+        return False
+    _LOGGER.warning(
+        "%s: ignoring a %s daily change of %.1f m3; no household uses that much "
+        "in a day, so it reads as a re-based or reset register rather than water",
+        entity_id,
+        kind,
+        change,
+    )
+    return True
 
 
 def _change_exceeds_the_register(row: Any) -> bool:
