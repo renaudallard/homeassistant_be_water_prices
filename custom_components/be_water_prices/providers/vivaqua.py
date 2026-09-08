@@ -119,7 +119,13 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
         cells = [td.get_text(" ", strip=True).lower() for td in tr.find_all(["td", "th"])]
         if len(cells) < 2:
             continue
-        if len(cells) > 2:
+        label_only = cells[0]
+        reads_this_row = (
+            "fixed charge" in label_only
+            or "variable charge" in label_only
+            or (label_only in ("supply", "sanitation"))
+        )
+        if len(cells) > 2 and reads_this_row:
             # One label, one value: that is the shape this card has always
             # had. Reading cells[-1] out of a wider row would silently take
             # whichever column happens to sit last, and VIVAQUA putting the
@@ -133,6 +139,12 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
                 "read as one label and one value, so a wider row needs the column "
                 "picking rather than guessing"
             )
+        if len(cells) > 2:
+            # A wide row the parser does not read is a footnote or a note
+            # appended to the same table. It used to be skipped, and
+            # refusing the whole card for it killed VIVAQUA on a purely
+            # cosmetic edit.
+            continue
         label, value = cells[0], cells[1]
         amounts = extract_amounts(value)
         if not amounts:

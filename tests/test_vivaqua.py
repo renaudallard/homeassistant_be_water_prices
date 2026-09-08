@@ -157,3 +157,18 @@ def test_a_wider_row_is_refused_rather_than_read_from_its_last_column() -> None:
     )
     with pytest.raises(ExtractorError, match="cells"):
         parse_tariff(mutated, year=2026)
+
+
+def test_a_wide_row_the_parser_does_not_read_is_skipped() -> None:
+    """A footnote row used to be harmless; refusing it killed the card."""
+    html = fixture_html("vivaqua_linear_2026.html")
+    row = (
+        '<tr style="height: 24px;"><td style="width: 50%;">note</td>'
+        '<td style="width: 25%;">a</td><td style="width: 25%;">b</td></tr>\n'
+    )
+    anchor = '<tr style="height: 24px;">\n<td style="width: 50%; height: 24px;">supply</td>'
+    assert anchor in html
+    mutated = html.replace(anchor, row + anchor, 1)
+    assert mutated != html, "the mutation did not land"
+    t = parse_tariff(mutated, year=2026)
+    assert t.linear_eur_per_m3 == pytest.approx(2.62 / 1.06)
