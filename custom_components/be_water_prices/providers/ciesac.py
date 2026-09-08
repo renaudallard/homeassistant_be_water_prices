@@ -26,9 +26,19 @@
 """CIESAC -- Compagnie Intercommunale des Eaux de la Source les Avins.
 
 Groupe Clavier: serves Clavier, Durbuy, Ouffet and Tinlot (4 communes,
-small population). The operator's own site (ciesac.be) is intermittently
-unreachable and doesn't publish a structured tariff page; we pull from
-the Callmepower public aggregator instead.
+small population). The CVD comes from the Callmepower aggregator because
+the operator's own site is down: every path under ``ciesac.be`` answers
+"Mise a jour du serveur en cours (46, ERR_UPDATING_SERVER)", and has for
+months.
+
+**The figure served here is not verified.** Callmepower prints it with
+one decimal where every other Walloon operator publishes two or four, so
+it is rounded at best, and there is no second source to hold it to. Two
+of the three cards this aggregator supplies were found wrong on
+2026-09-08 (AIEC by 53 EUR a year, IDEN by 18), so treat this one as
+provisional until ciesac.be answers again. Its site runs the same WebDev
+CMS as IDEN, whose card :mod:`iden` now reads directly, so the parser
+there is the place to start when it returns.
 
 Source: https://callmepower.be/fr/eau/distributeurs/ciesac
 """
