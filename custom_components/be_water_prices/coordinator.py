@@ -681,8 +681,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # a restart the very next reading re-establishes it.
         self._ytd_high_m3: float | None = None
         # Set when a round has treated the meter as replaced, cleared by
-        # the next tick that asks the recorder about it. Transient on
-        # purpose: a restart re-bootstraps from the recorder anyway.
+        # the next tick that asks the recorder about it. In memory only, so
+        # a restart in between loses the arbitration: the record a swap
+        # persists is a complete, self-consistent frame, so every clause of
+        # the gate reads False and nothing asks again. That is the same
+        # place v0.7.8 was in permanently, and closing it needs the intent
+        # persisted rather than held.
         self._ytd_arbitrate: bool = False
         # Whether the last recorder query succeeded, None before anything has
         # asked. Transient by design: it says what the database did a moment
