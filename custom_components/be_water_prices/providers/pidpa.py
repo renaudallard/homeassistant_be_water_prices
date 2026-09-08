@@ -29,10 +29,17 @@ Two ingestion paths:
 
   1. **Per-commune** page at ``/ons-aanbod/je-gemeente/<slug>``, one
      ``<table>`` per year (2018-2026) inside a tabbed widget, carrying
-     the current published rates. Pidpa charges one rate province-wide,
-     so with no commune configured the fetch reads the same page for a
-     fixed default commune (Geel) and the numbers are the household's
-     regardless; picking a commune only changes the citation.
+     the current published rates. With no commune configured the fetch
+     reads a fixed default commune's page (Geel).
+
+     Pidpa nearly charges one rate across the province, and this module
+     used to say it charged exactly one. It does not: of the 63 communes
+     it serves, Nijlen, Wommelgem and Kasterlee publish a lower
+     gemeentelijke saneringsbijdrage than the other 60, so the Geel
+     default over-charged them by 27, 19 and 5 EUR a year. Their
+     postcodes are pre-selected in the config flow through
+     :data:`_POSTCODE_COMMUNES`; everywhere else the default really is
+     the household's own rate.
 
   2. **Tariefplan PDF** (covering 2025-2030) at
      ``/sites/default/files/2024-05/Tariefplan_2025-2030_simulatie_type_gezin.pdf``,
@@ -127,10 +134,27 @@ COMMUNE_URL_FMT = "https://www.pidpa.be/ons-aanbod/je-gemeente/{slug}"
 SITEMAP_URL = "https://www.pidpa.be/sitemap.xml"
 
 # Default commune for the no-commune fetch. Any served commune's page
-# carries the province-wide household rate; Geel is the one the test
+# carries the rate 60 of the 63 communes pay; Geel is the one the test
 # fixture captures, and the fixture_drift check already watches it.
 _DEFAULT_COMMUNE_SLUG = "geel"
-_DEFAULT_COMMUNE_LABEL = "Geel (province-wide default)"
+_DEFAULT_COMMUNE_LABEL = "Geel (Pidpa default)"
+
+# The three communes whose gemeentelijke saneringsbijdrage is not the one
+# the Geel default carries, checked against all 63 commune pages on
+# 2026-09-08: Nijlen 1,7019, Wommelgem 1,7814 and Kasterlee 1,9078
+# against the other 60 at 1,9572. Left to the default they were
+# over-charged 27.06, 18.64 and 5.24 EUR a year.
+_POSTCODE_COMMUNES: dict[str, str] = {
+    "2560": "nijlen",
+    "2160": "wommelgem",
+    "2460": "kasterlee",
+}
+
+
+def commune_for_postcode(postcode: str) -> str | None:
+    """The commune slug for a postcode Pidpa does not bill at the default rate."""
+    return _POSTCODE_COMMUNES.get(postcode.strip())
+
 
 # The PDF text extraction yields "Drinkwatertarief\n2025 2026 2027 2028 2029 2030\n(excl. BTW)\n…",
 # i.e. the year header sits between the section title and "(excl. BTW)". We
@@ -436,7 +460,7 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    """No-commune fetch: the province-wide rate off the default commune page.
+    """No-commune fetch: the rate off the default commune's page.
 
     Falls back to the Tariefplan PDF when the page cannot be read, so the
     integration keeps producing a tariff, and says so, since that
@@ -503,4 +527,5 @@ EXTRACTOR = WaterExtractor(
     fetch=fetch,
     fetch_for_commune=fetch_for_commune,
     list_communes=list_communes,
+    commune_for_postcode=commune_for_postcode,
 )

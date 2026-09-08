@@ -93,7 +93,7 @@ def test_per_commune_parses_2026_basistarief_columns() -> None:
     assert t.basis_eur_per_m3 == 2.1888
     assert t.comfort_eur_per_m3 == 4.3776  # exactly 2× basis per VMM
     # Drinkwater + gemeentelijke afvoer + bovengemeentelijke zuivering --
-    # Pidpa publishes them per commune; today they are uniform province-wide.
+    # Pidpa publishes them per commune; 60 of the 63 carry this pair.
     assert t.sanering_gemeentelijk_eur_per_m3 == 1.9572
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
 
@@ -186,7 +186,7 @@ async def test_default_fetch_reads_the_commune_page(monkeypatch: pytest.MonkeyPa
     assert t.basis_eur_per_m3 == 2.1888
     assert t.sanering_gemeentelijk_eur_per_m3 == 1.9572
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
-    assert "province-wide default" in t.publication_label
+    assert "Pidpa default" in t.publication_label
     assert t.source_url.endswith("/ons-aanbod/je-gemeente/geel")
 
 

@@ -345,3 +345,21 @@ def test_the_2070_default_is_worth_the_difference_it_claims() -> None:
     )
     assert antwerpen is not None and ring is not None
     assert round(ring - antwerpen, 2) == 66.01
+
+
+def test_the_three_pidpa_communes_off_the_default_rate_are_pre_selected() -> None:
+    """Pidpa is not one rate province-wide; three of 63 communes are lower."""
+    from custom_components.be_water_prices.config_flow import _commune_for_postcode
+
+    for postcode, slug in (("2560", "nijlen"), ("2160", "wommelgem"), ("2460", "kasterlee")):
+        assert _resolve_postcode(postcode) == "pidpa", postcode
+        assert _commune_for_postcode("pidpa", postcode) == slug
+    # A commune that really is on the default rate is left alone.
+    assert _commune_for_postcode("pidpa", "2440") is None
+
+
+def test_the_pidpa_default_no_longer_claims_to_be_province_wide() -> None:
+    from custom_components.be_water_prices.providers import pidpa
+
+    assert "province-wide" not in pidpa._DEFAULT_COMMUNE_LABEL
+    assert "province-wide" not in (pidpa.__doc__ or "")
