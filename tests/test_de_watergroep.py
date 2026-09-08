@@ -59,10 +59,21 @@ class _FakeAjaxCtx:
         return False
 
 
+class _FakeJar:
+    """Just enough of aiohttp's cookie jar for the dwg_l cleanup."""
+
+    def __init__(self) -> None:
+        self.cleared = 0
+
+    def clear(self, _predicate: object = None) -> None:
+        self.cleared += 1
+
+
 class _FakeGetSession:
     def __init__(self, *, status: int | None = None, exc: BaseException | None = None) -> None:
         self._status = status
         self._exc = exc
+        self.cookie_jar = _FakeJar()
 
     def get(self, *_a: object, **_k: object) -> _FakeAjaxCtx:
         return _FakeAjaxCtx(status=self._status, exc=self._exc)
@@ -129,6 +140,7 @@ class _YearSession:
     def __init__(self, answers: dict[int, _FakeBodyResp]) -> None:
         self._answers = answers
         self.asked: list[int] = []
+        self.cookie_jar = _FakeJar()
 
     def get(self, url: str, **_k: object) -> _YearSession:
         year = int(url.rsplit("/", 1)[1])
@@ -237,3 +249,13 @@ async def test_the_no_commune_fetch_has_nothing_under_it() -> None:
     ):
         await dwg.fetch(session=None)  # type: ignore[arg-type]
     assert not hasattr(dwg, "parse_news_tariff")
+
+
+async def test_the_commune_cookie_does_not_outlive_its_request() -> None:
+    """A dwg_l left in the shared jar could answer for another commune."""
+    from custom_components.be_water_prices.providers import de_watergroep as dwg
+
+    session = _FakeGetSession(status=500)
+    with pytest.raises(ExtractorError):
+        await dwg._fetch_commune_ajax(session, "{GUID}", 2026)  # type: ignore[arg-type]
+    assert session.cookie_jar.cleared == 1

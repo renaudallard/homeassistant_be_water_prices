@@ -279,6 +279,14 @@ async def _fetch_commune_ajax(
         raise TransientFetchError(
             f"network error fetching De Watergroep AJAX endpoint: {error_text(err)}"
         ) from err
+    finally:
+        # The session is shared, and aiohttp merges its jar into the Cookie
+        # header it sends. A dwg_l the endpoint set on an earlier request
+        # would then travel with the next one and could answer for a
+        # commune nobody asked about, with nothing in the answer to reveal
+        # it: the commune is not named anywhere in the body. Drop it again
+        # so each request carries only the one it was given.
+        session.cookie_jar.clear(lambda cookie: cookie.key == "dwg_l")
     if not text.strip() or "Basistarief" not in text:
         raise ExtractorError(
             f"De Watergroep returned an empty body for commune {commune!r} "
