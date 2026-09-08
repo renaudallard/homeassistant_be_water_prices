@@ -158,3 +158,13 @@ def test_a_cva_section_is_still_read_first_amount_first() -> None:
     from custom_components.be_water_prices.providers.swde import parse_tariff
 
     assert parse_tariff(fixture_html("swde_2026.html"), year=2026).cva_eur_per_m3 == 2.748
+
+
+def test_a_clock_dated_swde_card_says_so() -> None:
+    """The page names no year, so nothing downstream can tell it is stale."""
+    from custom_components.be_water_prices.providers.swde import parse_tariff
+
+    page = fixture_html("swde_2026.html")
+    assert "states no year" in parse_tariff(page).publication_label
+    # An explicitly asked-for year is the caller's claim, not the page's.
+    assert "states no year" not in parse_tariff(page, year=2026).publication_label

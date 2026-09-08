@@ -179,12 +179,21 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         threshold=0.001,
     )
 
+    # SWDE's page states no tariff year anywhere, so the card can only be
+    # dated from the clock. That means a page left on last year's rate is
+    # served as this year's and the staleness check can never notice, so
+    # the label says which it is rather than implying the page said so.
+    stated = year is not None
     target = year or date.today().year
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
         source_url=SOURCE_URL,
-        publication_label=f"SWDE water prices {target}",
+        publication_label=(
+            f"SWDE water prices {target}"
+            if stated
+            else f"SWDE water prices {target} (page states no year)"
+        ),
         year=target,
     )
 

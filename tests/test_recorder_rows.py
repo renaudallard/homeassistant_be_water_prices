@@ -190,3 +190,25 @@ async def test_one_admitted_bucket_is_enough_to_call_the_year_readable() -> None
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
     assert round(total, 3) == 0.4
+
+
+async def test_a_meter_whose_history_starts_inside_the_window_loses_its_first_day() -> None:
+    """A deliberate trade, and until now an untested one.
+
+    Home Assistant builds `change` by subtracting the sum found strictly
+    before the window and falls back to zero when there is none, so a
+    meter whose statistics begin inside the window has change == sum on
+    its first bucket. That reads exactly like a purge, and the two cannot
+    be told apart from the row, so the day is dropped either way. It
+    costs that day for the rest of the year, which is why it is pinned
+    here rather than left to be re-decided by accident.
+    """
+    rows = [
+        _row(date(2026, 1, 5), change=0.3, state=0.3, total=0.3),
+        _row(date(2026, 1, 6), change=0.4, state=0.7, total=0.7),
+        _row(date(2026, 1, 7), change=0.5, state=1.2, total=1.2),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
+    # 0.3 of genuinely consumed water is missing, and stays missing.
+    assert round(total, 3) == 0.9

@@ -192,6 +192,15 @@ with it, again without a restart.
 | `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `all_in_basis_rate` | The first-block tariff per m³, VAT-incl: `(basis + sanering) × (1 + VAT)`, before any social-tariff reduction. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 
+Between 1 January and the day your operator publishes the new card, both
+cost sensors run at **last year's rates**, and `snapshot_stale` stays
+`false` because the card is deliberately held valid until 31 March (see
+the grace window above). The `valid_from` attribute is what tells you
+which year is on screen. Once the new card lands the whole year to date
+is re-billed at it, which is correct: Belgian tariffs apply from
+1 January whatever day they are published. On the 2025 to 2026 Pidpa
+step that window is worth about € 4 on the projection.
+
 All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting or the social tariff, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe.
 
 | Entity id suffix | Description |
