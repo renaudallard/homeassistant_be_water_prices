@@ -1,0 +1,25 @@
+# Pinned so a green run here means a green run anywhere, and so a release of
+# something upstream cannot turn the daily live check red while the
+# integration itself still works.
+#
+# The workflows that need only a couple of these install them by name and
+# take the version from this file with pip's -c, so each version is written
+# down once.
+#
+# The pinned homeassistant version is also the floor hacs.json declares.
+# Moving one without the other leaves the integration claiming support for
+# releases nothing ever runs it on.
+#
+# pytest, pytest-asyncio and pytest-timeout are pinned by
+# pytest-homeassistant-custom-component itself. They are spelled out anyway so
+# that bumping the harness shows what else it moved.
+aiohttp==3.13.3
+beautifulsoup4==4.15.0
+homeassistant==2026.2.3
+mypy==2.3.1
+pdfplumber==0.11.9
+pytest==9.0.0
+pytest-asyncio==1.3.0
+pytest-homeassistant-custom-component==0.13.316
+pytest-timeout==2.4.0
+ruff==0.16.6

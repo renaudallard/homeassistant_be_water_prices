@@ -29,13 +29,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      # The pinned homeassistant version is also the floor hacs.json
-      # declares. Moving one without the other leaves the integration
-      # claiming support for releases nothing ever runs it on.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff mypy pytest pytest-asyncio pytest-timeout pdfplumber beautifulsoup4 homeassistant==2026.2.3 pytest-homeassistant-custom-component==0.13.316
+          pip install -r requirements-dev.txt
       - name: Lint
         run: |
           ruff check .

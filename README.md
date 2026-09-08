@@ -600,6 +600,7 @@ when reporting an issue.
 ## Development
 
 ```bash
+pip install -r requirements-dev.txt
 ruff check .
 ruff format --check .
 mypy --strict custom_components/be_water_prices

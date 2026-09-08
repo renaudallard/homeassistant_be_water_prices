@@ -41,9 +41,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 
 def test_hacs_floor_matches_the_tested_home_assistant() -> None:
     declared = json.loads((_ROOT / "hacs.json").read_text(encoding="utf-8"))["homeassistant"]
-    workflow = (_ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
-    pinned = re.search(r"homeassistant==([0-9.]+)", workflow)
-    assert pinned is not None, "the test workflow no longer pins homeassistant"
+    requirements = (_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+    pinned = re.search(r"^homeassistant==([0-9.]+)$", requirements, re.MULTILINE)
+    assert pinned is not None, "requirements-dev.txt no longer pins homeassistant"
     assert declared == pinned.group(1), (
         f"hacs.json declares {declared} but CI installs {pinned.group(1)}"
     )
