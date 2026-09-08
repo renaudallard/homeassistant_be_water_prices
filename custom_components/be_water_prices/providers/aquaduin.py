@@ -64,7 +64,7 @@ import aiohttp
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse
-from ._pdf import fetch_pdf_text_layout, to_float
+from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
 from .base import (
     ExtractorError,
     TransientFetchError,
@@ -146,6 +146,16 @@ async def _discover_pdf_url(session: aiohttp.ClientSession, year: int) -> str:
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     """Parse a captured Aquaduin tariff PDF (extracted via pdfplumber)."""
     target = year or date.today().year
+    # The card states the year it applies from. Dating it from the file
+    # name or the page URL alone meant a link left pointing at an older
+    # card was served as this year's, and carry_prior_year_card and the
+    # staleness check could never retire it.
+    stated = stated_card_year(text)
+    if stated is not None and stated != target:
+        raise ExtractorError(
+            f"Aquaduin card states it applies from 1 January {stated}, "
+            f"not {target} as its link says"
+        )
     basis_m = _BASIS_RE.search(text)
     comfort_m = _COMFORT_RE.search(text)
     if basis_m is None:

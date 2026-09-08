@@ -408,6 +408,23 @@ def fold_accents(text: str) -> str:
     )
 
 
+# What a Dutch tariff card says it applies from: "Geldig vanaf 1 januari
+# 2026" on Water-link's, "Overzicht tarieven per 1 januari 2026" on
+# Aquaduin's. Both used to be dated from the file name or the page URL
+# alone, so a link left pointing at an older card was served as this
+# year's and never looked stale.
+_CARD_YEAR_RE = re.compile(
+    r"(?:geldig\s+vanaf|tarieven\s+per)\s+1\s+januari\s+(20\d\d)",
+    re.IGNORECASE,
+)
+
+
+def stated_card_year(text: str) -> int | None:
+    """The year a Dutch card states it applies from, if it states one."""
+    match = _CARD_YEAR_RE.search(text)
+    return int(match.group(1)) if match is not None else None
+
+
 def to_float(text: str) -> float:
     """Parse a Belgian / French decimal number ('15,93' or '0.102').
 

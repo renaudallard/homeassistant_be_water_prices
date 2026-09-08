@@ -132,7 +132,14 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
 
     from custom_components.be_water_prices.providers import aquaduin
 
-    text = _pdf_text()
+    # The fallback fetches last year's URL, so the stand-in has to be last
+    # year's card: it states the year it applies from, and the parser holds
+    # the link's year to it.
+    prior = date.today().year - 1
+    text = _pdf_text().replace(
+        "Overzicht tarieven per 1 januari 2026", f"Overzicht tarieven per 1 januari {prior}"
+    )
+    assert "per 1 januari 2026" not in text
     with (
         patch.object(aquaduin, "_discover_pdf_url", new=AsyncMock(return_value="http://x/y.pdf")),
         patch.object(
@@ -152,3 +159,15 @@ def test_find_pdf_href_accepts_the_cms_dedupe_suffix() -> None:
 
     href = "/volumes/general/Paginas/Zelf-regelen/Tarieven/overzicht-tarieven-2026_1.pdf?v=2"
     assert _find_pdf_href(f'<a href="{href}">t</a>', 2026) == href
+
+
+def test_a_card_dated_for_another_year_is_refused() -> None:
+    """A link left pointing at an older card was served as this year's."""
+    text = _pdf_text()
+    assert "Overzicht tarieven per 1 januari 2026" in text
+    stale = text.replace(
+        "Overzicht tarieven per 1 januari 2026",
+        "Overzicht tarieven per 1 januari 2026".replace("2026", "2025"),
+    )
+    with pytest.raises(ExtractorError, match="states it applies from 1 January 2025"):
+        parse_tariff(stale, year=2026)

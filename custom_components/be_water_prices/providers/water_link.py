@@ -76,7 +76,7 @@ import aiohttp
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse
-from ._pdf import fetch_pdf_text_layout, to_float
+from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
 from .base import (
     CommuneOption,
     ExtractorError,
@@ -176,6 +176,16 @@ def parse_tariff(
     the fixture tests and the drift check.
     """
     target = year or date.today().year
+    # The card states the year it applies from. Dating it from the file
+    # name or the page URL alone meant a link left pointing at an older
+    # card was served as this year's, and carry_prior_year_card and the
+    # staleness check could never retire it.
+    stated = stated_card_year(text)
+    if stated is not None and stated != target:
+        raise ExtractorError(
+            f"Water-link card states it applies from 1 January {stated}, "
+            f"not {target} as its link says"
+        )
     basis = _parse_commune_row(text, commune, "BASISTARIEF")
     comfort = _parse_commune_row(text, commune, "COMFORTTARIEF")
     if basis is None:

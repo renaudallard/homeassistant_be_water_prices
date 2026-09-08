@@ -306,3 +306,14 @@ def test_find_pdf_href_accepts_the_cms_dedupe_suffix() -> None:
     # The non-household card carries the same suffix and stays excluded.
     with pytest.raises(ExtractorError):
         _find_pdf_href('<a href="/sites/default/files/2026-01/2026%20NHH_0.pdf">x</a>', 2026)
+
+
+def test_a_card_dated_for_another_year_is_refused() -> None:
+    """A link left pointing at an older card was served as this year's."""
+    text = _pdf_text()
+    assert "Geldig vanaf 1 januari 2026" in text
+    stale = text.replace(
+        "Geldig vanaf 1 januari 2026", "Geldig vanaf 1 januari 2026".replace("2026", "2025")
+    )
+    with pytest.raises(ExtractorError, match="states it applies from 1 January 2025"):
+        parse_tariff(stale, year=2026)
