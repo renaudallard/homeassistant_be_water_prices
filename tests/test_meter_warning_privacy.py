@@ -56,7 +56,7 @@ async def test_the_second_meter_warning_names_no_entity(
         ),
         caplog.at_level(logging.WARNING),
     ):
-        assert await _discover_energy_water_meter(hass) == "sensor.kitchen_water"
+        assert await _discover_energy_water_meter(hass) == ("sensor.kitchen_water", 2)
     assert "2 water meters" in caplog.text
     assert "sensor.kitchen_water" not in caplog.text
     assert "sensor.garden_water" not in caplog.text

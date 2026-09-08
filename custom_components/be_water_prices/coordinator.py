@@ -1112,7 +1112,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 persons=int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS)),
                 social=bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False)),
             ),
-            cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3),
+            cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3, now_year),
         )
         if out.cycle != self._ytd:
             self._cycle_dirty = True
@@ -1223,17 +1223,26 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 )
         return ytd_m3, ytd_cost
 
-    def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float) -> float | None:
+    def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float, year: int) -> float | None:
         """Apply the pro-rated YTD bill math to a year-to-date m³ figure.
 
         Shared by the daily recorder path (:meth:`_compute_ytd`) and the
         live meter-event path (:meth:`_recompute_live_ytd`) so both use
         identical fee pro-rating and regional math.
+
+        ``year`` is the one the round is being folded for, not the one the
+        clock reads now. A tick that starts on 31 December and crosses
+        local midnight while its recorder query runs would otherwise price
+        the closing year at one day elapsed and hand back a fee of nothing.
         """
         today = dt_util.now().date()
-        jan1 = date(today.year, 1, 1)
+        if today.year != year:
+            # The clock moved on mid-round. Price the year the round is
+            # about, which is the one its consumption belongs to.
+            today = date(year, 12, 31) if today.year > year else date(year, 1, 1)
+        jan1 = date(year, 1, 1)
         elapsed = (today - jan1).days + 1  # include today
-        days_in_year = 366 if calendar.isleap(today.year) else 365
+        days_in_year = 366 if calendar.isleap(year) else 365
         fraction = elapsed / days_in_year
         persons = int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS))
         social = bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False))

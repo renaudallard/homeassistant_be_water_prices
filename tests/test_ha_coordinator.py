@@ -3321,3 +3321,41 @@ async def test_one_energy_water_source_raises_nothing(hass: HomeAssistant) -> No
         assert (
             ir.async_get(hass).async_get_issue(DOMAIN, coordinator.several_meters_issue_id) is None
         )
+
+
+@pytest.mark.asyncio
+async def test_a_round_that_crosses_midnight_prices_the_year_it_is_for(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 31 December tick whose query ran past midnight priced one day elapsed."""
+    from datetime import date as _date
+    from types import SimpleNamespace
+
+    from custom_components.be_water_prices import coordinator as co
+    from custom_components.be_water_prices.pricing import compute_annual_cost
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=AsyncMock())
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        coordinator = co.WaterCoordinator(hass, entry)
+
+    tariff = _fresh_tariff()
+
+    class _NewYear:
+        @staticmethod
+        def now() -> Any:
+            return SimpleNamespace(year=2027, date=lambda: _date(2027, 1, 1))
+
+    monkeypatch.setattr(co, "dt_util", _NewYear)
+    closing = coordinator._ytd_cost_from_m3(tariff, 80.0, 2026)
+    monkeypatch.undo()
+
+    # The closing year is billed as a full year, not as one day of the next.
+    assert closing == compute_annual_cost(tariff, 80.0, 1)
