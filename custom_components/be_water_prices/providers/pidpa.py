@@ -113,7 +113,6 @@ from ._pdf import fetch_pdf_text_layout, to_float
 from .base import (
     CommuneOption,
     ExtractorError,
-    TransientFetchError,
     WaterExtractor,
     WaterTariff,
     carry_prior_year_card,
@@ -475,29 +474,25 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     """No-commune fetch: the rate off the default commune's page.
 
-    Falls back to the Tariefplan PDF when the page cannot be read, so the
-    integration keeps producing a tariff, and says so, since that
-    projection runs well under the published rate. A transient blip
-    propagates instead, so the live check classifies it rather than the
-    projection quietly standing in for the outage.
+    Nothing stands in for it. The Tariefplan PDF used to: it is a
+    May-2024 projection whose 2026 column reads 2,0848 / 1,6533 / 1,1809
+    where the commune pages carry 2,1888 / 1,9572 / 1,7019, so it bills
+    606.21 EUR a year at 80 m3 against the page's 704.68. It shipped that
+    way for months once already, and the only signal was a log line.
+
+    A card 14 % short is worse than no card: without one the coordinator
+    keeps serving the last good snapshot and raises the stale-snapshot
+    Repair, and the daily live check fails and opens an issue. The PDF is
+    still parsed, by the drift check, which compares it against itself so
+    a change in the projection is still noticed.
     """
-    try:
-        return await fetch_and_parse(
-            session,
-            COMMUNE_URL_FMT.format(slug=_DEFAULT_COMMUNE_SLUG),
-            parse_commune_tariff,
-            commune_slug=_DEFAULT_COMMUNE_SLUG,
-            commune_label=_DEFAULT_COMMUNE_LABEL,
-        )
-    except TransientFetchError:
-        raise
-    except ExtractorError as err:
-        _LOGGER.warning(
-            "Pidpa default commune page unavailable (%s); serving the Tariefplan "
-            "PDF projection, which runs below the published rates",
-            err,
-        )
-        return await fetch_tariefplan(session)
+    return await fetch_and_parse(
+        session,
+        COMMUNE_URL_FMT.format(slug=_DEFAULT_COMMUNE_SLUG),
+        parse_commune_tariff,
+        commune_slug=_DEFAULT_COMMUNE_SLUG,
+        commune_label=_DEFAULT_COMMUNE_LABEL,
+    )
 
 
 def _slug_to_label(slug: str) -> str:

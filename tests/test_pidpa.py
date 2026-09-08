@@ -28,7 +28,6 @@
 from __future__ import annotations
 
 import functools
-import logging
 
 import pytest
 
@@ -190,36 +189,6 @@ async def test_default_fetch_reads_the_commune_page(monkeypatch: pytest.MonkeyPa
     assert t.source_url.endswith("/ons-aanbod/je-gemeente/geel")
 
 
-async def test_default_fetch_falls_back_to_the_tariefplan_pdf(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    from unittest.mock import AsyncMock, patch
-
-    from custom_components.be_water_prices.providers import _html, pidpa
-    from custom_components.be_water_prices.providers._flanders import build_flanders_tariff
-
-    # Extracting the real PDF inside an async test drags every pdfminer
-    # debug record through the event loop and trips the timeout; the
-    # routing is what matters here, so hand the fallback a ready tariff.
-    projection = build_flanders_tariff(
-        utility_id="pidpa",
-        year=2026,
-        publication_label="Pidpa Tariefplan 2025-2030 column 2026",
-        source_url=pidpa.SOURCE_URL,
-        basis=2.0848,
-        comfort=4.1696,
-    )
-    with (
-        patch.object(_html, "fetch_html", new=AsyncMock(side_effect=ExtractorError("HTTP 404"))),
-        patch.object(pidpa, "fetch_tariefplan", new=AsyncMock(return_value=projection)) as pdf,
-        caplog.at_level(logging.WARNING),
-    ):
-        t = await pidpa.fetch(session=None)  # type: ignore[arg-type]
-    pdf.assert_awaited_once()
-    assert t is projection
-    assert "Tariefplan PDF projection" in caplog.text
-
-
 async def test_default_fetch_reraises_transient_instead_of_the_pdf() -> None:
     from unittest.mock import AsyncMock, patch
 
@@ -334,3 +303,18 @@ def test_a_pidpa_leg_that_does_not_add_up_to_the_printed_total_is_refused() -> N
     assert mutated != page, "the mutation did not land"
     with pytest.raises(ExtractorError, match="do not add up to the integrale"):
         parse_commune_tariff(mutated, commune_slug="geel", year=2026)
+
+
+async def test_the_default_fetch_has_nothing_under_it() -> None:
+    """The Tariefplan projection billed 606.21 EUR a year against Geel's 704.68."""
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import pidpa
+
+    with (
+        patch.object(pidpa, "fetch_and_parse", new=AsyncMock(side_effect=ExtractorError("404"))),
+        patch.object(pidpa, "fetch_pdf_text_layout", new=AsyncMock()) as pdf,
+        pytest.raises(ExtractorError, match="404"),
+    ):
+        await pidpa.fetch(session=None)  # type: ignore[arg-type]
+    pdf.assert_not_awaited()
