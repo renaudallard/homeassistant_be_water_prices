@@ -3359,3 +3359,49 @@ async def test_a_round_that_crosses_midnight_prices_the_year_it_is_for(
 
     # The closing year is billed as a full year, not as one day of the next.
     assert closing == compute_annual_cost(tariff, 80.0, 1)
+
+
+@pytest.mark.asyncio
+async def test_the_tick_after_a_swap_asks_the_recorder(hass: HomeAssistant) -> None:
+    """Without it a meter that was merely offline billed its whole lifetime."""
+    from custom_components.be_water_prices import coordinator as co
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=AsyncMock())
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        coordinator = co.WaterCoordinator(hass, entry)
+
+    # A round that re-anchors on a new register sets the flag...
+    coordinator._ytd = co._YtdCycle(
+        meter="sensor.water_meter", year=dt_util.now().year, m3=40.0, offset_m3=1194.5
+    )
+    coordinator._ytd_hold_run = 2
+    coordinator._ytd_hold_span_s = 700.0
+    coordinator._ytd_run_m3 = 0.0
+    coordinator._ytd_high_m3 = 1234.5
+    coordinator._fold_cycle(
+        _fresh_tariff(),
+        meter="sensor.water_meter",
+        now_year=dt_util.now().year,
+        reading=0.0,
+        recorder_m3=None,
+    )
+    assert coordinator._ytd_arbitrate is True
+
+    # ...and the next tick spends it on a recorder query.
+    hass.states.async_set("sensor.water_meter", "1234.6")
+    recorder = AsyncMock(return_value=40.1)
+    with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
+        await coordinator._compute_ytd(_fresh_tariff())
+    recorder.assert_awaited()
+    assert coordinator._ytd_arbitrate is False

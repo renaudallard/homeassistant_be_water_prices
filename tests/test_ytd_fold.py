@@ -1018,3 +1018,26 @@ def test_a_record_written_before_the_basis_existed_rebuilds_its_floor_once() -> 
     out = _round(old, reading=1060.0)
     assert out.cost == _bill(60.0)
     assert out.cycle.basis == _BASIS
+
+
+def test_a_confirmed_swap_asks_for_the_recorder_next_round() -> None:
+    """The frame a swap builds is self-consistent, so nothing re-queried it."""
+    cycle = _anchored(40.0, 1194.5)
+    out = _round(cycle, reading=0.0, hold_run=2, hold_span_s=700.0, run_m3=0.0, high_m3=1234.5)
+    assert out.cycle.offset_m3 == 0.0
+    assert out.m3 == 0.0
+    assert out.swapped is True
+
+
+def test_an_ordinary_round_does_not_ask_for_arbitration() -> None:
+    out = _round(_anchored(40.0, 1000.0), reading=1041.0)
+    assert out.swapped is False
+    assert out.m3 == 41.0
+
+
+def test_a_frame_rebuilt_under_a_sound_reading_is_not_a_swap() -> None:
+    """Reading still above what the year used means the frame was too high."""
+    cycle = _anchored(40.0, 1194.5)
+    out = _round(cycle, reading=60.0, hold_run=2, hold_span_s=700.0, run_m3=60.0, high_m3=1234.5)
+    assert out.swapped is False
+    assert out.m3 == 40.0

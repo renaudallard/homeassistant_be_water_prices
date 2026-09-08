@@ -294,6 +294,11 @@ class _YtdFold:
     hold_span_s: float
     run_m3: float | None
     high_m3: float | None
+    # Set by the round that treats the meter as replaced. The frame is
+    # then built on a register with no history, so the year's figure rests
+    # on nothing but that reading until something dates it: the next tick
+    # asks the recorder rather than trusting the frame it just built.
+    swapped: bool = False
 
 
 def _fold(
@@ -519,7 +524,7 @@ def _fold(
         # all, and report nothing rather than publish a zero it has not
         # earned: the stamp is what stops the next reading starting the year
         # over.
-        return _YtdFold(cycle, None, None, hold_m3, hold_run, hold_span_s, run_m3, high_m3)
+        return _YtdFold(cycle, None, None, hold_m3, hold_run, hold_span_s, run_m3, high_m3, swapped)
     published = max(figures)
 
     if (
@@ -580,6 +585,7 @@ def _fold(
         hold_span_s,
         run_m3,
         high_m3,
+        swapped,
     )
 
 
@@ -668,6 +674,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # decides whether a reading is the meter climbing or a dip, and after
         # a restart the very next reading re-establishes it.
         self._ytd_high_m3: float | None = None
+        # Set when a round has treated the meter as replaced, cleared by
+        # the next tick that asks the recorder about it. Transient on
+        # purpose: a restart re-bootstraps from the recorder anyway.
+        self._ytd_arbitrate: bool = False
         # Whether the last recorder query succeeded, None before anything has
         # asked. Transient by design: it says what the database did a moment
         # ago, which is exactly as long as the answer is worth trusting.
@@ -1122,6 +1132,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_hold_span_s = out.hold_span_s
         self._ytd_run_m3 = out.run_m3
         self._ytd_high_m3 = out.high_m3
+        if out.swapped:
+            # Nothing has dated the new register yet. Ask the recorder on
+            # the next tick: without it the frame is self-consistent from
+            # the moment it is built, so the gate in _compute_ytd never
+            # queries again and a meter that was merely offline bills its
+            # whole lifetime into this year.
+            self._ytd_arbitrate = True
         return out.m3, out.cost
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
@@ -1183,7 +1200,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             or self._ytd.offset_m3 is None
             or live is None
             or stale_frame
+            or self._ytd_arbitrate
         ):
+            self._ytd_arbitrate = False
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)
             try:
