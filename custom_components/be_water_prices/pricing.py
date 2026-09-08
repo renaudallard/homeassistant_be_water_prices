@@ -62,10 +62,12 @@ def _compute_bill(
 
     **Wallonia** (tier): the first 30 m³ pay ``0.5·CVD + 0·CVA + FSE``
     per m³ (CVA is exempt on the residential first block by CWaPE
-    rule), above 30 m³ pays the full ``CVD + CVA + FSE``, plus
-    ``fee_factor · redevance``. ``persons`` unused. The block allowance
-    is annual (resets on Jan 1), so YTD consumption fills it up the
-    same way an annual projection does.
+    rule), 31 to 5000 m³ pay the full ``CVD + CVA + FSE``, and above
+    5000 m³ the CVD falls to 90 %, plus ``fee_factor · redevance``.
+    ``persons`` unused. The block allowances are annual (reset on
+    Jan 1), so YTD consumption fills them up the same way an annual
+    projection does. CILE publishes four further tranches above
+    50 000 m³; nothing this integration meters comes near them.
 
     **Flanders** (block): basis volume = ``30 + 30·persons`` m³, which
     the decree does not cap. Inside the basis volume each m³
@@ -99,8 +101,15 @@ def _compute_bill(
         cva = tariff.cva_eur_per_m3
         fse = tariff.fse_eur_per_m3
         first_block = min(consumption_m3, 30.0) * (0.5 * cvd + fse)
-        rest = max(0.0, consumption_m3 - 30.0) * (cvd + cva + fse)
-        ex_vat = first_block + rest + fee_factor * tariff.yearly_fixed_fee
+        middle = max(0.0, min(consumption_m3, 5000.0) - 30.0) * (cvd + cva + fse)
+        # Above 5000 m3 the CVD falls to 90 %, which every Walloon page
+        # prints and AIEC's card spells out as "(0,9 x CVD) + CVA". No
+        # household reaches it, but the year-to-date bill is driven by the
+        # meter rather than by the configured consumption, so a shared or
+        # building-wide meter can, and billing it the tranche below is
+        # 376.85 EUR out at 6000 m3 on CILE's rates.
+        top = max(0.0, consumption_m3 - 5000.0) * (0.9 * cvd + cva + fse)
+        ex_vat = first_block + middle + top + fee_factor * tariff.yearly_fixed_fee
         return round(ex_vat * (1.0 + tariff.vat_rate), 2)
 
     if tariff.region == "flanders":

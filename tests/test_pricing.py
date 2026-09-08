@@ -319,3 +319,36 @@ def test_ytd_returns_none_for_unwired_region() -> None:
         basis_eur_per_m3=2.95,
     )
     assert compute_ytd_cost(bogus, 40, 1, 0.5) is None
+
+
+def test_wallonia_above_5000_m3_pays_ninety_percent_of_the_cvd() -> None:
+    """AIEC's own card prints "(0,9 x CVD) + CVA" for the third tranche."""
+    cvd = 3.5552
+    t = _swde_2026()
+    t = type(t)(
+        **{
+            **t.__dict__,
+            "cvd_eur_per_m3": cvd,
+            "yearly_fixed_fee": 20 * cvd + 30 * WALLONIA_CVA_EUR_PER_M3,
+        }
+    )
+    fee = 20 * cvd + 30 * WALLONIA_CVA_EUR_PER_M3
+    fse = WALLONIA_FSE_EUR_PER_M3
+    cva = WALLONIA_CVA_EUR_PER_M3
+    expected = round(
+        (30 * (0.5 * cvd + fse) + 4970 * (cvd + cva + fse) + 1000 * (0.9 * cvd + cva + fse) + fee)
+        * 1.06,
+        2,
+    )
+    assert compute_annual_cost(t, consumption_m3=6000, persons=1) == expected
+
+
+def test_the_third_tranche_does_not_disturb_a_household_volume() -> None:
+    """Everything at or below 5000 m3 must be exactly what it was."""
+    t = _swde_2026()
+    assert compute_annual_cost(t, consumption_m3=80, persons=1) == 527.83
+    assert compute_annual_cost(t, consumption_m3=30, persons=1) == 208.67
+    at_boundary = compute_annual_cost(t, consumption_m3=5000, persons=1)
+    just_over = compute_annual_cost(t, consumption_m3=5001, persons=1)
+    assert at_boundary is not None and just_over is not None
+    assert just_over > at_boundary

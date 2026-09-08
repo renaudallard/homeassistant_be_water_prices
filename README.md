@@ -51,7 +51,7 @@ publication and how to parse it.
 - **Live tariff publications** — prices come straight from each utility's HTML page or PDF tariefplan; no EUR values live in this repo.
 - **Whole-bill view** — drinkwater + sanering + redevance + VAT all add up to a single EUR/year sensor that mirrors what you actually pay.
 - **Flemish integrale waterprijs** — VMM block structure (basis up to `30 + 30·persons` m³, comfort = 2× basis above), per-resident vastrecht korting, and the 80 % social-tariff reduction.
-- **Walloon CWaPE tiers** — first 30 m³ at `0.5·CVD + FSE` (CVA exempt on the residential first block), above 30 m³ at full `CVD + CVA + FSE`, plus the regulator-defined `20·CVD + 30·CVA` redevance. Verified to the cent against inBW's published facture.
+- **Walloon CWaPE tiers** — first 30 m³ at `0.5·CVD + FSE` (CVA exempt on the residential first block), 31 to 5 000 m³ at full `CVD + CVA + FSE`, above 5 000 m³ at `0.9·CVD + CVA + FSE`, plus the regulator-defined `20·CVD + 30·CVA` redevance. Verified to the cent against inBW's published facture and AIEC's own worked table.
 - **Brussels linear** — VIVAQUA's single-rate domestic tariff plus the annual fixed fee.
 - **Postcode auto-resolution** — enter your postcode and the right utility is picked automatically. Fall through to a manual picker for the long tail.
 - **Projected annual cost** — every entry has a `projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
@@ -148,7 +148,8 @@ Flanders  : (min(consumption, basis_volume) × (basis + sanering)
              + max(0, consumption - basis_volume) × (comfort + 2·sanering)
              + max(0, vastrecht - persons·korting)) × (1 + VAT)
 Wallonia  : (min(consumption, 30) × (0.5·CVD + FSE)
-             + max(0, consumption - 30) × (CVD + CVA + FSE)
+             + clamp(consumption, 30, 5000) × (CVD + CVA + FSE)
+             + max(0, consumption - 5000) × (0.9·CVD + CVA + FSE)
              + 20·CVD + 30·CVA) × (1 + VAT)
 ```
 
