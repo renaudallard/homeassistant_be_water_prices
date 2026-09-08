@@ -34,19 +34,15 @@ first day of the year for however long the utility took to publish.
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from custom_components.be_water_prices.providers import (
-    _html,
     agso_knokke,
-    de_watergroep,
     farys,
     pidpa,
 )
 from custom_components.be_water_prices.providers.base import (
-    ExtractorError,
     WaterTariff,
     carry_prior_year_card,
 )
@@ -102,28 +98,5 @@ def test_agso_page_still_on_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_farys_page_still_on_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
     _fake_today(farys, monkeypatch, date(2027, 1, 5))
     t = farys.parse_tariff(fixture_html("farys_gent_2026.json"))
-    assert t.valid_from == date(2026, 1, 1)
-    assert t.valid_until == date(2027, 3, 31)
-
-
-async def test_de_watergroep_prior_article_runs_to_the_end_of_march(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _fake_today(de_watergroep, monkeypatch, date(2027, 1, 5))
-    with (
-        patch.object(
-            de_watergroep,
-            "_fetch_commune_ajax",
-            new=AsyncMock(side_effect=ExtractorError("empty body")),
-        ),
-        patch.object(
-            _html,
-            "fetch_html",
-            new=AsyncMock(
-                side_effect=[ExtractorError("HTTP 404"), fixture_html("dewatergroep_2026.html")]
-            ),
-        ),
-    ):
-        t = await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
     assert t.valid_from == date(2026, 1, 1)
     assert t.valid_until == date(2027, 3, 31)

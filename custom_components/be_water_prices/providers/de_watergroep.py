@@ -32,11 +32,10 @@ Two ingestion paths share the same cookie-driven endpoint:
     GUID and labels the snapshot ``"Halle (DWG-served default)"``.
     That gives the full integrale waterprijs (drinkwater +
     gemeentelijke + bovengemeentelijke saneringsbijdragen) for one
-    representative DWG-served commune. If the AJAX endpoint is down
-    we fall through to the news article
-    ``over-de-watergroep/nieuws/tarieven-<year>`` which only carries
-    the drinkwater leg (sanering = 0) so the integration keeps
-    producing *some* tariff.
+    representative DWG-served commune. There is nothing under it: the
+    news article ``over-de-watergroep/nieuws/tarieven-<year>`` used to
+    be the fallback and carries the drinkwater leg alone, which bills
+    355.32 EUR a year where the Halle card bills 782.73.
 
   - **Per-commune fetch** GETs the same endpoint with the user-picked
     ``dwg_l=<GUID>`` cookie and returns the integrale waterprijs for
@@ -61,14 +60,9 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_DRINKWATER_PER_PERSON,
-    FLANDERS_VASTRECHT_DRINKWATER,
-    REGION_FLANDERS,
-)
+from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._html import fetch_and_parse, fetch_html
+from ._html import fetch_html
 from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, to_float
 from .base import (
     CommuneOption,
@@ -83,7 +77,6 @@ _LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "de_watergroep"
 LABEL = "De Watergroep"
-NEWS_URL_FMT = "https://www.dewatergroep.be/nl-be/over-de-watergroep/nieuws/tarieven-{year}"
 COMMUNE_LIST_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
 COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/{year}"
 
@@ -98,21 +91,6 @@ COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJ
 _DEFAULT_COMMUNE_GUID = "{B16A143A-49E6-4CE5-A241-1AA09BFC406A}"
 _DEFAULT_COMMUNE_LABEL = "Halle (DWG-served default)"
 
-# News article wording: "2,9521 euro voor 1.000 liter". The integer part
-# is bounded (a price never has more than a few leading digits) so a long
-# run of digits without the trailing "euro voor 1.000 liter" cannot make
-# the unbounded "+" backtrack quadratically over attacker-sized input.
-_BASIS_NEWS_RE = re.compile(
-    r"(\d{1,7},\s*\d{3,5})\s*euro\s+voor\s+1[.,]?000\s+liter",
-    re.IGNORECASE,
-)
-
-# Rows inside the "Basistarief per m³" block. After
-# _basis_per_m3_block() trims the surrounding sections out, these
-# regexes match against just that block -- so a missing Basistarief
-# Afvoer row cannot silently bleed into the Comforttarief Afvoer row
-# (DOTALL + non-greedy used to walk past the empty basis label and
-# match the comfort one, returning ~2x the correct rate).
 _DRINKWATER_RE = re.compile(
     r"Waterverbruik\s+drinkwater\s*€\s*([\d]+,\d{3,5})",
     re.IGNORECASE,
@@ -167,43 +145,6 @@ def _basis_per_m3_block(text: str) -> str | None:
         if "Waterverbruik drinkwater" in block:
             return block
         pos = start + 1
-
-
-def parse_news_tariff(html: str, year: int) -> WaterTariff:
-    """Parse the news-article fallback (drinkwater leg only).
-
-    Used as a deeper fallback when the cookie-driven per-commune
-    endpoint is unreachable; sanering stays at 0 because the news
-    article does not carry per-commune sewerage rates.
-
-    The article is prose, not the tariff card, and the two have been
-    seen to disagree: for 2026 it prints 2,9521 euro per 1.000 liter
-    where the tariff endpoint and De Watergroep's own kraanwater page
-    both print 2,9251. This path keeps a tariff on the board; it is
-    not a cross-check for the endpoint, and its figure must not be
-    used to "correct" the per-commune parser.
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(" ", strip=True)
-    match = _BASIS_NEWS_RE.search(text)
-    if match is None:
-        raise ExtractorError(
-            f"could not locate De Watergroep basistarief for {year} on the news article"
-        )
-    basis = to_float(match.group(1))
-    return WaterTariff(
-        utility=UTILITY_ID,
-        region=REGION_FLANDERS,
-        valid_from=date(year, 1, 1),
-        valid_until=date(year, 12, 31),
-        publication_label=f"De Watergroep tarieven {year} (drinkwater leg only)",
-        source_url=NEWS_URL_FMT.format(year=year),
-        yearly_fixed_fee=FLANDERS_VASTRECHT_DRINKWATER,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_DRINKWATER_PER_PERSON,
-        basis_eur_per_m3=basis,
-        comfort_eur_per_m3=2.0 * basis,  # VMM-mandated 2× rule
-        vat_rate=DEFAULT_VAT_RATE,
-    )
 
 
 def parse_commune_tariff(
@@ -266,51 +207,23 @@ def parse_commune_tariff(
     )
 
 
-# Backwards-compat alias for tests pinned to the old name.
-parse_tariff = parse_news_tariff
-
-
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    """No-commune fallback fetch.
+    """No-commune fetch: the full integrale waterprijs for a default commune.
 
-    Returns the full integrale waterprijs by hitting the cookie-driven
-    per-commune endpoint with a known DWG-served default commune
-    (Halle, postcode 1500). Falls back to the news-article ingestion
-    (drinkwater leg only, sanering = 0) if the per-commune endpoint
-    raises so the integration keeps producing *some* tariff rather
-    than going completely dark.
+    Hits the cookie-driven per-commune endpoint with a known DWG-served
+    commune (Halle, postcode 1500), which is the only source that carries
+    all three legs.
+
+    There is no fallback under it. The news article was one, and it
+    carries the drinkwater leg alone: where the Halle card bills 782.73
+    EUR a year at 80 m3, the article's card bills 355.32, and nothing on
+    the entry says which of the two is on screen. A card that is 55 %
+    short is worse than no card, because the coordinator keeps serving
+    the last good snapshot and raises the stale-snapshot Repair when a
+    fetch fails, and the daily live check opens an issue. Both of those
+    are how a De Watergroep outage should look.
     """
-    target = date.today().year
-    try:
-        return await _newest_commune_card(session, _DEFAULT_COMMUNE_GUID, _DEFAULT_COMMUNE_LABEL)
-    except ExtractorError as default_err:
-        if isinstance(default_err, TransientFetchError):
-            # A transient blip (5xx / 429 / timeout) must propagate so
-            # live_check / fixture_drift classify it as TRANSIENT, rather
-            # than silently degrading to the drinkwater-only news article
-            # (a ~200 EUR/year under-estimate).
-            raise
-        _LOGGER.info(
-            "De Watergroep default-commune fetch failed (%s); falling back to news article",
-            default_err,
-        )
-        try:
-            return await fetch_and_parse(
-                session, NEWS_URL_FMT.format(year=target), parse_news_tariff, year=target
-            )
-        except TransientFetchError:
-            # A blip on this year's article is an outage, not a missing
-            # article; serving last year's rate for it would hide the
-            # outage from the live check as well.
-            raise
-        except ExtractorError as err:
-            _LOGGER.info(
-                "De Watergroep %d article unavailable (%s); trying %d", target, err, target - 1
-            )
-            prior = await fetch_and_parse(
-                session, NEWS_URL_FMT.format(year=target - 1), parse_news_tariff, year=target - 1
-            )
-            return carry_prior_year_card(prior, target)
+    return await _newest_commune_card(session, _DEFAULT_COMMUNE_GUID, _DEFAULT_COMMUNE_LABEL)
 
 
 # The year switcher in the answer marks the tab it served, whichever year

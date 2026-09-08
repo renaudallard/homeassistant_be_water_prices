@@ -43,9 +43,6 @@ from custom_components.be_water_prices.providers.de_watergroep import (
 from custom_components.be_water_prices.providers.de_watergroep import (
     parse_commune_tariff as parse_dwg_commune,
 )
-from custom_components.be_water_prices.providers.de_watergroep import (
-    parse_news_tariff,
-)
 from custom_components.be_water_prices.providers.farys import (
     _OPTION_RE as FARYS_OPTION_RE,
 )
@@ -179,18 +176,6 @@ def test_dwg_per_commune_does_not_bleed_into_comforttarief_block() -> None:
     assert t.basis_eur_per_m3 == 2.9251
     assert t.sanering_gemeentelijk_eur_per_m3 == 0.0  # NOT 3.9144
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
-
-
-def test_dwg_news_fallback_keeps_drinkwater_leg_only_semantics() -> None:
-    # Sanity check: the no-commune fallback must NOT pretend to know
-    # sanering -- it must keep it at 0 and use the drinkwater-only
-    # vastrecht (50 / 10) so the bill matches the news-article example.
-    t = parse_news_tariff(fixture_html("dewatergroep_2026.html"), year=2026)
-    assert t.basis_eur_per_m3 == 2.9521
-    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
-    assert t.sanering_bovengemeentelijk_eur_per_m3 == 0.0
-    assert t.yearly_fixed_fee == 50.0  # drinkwater leg
-    assert t.yearly_fixed_fee_per_resident_discount == 10.0
 
 
 def test_dwg_commune_dropdown_yields_700_options() -> None:

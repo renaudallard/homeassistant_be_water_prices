@@ -28,48 +28,12 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
-from custom_components.be_water_prices.providers.de_watergroep import _BASIS_NEWS_RE, parse_tariff
 from tests import fixture_html
-
-
-def test_news_regex_matches_published_wording() -> None:
-    match = _BASIS_NEWS_RE.search("Dat kost 2,9521 euro voor 1.000 liter water.")
-    assert match is not None
-    assert match.group(1) == "2,9521"
-
-
-def test_news_regex_does_not_backtrack_on_long_digit_run() -> None:
-    # A long unbroken digit run without the required tail used to make the
-    # unbounded integer part backtrack quadratically; the bounded form
-    # returns immediately (the 30s pytest-timeout guards against regression).
-    assert _BASIS_NEWS_RE.search("9" * 200_000) is None
-
-
-def test_parses_2026_basistarief() -> None:
-    t = parse_tariff(fixture_html("dewatergroep_2026.html"), year=2026)
-    assert t.basis_eur_per_m3 == 2.9521
-    assert t.comfort_eur_per_m3 == 5.9042  # 2× basis
-
-
-def test_uses_drinkwater_only_vastrecht() -> None:
-    # The news article only covers the drinkwater leg, so vastrecht is
-    # 50 EUR / 10 EUR-per-persoon (not the full 100/20 integrale fee).
-    t = parse_tariff(fixture_html("dewatergroep_2026.html"), year=2026)
-    assert t.yearly_fixed_fee == 50.0
-    assert t.yearly_fixed_fee_per_resident_discount == 10.0
-    # Sanering stays at 0 -- per-commune data is a v0.4 polish.
-    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
-    assert t.sanering_bovengemeentelijk_eur_per_m3 == 0.0
-
-
-def test_raises_on_missing_basistarief_phrase() -> None:
-    with pytest.raises(ExtractorError):
-        parse_tariff("<html><body>nothing here</body></html>", year=2026)
 
 
 class _FakeResp:
@@ -137,49 +101,6 @@ async def test_fetch_commune_ajax_3xx_is_a_moved_endpoint() -> None:
             _FakeGetSession(status=302), "{guid}"
         )
     assert not isinstance(exc.value, TransientFetchError)
-
-
-async def test_fetch_reraises_transient_instead_of_news_fallback() -> None:
-    from unittest.mock import AsyncMock, patch
-
-    from custom_components.be_water_prices.providers import de_watergroep
-    from custom_components.be_water_prices.providers.base import TransientFetchError
-
-    with (
-        patch.object(
-            de_watergroep,
-            "_fetch_commune_ajax",
-            new=AsyncMock(side_effect=TransientFetchError("HTTP 503")),
-        ),
-        patch.object(de_watergroep, "fetch_html", new=AsyncMock()) as news,
-        pytest.raises(TransientFetchError),
-    ):
-        await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
-    # The drinkwater-only news fallback must NOT run on a transient blip.
-    news.assert_not_awaited()
-
-
-async def test_a_blip_on_this_years_article_is_not_answered_with_last_years() -> None:
-    """The news fallback must not turn an outage into last year's rate."""
-    from unittest.mock import AsyncMock, patch
-
-    from custom_components.be_water_prices.providers import _html, de_watergroep
-    from custom_components.be_water_prices.providers.base import ExtractorError, TransientFetchError
-
-    with (
-        patch.object(
-            de_watergroep,
-            "_fetch_commune_ajax",
-            new=AsyncMock(side_effect=ExtractorError("empty body")),
-        ),
-        patch.object(
-            _html, "fetch_html", new=AsyncMock(side_effect=TransientFetchError("HTTP 503"))
-        ) as news,
-        pytest.raises(TransientFetchError),
-    ):
-        await de_watergroep.fetch(session=None)  # type: ignore[arg-type]
-    # Only this year's article was asked for; last year's was not tried.
-    assert news.await_count == 1
 
 
 class _Body:
@@ -304,3 +225,15 @@ def test_a_commune_card_that_prints_both_legs_is_untouched() -> None:
     )
     assert t.sanering_gemeentelijk_eur_per_m3 == 1.9572
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+
+
+async def test_the_no_commune_fetch_has_nothing_under_it() -> None:
+    """The news article billed 355.32 EUR a year against Halle's 782.73."""
+    from custom_components.be_water_prices.providers import de_watergroep as dwg
+
+    with (
+        patch.object(dwg, "_newest_commune_card", new=AsyncMock(side_effect=ExtractorError("404"))),
+        pytest.raises(ExtractorError, match="404"),
+    ):
+        await dwg.fetch(session=None)  # type: ignore[arg-type]
+    assert not hasattr(dwg, "parse_news_tariff")
