@@ -56,6 +56,7 @@ _ALLOWED = (
     b"@aiem.be",
     b"@cile.be",
     b"@dewatergroep.be",
+    b"@eauxducondroz.be",
     b"@farys.be",
     b"@ieg.be",
     b"@inasep.be",

@@ -384,3 +384,34 @@ def test_iden_does_not_read_the_rate_out_of_the_explanatory_section() -> None:
     assert page.count("3,3552") == 1
     with pytest.raises(ExtractorError, match="could not locate IDEN's CVD"):
         parse_iden(page.replace('VALUE="3,3552', 'VALUE="x'), year=2026)
+
+
+def test_aiec_refuses_an_aggregator_card_the_operator_has_replaced() -> None:
+    """AIEC moved to 3,050 on 1 April 2026; Callmepower stayed on 2,460."""
+    from custom_components.be_water_prices.providers import aiec
+
+    card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
+    assert card.cvd_eur_per_m3 == 2.46
+    page = fixture_html("aiec_operator_2026.html")
+    assert aiec.published_card_date(page) == date(2026, 4, 1)
+    with pytest.raises(ExtractorError, match="published a card effective 2026-04-01"):
+        aiec.check_against_operator(card, page)
+
+
+def test_aiec_keeps_the_card_when_the_operator_dates_it_no_later() -> None:
+    """A 1 January card and a 1 January aggregator agree; nothing to refuse."""
+    from custom_components.be_water_prices.providers import aiec
+
+    card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
+    page = fixture_html("aiec_operator_2026.html").replace("Tarif-2026-04-1", "Tarif-2026-01-1")
+    assert aiec.published_card_date(page) == date(2026, 1, 1)
+    aiec.check_against_operator(card, page)
+
+
+def test_aiec_accepts_a_page_that_dates_no_card_at_all() -> None:
+    """Before AIEC dated its pictures there was nothing to check against."""
+    from custom_components.be_water_prices.providers import aiec
+
+    card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
+    assert aiec.published_card_date("<html><img src='logo.png'></html>") is None
+    aiec.check_against_operator(card, "<html><img src='logo.png'></html>")
