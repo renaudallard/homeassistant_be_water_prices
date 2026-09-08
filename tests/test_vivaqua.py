@@ -155,7 +155,7 @@ def test_a_wider_row_is_refused_rather_than_read_from_its_last_column() -> None:
     mutated = html.replace(
         cell, cell + '<td style="width: 50%; height: 24px;">\u20ac 2,17\xa0</td>', 1
     )
-    with pytest.raises(ExtractorError, match="cells"):
+    with pytest.raises(ExtractorError, match="so a wider row needs the column picking"):
         parse_tariff(mutated, year=2026)
 
 

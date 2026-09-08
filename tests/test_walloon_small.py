@@ -385,6 +385,7 @@ def test_iden_does_not_read_the_rate_out_of_the_explanatory_section() -> None:
     """The FAQ below repeats every label with no value; only the card counts."""
     page = fixture_html("iden_2026.html")
     assert page.count("3,3552") == 1
+    assert 'VALUE="3,3552' in page, "the field the mutation targets moved"
     with pytest.raises(ExtractorError, match="could not locate IDEN's CVD"):
         parse_iden(page.replace('VALUE="3,3552', 'VALUE="x'), year=2026)
 
