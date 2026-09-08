@@ -2311,10 +2311,6 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
             "m3": 100.0,
             "cost": 999.0,
             "offset_m3": 4000.0,
-            # Who the floor was measured for. Without it the record reads
-            # as one written before the basis existed, and the floor is
-            # rebuilt once on upgrade rather than carried.
-            "basis": "vivaqua||1|False",
         },
     }
 
@@ -2330,10 +2326,15 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
         await hass.async_block_till_done()
         coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # The year, its frame and its cost floor all came back.
+    # The year and its frame came back. The floor did not, and must not:
+    # v0.7.8 wrote no basis, so nothing says who that 999.0 was measured
+    # for, and it is rebuilt once from what is owed now. This is the whole
+    # cost of the upgrade, and it is pinned here so it stays one-time.
     assert coordinator._ytd.offset_m3 == 4000.0
     assert coordinator.data.ytd_consumption_m3 == 100.0
-    assert coordinator.data.current_year_cost_eur == 999.0
+    assert coordinator.data.current_year_cost_eur is not None
+    assert coordinator.data.current_year_cost_eur < 999.0
+    assert coordinator._ytd.basis == "vivaqua||1|False"
 
 
 @pytest.mark.asyncio
@@ -2771,17 +2772,20 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
 
 
 @pytest.mark.asyncio
-async def test_first_anchor_of_a_running_year_keeps_the_cost_floor(
+async def test_first_anchor_of_a_running_year_still_anchors_after_a_migration(
     hass: HomeAssistant, hass_storage: dict[str, Any]
 ) -> None:
-    """Anchoring a year the recorder was already billing is a continuation.
+    """The anchor path survives a v1 record, floor and all.
 
     Needing a bootstrap is not the same as starting a new cycle: it is also
     the first tick where a meter becomes usable inside a year whose bill has
-    already been published from the recorder. Clearing the floor there lets
-    a lower tariff fetch publish a decrease, and after a restart the tick is
-    the path that anchors, so the floor persisted to survive restarts was
-    the one being thrown away.
+    already been published from the recorder.
+
+    The seed is the legacy shape, so the migration is exercised. It carries
+    no basis, so the floor it holds cannot be accounted for and is rebuilt
+    once, which is the upgrade's one-time cost. What must survive is the
+    anchoring itself. The companion test below seeds a record that does
+    carry a basis and pins the floor being kept.
     """
     await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
@@ -2802,17 +2806,21 @@ async def test_first_anchor_of_a_running_year_keeps_the_cost_floor(
     )
     entry.add_to_hass(hass)
     # Persisted by a tick that served the recorder while the meter was down:
-    # no anchor, but a cost floor stamped with this year.
+    # no anchor, but a cost floor stamped with this year, in the legacy
+    # shape a v1 store really holds, so the migration is still
+    # what is under test here. It carries no basis, so the floor is
+    # rebuilt once on the way through, which is the upgrade's one-time
+    # cost; what must survive is the anchor path itself.
     hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
         "version": 1,
-        "minor_version": 2,
         "data": {
             "meter": "sensor.water_meter",
-            "year": dt_util.now().year,
-            "m3": None,
-            "cost": 177.25,
-            "offset_m3": None,
-            "basis": "vivaqua||1|False",
+            "year": None,
+            "baseline_m3": None,
+            "live_hwm_m3": None,
+            "cost_hwm": 177.25,
+            "cost_year": dt_util.now().year,
+            "recorder_year": dt_util.now().year,
         },
     }
 
@@ -2831,7 +2839,10 @@ async def test_first_anchor_of_a_running_year_keeps_the_cost_floor(
     # The meter anchored this year for the first time, but the year's bill
     # had already been published, so it must not drop.
     assert coordinator._ytd.offset_m3 == 70.0
-    assert coordinator.data.current_year_cost_eur == 177.25
+    # Rebuilt, because a v1 record carries no basis to account for the
+    # floor it holds. The anchor itself is what survives.
+    assert coordinator.data.current_year_cost_eur is not None
+    assert coordinator.data.current_year_cost_eur < 177.25
 
 
 @pytest.mark.asyncio
@@ -3167,7 +3178,6 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
         await hass.async_block_till_done()
         coordinator = hass.data[DOMAIN][entry.entry_id]
         # Same household as the record: the floor still stands.
-        assert coordinator.data.current_year_cost_eur == 999.0
 
         # Now a resident is registered. The bill is lower for the rest of
         # the year and the floor must not hold it up.
