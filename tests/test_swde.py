@@ -129,3 +129,32 @@ def test_headings_are_matched_with_their_accents_folded() -> None:
         "html.parser",
     )
     assert _find_component(soup, ("cout-verite de distribution",)) == 3.24
+
+
+def test_a_cvd_section_printing_two_figures_serves_the_current_one() -> None:
+    """A historic rate printed before the current one used to win."""
+    from custom_components.be_water_prices.providers.swde import parse_tariff
+
+    page = fixture_html("swde_2026.html")
+    # Put last year's figure ahead of this year's inside the CVD section.
+    mutated = page.replace(
+        "The current CVD &nbsp;amounts to <strong>&euro; 3.24/m&sup3;</strong>.",
+        "Until 2025 it was <strong>&euro; 3.11/m&sup3;</strong>. "
+        "The current CVD &nbsp;amounts to <strong>&euro; 3.24/m&sup3;</strong>.",
+        1,
+    )
+    if mutated == page:
+        mutated = page.replace(
+            "The current CVD &nbsp;amounts to",
+            "Until 2025 it was € 3.11/m³. The current CVD amounts to",
+            1,
+        )
+    assert mutated != page, "the mutation did not land"
+    assert parse_tariff(mutated, year=2026).cvd_eur_per_m3 == 3.24
+
+
+def test_a_cva_section_is_still_read_first_amount_first() -> None:
+    """Only the CVD reasons about indexation; CVA and FSE are pinned."""
+    from custom_components.be_water_prices.providers.swde import parse_tariff
+
+    assert parse_tariff(fixture_html("swde_2026.html"), year=2026).cva_eur_per_m3 == 2.748
