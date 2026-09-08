@@ -196,11 +196,21 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
                 chosen_year = past[0]
                 chosen = next(table for y, table in dated if y == chosen_year)
     if chosen is None:
-        # No usable headings: fall back to the highest integrale basis,
-        # since the operator only ever indexes up year on year.
+        # Not every table is dated: fall back to the highest integrale
+        # basis, since the operator only ever indexes up year on year.
         ranked.sort(key=lambda x: x[0], reverse=True)
         chosen = ranked[0][1]
-        chosen_year = target
+        # Stamping the clock's year on it made a card published early read
+        # as this year's, and stopped the staleness check ever firing,
+        # because the stamp always looked current. If the table the price
+        # picked does carry a heading, that is the year it is, whatever
+        # its neighbours are missing.
+        chosen_year = _year_for_table(chosen) or target
+        if chosen_year > target and year is None:
+            raise ExtractorError(
+                f"AGSO Knokke's dearest table is dated {chosen_year}, ahead of {target}, "
+                "and its neighbours carry no heading to place it against"
+            )
 
     parsed = _parse_one(chosen, chosen_year)
     if parsed is None:

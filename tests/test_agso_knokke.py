@@ -115,3 +115,32 @@ def test_a_leg_that_does_not_add_up_to_the_printed_total_is_refused() -> None:
     assert mutated != page, "the mutation did not land"
     with pytest.raises(ExtractorError, match="do not add up to the integrale"):
         parse_tariff(mutated, year=2026)
+
+
+def test_an_undated_neighbour_does_not_make_a_dated_card_this_year_s() -> None:
+    """The price fallback stamped the clock's year on whatever it picked."""
+    page = fixture_html("agso_knokke_2026.html")
+    # Break the 2025 heading so not every table is dated, which is what
+    # sends the choice to the price fallback.
+    broken = page.replace("OVERZICHT TARIEVEN 2025", "OVERZICHT TARIEVEN", 1)
+    assert broken != page, "the mutation did not land"
+    t = parse_tariff(broken, year=2026)
+    assert t.valid_from.year == 2026
+
+    # The same page read a year early: the dearest table is 2026 and
+    # nothing places it, so it is refused rather than served as 2025.
+    with pytest.raises(ExtractorError, match="ahead of 2025"):
+        import custom_components.be_water_prices.providers.agso_knokke as agso
+
+        real = agso.date
+        try:
+
+            class _D(real):  # type: ignore[misc, valid-type]
+                @classmethod
+                def today(cls) -> object:
+                    return real(2025, 6, 1)
+
+            agso.date = _D  # type: ignore[misc]
+            parse_tariff(broken)
+        finally:
+            agso.date = real  # type: ignore[misc]
