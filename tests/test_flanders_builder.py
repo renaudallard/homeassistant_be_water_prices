@@ -62,3 +62,38 @@ def test_a_negative_sanering_is_refused() -> None:
 def test_a_zero_sanering_is_a_legitimate_card() -> None:
     """Aquaduin folds it into the basis and a commune can levy none."""
     _build(sanering_gemeentelijk=0.0)
+
+
+def test_a_rate_outside_the_plausibility_window_is_not_a_card() -> None:
+    """A decimal that moved satisfies the 2x identity just as well."""
+    with pytest.raises(ExtractorError, match=r"basis rate 0\.29251 is outside"):
+        build_flanders_tariff(
+            utility_id="x",
+            year=2026,
+            publication_label="x",
+            source_url="https://example.invalid/",
+            basis=0.29251,
+            comfort=0.58502,
+        )
+    # A believable basis with a comfort rate that is not.
+    with pytest.raises(ExtractorError, match=r"comfort rate 29\.251 is outside"):
+        build_flanders_tariff(
+            utility_id="x",
+            year=2026,
+            publication_label="x",
+            source_url="https://example.invalid/",
+            basis=2.9251,
+            comfort=29.251,
+        )
+
+
+def test_every_real_flemish_rate_sits_inside_the_window() -> None:
+    """Water-link's 1,6692 and Aquaduin's integrated 5,9908 are the extremes."""
+    from custom_components.be_water_prices.providers._flanders import (
+        _MAX_PLAUSIBLE_RATE,
+        _MIN_PLAUSIBLE_RATE,
+    )
+
+    for basis in (1.6692, 2.1888, 2.3295, 2.9251, 3.0058, 5.9908):
+        assert _MIN_PLAUSIBLE_RATE <= basis <= _MAX_PLAUSIBLE_RATE
+        assert _MIN_PLAUSIBLE_RATE <= 2.0 * basis <= _MAX_PLAUSIBLE_RATE

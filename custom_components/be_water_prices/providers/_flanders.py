@@ -50,6 +50,17 @@ from ..const import (
 )
 from .base import ExtractorError, WaterTariff
 
+# What a Flemish drinkwater rate can plausibly be, in EUR/m3 ex-VAT. The
+# seven operators sit between 1.67 (Water-link) and 5.99 (Aquaduin, which
+# folds its sanering into the basis), so this is wide enough to hold a
+# decade of indexation and narrow enough to catch a decimal that moved or
+# a cell read from the wrong column. The same window already existed for
+# the Walloon CVD, and in scripts/live_check.py for every region, but the
+# live check runs in CI once a day and this runs in the user's own Home
+# Assistant on every fetch.
+_MIN_PLAUSIBLE_RATE = 0.5
+_MAX_PLAUSIBLE_RATE = 20.0
+
 
 def build_flanders_tariff(
     *,
@@ -65,14 +76,23 @@ def build_flanders_tariff(
     """Build a Flemish :class:`WaterTariff` with the standard VMM totals.
 
     A rate of zero or less is not a rate: the 2x check passed 0 against
-    0 and a card of nothing went to the sensors. A sanering component of
-    zero is legitimate (Aquaduin folds it into the basis, and a commune
-    can levy none), a negative one is not.
+    0 and a card of nothing went to the sensors. Nor is a rate outside
+    the plausibility window: a comfort rate that is exactly twice its
+    basis satisfies the VMM identity whether both are right or both are
+    a decimal place out. A sanering component of zero is legitimate
+    (Aquaduin folds it into the basis, and a commune can levy none), a
+    negative one is not.
     """
     if basis <= 0 or comfort <= 0:
         raise ExtractorError(
             f"{utility_id} {year}: drinkwater rate {basis} / {comfort} is not a price"
         )
+    for rate, label in ((basis, "basis"), (comfort, "comfort")):
+        if not _MIN_PLAUSIBLE_RATE <= rate <= _MAX_PLAUSIBLE_RATE:
+            raise ExtractorError(
+                f"{utility_id} {year}: {label} rate {rate} is outside "
+                f"[{_MIN_PLAUSIBLE_RATE}, {_MAX_PLAUSIBLE_RATE}] EUR/m3"
+            )
     if sanering_gemeentelijk < 0 or sanering_bovengemeentelijk < 0:
         raise ExtractorError(
             f"{utility_id} {year}: negative sanering {sanering_gemeentelijk} / "
