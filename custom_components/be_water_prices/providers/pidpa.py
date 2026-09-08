@@ -43,7 +43,9 @@ Two ingestion paths:
 
   2. **Tariefplan PDF** (covering 2025-2030) at
      ``/sites/default/files/2024-05/Tariefplan_2025-2030_simulatie_type_gezin.pdf``,
-     the fallback when the commune page cannot be read. It is a May-2024
+     no longer served to anyone. It used to be the fallback when the
+     commune page could not be read, and it is kept only as the drift
+     check's own subject, because it is a May-2024
      projection: the drinkwater column was never indexed and the
      saneringsbijdragen paragraph is frozen at 2024, so its 2026 column
      sits about 14 % under the rate the commune pages publish. It used

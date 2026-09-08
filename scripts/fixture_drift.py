@@ -155,8 +155,8 @@ CHECKS: list[FixtureCheck] = [
         lambda b: de_watergroep.parse_commune_tariff(
             _t(b), year=2026, commune_label="Halle (DWG-served default)"
         ),
-        # The endpoint itself, for the same reason as Pidpa below: the
-        # default fetch falls back to the news article when it fails.
+        # The endpoint itself, which is all there is: the default fetch has
+        # no fallback under it.
         lambda s: de_watergroep.fetch_for_commune(s, de_watergroep._DEFAULT_COMMUNE_GUID),
     ),
     FixtureCheck(
@@ -171,19 +171,19 @@ CHECKS: list[FixtureCheck] = [
         lambda s: de_watergroep.fetch_for_commune(s, _SINAAI_GUID),
     ),
     FixtureCheck(
-        # The no-commune fetch reads the Geel page; the PDF is only its
-        # fallback and a 2024 projection, so it is checked against
-        # itself here and never against what the default fetch serves.
+        # The no-commune fetch reads the Geel page. The PDF is a 2024
+        # projection that is no longer served to anyone, so it is checked
+        # against itself here and never against what the default serves.
         "Pidpa (PDF fallback)",
         "pidpa_tariefplan_2025-2030.pdf",
         lambda b: pidpa.parse_tariff(extract_pdf_text_layout(b), year=2026),
         lambda s: pidpa.fetch_tariefplan(s),
     ),
     FixtureCheck(
-        # Read the page itself, not the default fetch: that falls back to
-        # the PDF projection when the page cannot be read, and the
-        # fallback's numbers then showed up here as four drifted rates
-        # instead of an unreadable page.
+        # Read the page itself. It used to fall back to the PDF projection,
+        # whose numbers then showed up here as four drifted rates instead
+        # of an unreadable page; the fallback is gone and this stays
+        # pointed at the page either way.
         "Pidpa (Geel default)",
         "pidpa_geel_2026.html",
         lambda b: pidpa.parse_commune_tariff(_t(b), commune_slug="geel", year=2026),
