@@ -1717,7 +1717,9 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     # asked for. _recorder_full_year_m3 drops the overshoot by bucket and
     # this did not: a clock that ran ahead before NTP corrected it leaves a
     # bucket dated tomorrow, and on 31 December tomorrow is next year.
-    after_end = dt_util.start_of_local_day(end).timestamp() + 86400
+    # Measured as the next local midnight rather than a fixed 86400, or the
+    # 23-hour day the clocks go forward on would fall short of the cut.
+    after_end = dt_util.start_of_local_day(end + timedelta(days=1)).timestamp()
     for index, row in enumerate(await _recorder_daily_rows(hass, entity_id, start, end)):
         delta = row.get("change")
         if delta is None:
