@@ -225,3 +225,26 @@ async def test_a_meter_installed_today_still_anchors_its_year() -> None:
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
     assert total == 0.0
+
+
+async def test_the_first_days_of_a_year_are_empty_not_unreadable() -> None:
+    """On 1-2 January a reset is all a year has; it has still used nothing."""
+    rows = [
+        _row(date(2026, 1, 1), change=5.0, state=5.0, total=5.0),
+        _row(date(2026, 1, 2), change=-0.1, state=4.9, total=4.9),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 2))  # type: ignore[arg-type]
+    assert total == 0.0
+
+
+async def test_a_month_of_refusals_is_still_unreadable() -> None:
+    """The distinction is how many, not whether."""
+    rows = [
+        _row(date(2026, 3, 1 + n), change=0.3, state=0.3, total=0.3 * (n + 1)) for n in range(10)
+    ]
+    with (
+        patch(_ROWS, new=AsyncMock(return_value=rows)),
+        pytest.raises(co.RecorderUnavailable, match="every one of"),
+    ):
+        await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 11))  # type: ignore[arg-type]

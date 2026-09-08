@@ -117,6 +117,12 @@ _SWAP_CONFIRM_SPAN_S = 600.0
 # How long to wait for the Energy dashboard's manager singleton before
 # giving up on it for this tick.
 _ENERGY_MANAGER_TIMEOUT_S = 10.0
+# How many refused daily buckets it takes before a year counts as
+# unreadable rather than empty. A year that has barely begun has one or
+# two, and if a reset is what they hold it has still used nothing; a
+# meter that poisons every bucket accumulates them by the month.
+_REFUSALS_BEFORE_UNREADABLE = 2
+
 # A single meter report that climbs more than this many m3 is held for one
 # reading before it is allowed to advance the high-water mark. A household
 # uses roughly 80-100 m3 a year, so a step this size in one report is a
@@ -1771,9 +1777,12 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
             continue
         total += float(delta)
         admitted += 1
-    if refused and not admitted:
-        # Every bucket the year had was refused. That is not an empty year
-        # and must not be anchored as one.
+    if not admitted and refused > _REFUSALS_BEFORE_UNREADABLE:
+        # Every bucket the year had was refused, and there were enough of
+        # them to mean something. A handful is not enough: on 1 and 2
+        # January a year has one or two buckets, and if a reset or a
+        # backwards day is what they hold, the year really has used
+        # nothing yet and anchoring it at zero is right.
         raise RecorderUnavailable(
             f"every one of {refused} daily buckets for {entity_id} was refused; "
             "the year cannot be read rather than being empty"
