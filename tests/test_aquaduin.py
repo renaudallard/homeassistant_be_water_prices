@@ -135,11 +135,14 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
     # The fallback fetches last year's URL, so the stand-in has to be last
     # year's card: it states the year it applies from, and the parser holds
     # the link's year to it.
+    # Re-dated relative to the fixture's own year, not to the clock: with
+    # the clock at 2027 "last year" is 2026 and the swap became a no-op.
     prior = date.today().year - 1
     text = _pdf_text().replace(
-        "Overzicht tarieven per 1 januari 2026", f"Overzicht tarieven per 1 januari {prior}"
+        "Overzicht tarieven per 1 januari 2026",
+        f"Overzicht tarieven per 1 januari {prior}",
     )
-    assert "per 1 januari 2026" not in text
+    assert f"per 1 januari {prior}" in text, "the re-dating did not land"
     with (
         patch.object(aquaduin, "_discover_pdf_url", new=AsyncMock(return_value="http://x/y.pdf")),
         patch.object(
