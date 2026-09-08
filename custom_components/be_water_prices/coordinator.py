@@ -1677,9 +1677,10 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     guard in this module was re-deriving one call later.
     """
     total = 0.0
-    # How many buckets were read, and how many of them a guard refused. A
-    # year every guard rejects sums to the same 0.0 as a year with no
-    # statistics at all, and the caller may anchor an empty year at zero
+    # How many buckets a guard refused, and how many it admitted. The
+    # first-bucket trim below is not a refusal: it is a boundary artefact,
+    # not evidence about the year. A year every guard rejects sums to the
+    # same 0.0 as a year with no statistics at all, and the caller may anchor an empty year at zero
     # but not an unreadable one: a cumulative meter that republishes 0 on
     # a nightly reconnect leaves every bucket carrying the whole register,
     # all of them dropped, and the year restarted at zero with the water
@@ -1720,7 +1721,11 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 entity_id,
                 start,
             )
-            refused += 1
+            # Deliberately not counted as a refusal. It is a boundary trim
+            # every healthy year takes at most once, and counting it made a
+            # meter whose statistics start today, whose only bucket is this
+            # one, look like a year nothing could read: the year then
+            # refused to anchor at all where it used to anchor at zero.
             continue
         if delta < 0:
             # A register that went backwards is not consumption, and

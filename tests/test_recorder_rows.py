@@ -212,3 +212,16 @@ async def test_a_meter_whose_history_starts_inside_the_window_loses_its_first_da
         total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
     # 0.3 of genuinely consumed water is missing, and stays missing.
     assert round(total, 3) == 0.9
+
+
+async def test_a_meter_installed_today_still_anchors_its_year() -> None:
+    """The boundary trim is not evidence the year is unreadable.
+
+    Counting the first-bucket drop as a refusal made a meter whose only
+    statistics bucket is its first look like a year nothing could read,
+    so it refused to anchor where it used to anchor at zero.
+    """
+    rows = [_row(date(2026, 1, 5), change=0.3, state=0.3, total=0.3)]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
+    assert total == 0.0
