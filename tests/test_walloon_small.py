@@ -51,7 +51,7 @@ def test_each_utility_parses_its_2026_cvd() -> None:
         (parse_aiem, "aiem_2026.html", 2.87),
         (parse_aiec, "aiec_callmepower_2026.html", 2.46),
         (parse_ciesac, "ciesac_callmepower_2026.html", 2.9),
-        (parse_iden, "iden_callmepower_2026.html", 3.555),
+        (parse_iden, "iden_2026.html", 3.3552),
     ]
     for parse_fn, fixture, expected_cvd in cases:
         t = parse_fn(fixture_html(fixture), year=2026)
@@ -88,7 +88,7 @@ def test_callmepower_parser_ignores_the_summary_card_cva_value() -> None:
     assert (
         parse_ciesac(fixture_html("ciesac_callmepower_2026.html"), year=2026).cvd_eur_per_m3 == 2.9
     )
-    assert parse_iden(fixture_html("iden_callmepower_2026.html"), year=2026).cvd_eur_per_m3 == 3.555
+    assert parse_iden(fixture_html("iden_2026.html"), year=2026).cvd_eur_per_m3 == 3.3552
 
 
 def test_the_cva_decoy_cannot_win_the_generic_scan() -> None:
@@ -275,11 +275,14 @@ def test_a_page_still_on_last_years_card_stands_until_31_march(
         ("aiem_2026.html", "aiem"),
         ("aiec_callmepower_2026.html", "aiec"),
         ("ciesac_callmepower_2026.html", "ciesac"),
-        ("iden_callmepower_2026.html", "iden"),
     ],
 )
 def test_a_moved_cva_on_a_prose_page_fails_the_fetch(fixture: str, utility_id: str) -> None:
-    """Seven of nine Walloon pages print the CVA and none of them checked it."""
+    """Most Walloon pages print the CVA and none of them checked it.
+
+    IDEN is not here: it reads its own card through its own parser, which
+    runs the same check (see test_iden_holds_its_page_to_the_spge_constants).
+    """
     from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
 
     page = fixture_html(fixture)
@@ -293,7 +296,7 @@ def test_a_moved_cva_on_a_prose_page_fails_the_fetch(fixture: str, utility_id: s
 
 @pytest.mark.parametrize(
     "fixture",
-    ["ieg_2026.html", "aiem_2026.html", "aiec_callmepower_2026.html", "iden_callmepower_2026.html"],
+    ["ieg_2026.html", "aiem_2026.html", "aiec_callmepower_2026.html"],
 )
 def test_a_moved_fonds_social_on_a_prose_page_fails_the_fetch(fixture: str) -> None:
     from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
@@ -324,7 +327,6 @@ def test_the_prose_pages_print_the_constants_the_engine_uses() -> None:
         "aiem_2026.html",
         "aiec_callmepower_2026.html",
         "ciesac_callmepower_2026.html",
-        "iden_callmepower_2026.html",
         "inasep_2026.html",
     ):
         soup = BeautifulSoup(fixture_html(name), "html.parser")
@@ -356,3 +358,29 @@ def test_a_cvd_change_dated_this_year_moves_valid_from() -> None:
     assert parse_aiem(page, year=2026).valid_from == date(2026, 1, 1)
     moved = parse_aiem(page.replace("partir du 01/02/2025", "partir du 01/02/2026"), year=2026)
     assert moved.valid_from == date(2026, 2, 1)
+
+
+def test_iden_reads_the_operator_s_own_card_not_an_aggregator() -> None:
+    """Callmepower carried 3,555 where IDEN's own page says 3,3552."""
+    t = parse_iden(fixture_html("iden_2026.html"), year=2026)
+    assert t.cvd_eur_per_m3 == 3.3552
+    assert "callmepower" not in t.source_url.lower()
+    assert t.source_url.startswith("https://www.iden-eau.be/")
+
+
+def test_iden_holds_its_page_to_the_spge_constants() -> None:
+    """The two flat-Wallonia rows sit beside the CVD, so they are checked."""
+    page = fixture_html("iden_2026.html")
+    assert "2,7480" in page and "0,0339" in page
+    with pytest.raises(ExtractorError, match="CVA published value"):
+        parse_iden(page.replace("2,7480", "2,8500"), year=2026)
+    with pytest.raises(ExtractorError, match="FSE published value"):
+        parse_iden(page.replace("0,0339", "0,0400"), year=2026)
+
+
+def test_iden_does_not_read_the_rate_out_of_the_explanatory_section() -> None:
+    """The FAQ below repeats every label with no value; only the card counts."""
+    page = fixture_html("iden_2026.html")
+    assert page.count("3,3552") == 1
+    with pytest.raises(ExtractorError, match="could not locate IDEN's CVD"):
+        parse_iden(page.replace('VALUE="3,3552', 'VALUE="x'), year=2026)

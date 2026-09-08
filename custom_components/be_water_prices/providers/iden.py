@@ -23,41 +23,117 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+
 """IDEN -- Intercommunale de Distribution d'Eau de Nandrin, Tinlot et environs.
 
-Three communes (Nandrin, Tinlot, Modave), tiny population. The
-operator's own site (iden-eau.be) carries an educational page about
-CVD/CVA but no structured tariff numbers; we pull from the Callmepower
-public aggregator instead.
+Three communes (Nandrin, Tinlot, Modave), tiny population. The operator
+publishes its own card on ``iden_web/fr/Tarification.awp``: three
+read-only form fields, each headed "Depuis le 1er janvier <year> :" and
+labelled Distribution, Assainissement and Fonds Social de l'Eau.
 
-Source: https://callmepower.be/fr/eau/distributeurs/iden
+Read from the operator rather than from an aggregator. Callmepower
+carried 3,555 where IDEN's own page says 3,3552, a transposed digit that
+over-stated an 80 m3 bill by 18 EUR a year, and nothing could see it: a
+drift check compares the parser against its source, so a source that is
+itself wrong is invisible to it.
+
+Source: https://www.iden-eau.be/iden_web/fr/Tarification.awp
 """
 
 from __future__ import annotations
 
-from ._walloon_simple import build_extractor
-from ._walloon_simple import parse_tariff as _parse_tariff
-from .base import WaterTariff
+import logging
+import re
+
+import aiohttp
+from bs4 import BeautifulSoup
+
+from ..const import REGION_WALLONIA, WALLONIA_CVA_EUR_PER_M3, WALLONIA_FSE_EUR_PER_M3
+from ._html import fetch_and_parse
+from ._pdf import to_float
+from ._walloon_simple import build_tariff, detect_published_year, warn_constant_drift
+from .base import ExtractorError, WaterExtractor, WaterTariff
+
+_LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "iden"
 LABEL = "IDEN"
-SOURCE_URL = "https://callmepower.be/fr/eau/distributeurs/iden"
-_LABEL_PREFIX = "IDEN tarifs (via Callmepower)"
+SOURCE_URL = "https://www.iden-eau.be/iden_web/fr/Tarification.awp"
+_LABEL_PREFIX = "IDEN tarification"
+
+# The three rates sit in readonly <input> fields, so they are attributes
+# rather than text and get_text() drops them. Inline each value where the
+# input stands, then the labels and the values read in document order.
+_INPUT_VALUE_RE = re.compile(r"<input\b[^>]*?\bvalue\s*=\s*\"([^\"]*)\"[^>]*>", re.IGNORECASE)
+_VALUE_OPEN = "‹"
+_VALUE_CLOSE = "›"
+
+# The page wraps each initial in <strong>, so the rendered text reads
+# "C oût- V érité à la D istribution". Anchor on the tail of the word that
+# survives that split, and require the value to follow within one field so
+# the explanatory FAQ further down the page cannot supply it.
+_CVD_RE = re.compile(rf"istribution[^{_VALUE_OPEN}]{{0,40}}{_VALUE_OPEN}\s*(\d+,\d{{3,5}})")
+_CVA_RE = re.compile(rf"ssainissement[^{_VALUE_OPEN}]{{0,40}}{_VALUE_OPEN}\s*(\d+,\d{{3,5}})")
+_FSE_RE = re.compile(
+    rf"ocial de l.\s*E\s*au[^{_VALUE_OPEN}]{{0,40}}{_VALUE_OPEN}\s*(\d+,\d{{3,5}})"
+)
+
+
+def _text_with_field_values(html: str) -> str:
+    """The page's text with each input's value inlined where the input sits."""
+    inlined = _INPUT_VALUE_RE.sub(lambda m: f" {_VALUE_OPEN}{m.group(1)}{_VALUE_CLOSE} ", html)
+    soup = BeautifulSoup(inlined, "html.parser")
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+    return re.sub(r"\s+", " ", soup.get_text(" ", strip=True))
+
+
+def _amount(text: str, pattern: re.Pattern[str], label: str) -> float:
+    match = pattern.search(text)
+    if match is None:
+        raise ExtractorError(f"could not locate IDEN's {label} on {SOURCE_URL}")
+    return to_float(match.group(1))
 
 
 def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
-    return _parse_tariff(
-        html,
+    """Parse IDEN's own tariff card."""
+    text = _text_with_field_values(html)
+    cvd = _amount(text, _CVD_RE, "CVD")
+    # The page prints the two flat-Wallonia components next to the CVD, so
+    # hold them to the SPGE constants the same way every other Walloon
+    # extractor does.
+    warn_constant_drift(
+        published=_amount(text, _CVA_RE, "CVA"),
+        constant=WALLONIA_CVA_EUR_PER_M3,
+        label=f"{UTILITY_ID} CVA",
+        logger=_LOGGER,
+    )
+    warn_constant_drift(
+        published=_amount(text, _FSE_RE, "FSE"),
+        constant=WALLONIA_FSE_EUR_PER_M3,
+        label=f"{UTILITY_ID} FSE",
+        logger=_LOGGER,
+        threshold=0.001,
+    )
+    target = year or detect_published_year(text)
+    if target is None:
+        raise ExtractorError(f"IDEN states no tariff year on {SOURCE_URL}")
+    return build_tariff(
         utility_id=UTILITY_ID,
+        cvd=cvd,
         source_url=SOURCE_URL,
-        label_prefix=_LABEL_PREFIX,
-        year=year,
+        publication_label=f"{_LABEL_PREFIX} {target}",
+        year=target,
     )
 
 
-EXTRACTOR = build_extractor(
-    utility_id=UTILITY_ID,
+async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
+    return await fetch_and_parse(session, SOURCE_URL, parse_tariff)
+
+
+EXTRACTOR = WaterExtractor(
+    id=UTILITY_ID,
     label=LABEL,
-    source_url=SOURCE_URL,
-    publication_label_prefix=_LABEL_PREFIX,
+    region=REGION_WALLONIA,
+    fetch=fetch,
 )

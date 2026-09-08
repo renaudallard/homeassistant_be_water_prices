@@ -249,7 +249,7 @@ CHECKS: list[FixtureCheck] = [
     ),
     FixtureCheck(
         "IDEN",
-        "iden_callmepower_2026.html",
+        "iden_2026.html",
         lambda b: iden.parse_tariff(_t(b), year=2026),
         lambda s: get("iden").fetch(s),
     ),
