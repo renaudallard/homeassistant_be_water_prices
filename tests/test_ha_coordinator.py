@@ -553,8 +553,8 @@ async def test_live_tracking_follows_a_changed_auto_discovered_meter(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _discover(_hass: HomeAssistant) -> str | None:
-        return discovered
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return discovered, 1 if discovered else 0
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -1462,7 +1462,7 @@ async def test_a_wedged_energy_manager_does_not_stall_the_tick(hass: HomeAssista
             0.05,
         ),
     ):
-        assert await _discover_energy_water_meter(hass) is None
+        assert await _discover_energy_water_meter(hass) == (None, 0)
 
 
 @pytest.mark.asyncio
@@ -1714,21 +1714,22 @@ async def test_energy_dashboard_discovery_and_override(hass: HomeAssistant) -> N
         return manager
 
     with patch("homeassistant.components.energy.async_get_manager", new=_get_manager):
-        assert await _discover_energy_water_meter(hass) == "sensor.wm"
+        # Two water sources: the first is billed and the count says so.
+        assert await _discover_energy_water_meter(hass) == ("sensor.wm", 2)
 
         # No water source configured, and no energy data at all.
         manager.data = {"energy_sources": [{"type": "grid", "stat_energy_from": "sensor.grid"}]}
-        assert await _discover_energy_water_meter(hass) is None
+        assert await _discover_energy_water_meter(hass) == (None, 0)
         manager.data = None
-        assert await _discover_energy_water_meter(hass) is None
+        assert await _discover_energy_water_meter(hass) == (None, 0)
         manager.data = {"energy_sources": None}
-        assert await _discover_energy_water_meter(hass) is None
+        assert await _discover_energy_water_meter(hass) == (None, 0)
 
     async def _raises(_hass: HomeAssistant) -> Any:
         raise RuntimeError("energy component not set up")
 
     with patch("homeassistant.components.energy.async_get_manager", new=_raises):
-        assert await _discover_energy_water_meter(hass) is None
+        assert await _discover_energy_water_meter(hass) == (None, 0)
 
 
 @pytest.mark.asyncio
@@ -1851,8 +1852,8 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _discover(_hass: HomeAssistant) -> str | None:
-        return discovered
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return discovered, 1 if discovered else 0
 
     async def _recorder(_hass: HomeAssistant, meter: str, _s: date, _e: date) -> float:
         if meter == "sensor.meter_b":
@@ -2353,9 +2354,9 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _discover(_hass: HomeAssistant) -> str | None:
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
         # An external statistic id, not an entity: hass.states.get() is None.
-        return "watermeter:daily_consumption"
+        return "watermeter:daily_consumption", 1
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2664,8 +2665,8 @@ async def test_undatable_cost_floor_from_an_older_store_is_dropped(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _discover(_hass: HomeAssistant) -> str | None:
-        return "watermeter:daily_consumption"
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return "watermeter:daily_consumption", 1
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2727,8 +2728,8 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _discover(_hass: HomeAssistant) -> str | None:
-        return "watermeter:daily_consumption"
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return "watermeter:daily_consumption", 1
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2849,8 +2850,8 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _discover(_hass: HomeAssistant) -> str | None:
-        return "myintegration:water_consumption"
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return "myintegration:water_consumption", 1
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -3243,3 +3244,80 @@ async def test_a_litre_meter_spelt_the_way_home_assistant_knows_is_read(
     ):
         total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
     assert total == pytest.approx(0.3)
+
+
+@pytest.mark.asyncio
+async def test_several_energy_water_sources_raise_a_repair(hass: HomeAssistant) -> None:
+    """A hot-water sub-meter listed first billed 30 of 100 m3, with a log line."""
+    from homeassistant.helpers import issue_registry as ir
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return "sensor.hot_water", 2
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        issue = ir.async_get(hass).async_get_issue(DOMAIN, coordinator.several_meters_issue_id)
+        assert issue is not None
+        assert issue.translation_placeholders == {"utility": "VIVAQUA", "count": "2"}
+
+
+@pytest.mark.asyncio
+async def test_one_energy_water_source_raises_nothing(hass: HomeAssistant) -> None:
+    from homeassistant.helpers import issue_registry as ir
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return "sensor.wm", 1
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert (
+            ir.async_get(hass).async_get_issue(DOMAIN, coordinator.several_meters_issue_id) is None
+        )

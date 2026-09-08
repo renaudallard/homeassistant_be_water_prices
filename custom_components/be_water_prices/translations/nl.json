@@ -149,6 +149,10 @@
     }
   },
   "issues": {
+    "several_water_meters": {
+      "title": "{utility}: meer dan \u00e9\u00e9n watermeter op het energiedashboard",
+      "description": "Het energiedashboard bevat {count} waterbronnen en deze integratie rekent met \u00e9\u00e9n meter. Ze rekent nu met de bron die het dashboard als eerste bewaart, wat de volgorde van toevoegen weerspiegelt en niets zegt over welke meter je watermaatschappij factureert.\n\nKies de meter zelf in de opties van de integratie (Instellingen > Apparaten en diensten > {utility} > Configureren > Watermetersensor). Deze melding verdwijnt zodra er \u00e9\u00e9n is ingesteld."
+    },
     "snapshot_stale": {
       "title": "Tariefsnapshot van {utility} is verouderd",
       "fix_flow": {

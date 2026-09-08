@@ -149,6 +149,10 @@
     }
   },
   "issues": {
+    "several_water_meters": {
+      "title": "{utility} : plusieurs compteurs d'eau sur le tableau de bord \u00c9nergie",
+      "description": "Le tableau de bord \u00c9nergie contient {count} sources d'eau, et cette int\u00e9gration facture un seul compteur. Elle utilise actuellement celle que le tableau de bord enregistre en premier, ce qui refl\u00e8te l'ordre d'ajout et non le compteur que votre distributeur facture.\n\nChoisissez le compteur dans les options de l'int\u00e9gration (Param\u00e8tres > Appareils et services > {utility} > Configurer > Capteur de compteur d'eau). Cet avis dispara\u00eet d\u00e8s qu'un compteur est d\u00e9fini."
+    },
     "snapshot_stale": {
       "title": "Snapshot de tarif {utility} obsolète",
       "fix_flow": {

@@ -149,6 +149,10 @@
     }
   },
   "issues": {
+    "several_water_meters": {
+      "title": "{utility}: mehr als ein Wasserz\u00e4hler im Energie-Dashboard",
+      "description": "Das Energie-Dashboard f\u00fchrt {count} Wasserquellen, und diese Integration rechnet mit einem Z\u00e4hler. Sie rechnet derzeit mit der zuerst gespeicherten Quelle, was der Reihenfolge des Hinzuf\u00fcgens entspricht und nichts dar\u00fcber aussagt, welchen Z\u00e4hler Ihr Versorger abrechnet.\n\nW\u00e4hlen Sie den Z\u00e4hler in den Optionen der Integration (Einstellungen > Ger\u00e4te und Dienste > {utility} > Konfigurieren > Wasserz\u00e4hler-Sensor). Dieser Hinweis verschwindet, sobald einer gesetzt ist."
+    },
     "snapshot_stale": {
       "title": "{utility}-Tarif-Snapshot ist veraltet",
       "fix_flow": {

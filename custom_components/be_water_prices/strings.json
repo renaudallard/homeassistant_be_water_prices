@@ -133,6 +133,10 @@
     }
   },
   "issues": {
+    "several_water_meters": {
+      "title": "{utility}: more than one water meter on the Energy dashboard",
+      "description": "The Energy dashboard lists {count} water sources, and this integration bills one meter. It is currently billing whichever the dashboard stores first, which reflects the order they were added and nothing about which one your utility invoices.\n\nPick the meter yourself in the integration's options (Settings > Devices & services > {utility} > Configure > Water meter sensor). This notice clears once one is set."
+    },
     "snapshot_stale": {
       "title": "{utility} tariff snapshot is stale",
       "fix_flow": {

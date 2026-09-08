@@ -410,6 +410,13 @@ you paid is worth more than a tidy chart.
   wrong column even when the VMM 2× rule still holds, and never goes
   stale the way a pinned Flanders-wide constant would.
 
+  If your Energy dashboard lists more than one water source, the
+  integration bills whichever it stores first, which reflects the order
+  they were added and nothing about which meter your utility invoices.
+  There is no safe automatic answer (summing would double-count a
+  sub-meter and over-bill a rainwater or well meter), so a Repair card
+  asks you to pick one in the options; it clears once you do.
+
 ### Keeping the projection honest
 
 `projected_annual_cost` runs off the consumption figure you typed at

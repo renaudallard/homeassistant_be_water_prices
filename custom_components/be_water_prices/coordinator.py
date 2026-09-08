@@ -982,8 +982,44 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         """
         explicit = self.entry.options.get(CONF_WATER_METER_SENSOR)
         if explicit:
+            self._sync_several_meters_issue(0)
             return str(explicit)
-        return await _discover_energy_water_meter(self.hass)
+        meter, count = await _discover_energy_water_meter(self.hass)
+        self._sync_several_meters_issue(count)
+        return meter
+
+    @property
+    def several_meters_issue_id(self) -> str:
+        """Stable Repairs issue id for this entry's ambiguous-meter notice."""
+        return f"several_water_meters_{self.entry.entry_id}"
+
+    @callback
+    def _sync_several_meters_issue(self, count: int) -> None:
+        """Say so when the dashboard leaves the choice of meter to list order.
+
+        There is no right answer to fall back on: summing would double
+        count a sub-meter and over-bill a rainwater or well meter. So the
+        one meter is still billed and the household is asked which, rather
+        than the choice being made silently on the order the sources
+        happen to be stored in. A log line was the only signal, and a bill
+        computed from a hot-water sub-meter is not a log-level problem.
+        """
+        if count > 1 and self._owns_the_entry():
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self.several_meters_issue_id,
+                is_fixable=False,
+                is_persistent=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="several_water_meters",
+                translation_placeholders={
+                    "utility": self._extractor.label,
+                    "count": str(count),
+                },
+            )
+            return
+        ir.async_delete_issue(self.hass, DOMAIN, self.several_meters_issue_id)
 
     async def async_load_ytd_state(self) -> None:
         """Restore the persisted YTD cycle before the first refresh.
@@ -1405,10 +1441,15 @@ def _state_volume_m3(state: State | None) -> float | None:
         return None
 
 
-async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
-    """Return the first ``water`` source's ``stat_energy_from`` from
-    HA's Energy dashboard, or ``None`` when no water source is
-    configured (or the energy component is unavailable).
+async def _discover_energy_water_meter(hass: HomeAssistant) -> tuple[str | None, int]:
+    """Return the first ``water`` source's ``stat_energy_from`` from HA's
+    Energy dashboard, and how many water sources it holds.
+
+    The count comes back with the meter because the caller has to say so:
+    the dashboard's own order decides which of several is billed, and that
+    reflects the order they were added, not which one the utility
+    invoices. ``(None, 0)`` when no water source is configured, or the
+    energy component is unavailable.
 
     Wraps every failure mode -- ImportError on old HA without the
     energy component, manager raising on a fresh install, malformed
@@ -1422,7 +1463,7 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
             async_get_manager,
         )
     except ImportError:
-        return None
+        return None, 0
     try:
         # The manager is a singleton behind an asyncio.Event that is only
         # set once its first load succeeds. A failed read of
@@ -1434,10 +1475,10 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
             manager = await async_get_manager(hass)
     except Exception as err:  # a timeout, or whatever the energy component surfaced
         _LOGGER.debug("energy manager unavailable: %s", err)
-        return None
+        return None, 0
     data = getattr(manager, "data", None)
     if not data:
-        return None
+        return None, 0
     stats = [
         str(source["stat_energy_from"])
         for source in data.get("energy_sources") or []
@@ -1446,7 +1487,7 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
         and source.get("stat_energy_from")
     ]
     if not stats:
-        return None
+        return None, 0
     if len(stats) > 1:
         # One meter is what the YTD helpers are built around: they take a
         # single statistic id, and the live path tracks one entity. A
@@ -1460,7 +1501,7 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> str | None:
             "Set the water meter explicitly in the integration options to choose.",
             len(stats),
         )
-    return stats[0]
+    return stats[0], len(stats)
 
 
 async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, entity_id: str) -> None:
