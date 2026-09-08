@@ -92,6 +92,7 @@ if TYPE_CHECKING:
     WaterTariffFetcher = Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]]
     CommuneFetcher = Callable[[aiohttp.ClientSession, str], Awaitable[WaterTariff]]
     CommuneLister = Callable[[aiohttp.ClientSession], Awaitable[tuple["CommuneOption", ...]]]
+    CommuneForPostcode = Callable[[str], str | None]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -121,6 +122,13 @@ class WaterExtractor:
     fetch: WaterTariffFetcher
     fetch_for_commune: CommuneFetcher | None = None
     list_communes: CommuneLister | None = None
+    # Some postcodes inside a per-commune operator's area are not billed at
+    # its default commune's rate. Water-link's card puts 2070 in the ring
+    # group, not in Antwerpen, and a household that never opened the
+    # dropdown was billed 66 EUR a year too little. Where an operator can
+    # say which commune a postcode belongs to, the config flow pre-selects
+    # it instead of leaving the default to stand in silence.
+    commune_for_postcode: CommuneForPostcode | None = None
 
     @property
     def supports_communes(self) -> bool:

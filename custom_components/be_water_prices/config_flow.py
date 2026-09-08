@@ -159,11 +159,25 @@ def _choose_schema(candidates: tuple[str, ...]) -> vol.Schema:
     )
 
 
+def _commune_for_postcode(utility_id: str, postcode: str | None) -> str | None:
+    """The commune an operator bills ``postcode`` at, when it says.
+
+    Only Water-link does today, and only for 2070: its card bills
+    Zwijndrecht and Burcht in the ring group rather than at the Antwerpen
+    default the no-commune path would otherwise serve.
+    """
+    if not postcode:
+        return None
+    hook = get(utility_id).commune_for_postcode
+    return None if hook is None else hook(postcode)
+
+
 def _options_schema(
     current: dict[str, Any],
     *,
     flanders: bool,
     communes: tuple[CommuneOption, ...] = (),
+    suggested_commune: str | None = None,
 ) -> vol.Schema:
     fields: dict[Any, Any] = {
         vol.Required(
@@ -203,7 +217,7 @@ def _options_schema(
     # commune dropdown. The id is the utility's internal opaque
     # identifier (GUID for DWG, integer for Farys, name for Water-link).
     if communes:
-        commune_default = current.get(CONF_COMMUNE)
+        commune_default = current.get(CONF_COMMUNE) or suggested_commune
         fields[
             vol.Optional(
                 CONF_COMMUNE,
@@ -405,7 +419,10 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         return self.async_show_form(
             step_id="options",
             data_schema=_options_schema(
-                {}, flanders=_is_flanders(self._utility), communes=communes
+                {},
+                flanders=_is_flanders(self._utility),
+                communes=communes,
+                suggested_commune=_commune_for_postcode(self._utility, self._postcode),
             ),
         )
 
@@ -817,5 +834,6 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
                 current,
                 flanders=_is_flanders(utility_id),
                 communes=communes,
+                suggested_commune=_commune_for_postcode(utility_id, current.get(CONF_POSTCODE)),
             ),
         )

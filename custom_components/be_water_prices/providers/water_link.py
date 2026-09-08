@@ -115,6 +115,21 @@ _PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}(?:%20|[\s_-])?HH(?:_\d+)?\.pdf
 # in 2026).
 _DEFAULT_COMMUNE = "Antwerpen"
 
+# Postcodes inside Water-link's area that its card does not bill at the
+# Antwerpen rate. 2070 is Zwijndrecht and Burcht, across the Scheldt,
+# which the card puts in the Beveren-Kruibeke-Zwijndrecht row at a
+# gemeentelijke afvoer of 1,9572 against Antwerpen's 1,3345: 66 EUR a
+# year on an 80 m3 household that left the commune dropdown alone.
+_POSTCODE_COMMUNES: dict[str, str] = {
+    "2070": "Beveren-Kruibeke-Zwijndrecht",
+}
+
+
+def commune_for_postcode(postcode: str) -> str | None:
+    """The commune Water-link bills ``postcode`` at, when it is not the default."""
+    return _POSTCODE_COMMUNES.get(postcode.strip())
+
+
 # Anchored on "<commune>  N,NNNN  N,NNNN  N,NNNN  N,NNNN  N,NNNN" -- five
 # columns: Water, Afvoer, Zuivering, Totaal-ex-BTW, Totaal-incl-BTW. The
 # fourth is read too: it is the sum of the first three, so a row that
@@ -307,4 +322,5 @@ EXTRACTOR = WaterExtractor(
     fetch=fetch,
     fetch_for_commune=fetch_for_commune,
     list_communes=list_communes,
+    commune_for_postcode=commune_for_postcode,
 )

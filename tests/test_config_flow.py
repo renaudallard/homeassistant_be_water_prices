@@ -316,3 +316,32 @@ def test_every_table_answer_is_a_registered_extractor() -> None:
         _postcodes.resolve(str(pc)) for pc in range(1000, 10000) if _postcodes.resolve(str(pc))
     }
     assert answers <= ids, sorted(answers - ids)
+
+
+def test_water_link_2070_is_offered_its_own_commune_not_antwerpen() -> None:
+    """2070 is Zwijndrecht/Burcht: the card bills it in the ring group."""
+    from custom_components.be_water_prices.config_flow import _commune_for_postcode
+
+    assert _resolve_postcode("2070") == "water_link"
+    assert _commune_for_postcode("water_link", "2070") == "Beveren-Kruibeke-Zwijndrecht"
+    # The city core keeps the operator default.
+    assert _commune_for_postcode("water_link", "2000") is None
+    # Operators that say nothing about postcodes are unaffected.
+    assert _commune_for_postcode("farys", "9000") is None
+    assert _commune_for_postcode("water_link", None) is None
+
+
+def test_the_2070_default_is_worth_the_difference_it_claims() -> None:
+    """Antwerpen 1,3345 against the ring group's 1,9572 is 66 EUR a year."""
+    from custom_components.be_water_prices.pricing import compute_annual_cost
+    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
+    from custom_components.be_water_prices.providers.water_link import parse_tariff
+    from tests import fixture_bytes
+
+    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    antwerpen = compute_annual_cost(parse_tariff(text, year=2026, commune="Antwerpen"), 80, 1)
+    ring = compute_annual_cost(
+        parse_tariff(text, year=2026, commune="Beveren-Kruibeke-Zwijndrecht"), 80, 1
+    )
+    assert antwerpen is not None and ring is not None
+    assert round(ring - antwerpen, 2) == 66.01
