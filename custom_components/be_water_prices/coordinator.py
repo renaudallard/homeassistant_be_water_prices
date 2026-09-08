@@ -1608,6 +1608,15 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     guard in this module was re-deriving one call later.
     """
     total = 0.0
+    # How many buckets were read, and how many of them a guard refused. A
+    # year every guard rejects sums to the same 0.0 as a year with no
+    # statistics at all, and the caller may anchor an empty year at zero
+    # but not an unreadable one: a cumulative meter that republishes 0 on
+    # a nightly reconnect leaves every bucket carrying the whole register,
+    # all of them dropped, and the year restarted at zero with the water
+    # already used lost until January.
+    admitted = 0
+    refused = 0
     # A register drop waiting for the bucket after it, see below.
     pending_drop = 0.0
     # Asking for a day period makes Home Assistant re-align the end of the
@@ -1642,6 +1651,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 entity_id,
                 start,
             )
+            refused += 1
             continue
         if delta < 0:
             # A register that went backwards is not consumption, and
@@ -1652,16 +1662,20 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
             # actually used, while a genuine swap or a lost run-up leaves
             # the pair negative and is dropped whole.
             pending_drop += float(delta)
+            refused += 1
             continue
         if pending_drop < 0.0:
             netted = float(delta) + pending_drop
             pending_drop = 0.0
             if netted <= 0.0:
                 _LOGGER.debug("%s: dropping a register drop and its follow-up bucket", entity_id)
+                refused += 1
                 continue
             if _exceeds_a_day(netted, entity_id, "netted"):
+                refused += 1
                 continue
             total += netted
+            admitted += 1
             continue
         if _change_exceeds_the_register(row):
             # A register cannot consume more than it reads. Home Assistant
@@ -1676,10 +1690,20 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 delta,
                 row.get("state"),
             )
+            refused += 1
             continue
         if _exceeds_a_day(float(delta), entity_id, "single"):
+            refused += 1
             continue
         total += float(delta)
+        admitted += 1
+    if refused and not admitted:
+        # Every bucket the year had was refused. That is not an empty year
+        # and must not be anchored as one.
+        raise RecorderUnavailable(
+            f"every one of {refused} daily buckets for {entity_id} was refused; "
+            "the year cannot be read rather than being empty"
+        )
     # Nothing above can push the total below zero any more, but the floor
     # stays: it costs nothing and the sensor must never read negative.
     return max(0.0, total)

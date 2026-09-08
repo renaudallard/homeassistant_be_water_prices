@@ -31,6 +31,7 @@ from datetime import date
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from homeassistant.util import dt as dt_util
 
 from custom_components.be_water_prices import coordinator as co
@@ -160,3 +161,32 @@ async def test_a_bucket_dated_after_the_window_is_not_billed_into_it() -> None:
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         asked = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
     assert round(asked, 3) == 0.7
+
+
+async def test_a_year_whose_every_bucket_is_refused_is_unreadable_not_empty() -> None:
+    """A meter that republishes 0 nightly poisons every bucket; that is not zero."""
+    rows = [
+        _row(date(2026, 1, 1 + n), change=0.3, state=0.3, total=0.3 * (n + 1)) for n in range(5)
+    ]
+    with (
+        patch(_ROWS, new=AsyncMock(return_value=rows)),
+        pytest.raises(co.RecorderUnavailable, match="every one of"),
+    ):
+        await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
+
+
+async def test_a_year_with_no_buckets_at_all_is_still_zero() -> None:
+    """An empty year may be anchored at zero; only a refused one may not."""
+    with patch(_ROWS, new=AsyncMock(return_value=[])):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
+    assert total == 0.0
+
+
+async def test_one_admitted_bucket_is_enough_to_call_the_year_readable() -> None:
+    rows = [
+        _row(date(2026, 1, 1), change=0.3, state=0.3, total=0.3),
+        _row(date(2026, 1, 2), change=0.4, state=10.4, total=10.4),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
+    assert round(total, 3) == 0.4
