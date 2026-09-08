@@ -73,18 +73,28 @@ SOURCE_URL = "https://www.cile.be/facturation/le-prix-de-leau"
 
 
 def _value_column(table: Tag, year: int | None) -> int:
-    """The column whose heading names ``year``, else the last one.
+    """The column whose heading names ``year``, else the only one there is.
 
     The table has one value column today. Should a comparison column
     appear, "new | old" or "old | new", the last cell is the right one
-    only half the time; the heading that carries the year is not.
+    only half the time; the heading that carries the year is not. Falling
+    back to the last column across a two-column table was a coin toss on
+    which year the household got billed, so a table this cannot place the
+    year in is refused instead.
     """
     head = table.find("tr")
-    if year is not None and isinstance(head, Tag):
+    cells: list[str] = []
+    if isinstance(head, Tag):
         cells = [c.get_text(" ", strip=True) for c in head.find_all(["td", "th"])]
-        for index, cell in enumerate(cells):
-            if index > 0 and str(year) in cell:
-                return index
+        if year is not None:
+            for index, cell in enumerate(cells):
+                if index > 0 and str(year) in cell:
+                    return index
+    if len(cells) > 2:
+        raise ExtractorError(
+            f"CILE's table has {len(cells) - 1} value columns and none of them names "
+            f"{year}; refusing to guess which year the household is billed at"
+        )
     return -1
 
 

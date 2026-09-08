@@ -325,8 +325,15 @@ def detect_published_year(text: str, *, today: date | None = None) -> int | None
     for pattern in _PUBLISHED_YEAR_RES:
         found = {int(match.group(1)) for match in pattern.finditer(text)}
         plausible = [year for year in found if now - 1 <= year <= now + 1]
-        if plausible:
-            return max(plausible)
+        if not plausible:
+            continue
+        # The year in force wins over one merely announced. Taking the
+        # largest meant a page that names next year's card alongside the
+        # one it is actually billing dated the rate a year ahead, so a
+        # card that had gone stale never looked it. The current year is
+        # the answer whenever the page names it; failing that the largest,
+        # which is how a December page naming only next year is read.
+        return now if now in plausible else max(plausible)
     return None
 
 

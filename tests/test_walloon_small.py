@@ -447,3 +447,46 @@ def test_an_out_of_window_anchor_still_falls_through_to_the_scan() -> None:
         "<p>Le CVD applicable est de 3,2400 €</p></body></html>"
     )
     assert parse_cvd(page) == 3.24
+
+
+def test_a_year_in_force_outranks_one_merely_announced() -> None:
+    """A page naming next year's card dated the rate a year ahead."""
+    from custom_components.be_water_prices.providers._walloon_simple import detect_published_year
+
+    text = "Tarifs 2026 en vigueur. Tarifs 2027 a partir du 1er janvier prochain."
+    assert detect_published_year(text, today=date(2026, 6, 1)) == 2026
+
+
+def test_a_december_page_naming_only_next_year_is_still_read() -> None:
+    from custom_components.be_water_prices.providers._walloon_simple import detect_published_year
+
+    assert detect_published_year("Tarifs 2027", today=date(2026, 12, 20)) == 2027
+
+
+def test_a_cile_table_whose_columns_name_no_year_is_refused() -> None:
+    """Falling back to the last column was a coin toss on which year."""
+    from bs4 import BeautifulSoup
+
+    from custom_components.be_water_prices.providers._html import extract_amounts  # noqa: F401
+    from custom_components.be_water_prices.providers.cile import _value_column
+
+    table = BeautifulSoup(
+        "<table><tr><th>Poste</th><th>Nouveau tarif</th><th>Ancien tarif</th></tr>"
+        "<tr><td>C.V.D</td><td>3,5552</td><td>3,4237</td></tr></table>",
+        "html.parser",
+    ).find("table")
+    with pytest.raises(ExtractorError, match="value columns and none of them names"):
+        _value_column(table, 2026)
+
+
+def test_a_cile_table_with_one_value_column_still_reads_it() -> None:
+    from bs4 import BeautifulSoup
+
+    from custom_components.be_water_prices.providers.cile import _value_column
+
+    table = BeautifulSoup(
+        "<table><tr><th>Poste</th><th>Tarif</th></tr>"
+        "<tr><td>C.V.D</td><td>3,5552</td></tr></table>",
+        "html.parser",
+    ).find("table")
+    assert _value_column(table, 2026) == -1
