@@ -416,6 +416,12 @@ you paid is worth more than a tidy chart.
   enabling the social tariff or picking your commune lowers
   `current_year_cost` straight away.
 
+  It is also rebuilt once by any release that changes it, so a rate this
+  integration itself corrects downwards reaches `current_year_cost` the
+  day the fix ships rather than on the next January 1. That is safe
+  because the m³ figure carries its own high-water mark, so a recomputed
+  bill can only come out lower when the rates really are lower.
+
   What the floor still holds against is a **tariff fetch that comes back
   cheaper** — a transient bad parse, or a fallback card. A genuine
   mid-year price cut by your operator therefore only reaches

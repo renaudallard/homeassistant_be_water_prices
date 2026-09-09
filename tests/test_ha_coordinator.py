@@ -54,7 +54,7 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import RecorderUnavailable
+from custom_components.be_water_prices.coordinator import RecorderUnavailable, _cost_basis
 from custom_components.be_water_prices.providers.base import (
     ExtractorError,
     WaterExtractor,
@@ -2338,7 +2338,9 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
     assert coordinator.data.ytd_consumption_m3 == 100.0
     assert coordinator.data.current_year_cost_eur is not None
     assert coordinator.data.current_year_cost_eur < 999.0
-    assert coordinator._ytd.basis == "vivaqua||1|False"
+    assert coordinator._ytd.basis == _cost_basis(
+        utility="vivaqua", commune=None, persons=1, social=False
+    )
 
 
 @pytest.mark.asyncio
@@ -3166,7 +3168,7 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
             "m3": 100.0,
             "cost": 999.0,
             "offset_m3": 4000.0,
-            "basis": "vivaqua||1|False",
+            "basis": _cost_basis(utility="vivaqua", commune=None, persons=1, social=False),
         },
     }
 
@@ -3190,7 +3192,9 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert coordinator.data.current_year_cost_eur is not None
         assert coordinator.data.current_year_cost_eur < 999.0
-        assert coordinator._ytd.basis == "vivaqua||3|False"
+        assert coordinator._ytd.basis == _cost_basis(
+            utility="vivaqua", commune=None, persons=3, social=False
+        )
 
 
 @pytest.mark.asyncio
@@ -3524,7 +3528,7 @@ async def test_first_anchor_keeps_a_floor_it_can_account_for(
             "m3": None,
             "cost": 177.25,
             "offset_m3": None,
-            "basis": "vivaqua||1|False",
+            "basis": _cost_basis(utility="vivaqua", commune=None, persons=1, social=False),
         },
     }
 
@@ -3541,3 +3545,66 @@ async def test_first_anchor_keeps_a_floor_it_can_account_for(
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert coordinator.data.ytd_consumption_m3 == 30.0
         assert coordinator.data.current_year_cost_eur == 177.25
+
+
+@pytest.mark.asyncio
+async def test_a_floor_measured_by_an_earlier_release_is_rebuilt_once(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """The one-time cost of keying the floor on the release.
+
+    A rate this integration corrects downwards looks exactly like the
+    transiently cheaper fetch the floor exists for, so the correction only
+    reached the running bill in January. The release is part of the basis
+    now, which means one rebuild on upgrade and the corrected figure the
+    same day. Pinned here so it stays one rebuild.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return replace(_fresh_tariff(), linear_eur_per_m3=1.20)
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    hass_storage[f"{DOMAIN}.{entry.entry_id}.ytd"] = {
+        "version": 1,
+        "minor_version": 2,
+        "data": {
+            "meter": "sensor.water_meter",
+            "year": dt_util.now().year,
+            "m3": None,
+            "cost": 177.25,
+            "offset_m3": None,
+            # The shape v0.7.9 wrote: the household, and no release.
+            "basis": "vivaqua||1|False",
+        },
+    }
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=30.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        assert coordinator.data.ytd_consumption_m3 == 30.0
+        # Rebuilt from what the cheaper card actually costs, not held at 177.25.
+        assert coordinator.data.current_year_cost_eur is not None
+        assert coordinator.data.current_year_cost_eur < 177.25
+        assert coordinator._ytd.basis == _cost_basis(
+            utility="vivaqua", commune=None, persons=1, social=False
+        )

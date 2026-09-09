@@ -75,6 +75,7 @@ from .const import (
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
+    INTEGRATION_VERSION,
     MAX_CONSUMPTION_M3,
     MIN_CONSUMPTION_M3,
     PROJECTION_DRIFT_RATIO,
@@ -1427,8 +1428,18 @@ def _cost_basis(*, utility: str, commune: str | None, persons: int, social: bool
     absent: a cheaper card is exactly the transient this floor is for, and
     a real mid-year price cut still waits for the year to turn, which is
     the behaviour the README documents and four tests pin.
+
+    The release is here for the same reason the others are. A release that
+    corrects a rate downwards is not a dip either, and keying the floor on
+    the rates would defeat it, so the version stands in: an upgrade
+    rebuilds the floor once, and a correction reaches the running bill the
+    day it ships rather than in January. Rebuilding is safe because the m3
+    mark is monotonic on its own, so the recomputed cost can only come out
+    lower when the rates really are.
     """
-    return "|".join(str(part) for part in (utility, commune or "", persons, social))
+    return "|".join(
+        str(part) for part in (INTEGRATION_VERSION, utility, commune or "", persons, social)
+    )
 
 
 def _figure(value: object) -> float | None:

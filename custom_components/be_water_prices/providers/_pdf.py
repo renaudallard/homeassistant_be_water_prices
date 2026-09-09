@@ -34,18 +34,17 @@ are electricity-only).
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import math
 import re
 import unicodedata
 import zlib
 from io import BytesIO
-from pathlib import Path
 from urllib.parse import urlparse
 
 import aiohttp
 
+from ..const import INTEGRATION_VERSION
 from .base import ExtractorError, TransientFetchError
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,15 +76,7 @@ def _http_error(url: str, status: int) -> ExtractorError:
     return ExtractorError(message)
 
 
-def _read_version() -> str:
-    manifest = Path(__file__).resolve().parent.parent / "manifest.json"
-    try:
-        return str(json.loads(manifest.read_text(encoding="utf-8")).get("version", "0"))
-    except (OSError, ValueError):
-        return "0"
-
-
-USER_AGENT = f"Home Assistant be_water_prices/{_read_version()}"
+USER_AGENT = f"Home Assistant be_water_prices/{INTEGRATION_VERSION}"
 
 # Hard ceiling on a fetched response body. Real tariff PDFs and HTML
 # pages are well under a megabyte; this only bounds memory if an upstream

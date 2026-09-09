@@ -1144,3 +1144,31 @@ def test_a_frame_rebuilt_from_below_asks_the_recorder_too() -> None:
     assert out.m3 == 40.3  # and it publishes what it already published
     assert out.cycle.offset_m3 == 500.2 - 40.3  # the frame came down to the meter
     assert out.arbitrate is True
+
+
+def test_a_correction_shipped_in_a_release_reaches_the_running_bill() -> None:
+    """A rate this integration itself gets wrong is not the dip to clamp.
+
+    The floor holds across a rate change on purpose, because a fetch that
+    comes back cheaper is usually a glitch. A release that corrects a rate
+    downwards looks identical to it, so the correction only reached the
+    running bill in January: v0.7.9 took IDEN from 3,555 to 3,3552 and
+    every IDEN household would have stayed on the higher figure.
+    """
+    from custom_components.be_water_prices.const import INTEGRATION_VERSION
+    from custom_components.be_water_prices.coordinator import _cost_basis
+
+    now = _cost_basis(utility="iden", commune=None, persons=1, social=False)
+    assert now.startswith(f"{INTEGRATION_VERSION}|")
+    before = now.replace(INTEGRATION_VERSION, "0.0.1", 1)
+    assert before != now
+
+    cycle = _YtdCycle(meter=_METER, year=_YEAR, m3=40.0, cost=556.21, offset_m3=0.0, basis=before)
+    out = _round(cycle, reading=40.0, basis=now, cost_of=lambda _m3: 538.21)
+    assert out.cost == 538.21
+    assert out.cycle.basis == now
+
+    # Within one release the floor still holds, which is what it is for.
+    same = _YtdCycle(meter=_METER, year=_YEAR, m3=40.0, cost=556.21, offset_m3=0.0, basis=now)
+    held = _round(same, reading=40.0, basis=now, cost_of=lambda _m3: 538.21)
+    assert held.cost == 556.21

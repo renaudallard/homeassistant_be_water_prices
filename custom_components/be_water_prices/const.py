@@ -27,7 +27,27 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 DOMAIN = "be_water_prices"
+
+
+def _read_version() -> str:
+    """This release's version, straight from the manifest.
+
+    Read here rather than in each place that wants it: the User-Agent
+    every fetch sends and the key the running bill's floor is measured
+    under are both this number, and two readers would drift.
+    """
+    manifest = Path(__file__).resolve().parent / "manifest.json"
+    try:
+        return str(json.loads(manifest.read_text(encoding="utf-8")).get("version", "0"))
+    except (OSError, ValueError):
+        return "0"
+
+
+INTEGRATION_VERSION = _read_version()
 
 REGION_FLANDERS = "flanders"
 REGION_WALLONIA = "wallonia"
