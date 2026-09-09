@@ -3032,6 +3032,13 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
             await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 45.0
 
+        # The fold exempts a round with no interval behind it, which is the
+        # first one after a restart. time.monotonic() is what measures that
+        # interval and a frozen clock stops it, so say when the last round
+        # was rather than leaving the answer to whether this suite is being
+        # run under a pinned clock.
+        coordinator._ytd_last_fold_at = time.monotonic() - 3600.0
+
         # A step of 50 m3 on the next report. It is over _MAX_STEP_M3, so it
         # is held for the reading that follows it, and the year is not
         # marked as carrying water the recorder could not see.
