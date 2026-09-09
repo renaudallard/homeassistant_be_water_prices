@@ -130,6 +130,14 @@ _REFUSALS_BEFORE_UNREADABLE = 2
 # long outage is confirmed by the very next reading and accepted then.
 _IMPLAUSIBLE_JUMP_M3 = 100.0
 
+# Units that need no conversion because the figure behind them already is
+# cubic metres. A reading with no unit at all is the common case, and
+# ASCII "m3" is the superscript one typed on a keyboard: Home Assistant's
+# volume converter knows neither, and both halves of the meter path have
+# to accept exactly the same set or a meter is read on one and refused on
+# the other. Spelled out separately they drifted apart twice.
+_ALREADY_CUBIC_METRES: tuple[str | None, ...] = (None, "m3", UnitOfVolume.CUBIC_METERS)
+
 
 class RecorderUnavailable(Exception):
     """The recorder could not be queried, as distinct from answering empty.
@@ -1487,16 +1495,18 @@ def _state_volume_m3(state: State | None) -> float | None:
     ``water`` sensor (the explicit override and the Energy-dashboard
     auto-pick alike) to report litres, gallons, ft³, etc. Read the
     meter's own ``unit_of_measurement`` and convert so a non-m³ meter
-    is not silently billed ~1000× too high. A reading with no unit is
-    assumed to already be m³ (the common case); a unit we cannot
+    is not silently billed ~1000× too high. A reading with no unit, or
+    in ASCII ``m3``, is assumed to already be m³; a unit we cannot
     convert to a volume is rejected so the YTD sensors stay unknown
-    rather than publish a garbage figure.
+    rather than publish a garbage figure. The set that needs no
+    conversion is shared with the recorder-side guard, which has to
+    accept exactly the same units.
     """
     value = _numeric_state(state)
     if value is None or state is None:
         return None
     unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
-    if unit in (None, UnitOfVolume.CUBIC_METERS):
+    if unit in _ALREADY_CUBIC_METRES:
         return value
     try:
         return VolumeConverter.convert(value, unit, UnitOfVolume.CUBIC_METERS)
@@ -1572,9 +1582,6 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> tuple[str | None,
 # because the figures behind them already are cubic metres. ``None`` is a
 # sensor with no unit, which _state_volume_m3 reads as m3 on the live
 # side; ``m3`` is the ASCII spelling of the same thing.
-_ALREADY_CUBIC_METRES: tuple[str | None, ...] = (None, "m3")
-
-
 async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, entity_id: str) -> None:
     """Stop before reading a statistic Home Assistant cannot put into m³.
 
@@ -1591,13 +1598,13 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
     recorder. So the two halves now agree, and the year reports nothing
     rather than something absurd.
 
-    Agreeing means agreeing on what passes, too. :func:`_state_volume_m3`
-    takes a reading with no unit at all to be cubic metres already, and
-    that is the common case, so refusing it here would blank the year on
-    a meter that has always been read correctly. ASCII ``m3`` is the same
-    story from the other side: the converter does not know it, but the
-    figures behind it already are cubic metres, so there is nothing to
-    convert and nothing to get wrong.
+    Agreeing means agreeing on what passes, too, which is why both
+    halves read the same ``_ALREADY_CUBIC_METRES``: a reading with no
+    unit at all, and one in ASCII ``m3``, are cubic metres already, so
+    there is nothing to convert and nothing to get wrong. Spelled out
+    separately the two sets drifted apart, and a meter labelled ``m3``
+    was refused by the live path while this one took it, which left the
+    year anchored at zero on an install with no statistics yet.
     """
     try:
         from homeassistant.components.recorder.statistics import get_metadata

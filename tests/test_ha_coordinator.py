@@ -3421,6 +3421,33 @@ async def test_the_tick_after_a_swap_asks_the_recorder(hass: HomeAssistant) -> N
     assert coordinator._ytd_arbitrate is False
 
 
+def test_both_halves_of_the_meter_path_accept_the_same_units() -> None:
+    """The two guards have drifted apart twice, in opposite directions.
+
+    First the recorder side refused a unitless meter the live side reads
+    as cubic metres, so fresh installs never anchored. Then ASCII m3 went
+    the other way: the recorder took it and the live path handed it to
+    the converter, which does not know it, so every reading was dropped
+    and a meter with no compiled statistics yet left the year at zero.
+    """
+    from homeassistant.core import State
+
+    from custom_components.be_water_prices.coordinator import (
+        _ALREADY_CUBIC_METRES,
+        _state_volume_m3,
+    )
+
+    for unit in _ALREADY_CUBIC_METRES:
+        attributes = {} if unit is None else {"unit_of_measurement": unit}
+        assert _state_volume_m3(State("sensor.wm", "40.0", attributes)) == 40.0, unit
+    # And a unit that really does need converting still is converted.
+    assert _state_volume_m3(
+        State("sensor.wm", "40000", {"unit_of_measurement": "L"})
+    ) == pytest.approx(40.0)
+    # A unit that is not a volume at all is still refused.
+    assert _state_volume_m3(State("sensor.wm", "40.0", {"unit_of_measurement": "kWh"})) is None
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("unit", [None, "m3", "m\u00b3", "L"])
 async def test_a_unit_the_recorder_needs_no_help_with_is_read(
