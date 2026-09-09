@@ -2984,11 +2984,10 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
     """A round that only recomputes must not answer for the meter.
 
     The tick re-folds with no reading to republish a cycle a meter event
-    moved on during the Store save. The fold reads a round with no reading
-    as the meter having been unavailable, which exempts the next report
-    from the step bound and marks the year as holding water the recorder
-    never saw. The meter was not gone: it reported, which is why the cycle
-    moved and why the re-fold exists at all.
+    moved on during the Store save. That round has not looked at the meter,
+    so it must not leave the next one thinking the meter has been out of
+    sight: the step bound is scaled by that gap, and the meter reported a
+    moment ago, which is why the cycle moved and why this round exists.
     """
     await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
@@ -3032,21 +3031,13 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
             await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 45.0
 
-        # The fold exempts a round with no interval behind it, which is the
-        # first one after a restart. time.monotonic() is what measures that
-        # interval and a frozen clock stops it, so say when the last round
-        # was rather than leaving the answer to whether this suite is being
-        # run under a pinned clock.
-        coordinator._ytd_last_fold_at = time.monotonic() - 3600.0
-
-        # A step of 50 m3 on the next report. It is over _MAX_STEP_M3, so it
-        # is held for the reading that follows it, and the year is not
-        # marked as carrying water the recorder could not see.
+        # A step of 50 m3 on the next report. The meter was last seen a
+        # moment ago, so the gap buys nothing and the ordinary bound stands
+        # and the step is held for the reading that follows it.
         hass.states.async_set("sensor.water_meter", "175")
         await hass.async_block_till_done()
 
         assert coordinator.data.ytd_consumption_m3 == 45.0
-        assert coordinator._ytd.unrecorded is False
 
 
 @pytest.mark.asyncio

@@ -33,7 +33,7 @@ import logging
 import math
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from typing import Any
@@ -143,6 +143,18 @@ _IMPLAUSIBLE_JUMP_M3 = 100.0
 # it on the next tick -- so it can afford to be tight.
 _MAX_STEP_M3 = 30.0
 
+_SECONDS_PER_DAY = 86400.0
+
+# What a day out of sight may add to the step bound. A household uses
+# 80-100 m3 in a year, so a full cubic metre a day is already several
+# times any of them and covers a heavy one comfortably: three months off
+# the air buys 90 m3 on top of the ordinary bound, and a meter reporting
+# once a day buys one. _IMPLAUSIBLE_JUMP_M3 is the wrong rate for this
+# even though it is the other bound in here, because it is the figure a
+# day cannot exceed rather than one a day plausibly reaches, and using it
+# handed the whole of that ceiling to every daily-reporting meter.
+_AWAY_M3_PER_DAY = 1.0
+
 # How far a recorder answer may trail the meter and still be current.
 # Home Assistant compiles statistics every five minutes, so a query that
 # has not lost history is at most a few minutes of flow behind the reading
@@ -215,7 +227,7 @@ def _migrate_cycle_to_v2(old: dict[str, Any]) -> dict[str, Any]:
         kept: dict[str, Any] = {
             key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")
         }
-        for key in ("basis", "recorder_hwm", "unrecorded"):
+        for key in ("basis", "recorder_hwm", "seen_at"):
             # Carried when it is there, and not invented when it is not.
             # Rebuilding the dict without a key dropped it on every
             # rollback-and-upgrade: the floor lost its own provenance, and
@@ -321,12 +333,21 @@ class _YtdCycle:
     # accumulates, so an answer below it is a database that has lost some
     # and must not be believed against the year.
     recorder_hwm: float | None = None
-    # Whether the figure includes water the recorder cannot account for.
-    # Set when a meter that was unavailable comes back carrying the whole
-    # outage: HA compiled no statistics for it, so the recorder is
-    # permanently short by that much and can never speak for the year
-    # again. Without it the correction below would throw that water away.
-    unrecorded: bool = False
+    # When a reading was last folded into this cycle, as epoch seconds.
+    # Persisted, because the gap that matters most is the one across a
+    # restart and no in-process clock survives that. It is what the step
+    # bound is scaled by: a meter comes back carrying whatever was drawn
+    # while nobody was looking, and how much that can be depends entirely
+    # on how long nobody was looking.
+    #
+    # Out of the comparison, because it moves on every reading and the
+    # comparison is what marks the record for saving. A meter reporting
+    # every ten seconds says nothing new about the year most of the time,
+    # and writing the Store for each of those reports is a great deal of
+    # flash wear on the hardware this usually runs on. It rides along with
+    # the next real change instead, so what is persisted may trail the
+    # figure in hand by however long the year sat still.
+    seen_at: float | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
@@ -350,26 +371,6 @@ class _YtdFold:
     # wants the recorder on the next tick. Distinct from ``swapped``,
     # which also says the year restarted.
     arbitrate: bool = False
-    # Whether this round had a reading at all. The next round needs it:
-    # a meter that has been unavailable comes back showing everything
-    # drawn while it was down, and that step is real however large.
-    saw_reading: bool = False
-
-
-def _stepped_past_the_bound(framed: float, mark: float | None) -> bool:
-    """Whether a reading advanced the year by more than one report may.
-
-    Only an exemption can admit a step this size, and both of them -- a
-    meter that was unavailable, a first round after a restart -- mean the
-    same thing: the water arrived while Home Assistant was not watching,
-    so no statistics were compiled for it and the recorder is permanently
-    short by that much. It cannot speak for this year again.
-
-    A figure the recorder itself supplied is not that, however far it
-    jumps, which is why this asks only about a reading read through the
-    frame.
-    """
-    return mark is not None and framed - mark > _MAX_STEP_M3
 
 
 def _fold(
@@ -385,10 +386,10 @@ def _fold(
     hold_span_s: float,
     run_m3: float | None,
     elapsed_s: float,
+    now_ts: float,
     high_m3: float | None,
     basis: str,
     cost_of: Callable[[float], float | None],
-    saw_reading: bool = True,
 ) -> _YtdFold:
     """Fold one round of evidence into the year-to-date cycle.
 
@@ -435,13 +436,6 @@ def _fold(
     floor = cycle.cost if current and cycle.basis == basis else None
     offset = cycle.offset_m3 if current else None
     recorder_hwm = cycle.recorder_hwm if current else None
-    unrecorded = cycle.unrecorded if current else False
-    # What the year knew before this round. The flag below is inferred from
-    # the size of the step this round admits, and the guards that read it
-    # are weighing that same step against a recorder answer read alongside
-    # it. Reading the inference there would let a step vouch for itself and
-    # throw away the one piece of independent evidence about it.
-    carried = unrecorded
     if not current:
         hold_m3 = None
         hold_run = 0
@@ -453,14 +447,23 @@ def _fold(
     # that was held and then refuted used to set it for the life of the
     # process, and no real reading could clear it again, so the frame
     # correction below was switched off until the next restart.
-    # What one report may add before it is held. A meter that was
-    # unavailable last round, or a round with no interval behind it at all
-    # (the first fold after a restart), comes back carrying everything
-    # drawn while nobody was looking, and that step is real however large.
-    # A meter that has been reporting steadily has no such excuse, and
-    # below the old bound nothing tested it: a reading 90 m3 above where
-    # the meter stood was taken on sight and pinned the year 1254 EUR over.
-    step_bound = _IMPLAUSIBLE_JUMP_M3 if not saw_reading or elapsed_s <= 0.0 else _MAX_STEP_M3
+    # How long the meter has been out of sight, across restarts included.
+    # A backward clock step reads as no gap at all rather than a negative
+    # one, which is the cautious way round.
+    seen_at = cycle.seen_at
+    away_s = 0.0 if seen_at is None else max(0.0, now_ts - seen_at)
+    # What one report may add before it is held: the ordinary bound, plus
+    # whatever the household could have drawn while the meter was out of
+    # sight. A meter that was away comes back carrying all of it and that
+    # step is real however large, but how large it can be depends on how
+    # long nobody was looking.
+    #
+    # The gap used to count for nothing but its own existence. One dropped
+    # report bought the same 100 m3 as three months off the air, which is
+    # about five hours of a domestic connection at full bore or 437 days
+    # of an average household, and a spike arriving on the round after a
+    # single dropout was taken on sight for 993 EUR.
+    step_bound = _MAX_STEP_M3 + away_s / _SECONDS_PER_DAY * _AWAY_M3_PER_DAY
     was_high = high_m3
     # A record still carrying a stamp has history on this meter, so a
     # reading it cannot place comes from a meter that has been running all
@@ -551,7 +554,6 @@ def _fold(
                 # the recorder reported for the old meter, and any water it
                 # could not see there, go with it.
                 recorder_hwm = None
-                unrecorded = False
                 hold_m3 = None
                 hold_run = 0
                 hold_span_s = 0.0
@@ -611,7 +613,6 @@ def _fold(
             hold_m3 = None
         elif corroborated:
             candidate = framed
-            unrecorded = unrecorded or _stepped_past_the_bound(framed, mark)
             hold_m3 = None
         elif mark is not None and framed - mark > step_bound:
             # A step this large in one report is a garbage value far more
@@ -623,7 +624,6 @@ def _fold(
             hold_m3 = reading
         else:
             candidate = framed
-            unrecorded = unrecorded or _stepped_past_the_bound(framed, mark)
             hold_m3 = None
 
     spoken_before = recorder_hwm is not None
@@ -636,8 +636,7 @@ def _fold(
         # some, and it is ignored rather than believed against the year.
         recorder_hwm = recorder_m3
         if (
-            not carried
-            and candidate is not None
+            candidate is not None
             and candidate - recorder_m3 > _RECORDER_LAG_M3
             and (spoken_before or mark is None or recorder_m3 >= mark)
         ):
@@ -654,12 +653,7 @@ def _fold(
                 recorder_m3,
             )
             candidate = None
-        if (
-            spoken_before
-            and not carried
-            and mark is not None
-            and mark - recorder_m3 > _RECORDER_LAG_M3
-        ):
+        if spoken_before and mark is not None and mark - recorder_m3 > _RECORDER_LAG_M3:
             # And the mark comes down with it. A spike smaller than the step
             # bound is admitted on sight, raises the mark, and the mark only
             # ever climbed, so it stood until January however plainly the
@@ -684,8 +678,16 @@ def _fold(
                 offset = reading - recorder_m3
                 high_m3 = reading
 
-    if candidate is not None and reading is not None and (high_m3 is None or reading > high_m3):
-        high_m3 = reading
+    if candidate is not None and reading is not None:
+        # The meter was seen, which means it gave an answer this round could
+        # place. A reading held for confirmation or refused as a glitch is
+        # not that, and stamping on those spent the allowance a real
+        # catch-up needed: a garbage value arriving first after an outage
+        # took the whole of it and the reading behind it, which really did
+        # carry three months of water, was held as a spike.
+        seen_at = now_ts
+        if high_m3 is None or reading > high_m3:
+            high_m3 = reading
 
     if swapped:
         # The year restarts on the new meter, so a recorder total spanning
@@ -708,7 +710,6 @@ def _fold(
             high_m3,
             swapped,
             arbitrate,
-            reading is not None,
         )
     published = max(figures)
 
@@ -764,7 +765,7 @@ def _fold(
             offset_m3=offset,
             basis=basis,
             recorder_hwm=recorder_hwm,
-            unrecorded=unrecorded,
+            seen_at=seen_at,
         ),
         published,
         cost,
@@ -775,7 +776,6 @@ def _fold(
         high_m3,
         swapped,
         arbitrate,
-        reading is not None,
     )
 
 
@@ -872,8 +872,6 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # place v0.7.8 was in permanently, and closing it needs the intent
         # persisted rather than held.
         self._ytd_arbitrate: bool = False
-        # Whether the last round saw the meter at all; see _fold's step bound.
-        self._ytd_saw_reading: bool = True
         # Whether the last recorder query succeeded, None before anything has
         # asked. Transient by design: it says what the database did a moment
         # ago, which is exactly as long as the answer is worth trusting.
@@ -1353,7 +1351,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "offset_m3": self._ytd.offset_m3,
             "basis": self._ytd.basis,
             "recorder_hwm": self._ytd.recorder_hwm,
-            "unrecorded": self._ytd.unrecorded,
+            "seen_at": self._ytd.seen_at,
         }
 
     def _fold_cycle(
@@ -1364,7 +1362,6 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year: int,
         reading: float | None,
         recorder_m3: float | None,
-        republish: bool = False,
     ) -> tuple[float | None, float | None]:
         """Fold a round of evidence into the cycle and return what to publish.
 
@@ -1372,12 +1369,6 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         its answer. The record and the transient hold state are written back
         before returning, so a caller that decides not to publish still
         cannot lose a swap run, a held reading, or a rebuilt frame.
-
-        ``republish`` says this round brought no evidence and is only
-        recomputing what the cycle already holds. Such a round has not
-        looked at the meter, so it may not answer for it: the fold reads a
-        round with no reading as the meter having been unavailable, which
-        is the exemption from the step bound.
         """
         # How long since the last round. The rule itself keeps no clock,
         # so the caller measures the gap and hands it over as evidence --
@@ -1398,8 +1389,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             hold_span_s=self._ytd_hold_span_s,
             run_m3=self._ytd_run_m3,
             elapsed_s=elapsed_s,
+            # Wall clock, not the monotonic one above: this is the stamp
+            # the record carries, and the gap it has to measure is the one
+            # across a restart, which no monotonic clock survives.
+            now_ts=dt_util.utcnow().timestamp(),
             high_m3=self._ytd_high_m3,
-            saw_reading=self._ytd_saw_reading,
             basis=_cost_basis(
                 utility=tariff.utility,
                 commune=self.entry.options.get(CONF_COMMUNE),
@@ -1416,8 +1410,6 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_hold_span_s = out.hold_span_s
         self._ytd_run_m3 = out.run_m3
         self._ytd_high_m3 = out.high_m3
-        if not republish:
-            self._ytd_saw_reading = out.saw_reading
         if out.swapped or out.arbitrate:
             # Nothing has dated the new register yet, or the round met a
             # step it could not weigh. Ask the recorder on the next tick:
@@ -1525,12 +1517,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # stands rather than the figure computed before the await,
                 # which the year has already climbed past.
                 ytd_m3, ytd_cost = self._fold_cycle(
-                    tariff,
-                    meter=meter,
-                    now_year=now_year,
-                    reading=None,
-                    recorder_m3=None,
-                    republish=True,
+                    tariff, meter=meter, now_year=now_year, reading=None, recorder_m3=None
                 )
         return ytd_m3, ytd_cost
 
@@ -1716,7 +1703,7 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         return None
     if year is not None and (isinstance(year, bool) or not isinstance(year, int)):
         return None
-    figures = {key: data.get(key) for key in ("m3", "cost", "offset_m3", "recorder_hwm")}
+    figures = {key: data.get(key) for key in ("m3", "cost", "offset_m3", "recorder_hwm", "seen_at")}
     if any(value is not None and _figure(value) is None for value in figures.values()):
         return None
     return _YtdCycle(
@@ -1727,15 +1714,12 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         offset_m3=_figure(figures["offset_m3"]),
         basis=basis,
         recorder_hwm=_figure(figures["recorder_hwm"]),
-        # A record written before this existed says nothing either way.
-        # Reading silence as "there may be some" was the cautious answer
-        # and it cost the whole point of the release: every record in the
-        # field predates the key, so the correction reached nobody until
-        # January, and the years sitting on a spike right now are the ones
-        # it was written for. Such a record has no recorder_hwm either, so
-        # the first answer for the year still proves nothing on its own and
-        # cannot lower the mark. That guard is the one doing the work here.
-        unrecorded=bool(data.get("unrecorded", False)),
+        # No stamp means nothing has been seen on this meter since the
+        # record was written, and the honest answer to "how long ago" is
+        # that we do not know. Read as no gap, so the meter earns its
+        # allowance back from the first reading rather than being handed
+        # one on the strength of an unknown.
+        seen_at=_figure(figures["seen_at"]),
     )
 
 

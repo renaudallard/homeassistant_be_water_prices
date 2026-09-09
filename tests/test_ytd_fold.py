@@ -36,7 +36,8 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
-from dataclasses import replace
+
+import pytest
 
 from custom_components.be_water_prices.coordinator import (
     _fold,
@@ -60,6 +61,11 @@ def _bill(m3: float) -> float | None:
 # changed passes a different one.
 _BASIS = "stand-in"
 
+# The wall clock every round is folded at, so a test says how long the
+# meter was out of sight by stamping the cycle that far back.
+_NOW_TS = 1_760_000_000.0
+_DAY_S = 86400.0
+
 
 def _round(
     cycle: _YtdCycle,
@@ -72,8 +78,8 @@ def _round(
     hold_span_s: float = 0.0,
     run_m3: float | None = None,
     elapsed_s: float = 86400.0,
+    now_ts: float = _NOW_TS,
     high_m3: float | None = None,
-    saw_reading: bool = True,
     now_year: int = _YEAR,
     meter: str = _METER,
     basis: str = _BASIS,
@@ -91,8 +97,8 @@ def _round(
         hold_span_s=hold_span_s,
         run_m3=run_m3,
         elapsed_s=elapsed_s,
+        now_ts=now_ts,
         high_m3=high_m3,
-        saw_reading=saw_reading,
         basis=basis,
         cost_of=cost_of,
     )
@@ -103,8 +109,13 @@ def _anchored(
     offset_m3: float,
     cost: float | None = None,
     recorder_hwm: float | None = None,
+    away_s: float = 0.0,
 ) -> _YtdCycle:
-    """A cycle tracking the live meter: a figure and the frame behind it."""
+    """A cycle tracking the live meter: a figure and the frame behind it.
+
+    ``away_s`` is how long ago the meter was last seen, which is what the
+    step bound is scaled by.
+    """
     return _YtdCycle(
         meter=_METER,
         year=_YEAR,
@@ -113,13 +124,23 @@ def _anchored(
         offset_m3=offset_m3,
         basis=_BASIS,
         recorder_hwm=recorder_hwm,
+        seen_at=_NOW_TS - away_s,
     )
 
 
-def _served(m3: float, cost: float | None = None, recorder_hwm: float | None = None) -> _YtdCycle:
+def _served(
+    m3: float,
+    cost: float | None = None,
+    recorder_hwm: float | None = None,
+) -> _YtdCycle:
     """A cycle fed by the recorder alone: a figure, but no frame."""
     return _YtdCycle(
-        meter=_METER, year=_YEAR, m3=m3, cost=cost, basis=_BASIS, recorder_hwm=recorder_hwm
+        meter=_METER,
+        year=_YEAR,
+        m3=m3,
+        cost=cost,
+        basis=_BASIS,
+        recorder_hwm=recorder_hwm,
     )
 
 
@@ -581,7 +602,6 @@ def _replay(
     hold_m3: float | None = None
     hold_run = 0
     run_m3: float | None = None
-    saw_reading = True
     for reading, recorder_m3 in rounds:
         out = _round(
             cycle,
@@ -590,11 +610,9 @@ def _replay(
             hold_m3=hold_m3,
             hold_run=hold_run,
             run_m3=run_m3,
-            saw_reading=saw_reading,
         )
         cycle, hold_m3, hold_run = out.cycle, out.hold_m3, out.hold_run
         run_m3 = out.run_m3
-        saw_reading = out.saw_reading
         published.append(out.m3)
     return published
 
@@ -885,7 +903,7 @@ def test_migrating_a_record_that_is_already_current_changes_nothing() -> None:
 
     # Every key the record has grown since, or the rollback loses it and
     # the year comes back without what the recorder had reported for it.
-    full = {**current, "basis": "b", "recorder_hwm": 49.5, "unrecorded": True}
+    full = {**current, "basis": "b", "recorder_hwm": 49.5, "seen_at": 1.0}
 
     assert _migrate_cycle_to_v2(full) == full
 
@@ -1246,16 +1264,71 @@ def test_a_meter_that_was_down_may_come_back_with_everything_it_missed() -> None
     once. That is a real step however large, and it is exactly what a
     spike from a steadily reporting meter is not.
     """
-    down = _round(_anchored(88.0, 4000.0), reading=None)
-    assert down.saw_reading is False
-
-    back = _round(_anchored(88.0, 4000.0), reading=4128.0, saw_reading=False)
+    # Away long enough for 40 m3 to be ordinary consumption.
+    back = _round(_anchored(88.0, 4000.0, away_s=60 * _DAY_S), reading=4128.0)
     assert back.m3 == 128.0  # the 40 m3 drawn while it was down
 
     # The same step from a meter that never stopped reporting is held.
-    steady = _round(_anchored(88.0, 4000.0), reading=4128.0, saw_reading=True)
+    steady = _round(_anchored(88.0, 4000.0), reading=4128.0)
     assert steady.m3 == 88.0
     assert steady.hold_m3 == 4128.0
+
+
+def test_the_allowance_a_gap_buys_is_the_length_of_the_gap() -> None:
+    """One dropped report used to buy as much as three months off the air.
+
+    The exemption was granted on the fact of a gap and never its length, so
+    a spike landing on the round after a single missed reading was taken on
+    sight: 96 m3 admitted where a meter away for one report could not have
+    drawn a hundredth of it.
+    """
+    # An hour out of sight buys about a twenty-fourth of a cubic metre, so
+    # a 40 m3 step is still held.
+    brief = _round(_anchored(88.0, 4000.0, away_s=3600.0), reading=4128.0)
+    assert brief.m3 == 88.0
+    assert brief.hold_m3 == 4128.0
+
+    # Two months out of sight buys sixty, and the same step goes through.
+    long_gap = _round(_anchored(88.0, 4000.0, away_s=60 * _DAY_S), reading=4128.0)
+    assert long_gap.m3 == 128.0
+
+
+def test_a_meter_seen_a_moment_ago_earns_nothing_extra() -> None:
+    """A stamp in the future must not spend the ordinary bound.
+
+    A clock that jumps forward and back leaves the record stamped ahead of
+    now, and the gap reads negative. Subtracting it would take the bound
+    below what one report may always add, and a household drawing normally
+    would have every reading held and the year frozen where it stood.
+    """
+    ahead = _anchored(88.0, 4000.0, away_s=-60 * _DAY_S)
+    assert _round(ahead, reading=4090.0).m3 == 90.0  # an ordinary 2 m3 draw
+
+    # It buys nothing either: a step past the ordinary bound is still held.
+    assert _round(ahead, reading=4128.0).m3 == 88.0
+
+    fresh = _YtdCycle(meter=_METER, year=_YEAR, m3=88.0, offset_m3=4000.0, basis=_BASIS)
+    assert fresh.seen_at is None
+    assert _round(fresh, reading=4128.0).m3 == 88.0
+
+
+def test_the_stamp_alone_does_not_ask_for_a_save() -> None:
+    """A meter reporting every ten seconds must not write the Store as often.
+
+    The record is saved when the cycle compares unequal, and the stamp moves
+    on every reading. Counting it would put a write behind each report of a
+    figure that has not changed, which is a lot of flash wear on a Pi.
+    """
+    cycle = _anchored(40.0, 100.0, cost=_bill(40.0))
+    again = _round(cycle, reading=140.0, now_ts=_NOW_TS + 60.0)
+
+    assert again.m3 == 40.0
+    assert again.cycle == cycle  # nothing to save
+    assert again.cycle.seen_at == _NOW_TS + 60.0  # but the gap still moved
+
+    # A figure that really moved is still worth saving.
+    moved = _round(cycle, reading=141.0, now_ts=_NOW_TS + 120.0)
+    assert moved.cycle != cycle
 
 
 def test_a_recorder_that_has_spoken_before_brings_the_year_back_down() -> None:
@@ -1297,21 +1370,46 @@ def test_a_recorder_below_its_own_previous_answer_is_a_database_that_lost_some()
     assert out.cycle.recorder_hwm == 120.0  # and the high-water mark stands
 
 
-def test_a_year_holding_water_the_recorder_never_saw_is_left_alone() -> None:
-    """A meter that was down comes back carrying the whole outage.
+def test_a_meter_back_from_an_outage_agrees_with_the_recorder() -> None:
+    """The gap buys the reading its room, and the recorder is not short.
 
-    Home Assistant compiled no statistics for any of it, so the recorder
-    is permanently short by that much and cannot speak for the year again.
-    Correcting against it would throw away water that really flowed.
+    Home Assistant carries the running sum forward and attributes the whole
+    increase to the bucket where the meter comes back, so the recorder has
+    the outage too. What the reading needs is room to be believed, which
+    the length of the gap gives it; it does not need the recorder held off,
+    and holding it off cost the year its defence against a spike. See
+    tests/recorder for the compiler doing this.
     """
-    caught_up = _round(
-        _anchored(88.0, 4000.0, recorder_hwm=88.0), reading=4128.0, saw_reading=False
-    )
-    assert caught_up.m3 == 128.0
-    assert caught_up.cycle.unrecorded is True
+    away = _anchored(88.0, 4000.0, recorder_hwm=88.0, away_s=60 * _DAY_S)
 
-    later = _round(caught_up.cycle, reading=4129.0, recorder_m3=89.0)
-    assert later.m3 == 129.0  # not pulled down to the recorder's 89
+    caught_up = _round(away, reading=4128.0, recorder_m3=128.0, elapsed_s=_DAY_S)
+    assert caught_up.m3 == 128.0  # the 40 m3 drawn while it was down
+
+    later = _round(caught_up.cycle, reading=4129.0, recorder_m3=129.0)
+    assert later.m3 == 129.0
+
+
+def test_a_refused_reading_does_not_spend_what_the_gap_bought() -> None:
+    """Being seen means giving an answer the round could place.
+
+    A meter coming back from an outage often reports a garbage value
+    first. Counting that as having been seen restarted the gap, so the
+    allowance three months off the air had earned was spent on a reading
+    nobody believed, and the one behind it carrying the real catch-up was
+    held as a spike.
+    """
+    away = _anchored(115.9, 430.5, recorder_hwm=115.9, away_s=84 * _DAY_S)
+
+    # Below the frame, so it is a glitch or a swap run and neither places it.
+    glitch = _round(away, reading=276.3)
+    assert glitch.m3 == 115.9
+    assert glitch.cycle.seen_at == away.seen_at  # the gap still stands
+
+    # The real meter follows, carrying the whole outage: 80.8 m3 on top of
+    # what the year had, which eighty-four days out of sight covers.
+    back = _round(glitch.cycle, reading=627.2, hold_run=glitch.hold_run, run_m3=glitch.run_m3)
+    assert back.m3 == pytest.approx(196.7)
+    assert back.cycle.seen_at == _NOW_TS  # and now it has been seen
 
 
 def test_a_recorder_answering_alongside_the_step_still_settles_it() -> None:
@@ -1325,15 +1423,12 @@ def test_a_recorder_answering_alongside_the_step_still_settles_it() -> None:
     have drawn 96 m3.
     """
     out = _round(
-        _anchored(7.3, 2475.7, recorder_hwm=7.3),
+        _anchored(7.3, 2475.7, recorder_hwm=7.3, away_s=_DAY_S),
         reading=2580.2,
         recorder_m3=8.2,
-        saw_reading=False,
     )
 
     assert out.m3 == 8.2  # not the 104.5 the reading implies
-    # The year is still marked, so the round after this one is left alone.
-    assert out.cycle.unrecorded is True
 
 
 def test_a_record_from_before_the_correction_is_still_corrected() -> None:
@@ -1367,42 +1462,14 @@ def test_a_record_from_before_the_correction_is_still_corrected() -> None:
     assert second.cost == _bill(40.2)
 
 
-def test_the_unrecorded_mark_does_not_outlive_its_year() -> None:
-    """January starts over: the recorder speaks for the new year in full."""
-    stale = _YtdCycle(
-        meter=_METER, year=_YEAR - 1, m3=128.0, offset_m3=4000.0, basis=_BASIS, unrecorded=True
-    )
-    out = _round(stale, recorder_m3=2.0)
-
-    assert out.m3 == 2.0
-    assert out.cycle.unrecorded is False
-
-
-def test_a_figure_the_recorder_supplied_is_not_unrecorded_water() -> None:
-    """However far it jumps, the recorder is the one that said it.
-
-    A cycle with no frame is served from the recorder, so its figure comes
-    from the same statistics that would later correct it. Marking that
-    year as holding water the recorder never saw would lock the
-    correction out of a year that never needed locking.
-    """
-    served = _YtdCycle(meter=_METER, year=_YEAR, m3=5.0, basis=_BASIS, recorder_hwm=5.0)
-    out = _round(served, reading=1000.0, recorder_m3=100.0)
-
-    assert out.m3 == 100.0
-    assert out.cycle.unrecorded is False
-
-
 def test_a_swap_leaves_the_old_meter_s_history_behind() -> None:
     """The year restarts on a register with nothing behind it.
 
     What the recorder reported for the old meter says nothing about the
-    new one, and any water it could not see there went with it. Carried
-    over, the high-water mark would refuse every later answer as a lost
-    database and the flag would refuse every correction.
+    new one. Carried over, the high-water mark would refuse every later
+    answer as a database that had lost the year.
     """
     cycle = _anchored(128.0, 4000.0, recorder_hwm=88.0)
-    cycle = replace(cycle, unrecorded=True)
     hold_run = 0
     hold_span_s = 0.0
     run_m3: float | None = None
@@ -1430,5 +1497,4 @@ def test_a_swap_leaves_the_old_meter_s_history_behind() -> None:
     assert out is not None
     assert out.swapped is True
     assert out.m3 == 0.0
-    assert out.cycle.unrecorded is False
     assert out.cycle.recorder_hwm is None

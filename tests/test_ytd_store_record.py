@@ -104,14 +104,12 @@ async def test_a_malformed_record_starts_a_fresh_cycle(
 def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
     """An upgrading install has to get the fix, or nobody does.
 
-    The flag says the year holds water the recorder cannot account for,
-    which is what stops a recorder answer correcting the figure down.
-    Reading a missing key as "there may be some" locked every record in
-    the field out until January, and a year sitting on a spike today is
-    exactly what the correction was written for. Such a record carries no
-    recorder high-water mark either, so the first answer of the year still
-    proves nothing about its own history and cannot lower anything on its
-    own.
+    Nothing in an older record may stand in the way of the correction: a
+    year sitting on a spike today is exactly what it was written for. What
+    such a record does lack is a recorder high-water mark, so the first
+    answer of the year still proves nothing about its own history and
+    cannot lower anything on its own, which is the one guard that should
+    hold an upgrading install back and only for a round.
     """
     from custom_components.be_water_prices.coordinator import _cycle_from_record
 
@@ -119,8 +117,8 @@ def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
         {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "offset_m3": 1000.0}
     )
     assert old is not None
-    assert old.unrecorded is False
     assert old.recorder_hwm is None
+    assert old.seen_at is None
 
 
 def test_the_new_keys_round_trip_through_the_record() -> None:
@@ -133,12 +131,37 @@ def test_the_new_keys_round_trip_through_the_record() -> None:
             "m3": 40.0,
             "offset_m3": 1000.0,
             "recorder_hwm": 39.5,
-            "unrecorded": False,
+            "seen_at": 1_760_000_000.0,
         }
     )
     assert cycle is not None
     assert cycle.recorder_hwm == 39.5
-    assert cycle.unrecorded is False
+    assert cycle.seen_at == 1_760_000_000.0
+
+
+def test_when_the_meter_was_last_seen_survives_a_restart() -> None:
+    """The gap that matters most is the one no in-process clock survives.
+
+    The step bound is scaled by how long the meter has been out of sight,
+    and Home Assistant being down is the longest such gap there is. Only a
+    stamp on the record can measure it, so it is written and read back.
+    """
+    from custom_components.be_water_prices.coordinator import _cycle_from_record
+
+    base = {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "offset_m3": 1000.0}
+
+    kept = _cycle_from_record({**base, "seen_at": 1_760_000_000.0})
+    assert kept is not None
+    assert kept.seen_at == 1_760_000_000.0
+
+    # A record from before the stamp says nothing about when the meter was
+    # last seen, and the honest reading of that is no gap rather than one
+    # of unknown length handed over for free.
+    silent = _cycle_from_record(base)
+    assert silent is not None
+    assert silent.seen_at is None
+
+    assert _cycle_from_record({**base, "seen_at": "recently"}) is None
 
 
 def test_a_recorder_high_water_mark_that_is_not_a_number_is_refused() -> None:

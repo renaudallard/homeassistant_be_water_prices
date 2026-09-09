@@ -213,8 +213,8 @@ All five of the rows above are **tariff-card figures**: they are what your opera
 | Entity id suffix | Description |
 | --- | --- |
 | `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
-| `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure only goes **down for a reason**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease. The one thing that can lower it is the recorder, and only when it has already reported for this year, its latest answer is at or above every earlier one (so its history is intact), and the year was not already known to hold water it never saw. That is what takes back a meter spike small enough to have been admitted, which used to stand until January — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. The mark is measured for a household, so changing your commune, `gedomicilieerd_persons` or `social_tariff` rebuilds it from what you owe now rather than holding the old figure. Returns `unknown` until a water meter is configured in the options step. The meter's unit must be one Home Assistant can convert to m³ (`m³`, `L`, `gal`, `ft³`, `CCF`, …), or one that needs no converting because it already is cubic metres: no unit at all, or the ASCII spelling `m3`. A sensor labelled with anything else is refused rather than read as cubic metres, which is what a lowercase `l` used to do at 1000× the bill. |
-| `year_to_date_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark, so the only thing that lowers it mid-year is a recorder answer with the year's own statistics behind it. Companion to `current_year_cost`. A single day that claims more than 100 m³ is ignored: no household draws that in a day, so it reads as a counter re-based onto the real meter reading or a register reset rather than water. The live meter is bounded too, and more tightly: one report may advance the year by 30 m³ before it is held for confirmation and put to the recorder, since an hour of a domestic connection at full bore is about 20 m³ and a household uses 80-100 m³ in a year. A meter that was unavailable is exempt, because it comes back showing everything drawn while it was down, though a recorder answer read in the same round still settles the step. And a recorder answer that still has the year behind it settles the round outright: it reads the same meter's own statistics for the whole year, so water it has no record of did not flow. The figure resumes as soon as a reading and the recorder agree. |
+| `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure only goes **down for a reason**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease. The one thing that can lower it is the recorder, and only when it has already reported for this year and its latest answer is at or above every earlier one, so its history is intact. That is what takes back a meter spike small enough to have been admitted, which used to stand until January — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. The mark is measured for a household, so changing your commune, `gedomicilieerd_persons` or `social_tariff` rebuilds it from what you owe now rather than holding the old figure. Returns `unknown` until a water meter is configured in the options step. The meter's unit must be one Home Assistant can convert to m³ (`m³`, `L`, `gal`, `ft³`, `CCF`, …), or one that needs no converting because it already is cubic metres: no unit at all, or the ASCII spelling `m3`. A sensor labelled with anything else is refused rather than read as cubic metres, which is what a lowercase `l` used to do at 1000× the bill. |
+| `year_to_date_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark, so the only thing that lowers it mid-year is a recorder answer with the year's own statistics behind it. Companion to `current_year_cost`. A single day that claims more than 100 m³ is ignored: no household draws that in a day, so it reads as a counter re-based onto the real meter reading or a register reset rather than water. The live meter is bounded too, and more tightly: one report may advance the year by 30 m³ before it is held for confirmation and put to the recorder, since an hour of a domestic connection at full bore is about 20 m³ and a household uses 80-100 m³ in a year. A meter that has been out of sight gets more room, in proportion to how long it was away: it comes back showing everything drawn while it was down, and the allowance grows by a cubic metre for each day of the gap, which is several times what any household draws in one. That gap is measured across restarts, since Home Assistant being down is the longest a meter goes unseen. The recorder is not short of that water, whatever the gap: Home Assistant carries the running total forward and attributes the whole increase to the moment the meter comes back, so the two agree again as soon as it does. A recorder answer read in the same round still settles a step that goes beyond what the gap allows. And a recorder answer that still has the year behind it settles the round outright: it reads the same meter's own statistics for the whole year, so water it has no record of did not flow. The figure resumes as soon as a reading and the recorder agree. |
 
 Each sensor exposes `utility`, `region`, `valid_from`, `valid_until`,
 `publication_label`, `source_url`, `snapshot_age_hours`, `snapshot_stale`
@@ -374,18 +374,18 @@ you paid is worth more than a tidy chart.
   meter reading, a transiently lower tariff fetch, or a mid-year options
   change that would lower the bill is never published as a decrease.
 
-  The exception is the recorder, and only under three conditions: it has
-  already reported for this year, its latest answer is at or above every
-  earlier one, and the year was not already known to hold water it never
-  saw (a meter that was unavailable comes back carrying the whole outage,
-  and no statistics were compiled for any of it). That last condition is
-  read as the year stood before the reading being weighed, so a recorder
-  answer arriving alongside a large step still settles it: a meter away
-  for a single report cannot have drawn what such a step claims. Then it
-  is not a dip but the year's own statistics, and the figure is corrected
-  to them, frame and cost floor included. That is what takes back a meter
-  spike small enough to have been admitted in the first place, which
-  otherwise stood until January.
+  The exception is the recorder, and only under two conditions: it has
+  already reported for this year, and its latest answer is at or above
+  every earlier one, which is what says its history is whole rather than
+  half purged. There used to be a third, about water the recorder could
+  not account for, and it turned out to be answering a question that never
+  arises: Home Assistant carries a meter's running total across any gap and
+  attributes the whole increase to the moment it comes back, so an outage
+  costs the recorder nothing and a real catch-up needs no protecting from
+  it. Then it is not a dip but the year's own statistics, and the figure is
+  corrected to them, frame and cost floor included. That is what takes back
+  a meter spike small enough to have been admitted in the first place,
+  which otherwise stood until January.
 
   The baseline only re-anchors on a genuine reset: the Jan 1
   rollover, a meter swap confirmed by several consecutive readings below
@@ -582,6 +582,16 @@ when reporting an issue.
 
 ## Known limitations
 
+- **Water drawn while Home Assistant is down lands on the day it comes
+  back, and across 1 January that means the wrong year.** Home Assistant
+  measures a period's consumption against the last statistic it compiled
+  before that period, so a host that is off from 20 December to 10 January
+  attributes everything drawn in between to 10 January. The year-to-date
+  sensors then carry three weeks of December in their January figure,
+  about 4,5 m³ or € 60 on a Flemish bill at 80 m³/year. Nothing in the
+  data says when during the gap the water actually flowed, so splitting it
+  would be a guess dressed up as a measurement, and the figure corrects
+  itself the following January. The projected-cost sensor is unaffected.
 - **De Watergroep no-commune fallback uses Halle as a default commune.**
   Without a commune configured the extractor hits the cookie-driven
   endpoint with Halle's GUID (postcode 1500) and returns the full
