@@ -2978,6 +2978,71 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
 
 
 @pytest.mark.asyncio
+async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
+    hass: HomeAssistant,
+) -> None:
+    """A round that only recomputes must not answer for the meter.
+
+    The tick re-folds with no reading to republish a cycle a meter event
+    moved on during the Store save. The fold reads a round with no reading
+    as the meter having been unavailable, which exempts the next report
+    from the step bound and marks the year as holding water the recorder
+    never saw. The meter was not gone: it reported, which is why the cycle
+    moved and why the re-fold exists at all.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "100")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=20.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        real_save = coordinator._store.async_save
+
+        async def _slow_save(data: Any) -> None:
+            hass.states.async_set("sensor.water_meter", "125")
+            await asyncio.sleep(0)
+            await real_save(data)
+
+        coordinator._cycle_dirty = True
+        with patch.object(coordinator._store, "async_save", new=_slow_save):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 45.0
+
+        # A step of 50 m3 on the next report. It is over _MAX_STEP_M3, so it
+        # is held for the reading that follows it, and the year is not
+        # marked as carrying water the recorder could not see.
+        hass.states.async_set("sensor.water_meter", "175")
+        await hass.async_block_till_done()
+
+        assert coordinator.data.ytd_consumption_m3 == 45.0
+        assert coordinator._ytd.unrecorded is False
+
+
+@pytest.mark.asyncio
 async def test_meter_draw_does_not_churn_the_rate_sensors(hass: HomeAssistant) -> None:
     """A draw must only move the two sensors it actually affects.
 

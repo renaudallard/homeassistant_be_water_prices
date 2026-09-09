@@ -1355,6 +1355,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year: int,
         reading: float | None,
         recorder_m3: float | None,
+        republish: bool = False,
     ) -> tuple[float | None, float | None]:
         """Fold a round of evidence into the cycle and return what to publish.
 
@@ -1362,6 +1363,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         its answer. The record and the transient hold state are written back
         before returning, so a caller that decides not to publish still
         cannot lose a swap run, a held reading, or a rebuilt frame.
+
+        ``republish`` says this round brought no evidence and is only
+        recomputing what the cycle already holds. Such a round has not
+        looked at the meter, so it may not answer for it: the fold reads a
+        round with no reading as the meter having been unavailable, which
+        is the exemption from the step bound.
         """
         # How long since the last round. The rule itself keeps no clock,
         # so the caller measures the gap and hands it over as evidence --
@@ -1400,7 +1407,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_hold_span_s = out.hold_span_s
         self._ytd_run_m3 = out.run_m3
         self._ytd_high_m3 = out.high_m3
-        self._ytd_saw_reading = out.saw_reading
+        if not republish:
+            self._ytd_saw_reading = out.saw_reading
         if out.swapped or out.arbitrate:
             # Nothing has dated the new register yet, or the round met a
             # step it could not weigh. Ask the recorder on the next tick:
@@ -1508,7 +1516,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # stands rather than the figure computed before the await,
                 # which the year has already climbed past.
                 ytd_m3, ytd_cost = self._fold_cycle(
-                    tariff, meter=meter, now_year=now_year, reading=None, recorder_m3=None
+                    tariff,
+                    meter=meter,
+                    now_year=now_year,
+                    reading=None,
+                    recorder_m3=None,
+                    republish=True,
                 )
         return ytd_m3, ytd_cost
 
