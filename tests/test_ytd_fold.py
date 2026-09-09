@@ -310,12 +310,27 @@ def test_an_implausible_jump_is_held_for_one_reading() -> None:
     assert out.cycle.m3 == 25.0
 
 
-def test_a_repeated_jump_is_a_genuine_catch_up() -> None:
-    """A meter really sitting there reports the same figure again."""
+def test_a_repeated_jump_is_put_to_the_recorder_rather_than_billed() -> None:
+    """Two readings agreeing say where the meter is, not what the year used.
+
+    A counter re-based onto the physical register repeats itself just as
+    a genuine catch-up does, and the live path carries no recorder answer
+    to tell them apart. Taking it billed 1012.85 m3 where 12.8 was owed,
+    and the mark only climbs, so it stood until January.
+    """
     out = _round(_anchored(25.0, 80.0), reading=401.0, hold_m3=400.0)
 
-    assert out.m3 == 321.0
+    assert out.m3 == 25.0
     assert out.hold_m3 is None
+    assert out.arbitrate is True
+
+
+def test_a_repeated_jump_the_recorder_corroborates_is_billed() -> None:
+    """The deferral is not a refusal: the tick that can decide, decides."""
+    out = _round(_anchored(25.0, 80.0), reading=401.0, hold_m3=400.0, recorder_m3=321.0)
+
+    assert out.m3 == 321.0
+    assert out.arbitrate is False
 
 
 def test_a_reading_that_refutes_the_hold_faces_the_jump_test_itself() -> None:
@@ -332,12 +347,18 @@ def test_a_reading_that_refutes_the_hold_faces_the_jump_test_itself() -> None:
     assert out.hold_m3 == 250.0
 
 
-def test_a_reading_above_the_hold_still_confirms_it() -> None:
-    """A register that has climbed past the held value is a real catch-up."""
+def test_a_reading_above_the_hold_still_releases_it() -> None:
+    """The hold is answered either way; what follows depends on the evidence.
+
+    A reading above the held value confirms where the meter is, so the
+    hold lapses. Without a recorder answer the step it implies is still
+    too large to bill on two readings alone.
+    """
     out = _round(_anchored(25.0, 80.0), reading=900.0, hold_m3=400.0)
 
-    assert out.m3 == 820.0
     assert out.hold_m3 is None
+    assert out.m3 == 25.0
+    assert out.arbitrate is True
 
 
 def test_a_normal_reading_releases_a_held_jump() -> None:
@@ -522,14 +543,16 @@ def test_a_lagging_recorder_does_not_unseat_a_frame_the_mark_agrees_with() -> No
     assert out.cycle.offset_m3 == 80.0
 
 
-def test_a_confirmed_jump_stands_when_nothing_can_contradict_it() -> None:
+def test_a_confirmed_jump_nothing_can_weigh_waits_instead_of_standing() -> None:
     """A recorder answer is what makes the frame decidable, and this round
-    has none, so the confirmed reading is taken as it has always been.
+    has none, so the year holds and the next tick is asked to bring one.
+    Taken as it used to be, this round billed 1520 m3 on two readings.
     """
     out = _round(_anchored(7.0, 3.0), reading=1523.0, hold_m3=1520.0)
 
-    assert out.m3 == 1520.0
+    assert out.m3 == 7.0
     assert out.cycle.offset_m3 == 3.0
+    assert out.arbitrate is True
 
 
 def _replay(
@@ -1041,3 +1064,48 @@ def test_a_frame_rebuilt_under_a_sound_reading_is_not_a_swap() -> None:
     out = _round(cycle, reading=60.0, hold_run=2, hold_span_s=700.0, run_m3=60.0, high_m3=1234.5)
     assert out.swapped is False
     assert out.m3 == 40.0
+
+
+def test_a_meter_recovering_after_a_swap_waits_for_the_recorder() -> None:
+    """The arbitration tick used to lose the race to the live path.
+
+    A confirmed swap asks the next daily tick to bring a recorder answer,
+    but the meter's recovery to its real register arrives on the live
+    path within seconds and used to be confirmed by two readings and
+    billed whole: 1040.7 m3 against the 40.3 the year had actually used.
+    """
+    cycle = _anchored(40.2, 1000.0)
+    hold_m3: float | None = None
+    hold_run = 0
+    hold_span_s = 0.0
+    run_m3: float | None = None
+    high_m3: float | None = 1040.2
+    published: list[float | None] = []
+    # Three zeros far enough apart to confirm a replacement, then the
+    # meter coming back to where it really stands.
+    for reading, elapsed_s in (
+        (0.0, 400.0),
+        (0.0, 400.0),
+        (0.0, 400.0),
+        (1040.5, 60.0),
+        (1040.7, 60.0),
+    ):
+        out = _round(
+            cycle,
+            reading=reading,
+            hold_m3=hold_m3,
+            hold_run=hold_run,
+            hold_span_s=hold_span_s,
+            run_m3=run_m3,
+            elapsed_s=elapsed_s,
+            high_m3=high_m3,
+            recorder_ok=None,
+        )
+        cycle, hold_m3, high_m3 = out.cycle, out.hold_m3, out.high_m3
+        hold_run, hold_span_s, run_m3 = out.hold_run, out.hold_span_s, out.run_m3
+        published.append(out.m3)
+
+    assert published == [40.2, 40.2, 0.0, 0.0, 0.0]
+    # The tick arrives with what the meter's own statistics say.
+    out = _round(cycle, reading=1040.7, recorder_m3=40.3, hold_m3=hold_m3, high_m3=high_m3)
+    assert out.m3 == 40.3

@@ -271,13 +271,17 @@ async def test_one_absurd_reading_does_not_pin_the_year(hass: HomeAssistant) -> 
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 25.0
 
-        # A genuine catch-up repeats itself and is taken on the second read.
+        # A jump that repeats itself says where the meter is, not what the
+        # year used, and a re-based counter repeats itself just as a
+        # catch-up does. The live path carries no recorder answer, so the
+        # year holds and the next tick is asked to bring one.
         hass.states.async_set("sensor.water_meter", "400")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 25.0
         hass.states.async_set("sensor.water_meter", "401")
         await hass.async_block_till_done()
-        assert coordinator.data.ytd_consumption_m3 == 321.0
+        assert coordinator.data.ytd_consumption_m3 == 25.0
+        assert coordinator._ytd_arbitrate is True
 
 
 @pytest.mark.asyncio

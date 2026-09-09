@@ -305,6 +305,10 @@ class _YtdFold:
     # on nothing but that reading until something dates it: the next tick
     # asks the recorder rather than trusting the frame it just built.
     swapped: bool = False
+    # Set by a round that has met evidence it cannot weigh on its own and
+    # wants the recorder on the next tick. Distinct from ``swapped``,
+    # which also says the year restarted.
+    arbitrate: bool = False
 
 
 def _fold(
@@ -389,6 +393,7 @@ def _fold(
 
     candidate: float | None = None
     swapped = False
+    arbitrate = False
     seen = [figure for figure in (mark, recorder_m3) if figure is not None]
     # What a reading has to clear to belong to this cycle. A framed year
     # measures against the frame. A year served from the recorder has no
@@ -491,20 +496,29 @@ def _fold(
         # has to face the jump test on its own rather than being waved
         # through on the strength of the value it just contradicted.
         corroborated = hold_m3 is not None and reading >= hold_m3 - _IMPLAUSIBLE_JUMP_M3
-        if corroborated:
-            if seen and recorder_m3 is not None and framed - max(seen) > _IMPLAUSIBLE_JUMP_M3:
-                # The meter really is up there, but the frame says it has
-                # passed this much water since the cycle began and the
-                # recorder, reading the same meter's own statistics, says the
-                # year used far less. Two readings agreeing only establish
-                # where the meter stands, never where it stood when the cycle
-                # opened, so what they have confirmed is that the frame is
-                # under the meter: that is what a re-anchor onto a reading the
-                # meter never really showed leaves behind. Rebuild it against
+        if corroborated and seen and framed - max(seen) > _IMPLAUSIBLE_JUMP_M3:
+            # Two readings agreeing establish where the meter stands, never
+            # where it stood when the cycle opened, so a step this size is
+            # either a frame sitting under the meter or water the year has
+            # genuinely used since anyone last looked. Nothing in a reading
+            # tells those apart.
+            if recorder_m3 is not None:
+                # The recorder reads the same meter's own statistics and
+                # says the year used far less, so the frame is what is
+                # wrong: that is what a re-anchor onto a reading the meter
+                # never really showed leaves behind. Rebuild it against
                 # what the year knows instead of billing the difference.
                 offset = reading - max(seen)
             else:
-                candidate = framed
+                # The live path never carries a recorder answer, so this
+                # was the branch that billed the whole of a re-based
+                # register: 1012.85 m3 where 12.8 was owed, and the mark
+                # only climbs, so it stood until January. Publish nothing
+                # and put the question to the recorder on the next tick.
+                arbitrate = True
+            hold_m3 = None
+        elif corroborated:
+            candidate = framed
             hold_m3 = None
         elif mark is not None and framed - mark > _IMPLAUSIBLE_JUMP_M3:
             # A step this large in one report is a garbage value far more
@@ -530,7 +544,9 @@ def _fold(
         # all, and report nothing rather than publish a zero it has not
         # earned: the stamp is what stops the next reading starting the year
         # over.
-        return _YtdFold(cycle, None, None, hold_m3, hold_run, hold_span_s, run_m3, high_m3, swapped)
+        return _YtdFold(
+            cycle, None, None, hold_m3, hold_run, hold_span_s, run_m3, high_m3, swapped, arbitrate
+        )
     published = max(figures)
 
     if (
@@ -592,6 +608,7 @@ def _fold(
         run_m3,
         high_m3,
         swapped,
+        arbitrate,
     )
 
 
@@ -1142,12 +1159,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_hold_span_s = out.hold_span_s
         self._ytd_run_m3 = out.run_m3
         self._ytd_high_m3 = out.high_m3
-        if out.swapped:
-            # Nothing has dated the new register yet. Ask the recorder on
-            # the next tick: without it the frame is self-consistent from
-            # the moment it is built, so the gate in _compute_ytd never
-            # queries again and a meter that was merely offline bills its
-            # whole lifetime into this year.
+        if out.swapped or out.arbitrate:
+            # Nothing has dated the new register yet, or the round met a
+            # step it could not weigh. Ask the recorder on the next tick:
+            # without it the frame is self-consistent from the moment it
+            # is built, so the gate in _compute_ytd never queries again
+            # and a meter that was merely offline bills its whole
+            # lifetime into this year.
             self._ytd_arbitrate = True
         return out.m3, out.cost
 
