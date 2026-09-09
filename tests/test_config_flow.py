@@ -72,7 +72,9 @@ def test_antwerp_city_core_resolves_to_water_link() -> None:
 
 
 def test_rest_of_antwerp_province_resolves_to_pidpa() -> None:
-    assert _resolve_postcode("2100") == "pidpa"
+    # 2100 is Deurne, which is the city of Antwerp and Water-link's; the
+    # province outside the city and its ring is Pidpa's.
+    assert _resolve_postcode("2110") == "pidpa"
     assert _resolve_postcode("2300") == "pidpa"
     assert _resolve_postcode("2999") == "pidpa"
 
@@ -205,7 +207,10 @@ def test_postcode_range_boundaries_are_inclusive() -> None:
     assert _resolve_postcode("1300") == "inbw"
     assert _resolve_postcode("1500") == "de_watergroep"
     assert _resolve_postcode("2000") == "water_link"
-    assert _resolve_postcode("2100") == "pidpa"
+    # 2100 is Deurne, a district of the city of Antwerp and Water-link's;
+    # 2110 Wijnegem is the first postcode above the city block that Pidpa
+    # really serves, so it is the one that pins this range's start.
+    assert _resolve_postcode("2110") == "pidpa"
     assert _resolve_postcode("3000") == "de_watergroep"
 
 
@@ -356,6 +361,36 @@ def test_the_three_pidpa_communes_off_the_default_rate_are_pre_selected() -> Non
         assert _commune_for_postcode("pidpa", postcode) == slug
     # A commune that really is on the default rate is left alone.
     assert _commune_for_postcode("pidpa", "2440") is None
+
+
+def test_the_city_of_antwerp_is_water_link_not_pidpa() -> None:
+    """Every district above the 2000-2070 block, plus three ring communes.
+
+    water-link.be lists all twelve under "Water in jouw woonplaats", none
+    of their municipalities appears in Pidpa's own commune list, and
+    Water-link's card carries a billing row for Antwerpen, Edegem, Hove
+    and Mortsel. Left on the Pidpa range they were billed 121.09 EUR a
+    year too much (55.08 for the three ring communes).
+    """
+    for postcode in (
+        "2099",
+        "2100",  # Deurne
+        "2140",  # Borgerhout
+        "2150",  # Borsbeek
+        "2170",  # Merksem
+        "2180",  # Ekeren
+        "2540",  # Hove
+        "2600",  # Berchem
+        "2610",  # Wilrijk
+        "2640",  # Mortsel
+        "2650",  # Edegem
+        "2660",  # Hoboken
+    ):
+        assert _resolve_postcode(postcode) == "water_link", postcode
+    # Water-link is active in these three and bills none of them: they
+    # carry no row on its card and Pidpa lists all three.
+    for postcode in ("2520", "2620", "2900"):  # Ranst, Hemiksem, Schoten
+        assert _resolve_postcode(postcode) == "pidpa", postcode
 
 
 def test_the_farys_communes_off_the_default_card_are_pre_selected() -> None:

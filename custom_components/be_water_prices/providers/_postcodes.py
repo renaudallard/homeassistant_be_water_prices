@@ -99,6 +99,38 @@ import re
 # Aquaduin's Westkust communes (Koksijde, De Panne, Nieuwpoort, Veurne,
 # Alveringem). Hand-curated because they're scattered inside the 8000-8999
 # West-Vlaanderen block where Farys would otherwise be the default.
+# Water-link postcodes above the 2000-2070 city-core block. The city of
+# Antwerp is one commune and Water-link supplies all of it, but its
+# districts carry postcodes scattered through the 2100-2660 range that
+# the Pidpa rule below would otherwise swallow. Hove, Mortsel and Edegem
+# are separate communes with a billing row of their own on Water-link's
+# card.
+#
+# The test for membership is that row, not Water-link's coverage map:
+# Hemiksem (2620), Ranst (2520) and Schoten (2900) appear on
+# water-link.be as places it is active in, carry no row on its card, and
+# do appear in Pidpa's own commune list, so they stay with Pidpa.
+# Borsbeek (2150) went the other way and moved with the merger: Pidpa's
+# own page for it is a handover notice ("Waarom ben ik geen klant meer
+# bij Pidpa?").
+_WATER_LINK_POSTCODES: frozenset[int] = frozenset(
+    {
+        2099,  # Antwerpen (service code)
+        2100,  # Deurne
+        2140,  # Borgerhout
+        2150,  # Borsbeek
+        2170,  # Merksem
+        2180,  # Ekeren
+        2540,  # Hove
+        2600,  # Berchem
+        2610,  # Wilrijk
+        2640,  # Mortsel
+        2650,  # Edegem
+        2660,  # Hoboken
+    }
+)
+
+
 _AQUADUIN_POSTCODES: frozenset[int] = frozenset(
     {
         8620,  # Nieuwpoort
@@ -878,7 +910,7 @@ def _resolve_single(code: int) -> str | None:
     # communes (Edegem, Hove, Mortsel, etc.) overlap with Pidpa's wider
     # service area so we default to Pidpa there and let the user override
     # via the manual picker.
-    if 2000 <= code <= 2070:
+    if 2000 <= code <= 2070 or code in _WATER_LINK_POSTCODES:
         return "water_link"
     if 2000 <= code <= 2999:
         return "pidpa"
