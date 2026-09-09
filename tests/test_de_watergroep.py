@@ -294,3 +294,58 @@ def test_the_unshowable_sentence_survives_the_page_wrapping_it() -> None:
     assert wrapped != page, "the mutation did not land"
     with pytest.raises(ExtractorError, match="cannot be shown"):
         parse_commune_tariff(wrapped, year=2026, commune_label="Opglabbeek")
+
+
+def test_an_unshowable_leg_has_its_own_failure_type() -> None:
+    """It is the one failure the per-commune fetch can answer with a default."""
+    from custom_components.be_water_prices.providers.de_watergroep import (
+        UnshowableLeg,
+        parse_commune_tariff,
+    )
+
+    with pytest.raises(UnshowableLeg):
+        parse_commune_tariff(
+            fixture_html("dewatergroep_opglabbeek_2026.html"),
+            year=2026,
+            commune_label="Opglabbeek",
+        )
+
+
+@pytest.mark.asyncio
+async def test_a_commune_that_cannot_show_a_leg_is_served_the_default_card() -> None:
+    """3660 Opglabbeek could not finish setup at all, for months.
+
+    The page has printed the sentence since before the refusal shipped, so
+    that household had no entry and no way of knowing that leaving the
+    commune blank is what works. The default is a real, current card and
+    for Opglabbeek it is the figure the bill was calculated at.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import de_watergroep as dwg
+
+    default = dwg.parse_commune_tariff(
+        fixture_html("dewatergroep_halle_2026.html"), year=2026, commune_label="Halle"
+    )
+    cards = AsyncMock(side_effect=[dwg.UnshowableLeg("cannot be shown"), default])
+    with patch.object(dwg, "_newest_commune_card", new=cards):
+        tariff = await dwg.fetch_for_commune(object(), "{SOME-OTHER-GUID}")
+
+    assert tariff is default
+    assert cards.await_count == 2
+    # The second call asks for the default commune, by its own label.
+    assert cards.await_args.args[1] == dwg._DEFAULT_COMMUNE_GUID
+    assert cards.await_args.args[2] == dwg._DEFAULT_COMMUNE_LABEL
+
+
+@pytest.mark.asyncio
+async def test_the_default_commune_has_nothing_to_fall_back_to() -> None:
+    """Otherwise it would ask itself the same question for ever."""
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import de_watergroep as dwg
+
+    cards = AsyncMock(side_effect=dwg.UnshowableLeg("cannot be shown"))
+    with patch.object(dwg, "_newest_commune_card", new=cards), pytest.raises(dwg.UnshowableLeg):
+        await dwg.fetch_for_commune(object(), dwg._DEFAULT_COMMUNE_GUID)
+    assert cards.await_count == 1

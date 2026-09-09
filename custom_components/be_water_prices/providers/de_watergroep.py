@@ -77,6 +77,17 @@ _LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "de_watergroep"
 LABEL = "De Watergroep"
+
+
+class UnshowableLeg(ExtractorError):
+    """The page prints a sentence where a saneringsbijdrage should be.
+
+    Its own failure type because it is the one failure the per-commune
+    fetch can answer with the operator default: the page is there and
+    current, it just will not show one commune's number today.
+    """
+
+
 COMMUNE_LIST_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
 COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/{year}"
 
@@ -190,7 +201,7 @@ def parse_commune_tariff(
         (_ZUIVERING_UNAVAILABLE_RE, "bovengemeentelijke"),
     ):
         if pattern.search(block) is not None:
-            raise ExtractorError(
+            raise UnshowableLeg(
                 f"De Watergroep says the {leg} saneringsbijdrage cannot be shown "
                 f"for this commune; refusing to bill it as 0.00 EUR/m3"
             )
@@ -343,8 +354,34 @@ async def _newest_commune_card(
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
-    """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint."""
-    return await _newest_commune_card(session, commune, commune)
+    """Per-commune fetch via the cookie-driven UpdateDetailTariefJaar endpoint.
+
+    A commune whose page cannot show one of its saneringsbijdragen is
+    served the operator-wide default card instead of nothing at all.
+    3660 Opglabbeek has printed "De kostprijs kan momenteel niet getoond
+    worden" for months, and refusing outright left that household unable
+    to finish setup with no way of knowing that leaving the commune blank
+    is what works. The default is a real, current De Watergroep card and
+    across all 699 communes it is 0.43 EUR a year out on average; for
+    Opglabbeek in particular it is the figure the bill was calculated at.
+
+    The label says which commune the card is really for, so the swap is
+    visible on the entity and in diagnostics rather than silent, and only
+    this one failure is caught: anything else is still a failure.
+    """
+    try:
+        return await _newest_commune_card(session, commune, commune)
+    except UnshowableLeg as err:
+        if commune == _DEFAULT_COMMUNE_GUID:
+            raise
+        _LOGGER.warning(
+            "%s; serving the %s card instead, which is about 0.43 EUR a year out "
+            "across De Watergroep's communes. Pick another commune in the options "
+            "if that is not close enough",
+            err,
+            _DEFAULT_COMMUNE_LABEL,
+        )
+    return await _newest_commune_card(session, _DEFAULT_COMMUNE_GUID, _DEFAULT_COMMUNE_LABEL)
 
 
 # The gap between the tag and the label is not padded with \\s* on
