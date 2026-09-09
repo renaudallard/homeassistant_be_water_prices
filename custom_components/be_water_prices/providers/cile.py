@@ -62,7 +62,12 @@ from ..const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_and_parse
-from ._walloon_simple import build_tariff, detect_published_year, warn_constant_drift
+from ._walloon_simple import (
+    build_tariff,
+    detect_published_year,
+    hold_to_constant,
+    warn_constant_drift,
+)
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,7 +133,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if cvd is None:
         raise ExtractorError("could not find CILE CVD row")
 
-    warn_constant_drift(
+    hold_to_constant(
         published=_row_amount(table, "c.v.a", column),
         constant=WALLONIA_CVA_EUR_PER_M3,
         label="CILE CVA",

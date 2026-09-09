@@ -78,7 +78,7 @@ from ..const import (
 )
 from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents
-from ._walloon_simple import build_tariff, warn_constant_drift
+from ._walloon_simple import build_tariff, hold_to_constant, warn_constant_drift
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if cvd is None:
         raise ExtractorError("could not find SWDE CVD on the tariff page")
 
-    warn_constant_drift(
+    hold_to_constant(
         published=_find_component(soup, _CVA_HEADINGS),
         constant=WALLONIA_CVA_EUR_PER_M3,
         label="SWDE CVA",

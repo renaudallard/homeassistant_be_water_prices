@@ -197,6 +197,37 @@ _FSE_RES = (
 )
 
 
+def hold_to_constant(
+    *,
+    published: float | None,
+    constant: float,
+    label: str,
+    logger: logging.Logger,
+    threshold: float = 0.005,
+) -> None:
+    """:func:`warn_constant_drift`, with an absent value counting as a failure.
+
+    A check that has quietly stopped running is worth nothing. The label
+    it binds to moves, the value reads as absent, and the next SPGE step
+    then rides through unseen on a constant nobody is comparing to
+    anything. Every Walloon page these parsers read prints a CVA, so its
+    absence is the page having changed shape, which is a parser problem
+    and should be visible.
+    """
+    if published is None:
+        raise ExtractorError(
+            f"{label} is no longer printed on the page, so the constant "
+            f"{constant} cannot be checked against it"
+        )
+    warn_constant_drift(
+        published=published,
+        constant=constant,
+        label=label,
+        logger=logger,
+        threshold=threshold,
+    )
+
+
 def _first_amount(text: str, patterns: tuple[re.Pattern[str], ...]) -> float | None:
     for pattern in patterns:
         match = pattern.search(text)
@@ -228,20 +259,8 @@ def check_spge_constants(text: str, *, utility_id: str, logger: logging.Logger) 
     nothing. The FSE is not held to the same rule: CIESAC's page really
     does omit it.
     """
-    published_cva = parse_cva(text)
-    if published_cva is None:
-        # Every Walloon page these parsers read prints the CVA, and a
-        # check that quietly stops running is worth nothing: the constant
-        # is what the household is billed on, so an SPGE move would ride
-        # through unseen the moment a page reworded the label the check
-        # binds to. Losing it is a parser problem, and a parser problem
-        # should be visible.
-        raise ExtractorError(
-            f"{utility_id}: the page no longer prints a CVA, so the SPGE constant "
-            f"{WALLONIA_CVA_EUR_PER_M3} cannot be checked against it"
-        )
-    warn_constant_drift(
-        published=published_cva,
+    hold_to_constant(
+        published=parse_cva(text),
         constant=WALLONIA_CVA_EUR_PER_M3,
         label=f"{utility_id} CVA",
         logger=logger,

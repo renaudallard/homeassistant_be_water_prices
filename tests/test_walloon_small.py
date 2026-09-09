@@ -522,7 +522,7 @@ def test_a_page_that_stops_printing_the_cva_fails_rather_than_stops_checking() -
     page = fixture_html("ieg_2026.html")
     without = page.replace("CVA", "C.V.A.")
     assert without != page, "the mutation did not land"
-    with pytest.raises(ExtractorError, match="no longer prints a CVA"):
+    with pytest.raises(ExtractorError, match="cannot be checked against it"):
         parse_tariff(
             without, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
         )
@@ -571,3 +571,31 @@ def test_a_card_nobody_has_read_falls_back_instead_of_guessing() -> None:
     later = page.replace("Tarif-2026-04-1", "Tarif-2026-10-1")
     assert aiec.published_card_date(later) == date(2026, 10, 1)
     assert aiec.card_from_operator_page(later) is None
+
+
+@pytest.mark.parametrize(
+    ("fixture", "parse", "before", "after"),
+    [
+        ("swde_2026.html", "swde", "True cost of sanitation (CVA)", "Assainissement"),
+        ("cile_2026.html", "cile", "C.V.A", "CVA-"),
+        ("inbw_2026.html", "inbw", "CVA", "C.V.A."),
+    ],
+)
+def test_the_three_largest_walloon_pages_also_fail_on_a_missing_cva(
+    fixture: str, parse: str, before: str, after: str
+) -> None:
+    """The rule shipped for the small operators and skipped the big ones.
+
+    SWDE, CILE and inBW passed their parsed CVA straight to the drift
+    warning, which is a documented no-op when the value is absent, so
+    rewording the label they bind to left them shipping on a constant
+    nothing was comparing to anything.
+    """
+    from custom_components.be_water_prices.providers import cile, inbw, swde
+
+    parsers = {"swde": swde.parse_tariff, "cile": cile.parse_tariff, "inbw": inbw.parse_tariff}
+    page = fixture_html(fixture)
+    without = page.replace(before, after)
+    assert without != page, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="cannot be checked against it"):
+        parsers[parse](without, year=2026)

@@ -64,7 +64,12 @@ from ..const import (
     WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_html
-from ._walloon_simple import build_tariff, detect_published_year, warn_constant_drift
+from ._walloon_simple import (
+    build_tariff,
+    detect_published_year,
+    hold_to_constant,
+    warn_constant_drift,
+)
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -155,7 +160,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     # shows 30 x CVA, not the CVA itself. A moved CVA fails the fetch like
     # a moved FSE does; it used to log and price on the old figure.
     cva_row = _row_amount_after_label(table, ("redevance", "30", "cva"))
-    warn_constant_drift(
+    hold_to_constant(
         published=cva_row / 30.0 if cva_row is not None else None,
         constant=WALLONIA_CVA_EUR_PER_M3,
         label="inBW CVA",
