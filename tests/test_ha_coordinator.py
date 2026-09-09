@@ -50,6 +50,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
+    CONF_POSTCODE,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -3610,3 +3611,77 @@ async def test_a_floor_measured_by_an_earlier_release_is_rebuilt_once(
         assert coordinator._ytd.basis == _cost_basis(
             utility="vivaqua", commune=None, persons=1, social=False
         )
+
+
+@pytest.mark.asyncio
+async def test_a_postcode_that_now_resolves_elsewhere_says_so(
+    hass: HomeAssistant, issue_registry: Any
+) -> None:
+    """v2 entries keep the postcode so a resolver fix can reach them.
+
+    Nothing read it. resolve_candidates is called from the config flow
+    alone, so an entry set up before a correction keeps the operator that
+    was wrong when it installed: twelve postcodes moved from Pidpa to
+    Water-link and every entry already on one kept paying 121.09 EUR a
+    year too much with no signal anywhere.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        # 2100 is Deurne, which is the city of Antwerp and Water-link's.
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "2100"},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    from custom_components.be_water_prices.providers import get as real_get
+
+    fake = WaterExtractor(id="pidpa", label="Pidpa", region="flanders", fetch=_fetch)
+
+    def _get(utility_id: str) -> WaterExtractor:
+        # Only the entry's own operator is stubbed; the one its postcode
+        # resolves to has to come from the real registry or the notice
+        # would name whatever the stub happens to be called.
+        return fake if utility_id == "pidpa" else real_get(utility_id)
+
+    with patch("custom_components.be_water_prices.coordinator.get", new=_get):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        issue = issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id)
+        assert issue is not None
+        assert issue.translation_placeholders == {"utility": "Pidpa", "resolved": "Water-link"}
+
+
+@pytest.mark.asyncio
+async def test_a_postcode_that_still_resolves_here_is_left_alone(
+    hass: HomeAssistant, issue_registry: Any
+) -> None:
+    """And a split postcode counts as resolving: the household picked one."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    for postcode, utility in (("2440", "pidpa"), ("1770", "farys")):
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title=utility,
+            data={CONF_UTILITY: utility},
+            options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: postcode},
+            unique_id=f"{DOMAIN}_{utility}_{postcode}",
+        )
+        entry.add_to_hass(hass)
+        fake = WaterExtractor(id=utility, label=utility, region="flanders", fetch=_fetch)
+        with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            coordinator = hass.data[DOMAIN][entry.entry_id]
+            assert issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id) is None, (
+                postcode
+            )

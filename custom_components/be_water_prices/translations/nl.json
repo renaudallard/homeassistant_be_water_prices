@@ -149,6 +149,10 @@
     }
   },
   "issues": {
+    "operator_moved": {
+      "title": "{utility}: je postcode wijst nu naar een andere maatschappij",
+      "description": "De postcode van deze entry verwijst naar {resolved}, niet naar {utility}. De postcodetabel is gecorrigeerd nadat deze entry is aangemaakt, dus wordt nog altijd het tarief van {utility} opgehaald en je factuur daarop berekend.\n\nControleer het en pas het aan als het klopt: Instellingen > Apparaten en diensten > {utility} > de drie puntjes > Herconfigureren. Er wordt niets voor je gewijzigd, want van maatschappij veranderen wist ook de gemeente en de Vlaamse gezinsinstellingen."
+    },
     "several_water_meters": {
       "title": "{utility}: meer dan \u00e9\u00e9n watermeter op het energiedashboard",
       "description": "Het energiedashboard bevat {count} waterbronnen en deze integratie rekent met \u00e9\u00e9n meter. Ze rekent nu met de bron die het dashboard als eerste bewaart, wat de volgorde van toevoegen weerspiegelt en niets zegt over welke meter je watermaatschappij factureert.\n\nKies de meter zelf in de opties van de integratie (Instellingen > Apparaten en diensten > {utility} > Configureren > Watermetersensor). Deze melding verdwijnt zodra er \u00e9\u00e9n is ingesteld."

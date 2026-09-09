@@ -69,6 +69,7 @@ from .const import (
     CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
+    CONF_POSTCODE,
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
@@ -84,6 +85,7 @@ from .const import (
 )
 from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, WaterTariff, get
+from .providers._postcodes import resolve_candidates
 from .providers.base import WaterExtractor, relabel_with_human_commune
 
 _LOGGER = logging.getLogger(__name__)
@@ -873,6 +875,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         )
         self._last_good = data
         self._sync_repair_issue(data)
+        self._sync_operator_issue()
         if self.entry.state is ConfigEntryState.LOADED and self._owns_the_entry():
             # Only once the entry is up. The first refresh runs inside
             # setup, which calls the backfill itself a few lines later,
@@ -1170,6 +1173,53 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             )
             return
         ir.async_delete_issue(self.hass, DOMAIN, self.several_meters_issue_id)
+
+    @property
+    def operator_issue_id(self) -> str:
+        """Stable Repairs issue id for this entry's re-resolved postcode."""
+        return f"operator_moved_{self.entry.entry_id}"
+
+    @callback
+    def _sync_operator_issue(self) -> None:
+        """Say so when the stored postcode no longer resolves here.
+
+        v2 entries keep the postcode expressly so a later correction to
+        the resolver can reach them, and nothing read it: ``resolve_candidates``
+        is called from the config flow alone, so a household that installed
+        before the correction stays on the operator that was wrong when it
+        installed. Twelve postcodes moved from Pidpa to Water-link in
+        0.7.10 and every entry already on one of them kept paying 121.09
+        EUR a year too much, with nothing anywhere to say the release had
+        changed anything.
+
+        Saying it rather than acting on it. Changing operator rewrites the
+        entry's title, its unique id and its commune, and a move into
+        Flanders has to ask for the household first; the reconfigure flow
+        knows all of that and this does not need to learn it twice. What
+        was missing was the signal, not the machinery.
+        """
+        postcode = self.entry.options.get(CONF_POSTCODE) or self.entry.data.get(CONF_POSTCODE)
+        utility = self.entry.data.get(CONF_UTILITY, "")
+        candidates = resolve_candidates(str(postcode)) if postcode else ()
+        if not candidates or utility in candidates or not self._owns_the_entry():
+            # No postcode, an unresolvable one, or one that still answers
+            # with the operator in use. A postcode split between operators
+            # counts as answering: the household picked one of them.
+            ir.async_delete_issue(self.hass, DOMAIN, self.operator_issue_id)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self.operator_issue_id,
+            is_fixable=False,
+            is_persistent=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="operator_moved",
+            translation_placeholders={
+                "utility": self._extractor.label,
+                "resolved": get(candidates[0]).label,
+            },
+        )
 
     async def async_load_ytd_state(self) -> None:
         """Restore the persisted YTD cycle before the first refresh.

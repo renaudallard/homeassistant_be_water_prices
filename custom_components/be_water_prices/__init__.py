@@ -193,6 +193,7 @@ def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
         ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.several_meters_issue_id)
+        ir.async_delete_issue(hass, DOMAIN, coordinator.operator_issue_id)
     if not domain_data:
         async_unregister_services(hass)
 

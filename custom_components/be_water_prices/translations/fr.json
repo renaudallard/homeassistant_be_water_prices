@@ -149,6 +149,10 @@
     }
   },
   "issues": {
+    "operator_moved": {
+      "title": "{utility} : votre code postal renvoie maintenant vers un autre distributeur",
+      "description": "Le code postal enregistré sur cette entrée correspond à {resolved} et non à {utility}. La table des codes postaux a été corrigée après la création de cette entrée : le tarif de {utility} est donc toujours récupéré et votre facture calculée dessus.\n\nVérifiez-le et changez si c'est correct : Paramètres > Appareils et services > {utility} > les trois points > Reconfigurer. Rien n'est modifié à votre place, car changer de distributeur efface aussi la commune et les réglages de ménage flamands."
+    },
     "several_water_meters": {
       "title": "{utility} : plusieurs compteurs d'eau sur le tableau de bord \u00c9nergie",
       "description": "Le tableau de bord \u00c9nergie contient {count} sources d'eau, et cette int\u00e9gration facture un seul compteur. Elle utilise actuellement celle que le tableau de bord enregistre en premier, ce qui refl\u00e8te l'ordre d'ajout et non le compteur que votre distributeur facture.\n\nChoisissez le compteur dans les options de l'int\u00e9gration (Param\u00e8tres > Appareils et services > {utility} > Configurer > Capteur de compteur d'eau). Cet avis dispara\u00eet d\u00e8s qu'un compteur est d\u00e9fini."
