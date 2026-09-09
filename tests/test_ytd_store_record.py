@@ -101,14 +101,17 @@ async def test_a_malformed_record_starts_a_fresh_cycle(
     assert hass.data[DOMAIN][entry.entry_id].data.ytd_consumption_m3 == 20.0
 
 
-def test_a_record_written_before_the_new_keys_assumes_the_cautious_answer() -> None:
-    """Silence about unrecorded water has to read as "there may be some".
+def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
+    """An upgrading install has to get the fix, or nobody does.
 
     The flag says the year holds water the recorder cannot account for,
-    which is what stops a recorder answer correcting the figure down. A
-    record from a release that never wrote it says nothing either way, and
-    reading silence as "none" would let the recorder pull down a year that
-    really did catch up from an outage. It clears itself at the rollover.
+    which is what stops a recorder answer correcting the figure down.
+    Reading a missing key as "there may be some" locked every record in
+    the field out until January, and a year sitting on a spike today is
+    exactly what the correction was written for. Such a record carries no
+    recorder high-water mark either, so the first answer of the year still
+    proves nothing about its own history and cannot lower anything on its
+    own.
     """
     from custom_components.be_water_prices.coordinator import _cycle_from_record
 
@@ -116,7 +119,7 @@ def test_a_record_written_before_the_new_keys_assumes_the_cautious_answer() -> N
         {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "offset_m3": 1000.0}
     )
     assert old is not None
-    assert old.unrecorded is True
+    assert old.unrecorded is False
     assert old.recorder_hwm is None
 
 

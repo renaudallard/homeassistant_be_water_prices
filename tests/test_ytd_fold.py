@@ -1330,6 +1330,37 @@ def test_a_recorder_answering_alongside_the_step_still_settles_it() -> None:
     assert out.cycle.unrecorded is True
 
 
+def test_a_record_from_before_the_correction_is_still_corrected() -> None:
+    """The households stuck on a spike today are the ones upgrading into it.
+
+    Every record in the field was written before the flag existed, so
+    reading its absence as "the year may hold water the recorder never
+    saw" meant the correction reached nobody until January. It takes two
+    recorder answers, as it does for any other record: the first only
+    establishes that the recorder is there.
+    """
+    from custom_components.be_water_prices.coordinator import _cycle_from_record
+
+    cycle = _cycle_from_record(
+        {
+            "meter": _METER,
+            "year": _YEAR,
+            "m3": 90.0,
+            "cost": _bill(90.0),
+            "offset_m3": 100.0,
+            "basis": _BASIS,
+        }
+    )
+    assert cycle is not None
+
+    first = _round(cycle, reading=140.2, recorder_m3=40.2)
+    assert first.m3 == 90.0  # one answer proves nothing about its own history
+
+    second = _round(first.cycle, reading=140.2, recorder_m3=40.2)
+    assert second.m3 == 40.2
+    assert second.cost == _bill(40.2)
+
+
 def test_the_unrecorded_mark_does_not_outlive_its_year() -> None:
     """January starts over: the recorder speaks for the new year in full."""
     stale = _YtdCycle(

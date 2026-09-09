@@ -1724,10 +1724,15 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         offset_m3=_figure(figures["offset_m3"]),
         basis=basis,
         recorder_hwm=_figure(figures["recorder_hwm"]),
-        # A record written before this existed says nothing either way, and
-        # the safe reading of silence is that the year may hold water the
-        # recorder never saw. It clears itself at the next rollover.
-        unrecorded=bool(data.get("unrecorded", True)),
+        # A record written before this existed says nothing either way.
+        # Reading silence as "there may be some" was the cautious answer
+        # and it cost the whole point of the release: every record in the
+        # field predates the key, so the correction reached nobody until
+        # January, and the years sitting on a spike right now are the ones
+        # it was written for. Such a record has no recorder_hwm either, so
+        # the first answer for the year still proves nothing on its own and
+        # cannot lower the mark. That guard is the one doing the work here.
+        unrecorded=bool(data.get("unrecorded", False)),
     )
 
 
