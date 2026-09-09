@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
+from dataclasses import replace
 
 from custom_components.be_water_prices.coordinator import (
     _fold,
@@ -1316,3 +1317,59 @@ def test_the_unrecorded_mark_does_not_outlive_its_year() -> None:
 
     assert out.m3 == 2.0
     assert out.cycle.unrecorded is False
+
+
+def test_a_figure_the_recorder_supplied_is_not_unrecorded_water() -> None:
+    """However far it jumps, the recorder is the one that said it.
+
+    A cycle with no frame is served from the recorder, so its figure comes
+    from the same statistics that would later correct it. Marking that
+    year as holding water the recorder never saw would lock the
+    correction out of a year that never needed locking.
+    """
+    served = _YtdCycle(meter=_METER, year=_YEAR, m3=5.0, basis=_BASIS, recorder_hwm=5.0)
+    out = _round(served, reading=1000.0, recorder_m3=100.0)
+
+    assert out.m3 == 100.0
+    assert out.cycle.unrecorded is False
+
+
+def test_a_swap_leaves_the_old_meter_s_history_behind() -> None:
+    """The year restarts on a register with nothing behind it.
+
+    What the recorder reported for the old meter says nothing about the
+    new one, and any water it could not see there went with it. Carried
+    over, the high-water mark would refuse every later answer as a lost
+    database and the flag would refuse every correction.
+    """
+    cycle = _anchored(128.0, 4000.0, recorder_hwm=88.0)
+    cycle = replace(cycle, unrecorded=True)
+    hold_run = 0
+    hold_span_s = 0.0
+    run_m3: float | None = None
+    high_m3: float | None = 4128.0
+    out = None
+    for _ in range(3):
+        out = _round(
+            cycle,
+            reading=0.0,
+            hold_run=hold_run,
+            hold_span_s=hold_span_s,
+            run_m3=run_m3,
+            elapsed_s=400.0,
+            high_m3=high_m3,
+            recorder_ok=None,
+        )
+        cycle = out.cycle
+        hold_run, hold_span_s, run_m3, high_m3 = (
+            out.hold_run,
+            out.hold_span_s,
+            out.run_m3,
+            out.high_m3,
+        )
+
+    assert out is not None
+    assert out.swapped is True
+    assert out.m3 == 0.0
+    assert out.cycle.unrecorded is False
+    assert out.cycle.recorder_hwm is None

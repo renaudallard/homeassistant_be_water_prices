@@ -353,6 +353,22 @@ class _YtdFold:
     saw_reading: bool = False
 
 
+def _stepped_past_the_bound(framed: float, mark: float | None) -> bool:
+    """Whether a reading advanced the year by more than one report may.
+
+    Only an exemption can admit a step this size, and both of them -- a
+    meter that was unavailable, a first round after a restart -- mean the
+    same thing: the water arrived while Home Assistant was not watching,
+    so no statistics were compiled for it and the recorder is permanently
+    short by that much. It cannot speak for this year again.
+
+    A figure the recorder itself supplied is not that, however far it
+    jumps, which is why this asks only about a reading read through the
+    frame.
+    """
+    return mark is not None and framed - mark > _MAX_STEP_M3
+
+
 def _fold(
     cycle: _YtdCycle,
     *,
@@ -522,6 +538,11 @@ def _fold(
                 mark = 0.0
                 floor = None
                 candidate = 0.0
+                # The year restarts on a register with no history, so what
+                # the recorder reported for the old meter, and any water it
+                # could not see there, go with it.
+                recorder_hwm = None
+                unrecorded = False
                 hold_m3 = None
                 hold_run = 0
                 hold_span_s = 0.0
@@ -580,6 +601,7 @@ def _fold(
             hold_m3 = None
         elif corroborated:
             candidate = framed
+            unrecorded = unrecorded or _stepped_past_the_bound(framed, mark)
             hold_m3 = None
         elif mark is not None and framed - mark > step_bound:
             # A step this large in one report is a garbage value far more
@@ -590,16 +612,8 @@ def _fold(
             hold_m3 = reading
         else:
             candidate = framed
+            unrecorded = unrecorded or _stepped_past_the_bound(framed, mark)
             hold_m3 = None
-
-    if candidate is not None and mark is not None and candidate - mark > _MAX_STEP_M3:
-        # Only an exemption can admit a step this size, and both of them --
-        # a meter that was unavailable, a first round after a restart --
-        # mean the same thing: the water arrived while Home Assistant was
-        # not watching, so no statistics were compiled for it and the
-        # recorder is permanently short by that much. It cannot speak for
-        # this year again.
-        unrecorded = True
 
     spoken_before = recorder_hwm is not None
     if recorder_m3 is not None and (recorder_hwm is None or recorder_m3 >= recorder_hwm):
