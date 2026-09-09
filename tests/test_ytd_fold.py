@@ -1203,7 +1203,7 @@ def test_a_correction_shipped_in_a_release_reaches_the_running_bill() -> None:
     from custom_components.be_water_prices.const import INTEGRATION_VERSION
     from custom_components.be_water_prices.coordinator import _cost_basis
 
-    now = _cost_basis(utility="iden", commune=None, persons=1, social=False)
+    now = _cost_basis(utility="iden", commune=None, persons=1, social=False, card_year=2026)
     assert now.startswith(f"{INTEGRATION_VERSION}|")
     before = now.replace(INTEGRATION_VERSION, "0.0.1", 1)
     assert before != now
@@ -1217,6 +1217,38 @@ def test_a_correction_shipped_in_a_release_reaches_the_running_bill() -> None:
     same = _YtdCycle(meter=_METER, year=_YEAR, m3=40.0, cost=556.21, offset_m3=0.0, basis=now)
     held = _round(same, reading=40.0, basis=now, cost_of=lambda _m3: 538.21)
     assert held.cost == 556.21
+
+
+def test_the_card_a_late_publisher_stood_in_with_does_not_hold_the_year() -> None:
+    """January to March can run on last year's card, which is not a glitch.
+
+    Every extractor serves the prior card until 31 March when a publisher
+    runs late, so the year accrues at a stand-in's rates. A floor that
+    cannot tell that from a fetch that came back cheaper holds the
+    household on the stand-in until January if the real card is lower. The
+    price backfill has kept the card's year in its own gate all along for
+    exactly this; the floor had no term for it.
+    """
+    from custom_components.be_water_prices.coordinator import _cost_basis
+
+    stood_in = _cost_basis(
+        utility="swde", commune=None, persons=1, social=False, card_year=_YEAR - 1
+    )
+    published = _cost_basis(utility="swde", commune=None, persons=1, social=False, card_year=_YEAR)
+    assert stood_in != published
+
+    cycle = _YtdCycle(
+        meter=_METER, year=_YEAR, m3=20.0, cost=140.0, offset_m3=1000.0, basis=stood_in
+    )
+
+    # March: the real card lands and it is cheaper than the stand-in.
+    landed = _round(cycle, reading=1020.0, basis=published, cost_of=lambda _m3: 112.0)
+    assert landed.cost == 112.0
+
+    # A fetch of the same card that merely came back cheaper is still the
+    # transient the floor is for, and is still held.
+    glitch = _round(cycle, reading=1020.0, basis=stood_in, cost_of=lambda _m3: 112.0)
+    assert glitch.cost == 140.0
 
 
 def test_a_spike_under_the_old_bound_is_no_longer_taken_on_sight() -> None:

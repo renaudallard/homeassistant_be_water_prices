@@ -441,6 +441,12 @@ you paid is worth more than a tidy chart.
   because the m³ figure carries its own high-water mark, so a recomputed
   bill can only come out lower when the rates really are lower.
 
+  It is rebuilt once more when your operator finally publishes the new
+  year's card. Until 31 March a late publisher's entry runs on last year's
+  card, so January onwards accrues at a stand-in's rates; those are not a
+  transient fetch, and if the real card comes in cheaper the floor would
+  otherwise hold you on the stand-in until the year turned.
+
   What the floor still holds against is a **tariff fetch that comes back
   cheaper** — a transient bad parse, or a fallback card. A genuine
   mid-year price cut by your operator therefore only reaches

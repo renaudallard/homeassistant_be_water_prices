@@ -1399,6 +1399,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 commune=self.entry.options.get(CONF_COMMUNE),
                 persons=int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS)),
                 social=bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False)),
+                card_year=tariff.valid_from.year,
             ),
             cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3, now_year),
         )
@@ -1647,7 +1648,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.async_update_listeners()
 
 
-def _cost_basis(*, utility: str, commune: str | None, persons: int, social: bool) -> str:
+def _cost_basis(
+    *, utility: str, commune: str | None, persons: int, social: bool, card_year: int
+) -> str:
     """What the household is billed as, rather than what it is billed for.
 
     The cost floor exists to stop a momentary dip publishing a decrease: a
@@ -1671,9 +1674,19 @@ def _cost_basis(*, utility: str, commune: str | None, persons: int, social: bool
     mark comes down only where the recorder has corrected it, and that path
     drops the floor as it goes, so the recomputed cost can only come out
     lower when the rates really are.
+
+    The card's own year is here for the same reason again, and the price
+    backfill has kept it in its gate all along for exactly this: when a
+    publisher runs late every extractor serves last year's card until
+    31 March, so January to March accrues at a stand-in's rates. Those are
+    not a transient fetch, and if the real card comes in cheaper a floor
+    that cannot tell the two apart holds the household on the stand-in
+    until the year turns. A card year moves once, when the publisher
+    catches up.
     """
     return "|".join(
-        str(part) for part in (INTEGRATION_VERSION, utility, commune or "", persons, social)
+        str(part)
+        for part in (INTEGRATION_VERSION, utility, commune or "", persons, social, card_year)
     )
 
 

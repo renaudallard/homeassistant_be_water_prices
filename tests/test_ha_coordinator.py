@@ -2343,7 +2343,7 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
     assert coordinator.data.current_year_cost_eur is not None
     assert coordinator.data.current_year_cost_eur < 999.0
     assert coordinator._ytd.basis == _cost_basis(
-        utility="vivaqua", commune=None, persons=1, social=False
+        utility="vivaqua", commune=None, persons=1, social=False, card_year=2026
     )
 
 
@@ -3237,7 +3237,9 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
             "m3": 100.0,
             "cost": 999.0,
             "offset_m3": 4000.0,
-            "basis": _cost_basis(utility="vivaqua", commune=None, persons=1, social=False),
+            "basis": _cost_basis(
+                utility="vivaqua", commune=None, persons=1, social=False, card_year=2026
+            ),
         },
     }
 
@@ -3262,7 +3264,7 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
         assert coordinator.data.current_year_cost_eur is not None
         assert coordinator.data.current_year_cost_eur < 999.0
         assert coordinator._ytd.basis == _cost_basis(
-            utility="vivaqua", commune=None, persons=3, social=False
+            utility="vivaqua", commune=None, persons=3, social=False, card_year=2026
         )
 
 
@@ -3597,7 +3599,9 @@ async def test_first_anchor_keeps_a_floor_it_can_account_for(
             "m3": None,
             "cost": 177.25,
             "offset_m3": None,
-            "basis": _cost_basis(utility="vivaqua", commune=None, persons=1, social=False),
+            "basis": _cost_basis(
+                utility="vivaqua", commune=None, persons=1, social=False, card_year=2026
+            ),
         },
     }
 
@@ -3675,7 +3679,7 @@ async def test_a_floor_measured_by_an_earlier_release_is_rebuilt_once(
         assert coordinator.data.current_year_cost_eur is not None
         assert coordinator.data.current_year_cost_eur < 177.25
         assert coordinator._ytd.basis == _cost_basis(
-            utility="vivaqua", commune=None, persons=1, social=False
+            utility="vivaqua", commune=None, persons=1, social=False, card_year=2026
         )
 
 
