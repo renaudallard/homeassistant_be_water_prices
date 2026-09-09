@@ -152,6 +152,30 @@ async def test_full_year_sums_only_the_year_itself(hass: HomeAssistant) -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_re_based_register_is_not_offered_as_the_year(hass: HomeAssistant) -> None:
+    """The daily bound lived in the year-to-date reader and not in this one.
+
+    _change_exceeds_the_register is a shape test that by construction
+    catches only a same-day reset, so a counter re-based onto the real
+    meter reading, whose register stays larger than the jump, sailed
+    through: 1262 m3 offered as the year, and a 6791.93 EUR projection
+    written into the options if the Repair was accepted.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    rows = _buckets(
+        [
+            (date(2024, 12, 15), 3.0),
+            *_quiet_year(2025, date(2025, 1, 5), date(2025, 6, 1), date(2025, 12, 20)),
+            (date(2025, 1, 5), 10.0),
+            (date(2025, 6, 1), 1180.0),  # the day the counter was re-based
+            (date(2025, 12, 20), 5.0),
+        ]
+    )
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
+
+
+@pytest.mark.asyncio
 async def test_a_swap_after_the_year_does_not_refuse_it(hass: HomeAssistant) -> None:
     """The negative delta is in the next year's bucket, so it is not this year's."""
     await hass.config.async_set_time_zone("Europe/Brussels")

@@ -1967,6 +1967,16 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
             # The same reset arithmetic as above; a year that carries the
             # whole register as one day's water is not a year to offer.
             return None
+        if _exceeds_a_day(float(delta), entity_id, "full-year"):
+            # _change_exceeds_the_register is a shape test and by
+            # construction only catches a same-day reset: a counter
+            # re-based onto the real meter reading leaves a bucket whose
+            # register is larger still and sails through it. The daily
+            # bound is in the year-to-date reader and was never reached
+            # from here, so this offered 1262 m3 and a 6791.93 EUR
+            # projection where the household had used 82 m3 and owed
+            # 479.60, and accepting the Repair wrote it into the options.
+            return None
         days += 1
         total += float(delta)
     days_in_year = 366 if calendar.isleap(year) else 365
