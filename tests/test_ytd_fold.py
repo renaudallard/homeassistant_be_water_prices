@@ -72,6 +72,7 @@ def _round(
     run_m3: float | None = None,
     elapsed_s: float = 86400.0,
     high_m3: float | None = None,
+    saw_reading: bool = True,
     now_year: int = _YEAR,
     meter: str = _METER,
     basis: str = _BASIS,
@@ -90,6 +91,7 @@ def _round(
         run_m3=run_m3,
         elapsed_s=elapsed_s,
         high_m3=high_m3,
+        saw_reading=saw_reading,
         basis=basis,
         cost_of=cost_of,
     )
@@ -563,6 +565,7 @@ def _replay(
     hold_m3: float | None = None
     hold_run = 0
     run_m3: float | None = None
+    saw_reading = True
     for reading, recorder_m3 in rounds:
         out = _round(
             cycle,
@@ -571,9 +574,11 @@ def _replay(
             hold_m3=hold_m3,
             hold_run=hold_run,
             run_m3=run_m3,
+            saw_reading=saw_reading,
         )
         cycle, hold_m3, hold_run = out.cycle, out.hold_m3, out.hold_run
         run_m3 = out.run_m3
+        saw_reading = out.saw_reading
         published.append(out.m3)
     return published
 
@@ -1172,3 +1177,60 @@ def test_a_correction_shipped_in_a_release_reaches_the_running_bill() -> None:
     same = _YtdCycle(meter=_METER, year=_YEAR, m3=40.0, cost=556.21, offset_m3=0.0, basis=now)
     held = _round(same, reading=40.0, basis=now, cost_of=lambda _m3: 538.21)
     assert held.cost == 556.21
+
+
+def test_a_spike_under_the_old_bound_is_no_longer_taken_on_sight() -> None:
+    """Only a step over 100 m3 was ever tested, and nothing below it was.
+
+    A reading 90 m3 above where the meter stands is not a step any
+    household draws, and the mark only climbs, so taking it pinned the
+    year until January: 130.5 m3 against the 40.6 the recorder reported in
+    the very same round, which is 1254 EUR at a Flemish comfort rate.
+    """
+    out = _round(_anchored(40.0, 1000.0), reading=1130.5, recorder_m3=None)
+
+    assert out.m3 == 40.0  # held, not published
+    assert out.hold_m3 == 1130.5
+
+
+def test_a_recorder_that_still_has_the_year_settles_the_round() -> None:
+    """The published figure is the largest a round holds, so the recorder lost.
+
+    It reads the same meter's own statistics for the whole year, so water
+    it has no record of did not flow. It only speaks when it has not lost
+    history itself, which is the next test.
+    """
+    # A step the size bound lets through: 25 m3, under _MAX_STEP_M3, but
+    # 24 m3 more than the recorder has any record of for the whole year.
+    out = _round(_anchored(40.0, 1000.0), reading=1065.0, recorder_m3=40.6)
+
+    assert out.m3 == 40.6
+    # The reading is refused outright, so it does not raise the high-water
+    # mark either, which is what gates the frame correction.
+    assert out.high_m3 is None
+
+
+def test_a_recorder_that_lost_history_does_not_get_to_lower_the_year() -> None:
+    """A purged database reports a fraction of the year and must not win."""
+    out = _round(_anchored(88.0, 1000.0), reading=1089.0, recorder_m3=20.0)
+
+    assert out.m3 == 89.0  # the frame still speaks for the year
+
+
+def test_a_meter_that_was_down_may_come_back_with_everything_it_missed() -> None:
+    """The step bound would otherwise throw away water that really flowed.
+
+    A meter that has been unavailable returns showing the whole outage at
+    once. That is a real step however large, and it is exactly what a
+    spike from a steadily reporting meter is not.
+    """
+    down = _round(_anchored(88.0, 4000.0), reading=None)
+    assert down.saw_reading is False
+
+    back = _round(_anchored(88.0, 4000.0), reading=4128.0, saw_reading=False)
+    assert back.m3 == 128.0  # the 40 m3 drawn while it was down
+
+    # The same step from a meter that never stopped reporting is held.
+    steady = _round(_anchored(88.0, 4000.0), reading=4128.0, saw_reading=True)
+    assert steady.m3 == 88.0
+    assert steady.hold_m3 == 4128.0

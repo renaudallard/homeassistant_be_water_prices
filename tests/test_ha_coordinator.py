@@ -2958,7 +2958,7 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
         real_save = coordinator._store.async_save
 
         async def _slow_save(data: Any) -> None:
-            hass.states.async_set("sensor.water_meter", "140")
+            hass.states.async_set("sensor.water_meter", "125")
             await asyncio.sleep(0)
             await real_save(data)
 
@@ -2967,8 +2967,10 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
             await coordinator.async_refresh()
             await hass.async_block_till_done()
 
-        # 140 - 80 == 60; the tick must not republish the earlier 20.
-        assert coordinator.data.ytd_consumption_m3 == 60.0
+        # 125 - 80 == 45; the tick must not republish the earlier 20. The
+        # draw stays under _MAX_STEP_M3, so what this pins is the ordering
+        # rather than whether one report may advance the year that far.
+        assert coordinator.data.ytd_consumption_m3 == 45.0
 
 
 @pytest.mark.asyncio
