@@ -433,6 +433,12 @@ def _fold(
     offset = cycle.offset_m3 if current else None
     recorder_hwm = cycle.recorder_hwm if current else None
     unrecorded = cycle.unrecorded if current else False
+    # What the year knew before this round. The flag below is inferred from
+    # the size of the step this round admits, and the guards that read it
+    # are weighing that same step against a recorder answer read alongside
+    # it. Reading the inference there would let a step vouch for itself and
+    # throw away the one piece of independent evidence about it.
+    carried = unrecorded
     if not current:
         hold_m3 = None
         hold_run = 0
@@ -627,7 +633,7 @@ def _fold(
         # some, and it is ignored rather than believed against the year.
         recorder_hwm = recorder_m3
         if (
-            not unrecorded
+            not carried
             and candidate is not None
             and candidate - recorder_m3 > _RECORDER_LAG_M3
             and (spoken_before or mark is None or recorder_m3 >= mark)
@@ -647,7 +653,7 @@ def _fold(
             candidate = None
         if (
             spoken_before
-            and not unrecorded
+            and not carried
             and mark is not None
             and mark - recorder_m3 > _RECORDER_LAG_M3
         ):

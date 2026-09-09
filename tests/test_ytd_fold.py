@@ -1308,6 +1308,28 @@ def test_a_year_holding_water_the_recorder_never_saw_is_left_alone() -> None:
     assert later.m3 == 129.0  # not pulled down to the recorder's 89
 
 
+def test_a_recorder_answering_alongside_the_step_still_settles_it() -> None:
+    """A step may not vouch for itself against the evidence of its own round.
+
+    Admitting a step this large marks the year as holding water the
+    recorder never saw, and the guards read that mark. Reading it in the
+    same pass let the step discard the recorder answer that arrived with
+    it, which is the one thing that separates a real outage from a spike
+    landing after a single missed round. A meter away for one round cannot
+    have drawn 96 m3.
+    """
+    out = _round(
+        _anchored(7.3, 2475.7, recorder_hwm=7.3),
+        reading=2580.2,
+        recorder_m3=8.2,
+        saw_reading=False,
+    )
+
+    assert out.m3 == 8.2  # not the 104.5 the reading implies
+    # The year is still marked, so the round after this one is left alone.
+    assert out.cycle.unrecorded is True
+
+
 def test_the_unrecorded_mark_does_not_outlive_its_year() -> None:
     """January starts over: the recorder speaks for the new year in full."""
     stale = _YtdCycle(
