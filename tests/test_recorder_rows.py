@@ -65,6 +65,55 @@ async def test_a_day_whose_change_is_the_whole_register_is_not_water() -> None:
     assert total == 0.5
 
 
+async def test_the_day_a_meter_returns_carries_the_whole_absence() -> None:
+    """A bucket is not always one day of water.
+
+    Home Assistant compiles nothing while a meter is away and attributes
+    the whole absence to the bucket it comes back in, so reading that as
+    one day made it look like a re-based register. Dropping it cost the
+    outage rather than the day: a household on a cubic metre a day, away
+    from January to April, lost 105 m3 and the year was re-anchored under
+    it, near 1100 EUR on a Farys bill.
+    """
+    rows = [
+        _row(date(2026, 1, 1), change=1.0, state=1001.0, total=901.0),
+        _row(date(2026, 1, 2), change=1.0, state=1002.0, total=902.0),
+        _row(date(2026, 1, 3), change=1.0, state=1003.0, total=903.0),
+        _row(date(2026, 1, 4), change=1.0, state=1004.0, total=904.0),
+        # Away until 20 April, and the day it returns holds all of it.
+        _row(date(2026, 4, 20), change=105.0, state=1109.0, total=1009.0),
+        _row(date(2026, 4, 21), change=1.0, state=1110.0, total=1010.0),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 4, 21))  # type: ignore[arg-type]
+    assert total == 110.0
+
+
+async def test_the_room_a_gap_buys_is_a_household_and_not_a_register() -> None:
+    """It has to keep out the thing the bound was written for.
+
+    The allowance grows by what a household plausibly draws in a day, so a
+    re-based register is still refused however long the meter was away:
+    4050 m3 is beyond any gap a year can hold.
+    """
+    rebased = [
+        _row(date(2026, 1, 1), change=1.0, state=1001.0, total=901.0),
+        _row(date(2026, 12, 30), change=4050.0, state=5051.0, total=4951.0),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rebased)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 12, 30))  # type: ignore[arg-type]
+    assert total == 1.0
+
+    # And a day that stands on its own still gets one day's room.
+    same_day = [
+        _row(date(2026, 1, 1), change=1.0, state=1001.0, total=901.0),
+        _row(date(2026, 1, 2), change=150.0, state=1151.0, total=1051.0),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=same_day)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 2))  # type: ignore[arg-type]
+    assert total == 1.0
+
+
 async def test_ordinary_days_are_summed_in_full() -> None:
     rows = [
         _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),

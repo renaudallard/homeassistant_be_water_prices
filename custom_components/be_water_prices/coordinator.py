@@ -2010,6 +2010,11 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     # Measured as the next local midnight rather than a fixed 86400, or the
     # 23-hour day the clocks go forward on would fall short of the cut.
     after_end = dt_util.start_of_local_day(end + timedelta(days=1)).timestamp()
+    # The day before the window, so the first bucket in it counts as
+    # following on rather than as arriving out of nowhere. Days with no
+    # bucket of their own sit between this and the next one, and their
+    # water is in whichever bucket comes next.
+    previous = dt_util.start_of_local_day(start).timestamp() - _SECONDS_PER_DAY
     for index, row in enumerate(await _recorder_daily_rows(hass, entity_id, start, end)):
         delta = row.get("change")
         if delta is None:
@@ -2017,6 +2022,10 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
         bucket = row.get("start")
         if bucket is not None and bucket >= after_end:
             continue
+        gap_days = 0.0
+        if bucket is not None:
+            gap_days = max(0.0, (bucket - previous) / _SECONDS_PER_DAY - 1.0)
+            previous = bucket
         if index == 0 and _change_is_the_whole_register(row):
             # The recorder builds ``change`` by subtracting the sum it
             # finds immediately before the window, and falls back to zero
@@ -2059,7 +2068,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
                 _LOGGER.debug("%s: dropping a register drop and its follow-up bucket", entity_id)
                 refused += 1
                 continue
-            if _exceeds_a_day(netted, entity_id, "netted"):
+            if _exceeds_a_day(netted, entity_id, "netted", gap_days):
                 refused += 1
                 continue
             total += netted
@@ -2080,7 +2089,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
             )
             refused += 1
             continue
-        if _exceeds_a_day(float(delta), entity_id, "single"):
+        if _exceeds_a_day(float(delta), entity_id, "single", gap_days):
             refused += 1
             continue
         total += float(delta)
@@ -2100,8 +2109,8 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     return max(0.0, total)
 
 
-def _exceeds_a_day(change: float, entity_id: str, kind: str) -> bool:
-    """Whether one day claims more water than a day can hold.
+def _exceeds_a_day(change: float, entity_id: str, kind: str, gap_days: float = 0.0) -> bool:
+    """Whether a bucket claims more water than the days behind it can hold.
 
     The live path holds a single report that climbs more than
     ``_IMPLAUSIBLE_JUMP_M3`` until the next reading agrees with it. The
@@ -2119,17 +2128,29 @@ def _exceeds_a_day(change: float, entity_id: str, kind: str) -> bool:
 
     A day is dropped rather than held: there is no next reading to confirm
     it against, and the year's figure is a high-water mark, so admitting
-    one bad day pins the bill until January while losing one real day of a
-    genuinely enormous draw costs that day alone.
+    one bad day pins the bill until January.
+
+    ``gap_days`` is how many days with no bucket of their own sit behind
+    this one. A bucket is not always one day of water: Home Assistant
+    carries a meter's running total across a gap and attributes the whole
+    of it to the bucket the meter comes back in, so the day a meter returns
+    from an outage holds the outage. Read as one day it looked like a
+    re-based register and was dropped, and losing it cost the whole absence
+    rather than the one day this used to say. The gap buys room at the rate
+    a household plausibly draws, which is generous enough to keep a real
+    catch-up and far too mean to let a re-based register through: a
+    register carrying 4050 m3 is still refused after a year out of sight.
     """
-    if change <= _IMPLAUSIBLE_JUMP_M3:
+    allowance = _IMPLAUSIBLE_JUMP_M3 + max(0.0, gap_days) * _AWAY_M3_PER_DAY
+    if change <= allowance:
         return False
     _LOGGER.warning(
-        "%s: ignoring a %s daily change of %.1f m3; no household uses that much "
-        "in a day, so it reads as a re-based or reset register rather than water",
+        "%s: ignoring a %s change of %.1f m3 over %.0f day(s); no household uses "
+        "that much, so it reads as a re-based or reset register rather than water",
         entity_id,
         kind,
         change,
+        gap_days + 1.0,
     )
     return True
 
