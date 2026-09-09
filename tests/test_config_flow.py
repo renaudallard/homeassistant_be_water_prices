@@ -358,6 +358,36 @@ def test_the_three_pidpa_communes_off_the_default_rate_are_pre_selected() -> Non
     assert _commune_for_postcode("pidpa", "2440") is None
 
 
+def test_the_farys_communes_off_the_default_card_are_pre_selected() -> None:
+    """Five of Farys's 266 communes are not on the Gent-centrum card."""
+    from custom_components.be_water_prices.config_flow import _commune_for_postcode
+
+    for postcode, commune in (
+        ("1620", "25906"),  # Drogenbos, gemeentelijke 1,4903
+        ("1930", "25926"),  # Zaventem and Nossegem, drinkwater 2,9251
+        ("1932", "25931"),  # Sint-Stevens-Woluwe
+        ("1933", "25936"),  # Sterrebeek
+    ):
+        assert _resolve_postcode(postcode) == "farys", postcode
+        assert _commune_for_postcode("farys", postcode) == commune
+    # A commune that really is on the default card is left alone.
+    assert _commune_for_postcode("farys", "1730") is None
+
+
+def test_the_zaventem_default_is_worth_the_difference_it_claims() -> None:
+    """The tussenkomst is 0,0807 off the drinkwater leg, 8.55 EUR a year."""
+    from custom_components.be_water_prices.pricing import compute_annual_cost
+    from custom_components.be_water_prices.providers.farys import parse_tariff
+    from tests import fixture_html
+
+    gent = compute_annual_cost(parse_tariff(fixture_html("farys_gent_2026.json"), year=2026), 80, 1)
+    zaventem = compute_annual_cost(
+        parse_tariff(fixture_html("farys_zaventem_2026.json"), year=2026), 80, 1
+    )
+    assert gent is not None and zaventem is not None
+    assert round(gent - zaventem, 2) == 8.55
+
+
 def test_the_pidpa_default_no_longer_claims_to_be_province_wide() -> None:
     from custom_components.be_water_prices.providers import pidpa
 

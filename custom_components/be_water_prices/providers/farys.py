@@ -88,6 +88,28 @@ ENDPOINT_URL = "https://www.farys.be/nl/watertarieven?ajax_form=1"
 PAGE_URL = "https://www.farys.be/nl/watertarieven"
 DEFAULT_MUNICIPALITY_ID = "25071"  # Gent-centrum
 DEFAULT_MUNICIPALITY_LABEL = "Gent-centrum"
+
+# The five communes whose card is not the one the Gent-centrum default
+# carries, checked against all 266 commune pages on 2026-09-09: Drogenbos
+# levies a gemeentelijke saneringsbijdrage of 1,4903 against the other
+# 265 at 1,9572, and the four Zaventem cards net a gemeentelijke
+# tussenkomst off the drinkwater leg, leaving 2,9251 against the other
+# 262 at 3,0058. Left to the default, Drogenbos was over-charged 49.49
+# EUR a year and the Zaventem communes 8.55. Nossegem shares postcode
+# 1930 with Zaventem and is billed identically, so one entry covers both.
+_POSTCODE_COMMUNES: dict[str, str] = {
+    "1620": "25906",  # Drogenbos
+    "1930": "25926",  # Zaventem (and Nossegem)
+    "1932": "25931",  # Sint-Stevens-Woluwe
+    "1933": "25936",  # Sterrebeek
+}
+
+
+def commune_for_postcode(postcode: str) -> str | None:
+    """The commune id for a postcode Farys does not bill at the default rate."""
+    return _POSTCODE_COMMUNES.get(postcode.strip())
+
+
 _CURRENT_PAGE_NID = "20471"
 
 # Match "Basistarief drinkwater (per m³) € N,NNNN" and the matching
@@ -375,4 +397,5 @@ EXTRACTOR = WaterExtractor(
     fetch=fetch,
     fetch_for_commune=fetch_for_commune,
     list_communes=list_communes,
+    commune_for_postcode=commune_for_postcode,
 )
