@@ -526,3 +526,48 @@ def test_a_page_that_stops_printing_the_cva_fails_rather_than_stops_checking() -
         parse_tariff(
             without, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
         )
+
+
+def test_aiec_serves_the_rate_its_own_card_prints() -> None:
+    """The aggregator sat on 2,460 for five months after AIEC moved."""
+    from custom_components.be_water_prices.providers import aiec
+
+    card = aiec.card_from_operator_page(fixture_html("aiec_operator_2026.html"))
+    assert card is not None
+    assert card.cvd_eur_per_m3 == 3.050
+    assert card.valid_from == date(2026, 4, 1)
+    assert card.yearly_fixed_fee == pytest.approx(143.44)  # 20 x CVD + 30 x CVA
+    # The aggregator, which is what this replaces.
+    assert parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026).cvd_eur_per_m3 == 2.46
+
+
+def test_the_aiec_card_reproduces_the_table_printed_beside_it() -> None:
+    """The picture also prints a bill per household size; 3,050 fits it."""
+    from custom_components.be_water_prices.pricing import compute_annual_cost
+    from custom_components.be_water_prices.providers import aiec
+
+    card = aiec.card_from_operator_page(fixture_html("aiec_operator_2026.html"))
+    assert card is not None
+    for consumption, printed in (
+        (35, 233),
+        (70, 449),
+        (105, 665),
+        (140, 882),
+        (175, 1098),
+        (210, 1314),
+        (245, 1531),
+    ):
+        billed = compute_annual_cost(card, consumption, 1)
+        assert billed is not None
+        assert abs(billed - printed) < 0.5, (consumption, billed, printed)
+
+
+def test_a_card_nobody_has_read_falls_back_instead_of_guessing() -> None:
+    """A new picture means a rate we do not have, not a rate we invent."""
+    from custom_components.be_water_prices.providers import aiec
+
+    page = fixture_html("aiec_operator_2026.html")
+    assert page.count("Tarif-2026-04-1") == 1
+    later = page.replace("Tarif-2026-04-1", "Tarif-2026-10-1")
+    assert aiec.published_card_date(later) == date(2026, 10, 1)
+    assert aiec.card_from_operator_page(later) is None

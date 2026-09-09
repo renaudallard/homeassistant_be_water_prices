@@ -37,16 +37,23 @@ reads as green. On 1 April 2026 AIEC moved its CVD to 3,050 and
 Callmepower stayed on 2,460, under-stating an 80 m3 bill by 53 EUR a
 year with nothing to show for it.
 
-The picture's own date is readable even though its contents are not, so
-:func:`fetch` dates the aggregator's card from it. The aggregator prints
-no effective date and :func:`_walloon_simple.build_tariff` therefore
-stamps every card 1 January; the picture says when the rate actually
-took effect, and ``valid_from`` then says which card is on screen.
+The picture's contents cannot be read by a machine, but they can be read
+by a person, and its file name carries the day the card took effect. So
+the rate on each card is transcribed here against that date. While
+AIEC's page still shows the card we transcribed, that is what is served,
+and the aggregator is not consulted at all.
 
-Refusing the mismatch outright, which this did first, does not work: the
-aggregator card is 1 January by construction, so the refusal could never
-be cleared by the aggregator catching up, only by the next 1 January.
-Every AIEC entry went dark and a fresh one could not finish setup.
+A card we have not transcribed, or an unreadable operator page, falls
+back to the aggregator dated from the picture. That is the only thing
+that can be done with a number nobody has read yet, and it says so in
+the log. Refusing instead does not work: it was tried, and it took every
+AIEC entry dark while stopping a fresh one from finishing setup.
+
+Transcribing a rate is the one place in this integration where a
+per-distributor number is not fetched. It earns the exception because
+the alternative was measured: the aggregator sat on 2,460 for the five
+months after AIEC moved to 3,050, which under-billed an 80 m3 household
+by 53.16 EUR a year with nothing anywhere to show it.
 
 Sources: https://callmepower.be/fr/eau/distributeurs/aiec
          http://www.eauxducondroz.be/Prix.htm
@@ -63,7 +70,7 @@ import aiohttp
 
 from ..const import REGION_WALLONIA
 from ._html import fetch_html
-from ._walloon_simple import build_extractor
+from ._walloon_simple import build_extractor, build_tariff
 from ._walloon_simple import parse_tariff as _parse_tariff
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
@@ -92,6 +99,41 @@ _CARD_IMAGE_RE = re.compile(
     r"Tarif-(20\d\d)-(\d{1,2})-(\d{1,2})[^\"'>]*\.jpe?g",
     re.IGNORECASE,
 )
+
+
+# The rate each card prints, keyed by the day it took effect, which is
+# the day its picture's file name carries. Read off the picture by hand;
+# add a line when AIEC publishes a new one. A date that is not here is a
+# card nobody has read, and the aggregator stands in for it.
+_TRANSCRIBED_CVD: dict[date, float] = {
+    # "STRUCTURE TARIFAIRE DE L'EAU AU 01/04/2026", CVD: 3,050 EUR. The
+    # same card's own per-inhabitant table (233 / 449 / 665 / 882 / 1.098
+    # / 1.314 / 1.531 EUR) is reproduced to within rounding by this
+    # figure and by no other.
+    date(2026, 4, 1): 3.050,
+}
+
+
+def card_from_operator_page(html: str) -> WaterTariff | None:
+    """The card AIEC's page is showing, when its rate has been transcribed.
+
+    ``None`` when the page shows a card that is not in the table above,
+    which is the caller's cue to fall back to the aggregator.
+    """
+    published = published_card_date(html)
+    if published is None:
+        return None
+    cvd = _TRANSCRIBED_CVD.get(published)
+    if cvd is None:
+        return None
+    return build_tariff(
+        utility_id=UTILITY_ID,
+        cvd=cvd,
+        source_url=OPERATOR_URL,
+        publication_label=f"AIEC tarifs au {published.strftime('%d/%m/%Y')}",
+        year=published.year,
+        valid_from=published,
+    )
 
 
 def published_card_date(html: str) -> date | None:
@@ -146,17 +188,28 @@ def date_against_operator(tariff: WaterTariff, html: str) -> WaterTariff:
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    tariff = await _fetch_aggregator(session)
     try:
         html = await fetch_html(session, OPERATOR_URL)
     except ExtractorError as err:
-        # The operator's page dates the card; it does not carry the rate.
-        # Losing it is worth a log line, not a card already in hand. That
-        # includes a transient blip: eauxducondroz.be is a one-page
-        # plain-HTTP site, and letting its DNS or a 5xx discard a good
-        # fetch made every AIEC entry hostage to it.
-        _LOGGER.info("could not read %s to date the AIEC card: %s", OPERATOR_URL, err)
-        return tariff
+        # eauxducondroz.be is a one-page plain-HTTP site, so a DNS blip or
+        # a 5xx must not take AIEC down with it. Without the page there is
+        # no way to tell which card is on screen, so the aggregator stands
+        # in undated, as it did before any of this existed.
+        _LOGGER.info("could not read %s: %s; serving the aggregator", OPERATOR_URL, err)
+        return await _fetch_aggregator(session)
+    transcribed = card_from_operator_page(html)
+    if transcribed is not None:
+        return transcribed
+    published = published_card_date(html)
+    if published is not None:
+        _LOGGER.warning(
+            "AIEC published a card effective %s whose rate this release does not carry; "
+            "serving %s until it does, which was 53.16 EUR a year short the last time "
+            "the two disagreed",
+            published.isoformat(),
+            SOURCE_URL,
+        )
+    tariff = await _fetch_aggregator(session)
     return date_against_operator(tariff, html)
 
 

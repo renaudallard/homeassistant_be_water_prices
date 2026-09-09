@@ -134,6 +134,19 @@ def _t(b: bytes) -> str:
     return b.decode("utf-8")
 
 
+def _aiec_card(text: str) -> WaterTariff:
+    """The card AIEC's own page shows, refusing one nobody has read.
+
+    AIEC publishes as a picture, so the rate is transcribed against the
+    date the picture's name carries. A page showing a card that is not in
+    that table is exactly what this check exists to report.
+    """
+    card = aiec.card_from_operator_page(text)
+    if card is None:
+        raise ExtractorError("AIEC is showing a card whose rate has not been transcribed")
+    return card
+
+
 # A De Watergroep commune whose gemeentelijke leg differs from the Halle
 # default, so a move in either is visible.
 _SINAAI_GUID = "{C1F2FD07-A370-4AB2-86C8-8CA9B236DFB3}"
@@ -259,9 +272,13 @@ CHECKS: list[FixtureCheck] = [
         lambda s: get("aiem").fetch(s),
     ),
     FixtureCheck(
+        # Against AIEC's own page, not the aggregator's: the aggregator is
+        # only the fallback now, and a move on it would report a drift in
+        # a number nobody is billed on. A new card picture makes this
+        # check fail, which is the signal to read it and add its rate.
         "AIEC",
-        "aiec_callmepower_2026.html",
-        lambda b: aiec.parse_tariff(_t(b), year=2026),
+        "aiec_operator_2026.html",
+        lambda b: _aiec_card(_t(b)),
         lambda s: get("aiec").fetch(s),
     ),
     FixtureCheck(
