@@ -423,21 +423,23 @@ def test_aiec_leaves_a_card_alone_when_the_page_dates_none() -> None:
     assert aiec.date_against_operator(card, "<html></html>").valid_from == date(2026, 1, 1)
 
 
-def test_aiec_keeps_its_card_when_the_operator_page_is_unreachable() -> None:
-    """The page dates the card; it does not carry the rate."""
+def test_aiec_falls_back_when_the_operator_page_has_moved() -> None:
+    """A 404 leaves no way to tell which card is on screen.
+
+    The aggregator's rate is the wrong one today, but a card nobody can
+    date is all there is at that point, and something beats nothing.
+    """
     from unittest.mock import AsyncMock, patch
 
     from custom_components.be_water_prices.providers import aiec
-    from custom_components.be_water_prices.providers.base import TransientFetchError
 
     card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
-    for boom in (TransientFetchError("DNS"), ExtractorError("HTTP 500")):
-        with (
-            patch.object(aiec, "_fetch_aggregator", new=AsyncMock(return_value=card)),
-            patch.object(aiec, "fetch_html", new=AsyncMock(side_effect=boom)),
-        ):
-            got = asyncio.run(aiec.fetch(session=None))  # type: ignore[arg-type]
-        assert got.cvd_eur_per_m3 == 2.46
+    with (
+        patch.object(aiec, "_fetch_aggregator", new=AsyncMock(return_value=card)),
+        patch.object(aiec, "fetch_html", new=AsyncMock(side_effect=ExtractorError("HTTP 404"))),
+    ):
+        got = asyncio.run(aiec.fetch(session=None))  # type: ignore[arg-type]
+    assert got.cvd_eur_per_m3 == 2.46
 
 
 def test_an_anchor_that_matches_twice_takes_the_current_value() -> None:
@@ -599,3 +601,28 @@ def test_the_three_largest_walloon_pages_also_fail_on_a_missing_cva(
     assert without != page, "the mutation did not land"
     with pytest.raises(ExtractorError, match="cannot be checked against it"):
         parsers[parse](without, year=2026)
+
+
+@pytest.mark.asyncio
+async def test_a_blip_on_the_aiec_page_does_not_serve_the_aggregator() -> None:
+    """The rate lives on that page now, so losing it must not go unnoticed.
+
+    Falling back on a blip publishes the aggregator's 2,460 where the
+    operator's card says 3,050, which is 53.16 EUR a year short and looks
+    like an ordinary successful fetch from every angle.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import aiec
+    from custom_components.be_water_prices.providers.base import TransientFetchError
+
+    aggregator = AsyncMock()
+    with (
+        patch.object(
+            aiec, "fetch_html", new=AsyncMock(side_effect=TransientFetchError("HTTP 503"))
+        ),
+        patch.object(aiec, "_fetch_aggregator", new=aggregator),
+        pytest.raises(TransientFetchError),
+    ):
+        await aiec.fetch(object())
+    aggregator.assert_not_awaited()

@@ -72,7 +72,7 @@ from ..const import REGION_WALLONIA
 from ._html import fetch_html
 from ._walloon_simple import build_extractor, build_tariff
 from ._walloon_simple import parse_tariff as _parse_tariff
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -190,12 +190,18 @@ def date_against_operator(tariff: WaterTariff, html: str) -> WaterTariff:
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     try:
         html = await fetch_html(session, OPERATOR_URL)
+    except TransientFetchError:
+        # The rate lives on this page now, so a DNS blip or a 5xx must not
+        # quietly swap it for the aggregator's, which was 53 EUR a year
+        # short the last time the two disagreed. Let it through: an entry
+        # that already has a card keeps serving it behind the ordinary
+        # stale-snapshot machinery, and a fresh one retries.
+        raise
     except ExtractorError as err:
-        # eauxducondroz.be is a one-page plain-HTTP site, so a DNS blip or
-        # a 5xx must not take AIEC down with it. Without the page there is
-        # no way to tell which card is on screen, so the aggregator stands
-        # in undated, as it did before any of this existed.
-        _LOGGER.info("could not read %s: %s; serving the aggregator", OPERATOR_URL, err)
+        # Not a blip: the page has moved or stopped being a page. There is
+        # then no way to tell which card is on screen, and the aggregator
+        # standing in undated is better than nothing at all.
+        _LOGGER.warning("could not read %s: %s; serving %s", OPERATOR_URL, err, SOURCE_URL)
         return await _fetch_aggregator(session)
     transcribed = card_from_operator_page(html)
     if transcribed is not None:
