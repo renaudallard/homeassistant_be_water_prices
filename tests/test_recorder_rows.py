@@ -27,7 +27,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -129,6 +129,43 @@ async def test_a_metered_year_carrying_the_register_as_one_day_is_not_offered() 
         _row(date(2025, 12, 15), change=0.3, state=3000.0, total=50.0),
         _row(date(2026, 6, 1), change=3100.0, state=3100.0, total=3150.0),
         _row(date(2026, 12, 15), change=0.2, state=3100.2, total=3150.2),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        assert await co._recorder_full_year_m3(None, "sensor.m", 2026) is None  # type: ignore[arg-type]
+
+
+async def test_a_year_the_meter_was_away_for_is_still_offered() -> None:
+    """The projection reader has to allow what the year-to-date one does.
+
+    A bucket carries the absence before it, so refusing the day a meter
+    comes back refuses the whole year with it. The household then keeps
+    whatever consumption it typed at setup: at the 80 m3 default against a
+    real 364, the projected cost understates by 4012 EUR on a Farys card.
+    """
+    rows = [_row(date(2025, 12, 20), change=1.0, state=900.0, total=800.0)]
+    register, running = 901.0, 801.0
+    day = date(2026, 1, 1)
+    while day <= date(2026, 12, 31):
+        if date(2026, 1, 5) <= day < date(2026, 4, 20):
+            day += timedelta(days=1)  # away, so no bucket of its own
+            continue
+        change = 105.0 if day == date(2026, 4, 20) else 1.0
+        register += change
+        running += change
+        rows.append(_row(day, change=change, state=register, total=running))
+        day += timedelta(days=1)
+
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_full_year_m3(None, "sensor.m", 2026)  # type: ignore[arg-type]
+    assert total == 364.0
+
+
+async def test_a_register_carrying_its_own_total_is_refused_however_long_the_gap() -> None:
+    """The room a gap buys is a household's, so the teeth are still there."""
+    rows = [
+        _row(date(2025, 12, 20), change=1.0, state=900.0, total=800.0),
+        _row(date(2026, 6, 1), change=3100.0, state=5000.0, total=3900.0),
+        _row(date(2026, 12, 15), change=0.2, state=5000.2, total=3900.2),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await co._recorder_full_year_m3(None, "sensor.m", 2026) is None  # type: ignore[arg-type]

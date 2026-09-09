@@ -2228,10 +2228,17 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
     into_december = False
     days = 0
     total = 0.0
+    # The day before the window, so its first bucket counts as following on.
+    # Kept across the December rows as well: a bucket on 20 December says the
+    # meter was reporting then, which is what makes the gap to the next one
+    # measurable at all.
+    previous = dt_util.start_of_local_day(date(year - 1, 12, 1)).timestamp() - _SECONDS_PER_DAY
     for row in rows:
         bucket = row.get("start")
         if bucket is None:
             continue
+        gap_days = max(0.0, (bucket - previous) / _SECONDS_PER_DAY - 1.0)
+        previous = bucket
         if bucket < jan1:
             before_year = True
             continue
@@ -2248,7 +2255,7 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
             # The same reset arithmetic as above; a year that carries the
             # whole register as one day's water is not a year to offer.
             return None
-        if _exceeds_a_day(float(delta), entity_id, "full-year"):
+        if _exceeds_a_day(float(delta), entity_id, "full-year", gap_days):
             # _change_exceeds_the_register is a shape test and by
             # construction only catches a same-day reset: a counter
             # re-based onto the real meter reading leaves a bucket whose
