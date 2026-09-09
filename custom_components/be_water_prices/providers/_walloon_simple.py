@@ -38,9 +38,13 @@ CVA and FSE are the SPGE flat-Wallonia constants and come from
 :mod:`const`. The redevance is materialised at parse time from the
 regulator-defined ``20·CVD + 30·CVA`` formula.
 
-IEG and AIEM expose their CVD on the operator's own site; AIEC,
-CIESAC and IDEN don't carry the number on their official pages so
-they pull from Callmepower's public aggregator listing instead.
+IEG, AIEM and IDEN expose their CVD on the operator's own site. AIEC
+publishes its card as a picture, so :mod:`aiec` reads the picture's date
+and serves the rate transcribed against it. CIESAC's site has answered
+ERR_UPDATING_SERVER for months, which leaves Callmepower's public
+aggregator listing as the only source for it, and an unverified one: two
+of the three cards that aggregator used to supply here were found wrong
+on 2026-09-08.
 """
 
 from __future__ import annotations

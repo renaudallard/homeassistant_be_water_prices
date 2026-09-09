@@ -81,13 +81,13 @@ COMMUNE_LIST_URL = "https://www.dewatergroep.be/nl-be/drinkwater/tarieven"
 COMMUNE_DETAIL_URL_FMT = "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/{year}"
 
 # Default commune for the no-commune fallback. Halle (postcode 1500) is
-# a representative DWG-served commune in Vlaams-Brabant; we use it
-# because the cookie-driven endpoint returns the *full* integrale
-# waterprijs (drinkwater + gemeentelijke + bovengemeentelijke) where
-# the news-article path only has the drinkwater leg. Saneringsbijdragen
-# in Flanders vary by commune, so this still under- or over-estimates
-# slightly for users who don't pick their commune in OptionsFlow, but
-# the average error is ~25 EUR/year vs. the news article's ~200 EUR.
+# a representative DWG-served commune in Vlaams-Brabant, and the
+# cookie-driven endpoint returns the full integrale waterprijs there
+# (drinkwater + gemeentelijke + bovengemeentelijke). Saneringsbijdragen
+# in Flanders vary by commune, so it still under- or over-estimates for
+# a household that never picks its own: measured across all 699 commune
+# pages the mean error is 0.43 EUR a year and the worst real case 58.65
+# (Overijse, gemeentelijke 1,4039).
 _DEFAULT_COMMUNE_GUID = "{B16A143A-49E6-4CE5-A241-1AA09BFC406A}"
 _DEFAULT_COMMUNE_LABEL = "Halle (DWG-served default)"
 
