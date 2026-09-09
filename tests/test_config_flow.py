@@ -329,8 +329,14 @@ def test_water_link_2070_is_offered_its_own_commune_not_antwerpen() -> None:
 
     assert _resolve_postcode("2070") == "water_link"
     assert _commune_for_postcode("water_link", "2070") == "Beveren-Kruibeke-Zwijndrecht"
-    # The city core keeps the operator default.
+    # The three ring communes have a row of their own, at the same rate.
+    assert _commune_for_postcode("water_link", "2540") == "Hove"
+    assert _commune_for_postcode("water_link", "2640") == "Mortsel"
+    assert _commune_for_postcode("water_link", "2650") == "Edegem"
+    # The city keeps the operator default: the card bills every district
+    # on the Antwerpen row.
     assert _commune_for_postcode("water_link", "2000") is None
+    assert _commune_for_postcode("water_link", "2100") is None
     # Operators that say nothing about postcodes are unaffected.
     assert _commune_for_postcode("farys", "9000") is None
     assert _commune_for_postcode("water_link", None) is None
@@ -361,6 +367,40 @@ def test_the_three_pidpa_communes_off_the_default_rate_are_pre_selected() -> Non
         assert _commune_for_postcode("pidpa", postcode) == slug
     # A commune that really is on the default rate is left alone.
     assert _commune_for_postcode("pidpa", "2440") is None
+
+
+def test_every_water_link_postcode_commune_is_on_its_card() -> None:
+    """A pre-selected commune the card does not carry would fail to parse."""
+    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
+    from custom_components.be_water_prices.providers.water_link import (
+        _POSTCODE_COMMUNES,
+        _parse_commune_lines,
+    )
+    from tests import fixture_bytes
+
+    on_the_card = {
+        c.id
+        for c in _parse_commune_lines(extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf")))
+    }
+    assert set(_POSTCODE_COMMUNES.values()) <= on_the_card, sorted(
+        set(_POSTCODE_COMMUNES.values()) - on_the_card
+    )
+
+
+def test_the_ring_communes_are_billed_above_the_antwerpen_row() -> None:
+    """Hove, Mortsel and Edegem pay the ring afvoer, not the city's."""
+    from custom_components.be_water_prices.pricing import compute_annual_cost
+    from custom_components.be_water_prices.providers._pdf import extract_pdf_text_layout
+    from custom_components.be_water_prices.providers.water_link import parse_tariff
+    from tests import fixture_bytes
+
+    text = extract_pdf_text_layout(fixture_bytes("water_link_2026.pdf"))
+    antwerpen = compute_annual_cost(parse_tariff(text, year=2026, commune="Antwerpen"), 80, 1)
+    assert antwerpen is not None
+    for commune in ("Hove", "Mortsel", "Edegem"):
+        ring = compute_annual_cost(parse_tariff(text, year=2026, commune=commune), 80, 1)
+        assert ring is not None
+        assert round(ring - antwerpen, 2) == 66.01, commune
 
 
 def test_the_city_of_antwerp_is_water_link_not_pidpa() -> None:

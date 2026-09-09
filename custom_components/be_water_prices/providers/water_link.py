@@ -122,6 +122,13 @@ _DEFAULT_COMMUNE = "Antwerpen"
 # year on an 80 m3 household that left the commune dropdown alone.
 _POSTCODE_COMMUNES: dict[str, str] = {
     "2070": "Beveren-Kruibeke-Zwijndrecht",
+    # Hove, Mortsel and Edegem are communes of their own with a row of
+    # their own, all three at the ring rate. The nine city-district
+    # postcodes above 2070 need no entry: the card bills the whole city
+    # on the Antwerpen row, which is the default.
+    "2540": "Hove",
+    "2640": "Mortsel",
+    "2650": "Edegem",
 }
 
 
