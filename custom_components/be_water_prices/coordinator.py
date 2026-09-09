@@ -427,8 +427,8 @@ def _fold(
     # the household actually lives in all lower the bill for the rest of
     # the year, and clamping those to a figure measured under the old
     # answer published 437.56 EUR where 87.51 was owed. A cheaper card is
-    # not in that set and is still clamped. Consumption is unaffected: the
-    # m3 mark is monotonic whatever the rates do.
+    # not in that set and is still clamped. Consumption is unaffected: no
+    # rate has any say in the m3 mark.
     floor = cycle.cost if current and cycle.basis == basis else None
     offset = cycle.offset_m3 if current else None
     recorder_hwm = cycle.recorder_hwm if current else None
@@ -594,9 +594,10 @@ def _fold(
             else:
                 # The live path never carries a recorder answer, so this
                 # was the branch that billed the whole of a re-based
-                # register: 1012.85 m3 where 12.8 was owed, and the mark
-                # only climbs, so it stood until January. Publish nothing
-                # and put the question to the recorder on the next tick.
+                # register: 1012.85 m3 where 12.8 was owed, and nothing but
+                # the recorder can take a mark back, so it stood until
+                # January. Publish nothing and put the question to the
+                # recorder on the next tick.
                 arbitrate = True
             hold_m3 = None
         elif corroborated:
@@ -605,10 +606,11 @@ def _fold(
             hold_m3 = None
         elif mark is not None and framed - mark > step_bound:
             # A step this large in one report is a garbage value far more
-            # often than real usage, and the mark only ever climbs, so taking
-            # it would pin the year until January. Hold it for one reading: a
-            # meter really sitting there repeats the jump, while a spike is
-            # followed by normal values.
+            # often than real usage, and only the recorder can take the mark
+            # back down, so taking it would pin the year on a household whose
+            # recorder never speaks. Hold it for one reading: a meter really
+            # sitting there repeats the jump, while a spike is followed by
+            # normal values.
             hold_m3 = reading
         else:
             candidate = framed
@@ -736,10 +738,11 @@ def _fold(
     cost = cost_of(published)
     if cost is not None:
         if floor is not None and cost < floor:
-            # Consumption is monotonic by construction, but the bill is
-            # recomputed each tick from a freshly fetched tariff and an
-            # elapsed-day fraction, so it needs the same floor to stop a
-            # lower tariff or a backward clock step publishing a decrease.
+            # Consumption comes down only where the recorder has corrected
+            # it, and that path drops the floor itself. The bill is recomputed
+            # each tick from a freshly fetched tariff and an elapsed-day
+            # fraction, so it needs this floor of its own to stop a lower
+            # tariff or a backward clock step publishing a decrease.
             cost = floor
         else:
             floor = cost
@@ -1296,8 +1299,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def async_load_ytd_state(self) -> None:
         """Restore the persisted YTD cycle before the first refresh.
 
-        Restoring it across restarts is what keeps the running cost
-        monotonic: without it every restart re-derived the year from the
+        Restoring it across restarts is what stops the running cost
+        falling back: without it every restart re-derived the year from the
         recorder's trailing daily total and snapped the published figure
         downward.
 
@@ -1413,8 +1416,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         The recorder is consulted only when the cycle cannot answer on its
         own: no frame for this year, or no reading to put through it. From
-        there the live meter drives, and :func:`_fold` keeps the figure
-        monotonic.
+        there the live meter drives, and :func:`_fold` decides what the year
+        publishes.
 
         Returns ``(ytd_m3, ytd_cost_eur)``; both ``None`` when no meter is
         configured or nothing is known about this year yet.
@@ -1656,7 +1659,8 @@ def _cost_basis(*, utility: str, commune: str | None, persons: int, social: bool
     the rates would defeat it, so the version stands in: an upgrade
     rebuilds the floor once, and a correction reaches the running bill the
     day it ships rather than in January. Rebuilding is safe because the m3
-    mark is monotonic on its own, so the recomputed cost can only come out
+    mark comes down only where the recorder has corrected it, and that path
+    drops the floor as it goes, so the recomputed cost can only come out
     lower when the rates really are.
     """
     return "|".join(
