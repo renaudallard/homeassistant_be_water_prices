@@ -1109,3 +1109,38 @@ def test_a_meter_recovering_after_a_swap_waits_for_the_recorder() -> None:
     # The tick arrives with what the meter's own statistics say.
     out = _round(cycle, reading=1040.7, recorder_m3=40.3, hold_m3=hold_m3, high_m3=high_m3)
     assert out.m3 == 40.3
+
+
+def test_a_frame_rebuilt_from_below_asks_the_recorder_too() -> None:
+    """The sibling of the swap branch armed nothing at all.
+
+    A sustained run of low readings that still sit above what the year
+    has used rebuilds the frame under them rather than restarting the
+    year. The rebuilt frame reproduces the figure already standing, so
+    the stale-frame gate is satisfied the moment it is built and the
+    recorder was never asked again.
+    """
+    cycle = _anchored(40.3, 1000.0)
+    hold_run = 0
+    hold_span_s = 0.0
+    run_m3: float | None = None
+    out = None
+    for reading, elapsed_s in ((500.0, 400.0), (500.1, 400.0), (500.2, 400.0)):
+        out = _round(
+            cycle,
+            reading=reading,
+            hold_run=hold_run,
+            hold_span_s=hold_span_s,
+            run_m3=run_m3,
+            elapsed_s=elapsed_s,
+            high_m3=1040.3,
+            recorder_ok=None,
+        )
+        cycle = out.cycle
+        hold_run, hold_span_s, run_m3 = out.hold_run, out.hold_span_s, out.run_m3
+
+    assert out is not None
+    assert out.swapped is False  # the year did not restart
+    assert out.m3 == 40.3  # and it publishes what it already published
+    assert out.cycle.offset_m3 == 500.2 - 40.3  # the frame came down to the meter
+    assert out.arbitrate is True

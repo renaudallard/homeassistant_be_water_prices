@@ -447,6 +447,14 @@ def _fold(
                 # publishes what it already published; the recorder answer is
                 # kept, because it is still about this meter.
                 offset = reading - base
+                # Ask the recorder on the next tick, as the swap below
+                # does. A frame rebuilt this way reproduces the figure
+                # already standing, so the stale-frame gate in
+                # _compute_ytd is satisfied from the moment it is built
+                # and nothing would ever query again: a run of low
+                # readings that was really a dropout left the year on a
+                # frame nobody could check, 540.23 m3 against 40.30.
+                arbitrate = True
                 hold_m3 = None
                 hold_run = 0
                 hold_span_s = 0.0
