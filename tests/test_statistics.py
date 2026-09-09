@@ -583,3 +583,58 @@ async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
         await async_maybe_backfill_once(hass, entry)
     assert second.await_count == 1
     assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year}"
+
+
+async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
+    hass: HomeAssistant,
+) -> None:
+    """The gate carries the card's year, and only setup ever consulted it.
+
+    Publishers run late and last year's card stands until 31 March, so
+    January's flat line goes in at last year's rate. An install that does
+    not restart between January and the new card landing kept it.
+    """
+    from datetime import date
+
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+
+    calls: list[str] = []
+    card_year = 2025
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return WaterTariff(
+            utility="vivaqua",
+            region="brussels",
+            valid_from=date(card_year, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label=f"VIVAQUA {card_year}",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=40.0,
+            linear_eur_per_m3=2.0,
+        )
+
+    entry = _entry(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+
+    async def _backfill(*_a: Any, **_k: Any) -> None:
+        calls.append("backfill")
+
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.statistics.async_maybe_backfill_once",
+            new=_backfill,
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        # Setup ran it once; the first refresh inside setup must not.
+        assert calls == ["backfill"], calls
+
+        # The operator finally publishes, and the daily tick picks it up.
+        card_year = 2026
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    assert calls == ["backfill", "backfill"], calls

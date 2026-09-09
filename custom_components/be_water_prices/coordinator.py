@@ -807,7 +807,37 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         )
         self._last_good = data
         self._sync_repair_issue(data)
+        if self.entry.state is ConfigEntryState.LOADED and self._owns_the_entry():
+            # Only once the entry is up. The first refresh runs inside
+            # setup, which calls the backfill itself a few lines later,
+            # and doing it here as well would stamp the gate mid-setup and
+            # reload the entry out from under it.
+            #
+            # Scheduled rather than awaited: an await between the fold
+            # above and this return is the window a live meter event uses
+            # to publish a higher figure that the locals here would then
+            # overwrite with a lower one.
+            self.hass.async_create_task(self._async_rewrite_price_history())
         return data
+
+    async def _async_rewrite_price_history(self) -> None:
+        """Re-run the auto-once price backfill when its gate has moved.
+
+        The gate carries the year of the card the rates came off, so it
+        trips when a publisher that ran late finally puts the new one up
+        and January's flat line can be rewritten at the rate that really
+        applied. Only entry setup consulted it, so an install that has not
+        restarted between January and the card landing kept the old line.
+
+        Cheap on every other day: the gate matches and the call returns
+        having touched nothing.
+        """
+        from .statistics import async_maybe_backfill_once
+
+        try:
+            await async_maybe_backfill_once(self.hass, self.entry)
+        except Exception:
+            _LOGGER.exception("could not rewrite the price history for %s", self.entry.entry_id)
 
     @staticmethod
     def _age_hours(fetched_at: datetime) -> float:

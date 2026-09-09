@@ -499,7 +499,8 @@ and the Energy dashboard's tariff overlays. A fresh entry has no
 historical statistics, so the line normally starts at the install
 moment.
 
-On every first setup of a calendar year, the integration imports
+On the first setup of a calendar year, and on any later daily tick that
+finds the gate below has moved, the integration imports
 hourly flat-line rows from **1 January of the current year up to the
 previous full hour** for the five flat-line price sensors on the entry
 (`yearly_fixed_fee`, `basis_rate`, `comfort_rate` on Flemish entries,
@@ -514,7 +515,9 @@ of the card the rates came off. It trips when any of the three changes,
 so the line extends into a new year, follows an operator change, and is
 rewritten once your utility finally publishes the new card: publishers
 run late, last year's card stands until 31 March, and without the card
-year in the gate January's line kept last year's rate for good. If the
+year in the gate January's line kept last year's rate for good. The
+daily tick checks the gate too, so an install that never restarts
+between January and the card landing still gets the rewrite. If the
 snapshot is stale it waits instead, so a year is never filled in with
 rates that had already expired. The window also stops at the tariff's own
 `valid_until`. The YTD sensors
