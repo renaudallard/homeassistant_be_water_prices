@@ -288,6 +288,14 @@ def _adopt_commune_for_postcode(hass: HomeAssistant, entry: ConfigEntry) -> None
     if commune is None:
         return
     hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_COMMUNE: commune})
+    # Say so, for the same reason the drop above does: the bill moves and
+    # nothing else on the entry explains why. The commune itself stays out
+    # of the log, as it does everywhere else.
+    _LOGGER.info(
+        "%s: this postcode is billed on a commune card other than the operator default; "
+        "using it. Pick a commune in the options to override",
+        get_extractor(entry.data.get(CONF_UTILITY, "")).label,
+    )
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
