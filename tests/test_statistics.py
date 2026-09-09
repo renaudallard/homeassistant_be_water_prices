@@ -472,7 +472,7 @@ async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: Home
         title="VIVAQUA",
         data={
             CONF_UTILITY: "vivaqua",
-            DATA_BACKFILL_YEAR: f"{dt_util.now().year}:vivaqua:None",
+            DATA_BACKFILL_YEAR: f"{dt_util.now().year}:vivaqua:None:None",
         },
         options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
         unique_id=f"{DOMAIN}_vivaqua",
@@ -484,6 +484,67 @@ async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: Home
     ) as backfill:
         await async_maybe_backfill_once(hass, entry)
     backfill.assert_not_awaited()
+
+
+async def test_picking_a_commune_rewrites_the_price_line(hass: HomeAssistant) -> None:
+    """Several of the sensors this writes are made of the commune.
+
+    The gemeentelijke saneringsbijdrage is a commune's own number, so
+    sanering_rate and all_in_basis move with it. A household that installs,
+    gets the operator default flat-lined and then picks its own commune
+    kept the default's rates in History until January: 0.59 EUR/m3 out on
+    De Watergroep at Overijse, 0.66 on Water-link at Edegem.
+    """
+    from custom_components.be_water_prices.const import CONF_COMMUNE
+    from custom_components.be_water_prices.statistics import (
+        DATA_BACKFILL_YEAR,
+        async_maybe_backfill_once,
+    )
+
+    year = dt_util.now().year
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="De Watergroep",
+        data={
+            CONF_UTILITY: "de_watergroep",
+            DATA_BACKFILL_YEAR: f"{year}:de_watergroep:None:None",
+        },
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_de_watergroep",
+    )
+    entry.add_to_hass(hass)
+
+    # Nothing has changed yet, so nothing is rewritten.
+    with patch(
+        "custom_components.be_water_prices.statistics.async_backfill_prices",
+        new=AsyncMock(return_value=0),
+    ) as untouched:
+        await async_maybe_backfill_once(hass, entry)
+    untouched.assert_not_awaited()
+
+    # The household picks its commune.
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_COMMUNE: "{A-GUID}"}
+    )
+    with (
+        patch(
+            "custom_components.be_water_prices.statistics._async_clear_orphan_backfill_keys",
+            new=AsyncMock(),
+        ) as clear,
+        patch(
+            "custom_components.be_water_prices.statistics.async_backfill_prices",
+            new=AsyncMock(return_value=99),
+        ) as rewritten,
+    ):
+        await async_maybe_backfill_once(hass, entry)
+    rewritten.assert_awaited_once()
+    assert entry.data[DATA_BACKFILL_YEAR] == f"{year}:de_watergroep:None:{{A-GUID}}"
+
+    # The operator has not changed, so there are no orphaned rows to sweep.
+    # This is also what pins the utility to the second field: every term
+    # since has been appended, and reading the gate from the other end
+    # would take the commune for the operator on every entry that has one.
+    clear.assert_not_awaited()
 
 
 async def test_an_unreadable_history_counts_as_history(hass: HomeAssistant) -> None:
@@ -571,7 +632,7 @@ async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
     ) as first:
         await async_maybe_backfill_once(hass, entry)
     assert first.await_count == 1
-    assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year - 1}"
+    assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year - 1}:None"
 
     # March: the operator publishes this year's card. The line has to be
     # rewritten at the rate that actually applied from 1 January.
@@ -582,7 +643,7 @@ async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
     ) as second:
         await async_maybe_backfill_once(hass, entry)
     assert second.await_count == 1
-    assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year}"
+    assert entry.data[DATA_BACKFILL_YEAR] == f"{now_year}:vivaqua:{now_year}:None"
 
 
 async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(

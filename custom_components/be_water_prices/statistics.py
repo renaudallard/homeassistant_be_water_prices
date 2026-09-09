@@ -358,7 +358,7 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     gate trips again and the fresh flat line replaces the old one rather
     than mixing rates inside the same calendar year.
     """
-    from .const import CONF_UTILITY
+    from .const import CONF_COMMUNE, CONF_UTILITY
 
     coordinator_now: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     current_year = dt_util.now().year
@@ -373,7 +373,16 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
         if coordinator_now is not None and coordinator_now.data is not None
         else None
     )
-    current_gate = f"{current_year}:{current_utility}:{card_year}"
+    # The commune belongs here too. Several of the sensors this writes are
+    # made of it: the gemeentelijke saneringsbijdrage is a commune's own
+    # number, so sanering_rate and all_in_basis move with it. A household
+    # that installs, gets the operator default flat-lined, and then picks
+    # its own commune kept the default's rates in History for the rest of
+    # the year, 0.59 EUR/m3 out on De Watergroep at Overijse and 0.66 on
+    # Water-link at Edegem. Appended rather than inserted: the orphan
+    # cleanup below reads the utility out of field one.
+    current_commune = entry.options.get(CONF_COMMUNE)
+    current_gate = f"{current_year}:{current_utility}:{card_year}:{current_commune}"
     previous_gate = entry.data.get(DATA_BACKFILL_YEAR)
     if previous_gate == current_gate:
         return
@@ -389,9 +398,10 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     # the registry entry that setup removes right after this, so a
     # deferred cleanup never got a second chance.
     if isinstance(previous_gate, str) and ":" in previous_gate:
-        # "<year>:<utility>" before the card year joined it, "<year>:
-        # <utility>:<card year>" after, and a utility id never contains a
-        # colon, so the second field is the utility either way.
+        # "<year>:<utility>" first, then the card year joined it, then the
+        # commune. A utility id never contains a colon and every term since
+        # has been appended, so the second field is the utility whichever
+        # release wrote the string.
         previous_utility = previous_gate.split(":")[1]
         if previous_utility != str(current_utility):
             await _async_clear_orphan_backfill_keys(hass, entry)
