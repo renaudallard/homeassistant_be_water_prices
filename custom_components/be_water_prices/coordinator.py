@@ -215,13 +215,16 @@ def _migrate_cycle_to_v2(old: dict[str, Any]) -> dict[str, Any]:
         kept: dict[str, Any] = {
             key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")
         }
-        if "basis" in old:
+        for key in ("basis", "recorder_hwm", "unrecorded"):
             # Carried when it is there, and not invented when it is not.
-            # Rebuilding the dict without it dropped the floor's own
-            # provenance on every rollback-and-upgrade; adding it as None
-            # to a record that predates it would make this migration
-            # rewrite a record it is meant to hand back untouched.
-            kept["basis"] = old["basis"]
+            # Rebuilding the dict without a key dropped it on every
+            # rollback-and-upgrade: the floor lost its own provenance, and
+            # the year lost what the recorder had reported for it. Adding
+            # one as None to a record that predates it would make this
+            # migration rewrite a record it is meant to hand back
+            # untouched. Anything added to the record belongs on this list.
+            if key in old:
+                kept[key] = old[key]
         return kept
     anchor_year = old.get("year")
     offset = old.get("baseline_m3")

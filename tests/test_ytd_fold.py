@@ -883,6 +883,12 @@ def test_migrating_a_record_that_is_already_current_changes_nothing() -> None:
     assert _migrate_cycle_to_v2(current) == current
     assert _migrate_cycle_to_v2(_migrate_cycle_to_v2(current)) == current
 
+    # Every key the record has grown since, or the rollback loses it and
+    # the year comes back without what the recorder had reported for it.
+    full = {**current, "basis": "b", "recorder_hwm": 49.5, "unrecorded": True}
+
+    assert _migrate_cycle_to_v2(full) == full
+
 
 def test_a_migrated_record_loads_as_a_cycle() -> None:
     """The migration's keys are the ones async_load_ytd_state reads."""
