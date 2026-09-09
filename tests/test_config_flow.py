@@ -403,6 +403,30 @@ def test_the_ring_communes_are_billed_above_the_antwerpen_row() -> None:
         assert round(ring - antwerpen, 2) == 66.01, commune
 
 
+def test_a_secondary_postcode_follows_its_commune_not_the_range() -> None:
+    """Neither dropdown names these five, but both name their commune.
+
+    The carve-outs are a postcode-exact difference of the two commune
+    dropdowns, so a commune's second postcode falls to the range default,
+    which is the other operator.
+    """
+    assert _resolve_postcode("1733") == "farys"  # Asse, listed under 1730
+    assert _resolve_postcode("1931") == "farys"  # Machelen, listed under 1831
+    assert _resolve_postcode("1934") == "farys"
+    assert _resolve_postcode("1935") == "farys"  # Zaventem, listed under 1930
+    assert _resolve_postcode("9451") == "de_watergroep"  # Haaltert, under 9450
+    # The postcodes the dropdowns do name are unaffected.
+    assert _resolve_postcode("1730") == "farys"
+    assert _resolve_postcode("9450") == "de_watergroep"
+
+
+def test_a_secondary_postcode_lands_on_its_commune_card() -> None:
+    """1935 is Zaventem, whose card is not the Farys default."""
+    from custom_components.be_water_prices.config_flow import _commune_for_postcode
+
+    assert _commune_for_postcode("farys", "1935") == "25926"
+
+
 def test_the_city_of_antwerp_is_water_link_not_pidpa() -> None:
     """Every district above the 2000-2070 block, plus three ring communes.
 

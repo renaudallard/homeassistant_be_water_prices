@@ -901,8 +901,28 @@ def resolve_candidates(postcode: str | None) -> tuple[str, ...]:
     return (single,) if single else ()
 
 
+# Postcodes neither operator's commune dropdown names, resolved by the
+# commune that dropdown does name. The two carve-out sets above are a
+# postcode-exact set difference of the two dropdowns, so a secondary
+# postcode of a commune one of them serves is invisible to that
+# computation and falls through to the range default below, which is the
+# other operator. Kept out of the generated sets so re-running
+# scripts/refresh_postcodes.py does not drop them again.
+_SECONDARY_POSTCODES: dict[int, str] = {
+    1733: "farys",  # Asse; Farys lists Asse under 1730 and 1731
+    1931: "farys",  # Machelen (Diegem); Farys lists it under 1831
+    1934: "farys",  # Machelen (Diegem), likewise
+    1935: "farys",  # Zaventem; Farys lists it under 1930
+    9451: "de_watergroep",  # Haaltert (Kerksken); DWG lists it under 9450
+}
+
+
 def _resolve_single(code: int) -> str | None:
     """Range / table-based resolution for non-split postcodes."""
+    # Before every range rule: these are the postcodes the ranges get
+    # wrong, and none of them appears in any other table here.
+    if code in _SECONDARY_POSTCODES:
+        return _SECONDARY_POSTCODES[code]
     # Brussels.
     if 1000 <= code <= 1299:
         return "vivaqua"

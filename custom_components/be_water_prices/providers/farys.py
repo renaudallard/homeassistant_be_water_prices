@@ -102,6 +102,7 @@ _POSTCODE_COMMUNES: dict[str, str] = {
     "1930": "25926",  # Zaventem (and Nossegem)
     "1932": "25931",  # Sint-Stevens-Woluwe
     "1933": "25936",  # Sterrebeek
+    "1935": "25926",  # Zaventem, which Farys lists under 1930
 }
 
 

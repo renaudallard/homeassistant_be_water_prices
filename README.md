@@ -105,6 +105,7 @@ dominant operator for that area:
 | 1000-1299 | Brussels-Capital | VIVAQUA |
 | 1500-1999 (17 Farys-served postcodes) | Halle-Vilvoorde (Beersel, Asse, Zaventem, Machelen, Drogenbos, etc.) | Farys |
 | 1500-1999, 3000-3999 (rest) | Vlaams-Brabant + Halle-Vilvoorde + Limburg | De Watergroep |
+| 1733, 1931, 1934, 1935, 9451 | secondary postcodes of a commune the other operator serves (Asse, Machelen, Zaventem, Haaltert) | the operator whose dropdown names that commune, since neither names the postcode itself |
 | 2000-2070 | Antwerp city core | Water-link |
 | 2099, 2100, 2140, 2150, 2170, 2180, 2600, 2610, 2660 | the city of Antwerp's other districts (Deurne, Borgerhout, Borsbeek, Merksem, Ekeren, Berchem, Wilrijk, Hoboken) | Water-link |
 | 2540, 2640, 2650 | Hove, Mortsel, Edegem: ring communes with a billing row of their own on Water-link's card | Water-link |
