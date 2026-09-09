@@ -568,14 +568,14 @@ when reporting an issue.
   endpoint with Halle's GUID (postcode 1500) and returns the full
   integrale waterprijs there. Saneringsbijdragen vary by commune in
   Flanders, so the result still under- or over-estimates slightly for
-  users in other communes (typically off by tens of EUR/year vs ~200
-  EUR/year before). Pick your commune in the OptionsFlow for exact
-  numbers. If the cookie endpoint fails for this year and for last
-  year the integration falls back to the news-article snapshot
-  (drinkwater leg only) so it never goes completely dark. That article
-  is also less reliable than the
-  endpoint: its 2026 figure (2,9521 €/m³) disagrees with the 2,9251
-  the tariff pages publish.
+  users in other communes. Measured across all 699 commune pages the
+  mean error is € 0,43/year and the worst real case € 58,65 (Overijse,
+  gemeentelijke 1,4039). Pick your commune in the OptionsFlow for exact
+  numbers. There is no fallback under the cookie endpoint: the
+  news-article snapshot used to be one, it carries the drinkwater leg
+  alone, and it disagrees with the tariff pages anyway (2,9521 €/m³
+  against 2,9251). If the endpoint cannot be read the last good
+  snapshot keeps serving behind the stale-snapshot Repair.
 - **Aquaduin's January fallback depends on last year's page.** When the
   new year's tariff page is not up yet, the extractor reads the PDF
   link off last year's page, and Aquaduin strips that link once a year
@@ -583,23 +583,42 @@ when reporting an issue.
   is already gone when the new page is late, the fetch fails and the
   cached card keeps serving with the stale-snapshot Repair up until the
   new card is published.
-- **Pidpa falls back to the May-2024 Tariefplan PDF** when the default
-  commune page cannot be read. That PDF is a projection: its drinkwater
-  column was never indexed and its saneringsbijdragen are frozen at
-  2024, so its 2026 column sits about 14 % under the published rate
-  (606 vs 705 EUR/year at 80 m³ for one resident). The fallback logs a
-  warning and labels the snapshot `Tariefplan 2025-2030`. It was the
-  default up to v0.7.3, and the weekly drift check could not see the
-  gap because the PDF never changes. Pidpa charges the same rate in
-  every commune, so the Geel default is exact; the OptionsFlow exposes
-  the full sitemap-derived commune list anyway in case Pidpa starts
-  varying rates per commune.
+- **Pidpa's default commune page has nothing under it either.** The
+  May-2024 Tariefplan PDF used to stand in when the page could not be
+  read; it is a projection whose drinkwater column was never indexed
+  and whose saneringsbijdragen are frozen at 2024, so its 2026 column
+  sits about 14 % under the published rate (606 vs 705 EUR/year at
+  80 m³ for one resident). A card that short is worse than none, so an
+  unreadable page now leaves the last good snapshot in place. The
+  weekly drift check still parses the PDF against itself. **Pidpa does
+  not charge one rate province-wide**: Nijlen, Wommelgem and Kasterlee
+  publish a lower gemeentelijke saneringsbijdrage than the other 60
+  communes, and their postcodes are pre-selected for you. Anywhere else
+  in the province the Geel default is the rate you pay.
 - **Mid-year tariff revisions are billed for the whole year.** A
   snapshot carries one rate and the previous one is not published, so
-  when a utility changes a rate mid-year (INASEP moved its CVD on
-  27 April 2026) the year-to-date cost bills the whole year's volume at
-  the current rate. The tariff's `valid_from` attribute and the price
-  backfill do follow the published date.
+  when a utility changes a rate mid-year the year-to-date cost bills
+  the whole year's volume at the current rate. INASEP moved its CVD
+  from 2,9952 to 3,6734 on 27 April 2026, which is € 13,71/year too
+  much on an 80 m³ bill and € 28,05 at 150 m³. Pricing the two periods
+  apart would need the superseded rate, which no page publishes and a
+  fresh install has never seen. The tariff's `valid_from` attribute and
+  the price backfill do follow the published date.
+- **Consumption above the tranches the engine models is not the
+  operator's tariff.** The Walloon branch prices the CWaPE residential
+  structure up to `0.9·CVD` above 5 000 m³. SWDE publishes a further
+  `0.7·CVD` above 25 000 m³ and CILE 85 / 80 / 70 % above 50 000, and
+  neither figure is on the page the extractor reads. No household meter
+  reaches those volumes; a building-wide meter that does is on a
+  professional tariff with a different redevance and a meter-diameter
+  charge, so the card we hold is the wrong card for it either way.
+- **The decreed constants are only as current as the release.** When
+  CWaPE moves the CVA on 1 January, every Walloon household is billed
+  on last year's figure until a release carries the new one. The
+  operators' own pages lag too (INASEP still printed the 2025 CVA on
+  day 117 of 2026), so they cannot be used to detect the move: reading
+  the CVA off the page instead of the constant is the fail-open this
+  integration deliberately rejects.
 - **Wallonia régies communales** (~30 small operators -- Chimay,
   Theux, Libramont, ...) are deferred indefinitely. They have no
   central publication channel and the dev-hours / customer ratio
