@@ -97,14 +97,29 @@ def _round(
     )
 
 
-def _anchored(m3: float, offset_m3: float, cost: float | None = None) -> _YtdCycle:
+def _anchored(
+    m3: float,
+    offset_m3: float,
+    cost: float | None = None,
+    recorder_hwm: float | None = None,
+) -> _YtdCycle:
     """A cycle tracking the live meter: a figure and the frame behind it."""
-    return _YtdCycle(meter=_METER, year=_YEAR, m3=m3, cost=cost, offset_m3=offset_m3, basis=_BASIS)
+    return _YtdCycle(
+        meter=_METER,
+        year=_YEAR,
+        m3=m3,
+        cost=cost,
+        offset_m3=offset_m3,
+        basis=_BASIS,
+        recorder_hwm=recorder_hwm,
+    )
 
 
-def _served(m3: float, cost: float | None = None) -> _YtdCycle:
+def _served(m3: float, cost: float | None = None, recorder_hwm: float | None = None) -> _YtdCycle:
     """A cycle fed by the recorder alone: a figure, but no frame."""
-    return _YtdCycle(meter=_METER, year=_YEAR, m3=m3, cost=cost, basis=_BASIS)
+    return _YtdCycle(
+        meter=_METER, year=_YEAR, m3=m3, cost=cost, basis=_BASIS, recorder_hwm=recorder_hwm
+    )
 
 
 def test_a_first_reading_is_framed_by_the_recorder_figure() -> None:
@@ -113,7 +128,7 @@ def test_a_first_reading_is_framed_by_the_recorder_figure() -> None:
 
     assert out.m3 == 20.0
     assert out.cost == _bill(20.0)
-    assert out.cycle == _anchored(20.0, 80.0, cost=_bill(20.0))
+    assert out.cycle == _anchored(20.0, 80.0, cost=_bill(20.0), recorder_hwm=20.0)
 
 
 def test_an_empty_recorder_year_starts_the_cycle_at_zero() -> None:
@@ -725,7 +740,7 @@ def test_a_rolled_over_cycle_publishes_the_new_year_recorder_figure() -> None:
 
     assert out.m3 == 2.0
     assert out.cost == _bill(2.0)
-    assert out.cycle == _served(2.0, cost=_bill(2.0))
+    assert out.cycle == _served(2.0, cost=_bill(2.0), recorder_hwm=2.0)
 
 
 def test_a_repointed_meter_does_not_inherit_the_old_frame() -> None:
@@ -1234,3 +1249,70 @@ def test_a_meter_that_was_down_may_come_back_with_everything_it_missed() -> None
     steady = _round(_anchored(88.0, 4000.0), reading=4128.0, saw_reading=True)
     assert steady.m3 == 88.0
     assert steady.hold_m3 == 4128.0
+
+
+def test_a_recorder_that_has_spoken_before_brings_the_year_back_down() -> None:
+    """A spike under the step bound used to stand until January.
+
+    It is admitted on sight, it raises the mark, and the mark only ever
+    climbed, so no later evidence could take it back however plainly the
+    recorder contradicted it. The frame comes down with it, or the next
+    reading would simply put it back.
+    """
+    spiked = _anchored(130.0, 1000.0, cost=_bill(130.0), recorder_hwm=40.0)
+    out = _round(spiked, reading=1041.0, recorder_m3=41.0)
+
+    assert out.m3 == 41.0
+    assert out.cost == _bill(41.0)  # and the cost floor goes with it
+    assert out.cycle.offset_m3 == 1000.0  # 1041 - 41
+    assert out.cycle.recorder_hwm == 41.0
+
+
+def test_a_recorder_answering_for_the_first_time_may_not() -> None:
+    """Nothing behind it shows its history is whole.
+
+    A database that lost the year before anyone asked reads exactly like
+    one that has it, so the first answer of a cycle is only ever evidence
+    for a higher figure, never against the one standing.
+    """
+    out = _round(_anchored(130.0, 1000.0), reading=1041.0, recorder_m3=41.0)
+
+    assert out.m3 == 130.0
+    assert out.cycle.recorder_hwm == 41.0  # but it is remembered from here
+
+
+def test_a_recorder_below_its_own_previous_answer_is_a_database_that_lost_some() -> None:
+    """Consumption accumulates, so a healthy answer never goes backwards."""
+    purged = _anchored(130.0, 1000.0, recorder_hwm=120.0)
+    out = _round(purged, reading=1041.0, recorder_m3=41.0)
+
+    assert out.m3 == 130.0
+    assert out.cycle.recorder_hwm == 120.0  # and the high-water mark stands
+
+
+def test_a_year_holding_water_the_recorder_never_saw_is_left_alone() -> None:
+    """A meter that was down comes back carrying the whole outage.
+
+    Home Assistant compiled no statistics for any of it, so the recorder
+    is permanently short by that much and cannot speak for the year again.
+    Correcting against it would throw away water that really flowed.
+    """
+    caught_up = _round(
+        _anchored(88.0, 4000.0, recorder_hwm=88.0), reading=4128.0, saw_reading=False
+    )
+    assert caught_up.m3 == 128.0
+    assert caught_up.cycle.unrecorded is True
+
+    later = _round(caught_up.cycle, reading=4129.0, recorder_m3=89.0)
+    assert later.m3 == 129.0  # not pulled down to the recorder's 89
+
+
+def test_the_unrecorded_mark_does_not_outlive_its_year() -> None:
+    """January starts over: the recorder speaks for the new year in full."""
+    stale = _YtdCycle(
+        meter=_METER, year=_YEAR - 1, m3=128.0, offset_m3=4000.0, basis=_BASIS, unrecorded=True
+    )
+    out = _round(stale, recorder_m3=2.0)
+
+    assert out.m3 == 2.0
+    assert out.cycle.unrecorded is False

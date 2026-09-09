@@ -99,3 +99,52 @@ async def test_a_malformed_record_starts_a_fresh_cycle(
     assert entry.state is ConfigEntryState.LOADED
     assert "starting a fresh one" in caplog.text
     assert hass.data[DOMAIN][entry.entry_id].data.ytd_consumption_m3 == 20.0
+
+
+def test_a_record_written_before_the_new_keys_assumes_the_cautious_answer() -> None:
+    """Silence about unrecorded water has to read as "there may be some".
+
+    The flag says the year holds water the recorder cannot account for,
+    which is what stops a recorder answer correcting the figure down. A
+    record from a release that never wrote it says nothing either way, and
+    reading silence as "none" would let the recorder pull down a year that
+    really did catch up from an outage. It clears itself at the rollover.
+    """
+    from custom_components.be_water_prices.coordinator import _cycle_from_record
+
+    old = _cycle_from_record(
+        {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "offset_m3": 1000.0}
+    )
+    assert old is not None
+    assert old.unrecorded is True
+    assert old.recorder_hwm is None
+
+
+def test_the_new_keys_round_trip_through_the_record() -> None:
+    from custom_components.be_water_prices.coordinator import _cycle_from_record
+
+    cycle = _cycle_from_record(
+        {
+            "meter": "sensor.water_meter",
+            "year": 2026,
+            "m3": 40.0,
+            "offset_m3": 1000.0,
+            "recorder_hwm": 39.5,
+            "unrecorded": False,
+        }
+    )
+    assert cycle is not None
+    assert cycle.recorder_hwm == 39.5
+    assert cycle.unrecorded is False
+
+
+def test_a_recorder_high_water_mark_that_is_not_a_number_is_refused() -> None:
+    """The same rule the other figures follow: unreadable means re-bootstrap."""
+    from custom_components.be_water_prices.coordinator import _cycle_from_record
+
+    assert (
+        _cycle_from_record(
+            {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "recorder_hwm": "lots"}
+        )
+        is None
+    )

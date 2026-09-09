@@ -313,6 +313,17 @@ class _YtdCycle:
     # the options that price them. A floor only holds while these hold. An
     # older record has no basis and simply rebuilds its floor once.
     basis: str | None = None
+    # The highest figure the recorder has reported for this cycle. It only
+    # ever climbs while its history is intact, since consumption
+    # accumulates, so an answer below it is a database that has lost some
+    # and must not be believed against the year.
+    recorder_hwm: float | None = None
+    # Whether the figure includes water the recorder cannot account for.
+    # Set when a meter that was unavailable comes back carrying the whole
+    # outage: HA compiled no statistics for it, so the recorder is
+    # permanently short by that much and can never speak for the year
+    # again. Without it the correction below would throw that water away.
+    unrecorded: bool = False
 
 
 @dataclass(frozen=True)
@@ -404,6 +415,8 @@ def _fold(
     # m3 mark is monotonic whatever the rates do.
     floor = cycle.cost if current and cycle.basis == basis else None
     offset = cycle.offset_m3 if current else None
+    recorder_hwm = cycle.recorder_hwm if current else None
+    unrecorded = cycle.unrecorded if current else False
     if not current:
         hold_m3 = None
         hold_run = 0
@@ -579,29 +592,72 @@ def _fold(
             candidate = framed
             hold_m3 = None
 
-    if (
-        candidate is not None
-        and recorder_m3 is not None
-        and (mark is None or recorder_m3 >= mark)
-        and candidate - recorder_m3 > _RECORDER_LAG_M3
-    ):
-        # The recorder read the same meter's own statistics for the whole
-        # year and has not lost history -- it is at or above everything the
-        # year already knew -- so water it has no record of did not flow.
-        # Published figures are the maximum of what a round holds, so
-        # without this the recorder loses to the reading rather than
-        # settling it: a meter 90 m3 above where it stands pinned the year
-        # 1254 EUR over with the recorder saying otherwise in the same
-        # round. Dropping the candidate also leaves high_m3 alone, so the
-        # frame correction below stays available to a later round.
-        _LOGGER.warning(
-            "%s: a reading implying %.1f m3 for the year against the recorder's %.1f; "
-            "taking the recorder, which has the year's own statistics behind it",
-            meter,
-            candidate,
-            recorder_m3,
-        )
-        candidate = None
+    if candidate is not None and mark is not None and candidate - mark > _MAX_STEP_M3:
+        # Only an exemption can admit a step this size, and both of them --
+        # a meter that was unavailable, a first round after a restart --
+        # mean the same thing: the water arrived while Home Assistant was
+        # not watching, so no statistics were compiled for it and the
+        # recorder is permanently short by that much. It cannot speak for
+        # this year again.
+        unrecorded = True
+
+    spoken_before = recorder_hwm is not None
+    if recorder_m3 is not None and (recorder_hwm is None or recorder_m3 >= recorder_hwm):
+        # A recorder answer only climbs while its history is intact, since
+        # consumption accumulates. One at or above every previous answer is
+        # therefore a database that still holds the year, and it read the
+        # same meter's own statistics for all of it, so water it has no
+        # record of did not flow. One below is a database that has lost
+        # some, and it is ignored rather than believed against the year.
+        recorder_hwm = recorder_m3
+        if (
+            not unrecorded
+            and candidate is not None
+            and candidate - recorder_m3 > _RECORDER_LAG_M3
+            and (spoken_before or mark is None or recorder_m3 >= mark)
+        ):
+            # Published figures are the maximum of what a round holds, so
+            # without this the recorder loses to the reading rather than
+            # settling it: a meter 90 m3 above where it stands pinned the
+            # year 1254 EUR over with the recorder saying otherwise in the
+            # same round.
+            _LOGGER.warning(
+                "%s: a reading implying %.1f m3 for the year against the recorder's %.1f; "
+                "taking the recorder, which has the year's own statistics behind it",
+                meter,
+                candidate,
+                recorder_m3,
+            )
+            candidate = None
+        if (
+            spoken_before
+            and not unrecorded
+            and mark is not None
+            and mark - recorder_m3 > _RECORDER_LAG_M3
+        ):
+            # And the mark comes down with it. A spike smaller than the step
+            # bound is admitted on sight, raises the mark, and the mark only
+            # ever climbed, so it stood until January however plainly the
+            # recorder contradicted it. The frame is rebuilt under the
+            # corrected figure and the cost floor goes with it, or the
+            # correction would show on the volume and not on the bill.
+            #
+            # Only against a recorder that has already spoken for this
+            # year. One answering for the first time has nothing behind it
+            # to show its history is whole, and a database that lost the
+            # year before anyone asked would read exactly like this.
+            _LOGGER.warning(
+                "%s: the year stood at %.1f m3 against the recorder's %.1f; taking the "
+                "recorder, which has the year's own statistics behind it",
+                meter,
+                mark,
+                recorder_m3,
+            )
+            mark = recorder_m3
+            floor = None
+            if reading is not None:
+                offset = reading - recorder_m3
+                high_m3 = reading
 
     if candidate is not None and reading is not None and (high_m3 is None or reading > high_m3):
         high_m3 = reading
@@ -681,6 +737,8 @@ def _fold(
             cost=floor,
             offset_m3=offset,
             basis=basis,
+            recorder_hwm=recorder_hwm,
+            unrecorded=unrecorded,
         ),
         published,
         cost,
@@ -1268,6 +1326,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "cost": self._ytd.cost,
             "offset_m3": self._ytd.offset_m3,
             "basis": self._ytd.basis,
+            "recorder_hwm": self._ytd.recorder_hwm,
+            "unrecorded": self._ytd.unrecorded,
         }
 
     def _fold_cycle(
@@ -1616,7 +1676,7 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         return None
     if year is not None and (isinstance(year, bool) or not isinstance(year, int)):
         return None
-    figures = {key: data.get(key) for key in ("m3", "cost", "offset_m3")}
+    figures = {key: data.get(key) for key in ("m3", "cost", "offset_m3", "recorder_hwm")}
     if any(value is not None and _figure(value) is None for value in figures.values()):
         return None
     return _YtdCycle(
@@ -1626,6 +1686,11 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         cost=_figure(figures["cost"]),
         offset_m3=_figure(figures["offset_m3"]),
         basis=basis,
+        recorder_hwm=_figure(figures["recorder_hwm"]),
+        # A record written before this existed says nothing either way, and
+        # the safe reading of silence is that the year may hold water the
+        # recorder never saw. It clears itself at the next rollover.
+        unrecorded=bool(data.get("unrecorded", True)),
     )
 
 

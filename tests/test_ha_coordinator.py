@@ -1233,12 +1233,10 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=20.0)
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
-        ),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -1249,6 +1247,11 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
         hass.states.async_set("sensor.water_meter", "130")
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 50.0
+        # The recorder catches up with the draw, as it does in practice: its
+        # statistics are compiled every five minutes. Left frozen at 20 it
+        # would now be contradicting the year rather than trailing it, and
+        # what this test is about is the glitch, not that disagreement.
+        recorder.return_value = 50.0
 
         # Restart, then the meter momentarily reports 120 at setup time -- a
         # glitch below the climbed mark but above the Jan 1 baseline (80).
