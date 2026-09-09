@@ -110,7 +110,11 @@ _ZUIVERING_RE = re.compile(
 # 3660 Opglabbeek billed 575.26 EUR a year instead of 782.73 on
 # 2026-09-08. The two cases have to be told apart, so the sentence is
 # matched next to the label it replaced.
-_UNAVAILABLE = "de kostprijs kan momenteel niet getoond worden"
+# Matched word by word rather than as one literal: the page wraps the
+# sentence where the column happens to end, and get_text keeps a
+# string's own newlines, so a literal with hard single spaces stopped
+# matching the moment the layout moved.
+_UNAVAILABLE = r"\s+".join(("de", "kostprijs", "kan", "momenteel", "niet", "getoond", "worden"))
 _AFVOER_UNAVAILABLE_RE = re.compile(rf"Afvoer\s+van\s+afvalwater\s*{_UNAVAILABLE}", re.IGNORECASE)
 _ZUIVERING_UNAVAILABLE_RE = re.compile(
     rf"Zuivering\s+van\s+afvalwater\s*{_UNAVAILABLE}", re.IGNORECASE
@@ -190,10 +194,26 @@ def parse_commune_tariff(
                 f"De Watergroep says the {leg} saneringsbijdrage cannot be shown "
                 f"for this commune; refusing to bill it as 0.00 EUR/m3"
             )
-    afvoer = _AFVOER_RE.search(block)
-    zuivering = _ZUIVERING_RE.search(block)
-    san_gem = to_float(afvoer.group(1)) if afvoer is not None else 0.0
-    san_bov = to_float(zuivering.group(1)) if zuivering is not None else 0.0
+    # A row that is not there is not a leg that is not levied. All 699
+    # communes print both, 698 of them as an amount and Opglabbeek as the
+    # sentence above, so there is no commune a zero would be right for and
+    # every way of missing the row is a parser problem. Read as 0.00 it
+    # cost 207.47 EUR a year on an 80 m3 bill, which is what the check on
+    # the sentence alone was left to catch.
+    legs: dict[str, float] = {}
+    for pattern, leg, label in (
+        (_AFVOER_RE, "gemeentelijke", "Afvoer van afvalwater"),
+        (_ZUIVERING_RE, "bovengemeentelijke", "Zuivering van afvalwater"),
+    ):
+        match = pattern.search(block)
+        if match is None:
+            raise ExtractorError(
+                f"De Watergroep printed no {leg} saneringsbijdrage for this commune "
+                f"(no {label!r} row); refusing to bill it as 0.00 EUR/m3"
+            )
+        legs[leg] = to_float(match.group(1))
+    san_gem = legs["gemeentelijke"]
+    san_bov = legs["bovengemeentelijke"]
 
     return build_flanders_tariff(
         utility_id=UTILITY_ID,

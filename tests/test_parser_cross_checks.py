@@ -144,14 +144,16 @@ def test_de_watergroep_block_does_not_reach_into_the_per_litre_table() -> None:
 
     A commune whose per-m3 Afvoer row loses its amount -- a regex
     regression, a markup tweak -- would otherwise match the per-litre
-    row below it and publish 0,0020 EUR/m3 in place of 0,0.
+    row below it and publish 0,0020 EUR/m3, a thousandth of the rate.
+
+    The row is refused now rather than read as free, so what this pins is
+    that the refusal is what happens: reaching past the boundary would
+    hand back a plausible number instead.
     """
     page = fixture_html("dewatergroep_halle_2026.html")
     cell = '\n€ 1,9572<br /><span class="small">(incl. € 2,0746)</span>'
     assert page.count(cell) == 1, "the per-m3 Afvoer cell moved; the test needs updating"
     html = page.replace(cell, "")
 
-    tariff = de_watergroep.parse_commune_tariff(html, year=2026, commune_label="Halle")
-    # 0.0020 is the per-LITRE Afvoer figure from the table below.
-    assert tariff.sanering_gemeentelijk_eur_per_m3 == 0.0
-    assert tariff.sanering_gemeentelijk_eur_per_m3 != 0.002
+    with pytest.raises(ExtractorError, match="printed no gemeentelijke saneringsbijdrage"):
+        de_watergroep.parse_commune_tariff(html, year=2026, commune_label="Halle")

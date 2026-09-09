@@ -29,8 +29,11 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from custom_components.be_water_prices.providers import all_extractors
 from custom_components.be_water_prices.providers.base import (
+    ExtractorError,
     WaterTariff,
     relabel_with_human_commune,
 )
@@ -81,12 +84,14 @@ def test_dwg_per_commune_captures_full_integrale_waterprijs() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 > 0
 
 
-def test_dwg_per_commune_handles_a_bare_afvoer_label() -> None:
-    # A label with no euro amount and no "kan momenteel niet getoond
-    # worden" sentence reads as a commune that levies nothing, so the
-    # entry still loads instead of failing setup. Driven by a built page:
-    # Sinaai used to be cited as the real example and is not one, it
-    # publishes EUR 1,9114 today.
+def test_dwg_per_commune_refuses_a_bare_afvoer_label() -> None:
+    # A label with no euro amount used to read as a commune that levies
+    # nothing. No such commune exists: all 699 pages print both legs, 698
+    # of them as an amount and Opglabbeek as the "kan momenteel niet
+    # getoond worden" sentence. Sinaai was cited as the real example and
+    # is not one, it publishes EUR 1,9114 today. So a bare label is the
+    # parser having lost the row, and billing that leg at zero costs
+    # 207.47 EUR a year.
     page = (
         "<html><body>"
         "<div>Basistarief per m\u00b3</div>"
@@ -96,10 +101,8 @@ def test_dwg_per_commune_handles_a_bare_afvoer_label() -> None:
         "<div>Basistarief per liter</div>"
         "</body></html>"
     )
-    t = parse_dwg_commune(page, year=2026, commune_label="Elders")
-    assert t.basis_eur_per_m3 == 2.9251
-    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0
-    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+    with pytest.raises(ExtractorError, match="printed no gemeentelijke saneringsbijdrage"):
+        parse_dwg_commune(page, year=2026, commune_label="Elders")
 
 
 def test_the_sinaai_fixture_carries_the_rate_the_operator_publishes() -> None:
@@ -154,11 +157,11 @@ def test_dwg_per_commune_does_not_bleed_into_comforttarief_block() -> None:
     # Regression: an earlier version anchored the Afvoer/Zuivering
     # regexes on the single 'Basistarief per m³' phrase and used
     # re.DOTALL + .*? -- if the Basistarief Afvoer row had no euro
-    # amount (zero-afvoer commune), the regex skipped past it and
-    # silently matched the Comforttarief Afvoer (~2x the basistarief),
-    # silently doubling san_gem instead of returning 0. Build a minimal
-    # HTML where basis Afvoer is empty but comfort Afvoer carries an
-    # amount and assert san_gem stays 0.0.
+    # amount, the regex skipped past it and silently matched the
+    # Comforttarief Afvoer (~2x the basistarief), doubling san_gem. Build
+    # a minimal HTML where basis Afvoer is empty but comfort Afvoer
+    # carries an amount, and assert the row is refused rather than
+    # answered from the block below it.
     html = (
         "<html><body>"
         "Basistarief per m&#179; "
@@ -172,10 +175,8 @@ def test_dwg_per_commune_does_not_bleed_into_comforttarief_block() -> None:
         "Zuivering van afvalwater &euro; 3,4038 "
         "</body></html>"
     )
-    t = parse_dwg_commune(html, year=2026, commune_label="synthetic")
-    assert t.basis_eur_per_m3 == 2.9251
-    assert t.sanering_gemeentelijk_eur_per_m3 == 0.0  # NOT 3.9144
-    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+    with pytest.raises(ExtractorError, match="printed no gemeentelijke saneringsbijdrage"):
+        parse_dwg_commune(html, year=2026, commune_label="synthetic")
 
 
 def test_dwg_commune_dropdown_yields_700_options() -> None:

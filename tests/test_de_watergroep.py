@@ -259,3 +259,38 @@ async def test_the_commune_cookie_does_not_outlive_its_request() -> None:
     with pytest.raises(ExtractorError):
         await dwg._fetch_commune_ajax(session, "{GUID}", 2026)  # type: ignore[arg-type]
     assert session.cookie_jar.cleared == 1
+
+
+def test_a_leg_that_is_simply_absent_is_refused_too() -> None:
+    """No row is not a commune levying nothing.
+
+    All 699 commune pages print both legs, so a missing row is a parser
+    problem however it went missing: a relabelled row, a blanked amount,
+    a number in a format the pattern does not take. Read as 0.00 it costs
+    207.47 EUR a year on an 80 m3 single-resident bill.
+    """
+    from custom_components.be_water_prices.providers.de_watergroep import parse_commune_tariff
+
+    page = (
+        "<html><body>"
+        "<div>Basistarief per m³</div>"
+        "<div><span>Waterverbruik drinkwater</span><span>€ 2,9251</span></div>"
+        "<div><span>Afvoer afvalwater</span><span>€ 1,9572</span></div>"
+        "<div><span>Zuivering van afvalwater</span><span>€ 1,7019</span></div>"
+        "<div>Basistarief per liter</div>"
+        "</body></html>"
+    )
+    with pytest.raises(ExtractorError, match="printed no gemeentelijke saneringsbijdrage"):
+        parse_commune_tariff(page, year=2026, commune_label="Elders")
+
+
+def test_the_unshowable_sentence_survives_the_page_wrapping_it() -> None:
+    """get_text keeps a string's own newlines, so a hard-spaced literal missed."""
+    from custom_components.be_water_prices.providers.de_watergroep import parse_commune_tariff
+
+    page = fixture_html("dewatergroep_opglabbeek_2026.html")
+    assert page.count("kan momenteel") >= 1
+    wrapped = page.replace("kan momenteel", "kan\n            momenteel")
+    assert wrapped != page, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="cannot be shown"):
+        parse_commune_tariff(wrapped, year=2026, commune_label="Opglabbeek")
