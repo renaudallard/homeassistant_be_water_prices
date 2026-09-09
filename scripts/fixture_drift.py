@@ -214,6 +214,15 @@ CHECKS: list[FixtureCheck] = [
         lambda s: get("farys").fetch(s),
     ),
     FixtureCheck(
+        # A second Farys commune, because the default one prints no
+        # gemeentelijke tussenkomst and so cannot show that row moving or
+        # disappearing. Zaventem is the commune whose card carries one.
+        "Farys (Zaventem)",
+        "farys_zaventem_2026.json",
+        lambda b: farys.parse_tariff(_t(b), year=2026, municipality_label="Zaventem"),
+        lambda s: farys.fetch_for_commune(s, "25926"),
+    ),
+    FixtureCheck(
         "SWDE",
         "swde_2026.html",
         lambda b: swde.parse_tariff(_t(b), year=2026),

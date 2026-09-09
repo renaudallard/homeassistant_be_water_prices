@@ -114,6 +114,22 @@ _BASIS_BOVENGEMEENTELIJK_RE = re.compile(
     r"Basistarief\s+bovengemeentelijke\s+bijdrage\s*\(per\s*m³\)" + _PAIR,
     re.IGNORECASE,
 )
+# Some communes pay part of the drinkwater leg for their residents, and
+# Farys prints what they cover as a negative row directly under the leg
+# it applies to. Only a handful of cards carry one, so both rows are
+# optional; the sign is part of the value, which is why these do not use
+# _PAIR. A Unicode minus would fail to match and read as no discount,
+# which the integrale-waterprijs check two rows down then refuses rather
+# than letting the gross rate through.
+_SIGNED_PAIR = r"\s*€\s*(-?[\d]+,\d{3,5})\s*€\s*(-?[\d]+,\d{3,5})"
+_TUSSENKOMST_BASIS_RE = re.compile(
+    r"Gemeentelijke\s+tussenkomst\s+op\s+basistarief\s+drinkwater\s*\(per\s*m³\)" + _SIGNED_PAIR,
+    re.IGNORECASE,
+)
+_TUSSENKOMST_COMFORT_RE = re.compile(
+    r"Gemeentelijke\s+tussenkomst\s+op\s+comforttarief\s+drinkwater\s*\(per\s*m³\)" + _SIGNED_PAIR,
+    re.IGNORECASE,
+)
 
 
 def _active_period_year(soup: BeautifulSoup) -> int | None:
@@ -181,6 +197,18 @@ def _amount(text: str, pattern: re.Pattern[str], label: str) -> float:
     return rate
 
 
+def _optional_amount(text: str, pattern: re.Pattern[str], label: str) -> float:
+    """Read a row most cards do not print, as zero when it is absent.
+
+    Absent means the commune grants nothing, which is the common case. A
+    row that is there but malformed still goes through :func:`_amount`
+    and is refused, so this only widens what parses, never what passes.
+    """
+    if pattern.search(text) is None:
+        return 0.0
+    return _amount(text, pattern, label)
+
+
 def parse_tariff(
     ajax_response_text: str,
     *,
@@ -194,6 +222,14 @@ def parse_tariff(
 
     basis = _amount(text, _BASIS_DRINKWATER_RE, "drinkwater basistarief")
     comfort = _amount(text, _COMFORT_DRINKWATER_RE, "drinkwater comforttarief")
+    # What the commune covers comes off the leg it names, before the two
+    # checks below. Zaventem prints 3,0058 for the drinkwater basistarief
+    # and -0,0807 of gemeentelijke tussenkomst under it, and the integrale
+    # waterprijs it prints two rows further down is 6,5842, not the 6,6649
+    # the gross rows add up to. The rows are already negative, so they are
+    # added rather than subtracted.
+    basis += _optional_amount(text, _TUSSENKOMST_BASIS_RE, "tussenkomst basistarief")
+    comfort += _optional_amount(text, _TUSSENKOMST_COMFORT_RE, "tussenkomst comforttarief")
     if abs(comfort - 2.0 * basis) > 0.01:
         raise ExtractorError(
             f"Farys comforttarief {comfort} is not 2× basistarief {basis} (VMM 2× rule)"

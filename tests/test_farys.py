@@ -289,3 +289,45 @@ def test_a_leg_that_does_not_add_up_to_the_printed_total_is_refused() -> None:
     assert mutated != raw, "the mutation did not land"
     with pytest.raises(ExtractorError, match="do not add up to the integrale"):
         parse_tariff(mutated, year=2026)
+
+
+def test_a_commune_that_pays_part_of_the_drinkwater_leg_is_billed_net() -> None:
+    """Zaventem covers 0,0807 EUR/m3 of the drinkwater basistarief.
+
+    Farys prints the gross rate and the tussenkomst as two rows, and its
+    own integrale waterprijs two rows below is the netted figure. Before
+    this was read the components summed to 6,6649 against a printed
+    6,5842 and the card was refused outright.
+    """
+    t = parse_tariff(fixture_html("farys_zaventem_2026.json"), year=2026)
+    assert t.basis_eur_per_m3 == pytest.approx(2.9251)  # 3,0058 - 0,0807
+    assert t.comfort_eur_per_m3 == pytest.approx(5.8502)  # 6,0116 - 0,1614
+    assert t.sanering_gemeentelijk_eur_per_m3 == 1.9572
+    assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.7019
+    total = (
+        t.basis_eur_per_m3
+        + t.sanering_gemeentelijk_eur_per_m3
+        + t.sanering_bovengemeentelijk_eur_per_m3
+    )
+    assert total == pytest.approx(6.5842)  # what the page prints
+
+
+def test_dropping_the_tussenkomst_row_no_longer_adds_up() -> None:
+    """The netting is what reconciles the card, not a loosened check."""
+    raw = fixture_html("farys_zaventem_2026.json")
+    for cell in ("-0,0807", "-0,0855", "-0,1614", "-0,1711"):
+        assert raw.count(cell) == 1, f"{cell} moved; the test needs updating"
+    without = raw
+    for cell in ("-0,0807", "-0,0855", "-0,1614", "-0,1711"):
+        without = without.replace(cell, "0,0000")
+    assert without != raw, "the mutation did not land"
+    with pytest.raises(ExtractorError, match="do not add up to the integrale"):
+        parse_tariff(without, year=2026)
+
+
+def test_a_tussenkomst_row_whose_vat_twin_disagrees_is_refused() -> None:
+    """An optional row still faces the same VAT cross-check as a required one."""
+    raw = fixture_html("farys_zaventem_2026.json")
+    assert raw.count("-0,0855") == 1
+    with pytest.raises(ExtractorError, match="do not agree"):
+        parse_tariff(raw.replace("-0,0855", "-0,1855"), year=2026)
