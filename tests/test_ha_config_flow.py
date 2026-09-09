@@ -1821,3 +1821,74 @@ async def test_opening_and_cancelling_the_options_dialog_drops_nothing_and_says_
         await hass.async_block_till_done()
     assert entry.options[CONF_COMMUNE] == "99999"
     assert "no longer in the operator" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_an_existing_entry_adopts_the_commune_its_postcode_is_billed_at(
+    hass: HomeAssistant,
+) -> None:
+    """The postcode hook reached new entries only, through a form field.
+
+    An entry created before it keeps the operator-wide default with
+    nothing to say so: Water-link's 2070 is billed 66.01 EUR a year
+    short that way.
+    """
+    from custom_components.be_water_prices import _adopt_commune_for_postcode
+    from custom_components.be_water_prices.providers import async_load as async_load_providers
+
+    await async_load_providers(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water-link",
+        data={CONF_UTILITY: "water_link"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "2070"},
+        unique_id=f"{DOMAIN}_water_link",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    _adopt_commune_for_postcode(hass, entry)
+    assert entry.options[CONF_COMMUNE] == "Beveren-Kruibeke-Zwijndrecht"
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 80
+
+
+@pytest.mark.asyncio
+async def test_adopting_a_commune_never_overwrites_the_one_the_user_picked(
+    hass: HomeAssistant,
+) -> None:
+    from custom_components.be_water_prices import _adopt_commune_for_postcode
+    from custom_components.be_water_prices.providers import async_load as async_load_providers
+
+    await async_load_providers(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water-link",
+        data={CONF_UTILITY: "water_link"},
+        options={CONF_POSTCODE: "2070", CONF_COMMUNE: "Antwerpen"},
+        unique_id=f"{DOMAIN}_water_link_picked",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    _adopt_commune_for_postcode(hass, entry)
+    assert entry.options[CONF_COMMUNE] == "Antwerpen"
+
+
+@pytest.mark.asyncio
+async def test_a_postcode_on_the_default_card_adopts_nothing(hass: HomeAssistant) -> None:
+    from custom_components.be_water_prices import _adopt_commune_for_postcode
+    from custom_components.be_water_prices.providers import async_load as async_load_providers
+
+    await async_load_providers(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={CONF_POSTCODE: "2440"},
+        unique_id=f"{DOMAIN}_pidpa_default",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    _adopt_commune_for_postcode(hass, entry)
+    assert CONF_COMMUNE not in entry.options

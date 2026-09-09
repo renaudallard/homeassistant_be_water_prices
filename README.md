@@ -276,7 +276,9 @@ auto-resolves cleanly.
      card puts a postcode somewhere other than its default, the flow
      pre-selects that commune for you: Water-link's 2070, 2540, 2640
      and 2650, Pidpa's Nijlen, Wommelgem and Kasterlee, and Farys's
-     Drogenbos and four Zaventem postcodes. Everywhere else the default is
+     Drogenbos and four Zaventem postcodes. An entry that already
+     exists picks the same commune up on its next load, so upgrading is
+     enough and no reconfigure is needed. Everywhere else the default is
      what 60 of Pidpa's 63 communes pay and what 96 % of De
      Watergroep's communes pay, but the saneringsbijdragen do vary,
      so the projected-cost sensor can be out by up to ~59 EUR/year

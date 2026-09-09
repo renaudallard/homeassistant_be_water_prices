@@ -67,13 +67,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # come back into the blocklist's good graces later.
     original_options = dict(entry.options)
     _drop_phantom_commune_if_blocked(hass, entry)
-    options_changed = entry.options != original_options
+    commune_dropped = entry.options != original_options
 
     # Build the extractor registry off the event loop: importing the
     # provider modules pulls in pdfplumber / BeautifulSoup / aiohttp and
     # reads manifest.json, blocking work HA forbids on the loop. The
     # synchronous get() inside WaterCoordinator then hits the cache.
     await async_load_providers(hass)
+    # After the registry is warm, since this asks the extractor. Also
+    # after the phantom drop above, so an entry that has just lost its
+    # commune can be given the right one back.
+    _adopt_commune_for_postcode(hass, entry)
+    options_changed = entry.options != original_options
     coordinator = WaterCoordinator(hass, entry)
     # Restore the persisted YTD baseline before the first refresh so a
     # restart does not re-anchor the running cost down to the recorder's
@@ -90,7 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if options_changed:
             hass.config_entries.async_update_entry(entry, options=original_options)
         raise
-    if options_changed:
+    if commune_dropped:
         # Once it sticks, and once: said before the refresh it was repeated
         # on every retry, since the rollback above put the commune back.
         # Silently rewriting the options moved the bill to the operator-wide
@@ -248,6 +253,41 @@ def _drop_phantom_commune_if_blocked(hass: HomeAssistant, entry: ConfigEntry) ->
     new_options.pop(CONF_COMMUNE, None)
     new_options.pop(CONF_COMMUNE_LABEL, None)
     hass.config_entries.async_update_entry(entry, options=new_options)
+
+
+def _adopt_commune_for_postcode(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Give an entry with no commune the one its postcode is billed at.
+
+    Four operators bill some postcodes on a card other than the one their
+    no-commune fetch serves, and each names them in its own
+    ``commune_for_postcode``. The config flow reads that hook, but only
+    to fill in a form field, so it reaches new entries alone: one created
+    before the hook existed, or one the phantom drop above has just
+    stripped, keeps the operator-wide default and no Repair says so.
+    Water-link's 2070 is billed 66.01 EUR a year short that way and
+    Pidpa's Nijlen 27.06 too much.
+
+    Only an absent commune is filled in, so a commune the user picked is
+    never overwritten. The human label is left for the OptionsFlow to
+    write on the next save: it is not on the entry yet, reading it costs
+    a network round trip, and every surface that shows the commune
+    redacts it anyway.
+    """
+    from .const import CONF_COMMUNE, CONF_POSTCODE, CONF_UTILITY
+    from .providers import get as get_extractor
+
+    if entry.options.get(CONF_COMMUNE) is not None:
+        return
+    postcode = entry.options.get(CONF_POSTCODE) or entry.data.get(CONF_POSTCODE)
+    if not postcode:
+        return
+    hook = get_extractor(entry.data.get(CONF_UTILITY, "")).commune_for_postcode
+    if hook is None:
+        return
+    commune = hook(str(postcode))
+    if commune is None:
+        return
+    hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_COMMUNE: commune})
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
