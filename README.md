@@ -794,7 +794,12 @@ fetching anything.
 
 [`.github/workflows/archive_cards.yml`](./.github/workflows/archive_cards.yml)
 runs the archiver every morning at 05:23 UTC against the `archive`
-branch, uploads the PDFs of the day to the releases of the shared cards
+branch, walking the communes of the per-commune utilities on Sundays
+and the sixteen default rows only on the other days (the tariffs are
+annual, and De Watergroep alone lists about seven hundred communes; a
+manual run walks them unless its `communes` input is unticked, and
+`--defaults-only` is the local equivalent), uploads the PDFs of the day
+to the releases of the shared cards
 repository [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
 (`water-<YYYY-MM>`, one per month the cards were seen in; the electricity
 integration's live beside them as `electricity-<YYYY-MM>`), rewrites the

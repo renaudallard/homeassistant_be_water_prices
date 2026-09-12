@@ -303,6 +303,14 @@ async def test_every_commune_of_a_per_commune_utility_gets_its_own_row(tmp_path:
     summary = await ac.archive(tmp_path, extractors=[broken], now=NOW, sleep=_no_sleep)
     assert summary.stored == 1
     assert summary.failed == ["beta/communes: ExtractorError: the commune list has moved"]
+    # Six days a week only the default rows are asked for: the communes
+    # are neither listed nor fetched, and the rows they have stay.
+    asked.clear()
+    summary = await ac.archive(
+        tmp_path, extractors=[extractor], defaults_only=True, now=NOW, sleep=_no_sleep
+    )
+    assert (summary.stored, summary.unchanged, asked) == (0, 1, [])
+    assert (tmp_path / "acme/2/2026-09.json").exists()
 
 
 async def test_a_commune_id_that_cannot_name_a_directory_is_refused(tmp_path: Path) -> None:

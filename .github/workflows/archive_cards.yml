@@ -8,6 +8,11 @@ on:
     - cron: "23 5 * * *"
   workflow_dispatch:
     inputs:
+      communes:
+        description: Walk every commune of the per-commune utilities, not only the default rows.
+        default: true
+        required: false
+        type: boolean
       reparse:
         description: Replay every stored month through the parser even if it did not change.
         default: false
@@ -35,8 +40,8 @@ concurrency:
 jobs:
   archive:
     runs-on: ubuntu-latest
-    # A full walk is sixteen utilities and a few hundred commune pages; a
-    # parse that never returns is bounded per card by the script. A
+    # A full walk is sixteen utilities and about a thousand commune pages;
+    # a parse that never returns is bounded per card by the script. A
     # re-render renders every kept PDF again on top.
     timeout-minutes: ${{ github.event.inputs.rerender == 'true' && 180 || 60 }}
     steps:
@@ -68,14 +73,25 @@ jobs:
 
       - name: Store today's cards
         id: store
+        # The tariffs are annual and the commune rows are most of the walk
+        # (about a thousand pages), so the schedule walks them on Sundays
+        # only and stores the sixteen default rows on the other days; a
+        # manual run walks them unless told otherwise.
         env:
           CARDS_REPO: renaudallard/be_price_cards
-        run: >-
-          python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs
-          --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download"
-          --archive-base-url "${{ github.server_url }}/${{ github.repository }}/blob/archive"
-          ${{ github.event.inputs.reparse == 'true' && '--reparse' || '' }}
-          ${{ github.event.inputs.rerender == 'true' && '--rerender' || '' }}
+        run: |
+          communes=''
+          if [ "${{ github.event_name }}" = schedule ]; then
+            [ "$(date -u +%u)" = 7 ] || communes='--defaults-only'
+          elif [ "${{ github.event.inputs.communes }}" = false ]; then
+            communes='--defaults-only'
+          fi
+          python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs \
+            --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download" \
+            --archive-base-url "${{ github.server_url }}/${{ github.repository }}/blob/archive" \
+            $communes \
+            ${{ github.event.inputs.reparse == 'true' && '--reparse' || '' }} \
+            ${{ github.event.inputs.rerender == 'true' && '--rerender' || '' }}
 
       - name: Keep the cards themselves
         id: keep

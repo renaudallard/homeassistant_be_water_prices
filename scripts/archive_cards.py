@@ -44,9 +44,15 @@ when none was: that is a runner-wide problem rather than a utility's, so
 the run goes red without filing anything. The live check already files
 per-utility issues and this is not a second checker.
 
+A water tariff is annual, and the commune rows are most of the walk: De
+Watergroep alone lists about seven hundred communes. ``--defaults-only``
+skips the commune listings and stores each utility's default row only,
+which is what the daily run asks for on six days of the week; the
+communes are walked on Sundays and on request.
+
 Usage:
     python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa ...]
-        [--reparse] [--rerender]
+        [--defaults-only] [--reparse] [--rerender]
         [--pdf-base-url https://github.com/<owner>/<cards repo>/releases/download]
         [--archive-base-url https://github.com/<owner>/<this repo>/blob/archive]
 """
@@ -792,12 +798,21 @@ async def _capture(
     run.cards.file(run.seen_month, (s.pdf for s in sources if s.pdf is not None))
 
 
-async def _walk(run: _Run, session: aiohttp.ClientSession, targets: list[WaterExtractor]) -> None:
-    """Every utility's default fetch, then every commune it lists."""
+async def _walk(
+    run: _Run,
+    session: aiohttp.ClientSession,
+    targets: list[WaterExtractor],
+    *,
+    defaults_only: bool = False,
+) -> None:
+    """Every utility's default fetch, then every commune it lists unless
+    the communes are not asked for today."""
     for ex in targets:
         await _capture(run, ex, _DEFAULT, None, partial(ex.fetch, session))
         list_communes, fetch_for_commune = ex.list_communes, ex.fetch_for_commune
         if list_communes is None or fetch_for_commune is None or ex.id in run.patience.given_up:
+            continue
+        if defaults_only:
             continue
         run.memo.touched.clear()
         try:
@@ -921,6 +936,7 @@ async def archive(
     pdf_dir: Path | None = None,
     pdf_base_url: str | None = None,
     archive_base_url: str | None = None,
+    defaults_only: bool = False,
     reparse: bool = False,
     rerender: bool = False,
     extractors: Iterable[WaterExtractor] | None = None,
@@ -942,7 +958,7 @@ async def archive(
     targets = _targets(registry, only or set(), on_ci)
     async with aiohttp.ClientSession() as session:
         with memoise_text_fetches(run.memo), render_through(cards.render):
-            await _walk(run, session, targets)
+            await _walk(run, session, targets, defaults_only=defaults_only)
         # A fresh archive holds nothing older than this parser, so the first
         # run only stamps it; from then on a changed digest replays the rows.
         stamp = out / _PARSER_STAMP
@@ -1008,6 +1024,11 @@ def main() -> int:
         help="where the branch is browsed, for the listing's links to rows and pages",
     )
     parser.add_argument(
+        "--defaults-only",
+        action="store_true",
+        help="store each utility's default row only; do not list or walk the communes",
+    )
+    parser.add_argument(
         "--reparse",
         action="store_true",
         help="replay every stored row through the parser even if it did not change",
@@ -1036,6 +1057,7 @@ def main() -> int:
             pdf_dir=args.pdfs,
             pdf_base_url=args.pdf_base_url,
             archive_base_url=args.archive_base_url,
+            defaults_only=args.defaults_only,
             reparse=args.reparse,
             rerender=args.rerender,
         )
