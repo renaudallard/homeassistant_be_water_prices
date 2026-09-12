@@ -557,12 +557,15 @@ with your options rather than with the tariff, so a flat line back to
 January would be fiction. The start is clamped to the
 tariff snapshot's `valid_from` so periods with no published source
 are not invented. The auto-once gate is stamped onto the config
-entry's data and carries the calendar year, the operator, and the year
-of the card the rates came off. It trips when any of the three changes,
-so the line extends into a new year, follows an operator change, and is
-rewritten once your utility finally publishes the new card: publishers
-run late, last year's card stands until 31 March, and without the card
-year in the gate January's line kept last year's rate for good. The
+entry's data and carries the calendar year, the operator, the year of
+the card the rates came off, and the commune. It trips when any of the
+four changes, so the line extends into a new year, follows an operator
+change, is redrawn when you pick your own commune (the gemeentelijke
+saneringsbijdrage is a commune's own number, so `sewerage_rate` and
+`all_in_basis_rate` both carry it), and is rewritten once your utility
+finally publishes the new card: publishers run late, last year's card
+stands until 31 March, and without the card year in the gate January's
+line kept last year's rate for good. The
 daily tick checks the gate too, so an install that never restarts
 between January and the card landing still gets the rewrite. If the
 snapshot is stale it waits instead, so a year is never filled in with
