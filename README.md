@@ -14,10 +14,12 @@ Written daily by `.github/workflows/archive_cards.yml` running
 - `pdfs.json`: where each PDF is kept, as `<release tag>/<sha256>.pdf` in
   the releases of the cards repository (`be_price_cards`, shared with
   be_electricity_prices; this integration's releases are `water-<YYYY-MM>`).
-- `coverage.md`: which months the branch holds for each utility and
-  commune, each linking to the PDF or the page it was parsed from and to
-  the JSON above.
+- `coverage.md` and `coverage/<utility>.md`: which months the branch
+  holds for each utility and commune, each linking to the PDF or the page
+  it was parsed from and to the JSON above; one sheet per utility, the
+  index naming them.
 
 To get the original card of a utility, commune and month: open
-`coverage.md`, find the row, click `pdf` or `page`; `json` is what the
-integration parsed out of it. Months older than three years are removed.
+`coverage.md`, open the utility's sheet, find the row, click `pdf` or
+`page`; `json` is what the integration parsed out of it. Months older than
+three years are removed.
