@@ -50,8 +50,8 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 # Insertion order is the user-facing order in the manual-picker
-# dropdown. Brussels / DWG / Pidpa / Aquaduin / AGSO / Water-link /
-# Farys are the seven Flemish operators; the rest are Walloon.
+# dropdown. VIVAQUA is Brussels, the six after it are the Flemish
+# operators, and the nine below those are Walloon.
 _MODULE_NAMES: tuple[str, ...] = (
     "vivaqua",
     "de_watergroep",
