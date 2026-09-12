@@ -762,6 +762,24 @@ branch, `coverage.md` (per utility and commune, the months held, each
 linking to the PDF or the page it was parsed from) and `pdfs.md` (every
 kept PDF with the rows it was read for), without fetching anything.
 
+[`.github/workflows/archive_cards.yml`](./.github/workflows/archive_cards.yml)
+runs the archiver every morning at 05:23 UTC against the `archive`
+branch, uploads the PDFs of the day to the releases of the shared cards
+repository [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
+(`water-<YYYY-MM>`, one per month the cards were seen in; the electricity
+integration's live beside them as `electricity-<YYYY-MM>`), rewrites the
+two listings so each links to a file that exists, publishes them under
+`water/` in that repository, and commits the branch when anything
+changed. The upload needs a fine-grained token with contents read and
+write on the cards repository in the `BE_WATER_CARDS` secret; without it
+the branch still gets the parsed cards and their texts and the step says
+so. A run that stores nothing, a refused push or an expired token files
+an issue labelled `archive-cards`, one per problem with a comment per
+further failing run, and the token's expiry is announced two weeks ahead
+the same way. A manual run can ask for `--reparse` or `--rerender`.
+Water-link is skipped on a runner, as the checks skip it; an archive run
+from a residential address stores it.
+
 ## License
 
 BSD 2-Clause. See [LICENSE](./LICENSE).

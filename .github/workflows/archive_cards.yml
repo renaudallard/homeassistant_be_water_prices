@@ -1,0 +1,327 @@
+name: Archive tariff cards
+
+on:
+  schedule:
+    # 05:23 UTC = 06:23 CET / 07:23 CEST, before the 06:00 live check. Off
+    # the hour, since the top of the hour is where GitHub sheds scheduled
+    # runs first.
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+    inputs:
+      reparse:
+        description: Replay every stored month through the parser even if it did not change.
+        default: false
+        required: false
+        type: boolean
+      rerender:
+        description: Replay every stored month with its PDFs rendered afresh, for a PDF reader upgrade.
+        default: false
+        required: false
+        type: boolean
+
+# The job pushes to the archive branch, and nothing else does; issues so a
+# failed run is filed rather than left on the Actions tab.
+permissions:
+  contents: write
+  issues: write
+
+# A manual run overlapping the schedule would push the same day's cards
+# twice and the second push would be rejected as non-fast-forward. Queue
+# it instead of cancelling: both runs are worth finishing.
+concurrency:
+  group: archive-cards
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    # A full walk is sixteen utilities and a few hundred commune pages; a
+    # parse that never returns is bounded per card by the script. A
+    # re-render renders every kept PDF again on top.
+    timeout-minutes: ${{ github.event.inputs.rerender == 'true' && 180 || 60 }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # What the extractors need, at the versions the test suite
+          # proved, plus freezegun, which pins the clock to a row's capture
+          # day while a stored month is replayed through the current parser.
+          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 freezegun
+
+      - name: Check out the archive branch
+        # The archive lives on its own branch so three years of daily
+        # commits stay out of main's history and out of every HACS
+        # download. Checked out as a worktree under tmp/, which main's
+        # .gitignore covers. The first run creates the branch unborn.
+        run: |
+          if git fetch --depth=1 origin archive; then
+            git worktree add --detach tmp/archive FETCH_HEAD
+            git -C tmp/archive checkout -B archive
+          else
+            git worktree add --orphan -b archive tmp/archive
+          fi
+
+      - name: Store today's cards
+        id: store
+        env:
+          CARDS_REPO: renaudallard/be_price_cards
+        run: >-
+          python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs
+          --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download"
+          --archive-base-url "${{ github.server_url }}/${{ github.repository }}/blob/archive"
+          ${{ github.event.inputs.reparse == 'true' && '--reparse' || '' }}
+          ${{ github.event.inputs.rerender == 'true' && '--rerender' || '' }}
+
+      - name: Keep the cards themselves
+        id: keep
+        # The PDFs go to the releases of be_price_cards, a repository shared
+        # with be_electricity_prices: this integration's releases are named
+        # water-<YYYY-MM> after the month the cards were seen in, the files
+        # by their SHA-256. Few water utilities publish a PDF, so a month
+        # holds a handful of files, but a card is a card and it belongs
+        # with the others rather than on a git branch. GitHub caps a release
+        # at a thousand assets; should a month ever overflow it spills into
+        # water-YYYY-MM-2, and the manifest on the branch says which release
+        # holds each file. Needs a fine-grained token with contents read and
+        # write on that repository in the BE_WATER_CARDS secret; without it
+        # the step says so and the branch still gets the parsed cards and
+        # their texts.
+        env:
+          GH_TOKEN: ${{ secrets.BE_WATER_CARDS }}
+          CARDS_REPO: renaudallard/be_price_cards
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "BE_WATER_CARDS is not set: today's PDFs are not kept" >&2
+            exit 0
+          fi
+          # A release needs a commit to tag, and a repository created empty
+          # has none: give it a first one, once.
+          cards_url="https://x-access-token:${GH_TOKEN}@github.com/${CARDS_REPO}.git"
+          if [ -z "$(git ls-remote --heads "$cards_url" 2>/dev/null)" ]; then
+            seed=$(mktemp -d)
+            printf '%s\n' \
+              "# Price cards" \
+              "" \
+              "The original tariff cards the Belgian price integrations refer to, kept as" \
+              "release assets named by their SHA-256, one namespace per integration." \
+              "Nothing here is edited by hand." \
+              > "$seed/README.md"
+            git -C "$seed" init -q -b main
+            git -C "$seed" add README.md
+            git -C "$seed" -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Start the card store"
+            git -C "$seed" push -q "$cards_url" main
+          fi
+          manifest=tmp/archive/pdfs.json
+          [ -s "$manifest" ] || echo '{}' > "$manifest"
+          ensure_release() {
+            gh release view "$1" --repo "$CARDS_REPO" >/dev/null 2>&1 && return 0
+            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The PDF tariff cards seen in $2 that the archive branch of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: https://github.com/${CARDS_REPO}/blob/main/water/pdfs.md#$1 (and coverage.md beside it links each utility, commune and month to its file)."
+          }
+          for dir in tmp/pdfs/water-*/; do
+            [ -d "$dir" ] || continue
+            base=$(basename "$dir")
+            month=${base#water-}
+            # Every release of this month that exists (normally one; a
+            # month never nears the cap): which file is where, and how full
+            # the last one is.
+            : > have.txt
+            n=1; tag=$base; count=0
+            while gh release view "$tag" --repo "$CARDS_REPO" --json assets --jq ".assets[].name | \"\(.) $tag\"" >> have.txt 2>/dev/null; do
+              count=$(gh release view "$tag" --repo "$CARDS_REPO" --json assets --jq '.assets | length')
+              next="$base-$((n + 1))"
+              gh release view "$next" --repo "$CARDS_REPO" >/dev/null 2>&1 || break
+              n=$((n + 1)); tag=$next
+            done
+            ensure_release "$tag" "$month"
+            # Where each file landed, merged into the manifest once per
+            # month rather than once per file.
+            : > landed.txt
+            for pdf in "$dir"*.pdf; do
+              name=$(basename "$pdf")
+              where=$(awk -v f="$name" '$1 == f {print $2; exit}' have.txt)
+              if [ -z "$where" ]; then
+                if [ "$count" -ge 1000 ]; then
+                  n=$((n + 1)); tag="$base-$n"; count=0
+                  ensure_release "$tag" "$month"
+                fi
+                gh release upload "$tag" "$pdf" --repo "$CARDS_REPO"
+                count=$((count + 1))
+                where=$tag
+              fi
+              echo "${name%.pdf} $where/$name" >> landed.txt
+            done
+            if [ -s landed.txt ]; then
+              jq -Rn '[inputs | split(" ") | {(.[0]): .[1]}] | add // {}' landed.txt > landed.json
+              jq -s '.[0] + .[1]' "$manifest" landed.json > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+            fi
+          done
+          # Same retention as the branch: a month older than three years goes.
+          # Only this integration's releases; the electricity ones are not ours.
+          cutoff="water-$(date -u -d '-36 months' +%Y-%m)"
+          gh release list --repo "$CARDS_REPO" --json tagName --jq '.[].tagName' \
+            | while read -r tag; do
+              case "$tag" in water-*) ;; *) continue ;; esac
+              if [ "$tag" \< "$cutoff" ]; then
+                gh release delete "$tag" --repo "$CARDS_REPO" --yes --cleanup-tag
+              fi
+            done
+
+      - name: Index the kept cards for people
+        # The walk wrote coverage.md and pdfs.md before today's uploads were
+        # in the manifest; rewrite them now so every month links to a file
+        # that exists. No fetch, a second or two.
+        env:
+          CARDS_REPO: renaudallard/be_price_cards
+        run: >-
+          python scripts/archive_cards.py --out tmp/archive --index-only
+          --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download"
+          --archive-base-url "${{ github.server_url }}/${{ github.repository }}/blob/archive"
+
+      - name: Publish the listings in the cards repository
+        # The releases name files by digest; the listings that name the
+        # cards live beside them, under this integration's own directory
+        # of the shared repository, so a person on the releases page is one
+        # click from the names. The root README is the same text the
+        # electricity workflow writes, so neither rewrites the other's. A
+        # commit only when a listing changed.
+        env:
+          CARDS_TOKEN: ${{ secrets.BE_WATER_CARDS }}
+          CARDS_REPO: renaudallard/be_price_cards
+        run: |
+          [ -n "$CARDS_TOKEN" ] || exit 0
+          cards_url="https://x-access-token:${CARDS_TOKEN}@github.com/${CARDS_REPO}.git"
+          git clone -q --depth=1 "$cards_url" tmp/cards
+          mkdir -p tmp/cards/water
+          printf '%s\n' \
+            "# Price cards" \
+            "" \
+            "The original tariff cards the Belgian price integrations refer to, kept as" \
+            "release assets named by their SHA-256, one namespace per integration:" \
+            "" \
+            "- \`electricity/\`: homeassistant_be_electricity_prices, releases \`electricity-<YYYY-MM>\`." \
+            "- \`water/\`: be_water_prices, releases \`water-<YYYY-MM>\`." \
+            "" \
+            "Each directory holds the listings that name the files: which contract and month" \
+            "a card is, and where to download it. Nothing here is edited by hand." \
+            > tmp/cards/README.md
+          printf '%s\n' \
+            "# Water cards" \
+            "" \
+            "The tariff cards homeassistant_be_water_prices parsed, kept as the assets of the" \
+            "\`water-<YYYY-MM>\` releases of this repository and named by their SHA-256. Most" \
+            "water utilities publish a page rather than a PDF; the text of every page as it" \
+            "was read is on the archive branch, and the coverage table links to it." \
+            "" \
+            "- \`coverage.md\`: per utility and commune, the months held, each linking to the" \
+            "  PDF or the page it was parsed from." \
+            "- \`pdfs.md\`: every kept card by release, with the utilities, communes and months" \
+            "  it was read for." \
+            "" \
+            "The parsed cards themselves are the \`archive\` branch of" \
+            "https://github.com/renaudallard/homeassistant_be_water_prices." \
+            > tmp/cards/water/README.md
+          cp tmp/archive/coverage.md tmp/archive/pdfs.md tmp/cards/water/
+          cd tmp/cards
+          git add -A
+          if git diff --cached --quiet; then
+            echo "listings unchanged"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Water listings of $(date -u +%Y-%m-%d)"
+          git push -q origin HEAD:main
+
+      - name: Warn before the upload token expires
+        # A fine-grained token lives a year at most, and the first sign of
+        # its expiry would otherwise be the failure issue on the morning
+        # after. GitHub reports a fine-grained token's expiry in a response
+        # header, so ask, and file an issue while there are still two weeks
+        # to make a new one and update the secret. Runs even when an earlier
+        # step failed: the warning is worth having either way.
+        if: always()
+        env:
+          CARDS_TOKEN: ${{ secrets.BE_WATER_CARDS }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -n "$CARDS_TOKEN" ] || exit 0
+          expires=$(GH_TOKEN=$CARDS_TOKEN gh api -i /user 2>/dev/null | tr -d '\r' | awk -F': ' 'tolower($1) == "github-authentication-token-expiration" {print $2}')
+          if [ -z "$expires" ]; then
+            echo "the upload token reports no expiry"
+            exit 0
+          fi
+          left=$(( ( $(date -u -d "$expires" +%s) - $(date -u +%s) ) / 86400 ))
+          echo "the upload token expires on $expires ($left days left)"
+          [ "$left" -le 14 ] || exit 0
+          {
+            echo "## The upload token expires on $expires"
+            echo
+            echo "$left day(s) left. Create a new fine-grained token with contents read and"
+            echo "write on the cards repository and store it as the BE_WATER_CARDS secret;"
+            echo "until then the PDFs of each day are offered again by the next run that"
+            echo "has a working token."
+          } > token_body.md
+          echo "token expires $expires" > token_fingerprint.txt
+          bash scripts/file_ci_issue.sh \
+            --label archive-cards \
+            --title "[archive-cards] the upload token expires soon" \
+            --body token_body.md \
+            --fingerprint token_fingerprint.txt \
+            --workflow .github/workflows/archive_cards.yml
+
+      - name: Commit and push what changed
+        id: push
+        run: |
+          cd tmp/archive
+          git add -A
+          if git diff --cached --quiet; then
+            echo "no card changed today"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Cards seen on $(date -u +%Y-%m-%d)"
+          git push origin archive
+
+      - name: File the failure as an issue
+        # Nobody watches the Actions tab. A run that stored nothing, a push
+        # that was refused or an upload token that has expired (fine-grained
+        # tokens live a year at most) would otherwise end the archive quietly.
+        # One open issue per problem, a comment per further failing run,
+        # and it says which step failed so the token case is told from the
+        # others.
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          label='archive-cards'
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed=''
+          [ "${{ steps.store.outcome }}" = 'failure' ] && failed='Store today'"'"'s cards (the walk stored nothing, or crashed)'
+          [ "${{ steps.keep.outcome }}" = 'failure' ] && failed='Keep the cards themselves (the upload to the cards repository; check the BE_WATER_CARDS token, it expires)'
+          [ "${{ steps.push.outcome }}" = 'failure' ] && failed='Commit and push what changed (the push to the archive branch)'
+          {
+            echo "## Run"
+            echo
+            echo "$run_url"
+            echo
+            echo "## Failed step"
+            echo
+            echo "${failed:-an earlier step; see the run}"
+          } > issue_body.md
+          # The failed step is the fingerprint: the same step failing again
+          # within the week adds nothing, a different one is posted at once.
+          echo "${failed:-unknown}" > failed_step.txt
+          bash scripts/file_ci_issue.sh \
+            --label "$label" \
+            --title "[archive-cards] the card archive run failed" \
+            --body issue_body.md \
+            --fingerprint failed_step.txt \
+            --workflow .github/workflows/archive_cards.yml
