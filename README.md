@@ -407,16 +407,19 @@ you paid is worth more than a tidy chart.
   is wrong. It was set too high by an overstated reading, and it is rebuilt
   under the meter with the year's figure left untouched, which puts live
   tracking back to work instead of restarting the year at zero.
-  The same applies upward: a reading that climbs more than 100 m³ in one
-  report is held until the next reading confirms it, so one garbage value
-  cannot pin the year's figure while a real catch-up after a long outage
-  still lands. Two readings agreeing say where the meter is, though, not
-  where it stood in January, so a confirmed climb that the recorder's own
-  figure for the year contradicts by more than 100 m³ is treated as a
-  baseline sitting under the meter and rebuilds it instead of being billed.
+  The same applies upward: a reading that climbs more than 30 m³ in one
+  report is held until the next reading confirms it, the bound growing by
+  a cubic metre for each day the meter was out of sight, so one garbage
+  value cannot pin the year's figure while a real catch-up after a long
+  outage still lands. Two readings agreeing say where the meter is,
+  though, not where it stood in January, so a confirmed climb that still
+  stands that far above the year's own figure is read as a baseline
+  sitting under the meter: with a recorder answer in hand the baseline is
+  rebuilt under the reading instead of the difference being billed.
   A genuine catch-up is not affected: the recorder sees the same water and
   agrees. With no recorder answer in that round there is nothing to weigh
-  the baseline against, and the confirmed reading is taken as it stands.
+  the baseline against, so the figure holds where it is and the next daily
+  tick brings one.
   If the recorder cannot be read at the moment the year rolls over, neither
   sensor starts the new year at 0: a query that failed is not the same as a
   year that is genuinely empty, and anchoring on it would discard
