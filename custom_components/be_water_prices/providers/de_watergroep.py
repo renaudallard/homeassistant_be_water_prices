@@ -63,7 +63,7 @@ from bs4 import BeautifulSoup
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_html
-from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, to_float
+from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, memoised_text, to_float
 from .base import (
     CommuneOption,
     ExtractorError,
@@ -290,34 +290,39 @@ async def _fetch_commune_ajax(
     """
     target = year or date.today().year
     url = COMMUNE_DETAIL_URL_FMT.format(year=target)
-    try:
-        async with session.get(
-            url,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Cookie": f"dwg_l={commune}",
-                "X-Requested-With": "XMLHttpRequest",
-            },
-            timeout=aiohttp.ClientTimeout(total=30),
-            # The commune cookie must not travel to wherever a redirect
-            # points; a moved endpoint is a failure to look at.
-            allow_redirects=False,
-        ) as resp:
-            if not 200 <= resp.status < 300:
-                raise _http_error(url, resp.status)
-            text = await _read_text_capped(resp, url)
-    except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(
-            f"network error fetching De Watergroep AJAX endpoint: {error_text(err)}"
-        ) from err
-    finally:
-        # The session is shared, and aiohttp merges its jar into the Cookie
-        # header it sends. A dwg_l the endpoint set on an earlier request
-        # would then travel with the next one and could answer for a
-        # commune nobody asked about, with nothing in the answer to reveal
-        # it: the commune is not named anywhere in the body. Drop it again
-        # so each request carries only the one it was given.
-        session.cookie_jar.clear(lambda cookie: cookie.key == "dwg_l")
+
+    async def read() -> str:
+        try:
+            async with session.get(
+                url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Cookie": f"dwg_l={commune}",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+                # The commune cookie must not travel to wherever a redirect
+                # points; a moved endpoint is a failure to look at.
+                allow_redirects=False,
+            ) as resp:
+                if not 200 <= resp.status < 300:
+                    raise _http_error(url, resp.status)
+                return await _read_text_capped(resp, url)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise TransientFetchError(
+                f"network error fetching De Watergroep AJAX endpoint: {error_text(err)}"
+            ) from err
+        finally:
+            # The session is shared, and aiohttp merges its jar into the Cookie
+            # header it sends. A dwg_l the endpoint set on an earlier request
+            # would then travel with the next one and could answer for a
+            # commune nobody asked about, with nothing in the answer to reveal
+            # it: the commune is not named anywhere in the body. Drop it again
+            # so each request carries only the one it was given.
+            session.cookie_jar.clear(lambda cookie: cookie.key == "dwg_l")
+
+    # The commune is not in the URL, so the memo key carries it.
+    text = await memoised_text(f"{url}#dwg_l={commune}", read)
     if not text.strip() or "Basistarief" not in text:
         raise ExtractorError(
             f"De Watergroep returned an empty body for commune {commune!r} "

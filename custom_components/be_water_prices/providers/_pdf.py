@@ -350,6 +350,22 @@ def memoise_text_fetches(store: dict[str, str]) -> Iterator[None]:
         _TEXT_MEMO.reset(token)
 
 
+async def memoised_text(key: str, fetch: Callable[[], Awaitable[str]]) -> str:
+    """``fetch`` once per ``key`` inside memoise_text_fetches, every time
+    outside it. The key is the URL for a page and ``layout\0<url>`` for a
+    rendered PDF; a provider that asks one endpoint for several answers (a
+    commune in a cookie, or in a form field) puts what it asked for in the
+    key, since the URL alone would serve the first commune's answer to
+    every other."""
+    memo = _TEXT_MEMO.get()
+    if memo is not None and key in memo:
+        return memo[key]
+    text = await fetch()
+    if memo is not None:
+        memo[key] = text
+    return text
+
+
 # How downloaded PDF bytes become text, when someone other than the reader
 # wants a say. The card archiver keys the render on the bytes' hash, so a
 # card that has not changed since it was stored is neither rendered nor
@@ -382,32 +398,29 @@ async def render_pdf(variant: str, url: str, payload: bytes, render: Callable[[b
 
 async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str:
     """Download ``url`` and return its text with the table layout kept."""
-    memo = _TEXT_MEMO.get()
-    key = f"layout\0{url}"
-    if memo is not None and key in memo:
-        return memo[key]
-    try:
-        async with session.get(
-            url,
-            headers={"User-Agent": USER_AGENT},
-            timeout=aiohttp.ClientTimeout(total=30),
-        ) as resp:
-            if not 200 <= resp.status < 300:
-                raise _http_error(url, resp.status)
-            _guard_redirect(url, resp)
-            content_type = resp.content_type
-            payload = await _read_capped(resp, url)
-    except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
-    if not _is_pdf_payload(payload):
-        # The content type, not the first bytes: whatever answered is not
-        # the tariff card, and quoting it put a stranger's page into a
-        # sensor attribute and the diagnostics dump.
-        raise ExtractorError(f"the answer from {url} ({content_type}) has no PDF signature")
-    text = await render_pdf("layout", url, payload, extract_pdf_text_layout)
-    if memo is not None:
-        memo[key] = text
-    return text
+
+    async def read() -> str:
+        try:
+            async with session.get(
+                url,
+                headers={"User-Agent": USER_AGENT},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if not 200 <= resp.status < 300:
+                    raise _http_error(url, resp.status)
+                _guard_redirect(url, resp)
+                content_type = resp.content_type
+                payload = await _read_capped(resp, url)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
+        if not _is_pdf_payload(payload):
+            # The content type, not the first bytes: whatever answered is not
+            # the tariff card, and quoting it put a stranger's page into a
+            # sensor attribute and the diagnostics dump.
+            raise ExtractorError(f"the answer from {url} ({content_type}) has no PDF signature")
+        return await render_pdf("layout", url, payload, extract_pdf_text_layout)
+
+    return await memoised_text(f"layout\0{url}", read)
 
 
 async def fetch_text(
@@ -425,26 +438,24 @@ async def fetch_text(
     is not sent by the server). The risk is bounded -- worst case is
     a MitM serving stale tariff numbers, no credentials are involved.
     """
-    memo = _TEXT_MEMO.get()
-    if memo is not None and url in memo:
-        return memo[url]
-    try:
-        kwargs: dict[str, object] = {
-            "headers": {"User-Agent": USER_AGENT},
-            "timeout": aiohttp.ClientTimeout(total=timeout),
-        }
-        if not verify_ssl:
-            kwargs["ssl"] = False
-        async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
-            if not 200 <= resp.status < 300:
-                raise _http_error(url, resp.status)
-            _guard_redirect(url, resp)
-            body = await _read_text_capped(resp, url)
-    except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
-    if memo is not None:
-        memo[url] = body
-    return body
+
+    async def read() -> str:
+        try:
+            kwargs: dict[str, object] = {
+                "headers": {"User-Agent": USER_AGENT},
+                "timeout": aiohttp.ClientTimeout(total=timeout),
+            }
+            if not verify_ssl:
+                kwargs["ssl"] = False
+            async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
+                if not 200 <= resp.status < 300:
+                    raise _http_error(url, resp.status)
+                _guard_redirect(url, resp)
+                return await _read_text_capped(resp, url)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
+
+    return await memoised_text(url, read)
 
 
 _NUMERIC_SEPARATORS = (

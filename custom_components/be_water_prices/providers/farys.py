@@ -65,7 +65,15 @@ from .._phantom_blocklists import (
 )
 from ..const import DEFAULT_VAT_RATE, REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, fetch_text, to_float
+from ._pdf import (
+    USER_AGENT,
+    _http_error,
+    _read_text_capped,
+    error_text,
+    fetch_text,
+    memoised_text,
+    to_float,
+)
 from .base import (
     CommuneOption,
     ExtractorError,
@@ -303,25 +311,31 @@ async def _post_for_commune(session: aiohttp.ClientSession, commune_id: str) -> 
         "form_id": "farys_municipalities_switcher_form",
         "_triggering_element_name": "municipality",
     }
-    try:
-        async with session.post(
-            ENDPOINT_URL,
-            data=payload,
-            headers={
-                "User-Agent": USER_AGENT,
-                "X-Requested-With": "XMLHttpRequest",
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-            },
-            timeout=aiohttp.ClientTimeout(total=30),
-            allow_redirects=False,
-        ) as resp:
-            if not 200 <= resp.status < 300:
-                raise _http_error(ENDPOINT_URL, resp.status)
-            return await _read_text_capped(resp, ENDPOINT_URL)
-    except (aiohttp.ClientError, TimeoutError) as err:
-        raise TransientFetchError(
-            f"network error fetching Farys AJAX endpoint: {error_text(err)}"
-        ) from err
+
+    async def read() -> str:
+        try:
+            async with session.post(
+                ENDPOINT_URL,
+                data=payload,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+                allow_redirects=False,
+            ) as resp:
+                if not 200 <= resp.status < 300:
+                    raise _http_error(ENDPOINT_URL, resp.status)
+                return await _read_text_capped(resp, ENDPOINT_URL)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise TransientFetchError(
+                f"network error fetching Farys AJAX endpoint: {error_text(err)}"
+            ) from err
+
+    # The commune is a form field, not part of the URL, so the memo key
+    # carries it.
+    return await memoised_text(f"{ENDPOINT_URL}#municipality={commune_id}", read)
 
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:

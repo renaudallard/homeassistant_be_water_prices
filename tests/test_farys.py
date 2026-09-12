@@ -331,3 +331,17 @@ def test_a_tussenkomst_row_whose_vat_twin_disagrees_is_refused() -> None:
     assert raw.count("-0,0855") == 1
     with pytest.raises(ExtractorError, match="do not agree"):
         parse_tariff(raw.replace("-0,0855", "-0,1855"), year=2026)
+
+
+async def test_the_commune_is_part_of_the_memo_key() -> None:
+    """One endpoint answers every commune, the commune being a form field,
+    so the memo key carries it: a stored answer is served without a
+    request, another commune's is not."""
+    from custom_components.be_water_prices.providers import farys
+    from custom_components.be_water_prices.providers._pdf import memoise_text_fetches
+
+    store = {f"{farys.ENDPOINT_URL}#municipality=25071": "[]"}
+    with memoise_text_fetches(store):
+        assert await farys._post_for_commune(None, "25071") == "[]"  # type: ignore[arg-type]
+        with pytest.raises(AttributeError):
+            await farys._post_for_commune(None, "25926")  # type: ignore[arg-type]

@@ -349,3 +349,21 @@ async def test_the_default_commune_has_nothing_to_fall_back_to() -> None:
     with patch.object(dwg, "_newest_commune_card", new=cards), pytest.raises(dwg.UnshowableLeg):
         await dwg.fetch_for_commune(object(), dwg._DEFAULT_COMMUNE_GUID)
     assert cards.await_count == 1
+
+
+async def test_the_commune_is_part_of_the_memo_key() -> None:
+    """Every commune is asked at the same URL, the commune riding in a
+    cookie, so a memo keyed on the URL alone would answer every commune
+    with the first one's card. The key carries the commune: a stored
+    answer is served without a request, another commune is not."""
+    from custom_components.be_water_prices.providers import de_watergroep
+    from custom_components.be_water_prices.providers._pdf import memoise_text_fetches
+
+    url = de_watergroep.COMMUNE_DETAIL_URL_FMT.format(year=2026)
+    store = {f"{url}#dwg_l=guid-1": "<p>Basistarief 2,1888</p>"}
+    with memoise_text_fetches(store):
+        text, year = await de_watergroep._fetch_commune_ajax(None, "guid-1", 2026)  # type: ignore[arg-type]
+        assert (text, year) == ("<p>Basistarief 2,1888</p>", 2026)
+        with pytest.raises(AttributeError):
+            # A miss reaches the session, which here is nothing.
+            await de_watergroep._fetch_commune_ajax(None, "guid-2", 2026)  # type: ignore[arg-type]
