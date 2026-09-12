@@ -218,5 +218,6 @@ async def test_run_exit_code_follows_the_worst_outcome(
             )
         ],
     )
-    _results, rc = await fixture_drift._run()
+    _results, rc, cache = await fixture_drift._run()
     assert rc == expected_rc
+    assert cache is None

@@ -29,11 +29,25 @@ jobs:
           # into a job that has no use for it.
           pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4
 
+      - name: Check out the archive branch's texts
+        # A PDF the card archive walked earlier today and still holds is
+        # not rendered again: the check downloads it and parses it, and
+        # takes the render from the branch. A fork's pull request has no
+        # such branch and renders everything, as before.
+        run: |
+          if git fetch --depth=1 origin archive 2>/dev/null; then
+            git worktree add --detach tmp/archive FETCH_HEAD
+          else
+            echo "no archive branch to read texts from; every PDF is rendered"
+          fi
+
       - name: Run fixture drift check
         id: check
         run: |
           set +e
-          python scripts/fixture_drift.py > report.md
+          texts=''
+          [ -d tmp/archive ] && texts='--texts tmp/archive'
+          python scripts/fixture_drift.py $texts > report.md
           rc=$?
           if [ ! -s report.md ]; then
             # No report at all: the script crashed before writing one,

@@ -52,11 +52,13 @@ is set and opens the broken-extractor issue only when bit 1 is set.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import os
 import sys
 import traceback
 from collections.abc import Awaitable, Callable
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -65,9 +67,14 @@ import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 # Imports happen after sys.path mutation; the package's __init__ is lazy so
-# this works without homeassistant being installed.
+# this works without homeassistant being installed. The render cache is
+# the card archiver's own, so a card the archive already holds is not
+# rendered again here.
+from card_texts import StoredTexts  # noqa: E402
+
 from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterExtractor,
     WaterTariff,
@@ -75,6 +82,7 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
     de_watergroep,
     pidpa,
 )
+from custom_components.be_water_prices.providers._pdf import render_through  # noqa: E402
 from custom_components.be_water_prices.providers.base import (  # noqa: E402
     ExtractorError,
     TransientFetchError,
@@ -252,14 +260,32 @@ def _exit_code(results: list[CheckResult]) -> int:
     return rc
 
 
-async def _run() -> tuple[list[CheckResult], int]:
-    async with aiohttp.ClientSession() as session:
-        results = [await _check_one(session, e) for e in all_extractors()]
-        results += [await _check_probe(session, p) for p in PRIMARY_PATH_PROBES]
-    return results, _exit_code(results)
+async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, StoredTexts | None]:
+    """Every check, with the archive branch's texts as a render cache when
+    a checkout is given: a PDF whose bytes the branch already holds is
+    downloaded and measured as before, but its text is read from the
+    branch instead of being rendered again."""
+    cache = StoredTexts(texts) if texts is not None else None
+    with ExitStack() as hooks:
+        if cache is not None:
+            hooks.enter_context(render_through(cache.render))
+        async with aiohttp.ClientSession() as session:
+            results = [await _check_one(session, e) for e in all_extractors()]
+            results += [await _check_probe(session, p) for p in PRIMARY_PATH_PROBES]
+    return results, _exit_code(results), cache
 
 
-def _render(results: list[CheckResult]) -> str:
+def _texts_line(cache: StoredTexts | None) -> str:
+    """How much rendering the archive's texts saved this run."""
+    if cache is None:
+        return ""
+    return (
+        f"\n\n_{cache.unrendered} of {cache.unrendered + cache.rendered} PDFs were served from"
+        f" the archive's texts; {cache.rendered} were rendered._"
+    )
+
+
+def _render(results: list[CheckResult], cache: StoredTexts | None = None) -> str:
     lines = ["# Water extractor live check", ""]
     lines.append("| utility | region | status | detail |")
     lines.append("|---|---|---|---|")
@@ -297,12 +323,21 @@ def _render(results: list[CheckResult]) -> str:
         else:
             headline = "All reachable extractors green"
         lines.append(f"{headline} ({counts}).")
-    return "\n".join(lines)
+    return "\n".join(lines) + _texts_line(cache)
 
 
 def main() -> int:
-    results, rc = asyncio.run(_run())
-    print(_render(results))
+    parser = argparse.ArgumentParser(description="Fetch every utility's live tariff and check it.")
+    parser.add_argument(
+        "--texts",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="a checkout of the archive branch; PDFs it already holds are not rendered again",
+    )
+    args = parser.parse_args()
+    results, rc, cache = asyncio.run(_run(args.texts))
+    print(_render(results, cache))
     return rc
 
 

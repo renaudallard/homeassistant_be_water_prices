@@ -32,7 +32,11 @@ a false GitHub issue; only a genuine parse / shape / 4xx failure is FAIL.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import aiohttp
 import pytest
@@ -305,3 +309,94 @@ def test_validate_refuses_an_implausible_tariff() -> None:
     assert "no volumetric" in (_validate(replace(sane, basis_eur_per_m3=None), "flanders") or "")
     far = replace(sane, valid_from=date(2000, 1, 1))
     assert "too far" in (_validate(far, "flanders") or "")
+
+
+async def test_a_pdf_the_archive_holds_is_not_rendered_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a checkout of the archive branch, a downloaded PDF whose bytes a
+    stored row names is served that row's text instead of being rendered,
+    and the report says how many were."""
+    import hashlib
+    import json
+
+    from custom_components.be_water_prices.providers import _pdf
+    from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+    from scripts import live_check
+
+    payload = b"%PDF card"
+    digest = hashlib.sha256(payload).hexdigest()
+    (tmp_path / "texts").mkdir()
+    (tmp_path / "texts/abc.txt").write_text("stored text")
+    row = tmp_path / "acme/default/2026-09.json"
+    row.parent.mkdir(parents=True)
+    row.write_text(
+        json.dumps(
+            {
+                "_sources": [
+                    {
+                        "url": "https://acme.test/card.pdf",
+                        "variant": "layout",
+                        "text": "texts/abc.txt",
+                        "pdf": digest,
+                    }
+                ]
+            }
+        )
+    )
+
+    class _Chunks:
+        async def iter_chunked(self, _size: int) -> AsyncIterator[bytes]:
+            yield payload
+
+    class _Response:
+        status = 200
+        content_length = None
+        content_type = "application/pdf"
+        history: tuple[object, ...] = ()
+        content = _Chunks()
+
+        async def __aenter__(self) -> _Response:
+            return self
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    class _Session:
+        def get(self, *_a: object, **_k: object) -> _Response:
+            return _Response()
+
+    seen: list[str] = []
+
+    async def fetch(_session: Any) -> WaterTariff:
+        text = await _pdf.fetch_pdf_text_layout(_Session(), "https://acme.test/card.pdf")  # type: ignore[arg-type]
+        seen.append(text)
+        return WaterTariff(
+            utility="acme",
+            region="flanders",
+            valid_from=date(2026, 1, 1),
+            valid_until=date(2026, 12, 31),
+            publication_label="Tarieven 2026",
+            source_url="https://acme.test/card.pdf",
+            yearly_fixed_fee=100.0,
+            basis_eur_per_m3=2.0,
+        )
+
+    def never(_payload: bytes) -> str:
+        raise AssertionError("rendered")
+
+    monkeypatch.setattr(_pdf, "extract_pdf_text_layout", never)
+    monkeypatch.setattr(
+        live_check,
+        "all_extractors",
+        lambda: (WaterExtractor(id="acme", label="Acme", region="flanders", fetch=fetch),),
+    )
+    monkeypatch.setattr(live_check, "PRIMARY_PATH_PROBES", ())
+    results, rc, cache = await live_check._run(tmp_path)
+    assert (rc, seen) == (0, ["stored text"])
+    assert cache is not None and (cache.unrendered, cache.rendered) == (1, 0)
+    assert (
+        "1 of 1 PDFs were served from the archive's texts; 0 were rendered"
+        in live_check._render(results, cache)
+    )
+    assert not live_check._render(results).endswith("rendered._")

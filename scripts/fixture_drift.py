@@ -53,11 +53,13 @@ workflow opens or updates a single GitHub issue with this report.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import os
 import sys
 import traceback
 from collections.abc import Awaitable, Callable
+from contextlib import ExitStack
 from dataclasses import dataclass, fields
 from pathlib import Path
 
@@ -65,9 +67,14 @@ import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 # Imports happen after sys.path mutation; the package's __init__ is lazy so
-# this works without homeassistant being installed.
+# this works without homeassistant being installed. The render cache is
+# the card archiver's own, so a live PDF the archive already holds is not
+# rendered again here; the fixture side renders as always.
+from card_texts import StoredTexts  # noqa: E402
+
 from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterTariff,
     agso_knokke,
@@ -90,6 +97,7 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
 )
 from custom_components.be_water_prices.providers._pdf import (  # noqa: E402
     extract_pdf_text_layout,
+    render_through,
 )
 from custom_components.be_water_prices.providers.base import (  # noqa: E402
     ExtractorError,
@@ -390,9 +398,13 @@ async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> Drift
     return DriftResult(chk, _diff(fixture_t, live_t), error=None)
 
 
-async def _run() -> tuple[list[DriftResult], int]:
-    async with aiohttp.ClientSession() as session:
-        results = [await _check_one(session, c) for c in CHECKS]
+async def _run(texts: Path | None = None) -> tuple[list[DriftResult], int, StoredTexts | None]:
+    cache = StoredTexts(texts) if texts is not None else None
+    with ExitStack() as hooks:
+        if cache is not None:
+            hooks.enter_context(render_through(cache.render))
+        async with aiohttp.ClientSession() as session:
+            results = [await _check_one(session, c) for c in CHECKS]
     drifted = sum(1 for r in results if r.deltas)
     errored = sum(1 for r in results if r.error is not None)
     # Skipped entries (CI-unreachable utilities) do not flip the exit
@@ -400,13 +412,13 @@ async def _run() -> tuple[list[DriftResult], int]:
     # user is unaffected. The skip reason still appears in the report
     # so the maintainer can rerun locally.
     if drifted or errored:
-        return results, 1
+        return results, 1, cache
     # Nothing drifted, but a utility skipped on a blip was not actually
     # checked. Exit 2 so the workflow neither files an issue nor claims the
     # drift cleared on one it already has open.
     if any(r.transient for r in results):
-        return results, 2
-    return results, 0
+        return results, 2, cache
+    return results, 0, cache
 
 
 def _fmt(value: float | None) -> str:
@@ -415,7 +427,17 @@ def _fmt(value: float | None) -> str:
     return f"{value:.4f}"
 
 
-def _render(results: list[DriftResult]) -> str:
+def _texts_line(cache: StoredTexts | None) -> str:
+    """How much rendering the archive's texts saved this run."""
+    if cache is None:
+        return ""
+    return (
+        f"\n\n_{cache.unrendered} of {cache.unrendered + cache.rendered} live PDFs were served"
+        f" from the archive's texts; {cache.rendered} were rendered._"
+    )
+
+
+def _render(results: list[DriftResult], cache: StoredTexts | None = None) -> str:
     drifted = [r for r in results if r.deltas]
     errored = [r for r in results if r.error is not None]
     skipped = [r for r in results if r.skipped is not None]
@@ -438,7 +460,7 @@ def _render(results: list[DriftResult]) -> str:
             lines.append("")
             for r in skipped:
                 lines.append(f"- **{r.check.label}**: {r.skipped}")
-        return "\n".join(lines)
+        return "\n".join(lines) + _texts_line(cache)
 
     lines.append(
         f"**{len(drifted)} drifted, {len(errored)} errored, "
@@ -483,12 +505,23 @@ def _render(results: list[DriftResult]) -> str:
         lines.append("")
         lines.append(", ".join(r.check.label for r in clean))
 
-    return "\n".join(lines)
+    return "\n".join(lines) + _texts_line(cache)
 
 
 def main() -> int:
-    results, rc = asyncio.run(_run())
-    print(_render(results))
+    parser = argparse.ArgumentParser(
+        description="Diff every utility's live tariff against its fixture."
+    )
+    parser.add_argument(
+        "--texts",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="a checkout of the archive branch; PDFs it already holds are not rendered again",
+    )
+    args = parser.parse_args()
+    results, rc, cache = asyncio.run(_run(args.texts))
+    print(_render(results, cache))
     return rc
 
 

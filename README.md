@@ -717,6 +717,12 @@ Actions IP ranges. Reachable from residential IPs; rerun either
 script locally to drift-check Water-link. The skip is keyed on the
 runner's `GITHUB_ACTIONS` variable, so a local run does check it.
 
+Both checks read the archive branch's texts when a checkout is given
+(`--texts tmp/archive`, which the workflows pass after fetching the
+branch): a PDF whose bytes the archive already holds is downloaded and
+parsed as before, but its text is taken from the branch instead of being
+rendered again, and the report ends with how many were served that way.
+
 The readers in `providers/_pdf.py` carry two seams for scripts that walk
 every utility in one go, both off in Home Assistant itself: a text memo
 (`memoise_text_fetches`) that serves a page or a rendered PDF read twice
