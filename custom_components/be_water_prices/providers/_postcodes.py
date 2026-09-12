@@ -66,12 +66,13 @@ Coverage:
                   Halle-Vilvoorde postcodes below)
   * 2000-2070    Antwerp city core                      → WATER-LINK
   * 2100-2999    Rest of Antwerp province               → PIDPA
-                 (Water-link's ring communes -- Edegem,
-                  Hove, Mortsel, Schoten, Beveren, etc.
-                  -- need the manual picker; their
-                  postcodes overlap with Pidpa's wider
-                  service area so we default to Pidpa
-                  outside the city core)
+                 (minus the Water-link postcodes below:
+                  the city's other districts, and Hove,
+                  Mortsel and Edegem, which carry a
+                  billing row of their own on its card.
+                  Ranst, Hemiksem and Schoten stay with
+                  Pidpa: Water-link lists them and
+                  bills none of them)
   * 1300-1499,
     4000-7999    Per the ZDE-derived
                  ``_PER_POSTCODE`` table       → SWDE / CILE /
@@ -926,10 +927,10 @@ def _resolve_single(code: int) -> str | None:
     # Brussels.
     if 1000 <= code <= 1299:
         return "vivaqua"
-    # Antwerp city core is Water-link; rest of the province is Pidpa. Ring
-    # communes (Edegem, Hove, Mortsel, etc.) overlap with Pidpa's wider
-    # service area so we default to Pidpa there and let the user override
-    # via the manual picker.
+    # Antwerp city core is Water-link, and so is every postcode its card
+    # bills on a row of its own: the city's other districts, and the three
+    # ring communes. The rest of the province is Pidpa, the three communes
+    # Water-link lists without billing them included.
     if 2000 <= code <= 2070 or code in _WATER_LINK_POSTCODES:
         return "water_link"
     if 2000 <= code <= 2999:
