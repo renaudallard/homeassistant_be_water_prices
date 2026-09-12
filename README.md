@@ -469,12 +469,12 @@ you paid is worth more than a tidy chart.
   € 791,28 at one.
 
   Four Flemish operators print the sum of their own three legs next to
-  them; Water-link's parser already checked its row against that total,
-  and this release added the same check to AGSO Knokke's "Integrale
-  waterprijs excl. BTW" row, Pidpa's fifth column and Farys's "Integrale
-  waterprijs basistarief". Each parser checks the legs against that sum, which catches a cell read from the
-  wrong column even when the VMM 2× rule still holds, and never goes
-  stale the way a pinned Flanders-wide constant would.
+  them, and each of those parsers checks its legs against that sum:
+  Water-link's fourth column, AGSO Knokke's "Integrale waterprijs excl.
+  BTW" row, Pidpa's fifth column and Farys's "Integrale waterprijs
+  basistarief". It catches a cell read from the wrong column even when
+  the VMM 2× rule still holds, and never goes stale the way a pinned
+  Flanders-wide constant would.
 
   If your Energy dashboard lists more than one water source, the
   integration bills whichever it stores first, which reflects the order
