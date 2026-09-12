@@ -130,18 +130,14 @@ jobs:
             echo
             cat fail_report.md
           } > issue_body.md
-
-          existing=$(gh issue list \
-            --state open \
-            --search "\"$title_prefix\" in:title" \
-            --json number,title \
-            --jq '.[0].number // empty')
-
-          if [ -n "$existing" ]; then
-            echo "appending comment to issue #$existing"
-            gh issue comment "$existing" --body-file issue_body.md
-          else
-            gh issue create \
-              --title "$title_prefix ($(date -u +%Y-%m-%d))" \
-              --body-file issue_body.md
-          fi
+          # One issue per problem, found by its label; the failing
+          # utilities are the fingerprint, so a utility that stays broken
+          # gets one comment a week rather than one a day, and a failure
+          # that changes shape is posted at once.
+          grep '| FAIL |' fail_report.md | cut -d'|' -f2 | sed 's/^ *//;s/ *$//' | sort > failed.txt
+          bash scripts/file_ci_issue.sh \
+            --label live-check \
+            --title "$title_prefix" \
+            --body issue_body.md \
+            --fingerprint failed.txt \
+            --workflow .github/workflows/live_check.yml

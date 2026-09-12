@@ -711,9 +711,12 @@ Two cron workflows guard against silent regressions:
 - [`.github/workflows/live_check.yml`](./.github/workflows/live_check.yml)
   runs daily, hits every registered extractor against its real
   publication URL, retries up to five times with exponential
-  backoff, and opens / updates a GitHub issue titled
-  `[live-check] water extractor broken …` on persistent parser
-  failure. Transient upstream hiccups (timeout, connection reset,
+  backoff, and opens or updates one GitHub issue, found by its
+  `live-check` label (`[live-check] water extractor broken …`), on
+  persistent parser failure. The failing utilities are the fingerprint:
+  a utility that stays broken gets one comment a week rather than one a
+  day, and a failure that changes shape is posted at once. Transient
+  upstream hiccups (timeout, connection reset,
   HTTP 5xx / 429) are reported as a `TRANSIENT` row and retried but
   never open an issue — only a real regression (parse / shape error,
   HTTP 3xx / 4xx) does, so a brief outage at a utility is not mistaken for a
@@ -724,9 +727,11 @@ Two cron workflows guard against silent regressions:
 - [`.github/workflows/fixture_drift.yml`](./.github/workflows/fixture_drift.yml)
   runs weekly, parses each utility's live publication and diffs
   the result against the parser's output on the committed test
-  fixture. Opens / updates `[fixture-drift] water fixtures need
-  refresh …` when any tariff field drifts above the threshold
-  (rates `> 0.001` €/m³, fees `> 0.01` €/year). Catches *silent
+  fixture. Opens or updates one issue, found by its `fixture-drift`
+  label (`[fixture-drift] water fixtures need refresh …`), when any
+  tariff field drifts above the threshold (rates `> 0.001` €/m³, fees
+  `> 0.01` €/year), the drifted fields being the fingerprint so an
+  unchanged drift gets one comment a week. Catches *silent
   rate drift* that the live check misses. A run where a utility was
   unreachable on a blip exits 2 rather than 0, so it neither opens an
   issue nor comments "drift cleared" on an open one it did not recheck.

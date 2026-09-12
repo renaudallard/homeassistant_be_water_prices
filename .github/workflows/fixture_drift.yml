@@ -79,21 +79,17 @@ jobs:
             echo
             cat report.md
           } > issue_body.md
-
-          existing=$(gh issue list \
-            --state open \
-            --search "\"$title_prefix\" in:title" \
-            --json number,title \
-            --jq '.[0].number // empty')
-
-          if [ -n "$existing" ]; then
-            echo "appending comment to issue #$existing"
-            gh issue comment "$existing" --body-file issue_body.md
-          else
-            gh issue create \
-              --title "$title_prefix ($(date -u +%Y-%m-%d))" \
-              --body-file issue_body.md
-          fi
+          # One issue per problem, found by its label; the drifted fields
+          # and the errors are the fingerprint, so a drift that stays as it
+          # is gets one comment a week rather than one a day, and a new
+          # drift is posted at once.
+          grep -E '^\| |^- \*\*' report.md > drifted.txt || true
+          bash scripts/file_ci_issue.sh \
+            --label fixture-drift \
+            --title "$title_prefix" \
+            --body issue_body.md \
+            --fingerprint drifted.txt \
+            --workflow .github/workflows/fixture_drift.yml
 
       # rc 2 means nothing drifted but a utility was unreachable on a blip,
       # so this run did not actually check everything: neither file an issue
@@ -119,12 +115,12 @@ jobs:
         run: |
           # Add a "drift cleared" comment to any open drift issue so
           # the maintainer sees that the situation resolved itself,
-          # but never close the issue automatically.
-          title_prefix='[fixture-drift] water fixtures need refresh'
+          # but never close the issue automatically. The issue is the one
+          # under the label, the same one the filer comments on.
           existing=$(gh issue list \
             --state open \
-            --search "\"$title_prefix\" in:title" \
-            --json number,title \
+            --label fixture-drift \
+            --json number \
             --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue comment "$existing" \
