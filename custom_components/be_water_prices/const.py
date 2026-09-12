@@ -57,6 +57,15 @@ REGIONS: tuple[str, ...] = (REGION_FLANDERS, REGION_WALLONIA, REGION_BRUSSELS)
 # Daily refresh; tariffs change once a year so anything tighter is wasted work.
 UPDATE_INTERVAL_HOURS = 24
 
+# The project's own daily capture of every utility's card, one JSON per
+# utility, commune and month on the archive branch (scripts/archive_cards.py
+# writes it). Read only when a refresh fails with nothing cached to serve,
+# a restart while the utility is down, so the entry loads on the last card
+# the archive saw instead of retrying setup until the utility is back.
+CARD_ARCHIVE_URL = (
+    "https://raw.githubusercontent.com/renaudallard/homeassistant_be_water_prices/archive"
+)
+
 # Treat the snapshot as stale once it has not been refreshed for this many days
 # OR the parsed valid_until is in the past. Surfaced as a sensor attribute and
 # logged; persistent failure is caught by the daily live_check workflow.
@@ -103,6 +112,10 @@ CONF_SOCIAL_TARIFF = "social_tariff"
 CONF_WATER_METER_SENSOR = "water_meter_sensor"
 CONF_COMMUNE = "commune"
 CONF_COMMUNE_LABEL = "commune_label"
+# Whether that archive may be asked at all. The request names the utility
+# and the commune id, so it is a switch, on by default.
+CONF_CARD_ARCHIVE = "card_archive"
+DEFAULT_CARD_ARCHIVE = True
 
 DEFAULT_CONSUMPTION_M3 = 80
 MIN_CONSUMPTION_M3 = 1

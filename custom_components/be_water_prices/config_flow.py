@@ -93,6 +93,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_CARD_ARCHIVE,
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
@@ -101,6 +102,7 @@ from .const import (
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
+    DEFAULT_CARD_ARCHIVE,
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
@@ -248,6 +250,15 @@ def _options_schema(
             device_class=SensorDeviceClass.WATER,
         )
     )
+    # Whether a refresh that fails with nothing cached may serve the card
+    # the project's daily archive holds for this utility and commune. The
+    # request names both, so it is the household's call.
+    fields[
+        vol.Required(
+            CONF_CARD_ARCHIVE,
+            default=current.get(CONF_CARD_ARCHIVE, DEFAULT_CARD_ARCHIVE),
+        )
+    ] = BooleanSelector()
     return vol.Schema(fields)
 
 

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import json
 import logging
 import math
 import time
@@ -36,7 +37,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import (
@@ -65,6 +67,8 @@ from homeassistant.util.unit_conversion import VolumeConverter
 
 from ._redact import scrub_tokens, sensitive_tokens, source_url_without_commune
 from .const import (
+    CARD_ARCHIVE_URL,
+    CONF_CARD_ARCHIVE,
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
@@ -73,6 +77,7 @@ from .const import (
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
+    DEFAULT_CARD_ARCHIVE,
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
@@ -85,8 +90,12 @@ from .const import (
 )
 from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, WaterTariff, get
+from .providers._pdf import fetch_text
 from .providers._postcodes import resolve_candidates
-from .providers.base import WaterExtractor, relabel_with_human_commune
+from .providers.base import WaterExtractor, relabel_with_human_commune, tariff_from_dict
+
+if TYPE_CHECKING:
+    import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -827,6 +836,23 @@ class CoordinatorData:
     ytd_consumption_m3: float | None = None
 
 
+async def _archived_row(
+    session: aiohttp.ClientSession, utility: str, commune: str, month: date
+) -> dict[str, Any] | None:
+    """The row the project's card archive holds for that utility, commune
+    and month, or None: not held, unreachable or not a row."""
+    url = f"{CARD_ARCHIVE_URL}/{utility}/{quote(commune, safe='')}/{month:%Y-%m}.json"
+    try:
+        body = await fetch_text(session, url)
+    except ExtractorError:
+        return None
+    try:
+        row = json.loads(body)
+    except ValueError:
+        return None
+    return row if isinstance(row, dict) else None
+
+
 class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     """Fetches the configured utility's tariff once a day."""
 
@@ -1039,7 +1065,20 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             str(failure), sensitive_tokens(self.entry), placeholder="**redacted**"
         )
         if self._last_good is None:
-            raise UpdateFailed(scrubbed) from failure
+            archived = await self._from_card_archive()
+            if archived is None:
+                raise UpdateFailed(scrubbed) from failure
+            _LOGGER.warning(
+                "water tariff fetch failed (%s), serving the card archived on %s: %s",
+                type(failure).__name__,
+                archived.fetched_at.date(),
+                scrubbed,
+            )
+            # From here on it is the last good snapshot, ageing like one.
+            self._last_good = archived
+            data = replace(archived, last_error=scrubbed)
+            self._sync_repair_issue(data)
+            return data
         _LOGGER.warning(
             "water tariff fetch failed (%s), serving cached: %s",
             type(failure).__name__,
@@ -1059,6 +1098,55 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         )
         self._sync_repair_issue(cached)
         return cached
+
+    async def _from_card_archive(self) -> CoordinatorData | None:
+        """The last card the project's archive holds for this entry, dated
+        the day it was captured; None when the archive is switched off,
+        unreachable, or has nothing for this utility and commune.
+
+        Asked only when a refresh failed with nothing cached, which is a
+        restart while the utility is down: the entry then loads on that
+        card, stale after the usual 35 days, instead of retrying setup
+        until the utility is back. This month's row first, since the
+        archive writes one per month, then last month's for the first days
+        of a month.
+        """
+        if not self.entry.options.get(CONF_CARD_ARCHIVE, DEFAULT_CARD_ARCHIVE):
+            return None
+        commune = self.entry.options.get(CONF_COMMUNE)
+        key = (
+            str(commune) if commune and self._extractor.fetch_for_commune is not None else "default"
+        )
+        session = async_get_clientsession(self.hass)
+        today = dt_util.now().date()
+        row: dict[str, Any] | None = None
+        for month in (today, today.replace(day=1) - timedelta(days=1)):
+            row = await _archived_row(session, self._extractor.id, key, month)
+            if row is not None:
+                break
+        if row is None:
+            return None
+        try:
+            tariff = tariff_from_dict(row)
+            seen_on = date.fromisoformat(str(row["_seen_on"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        if key != "default":
+            tariff = relabel_with_human_commune(
+                tariff, commune_id=key, commune_label=self.entry.options.get(CONF_COMMUNE_LABEL)
+            )
+        # The archive walks at 05:23 UTC; the hour only feeds the age.
+        fetched_at = datetime(seen_on.year, seen_on.month, seen_on.day, 6, tzinfo=UTC)
+        ytd_m3, ytd_cost = await self._compute_ytd(tariff)
+        return CoordinatorData(
+            tariff=tariff,
+            fetched_at=fetched_at,
+            snapshot_age_hours=self._age_hours(fetched_at),
+            snapshot_stale=self._is_stale(tariff, fetched_at),
+            projected_annual_cost_eur=self._project_cost(tariff),
+            current_year_cost_eur=ytd_cost,
+            ytd_consumption_m3=ytd_m3,
+        )
 
     @callback
     def async_retire(self) -> None:

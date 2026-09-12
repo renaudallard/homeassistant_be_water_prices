@@ -40,6 +40,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
@@ -48,6 +49,8 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
+    CONF_COMMUNE,
+    CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
@@ -78,7 +81,13 @@ def _fresh_tariff(valid_until: date | None = None) -> WaterTariff:
     )
 
 
-async def _setup_entry(hass: HomeAssistant, fetch_callable: Any) -> MockConfigEntry:
+async def _setup_entry(
+    hass: HomeAssistant,
+    fetch_callable: Any,
+    *,
+    options: dict[str, Any] | None = None,
+    loads: bool = True,
+) -> MockConfigEntry:
     # The integration is Belgium-only and production code reads HA-local
     # time (the valid_until staleness check uses dt_util.now().date()).
     # The harness defaults to US/Pacific which silently flips date
@@ -90,7 +99,7 @@ async def _setup_entry(hass: HomeAssistant, fetch_callable: Any) -> MockConfigEn
         domain=DOMAIN,
         title="VIVAQUA",
         data={CONF_UTILITY: "vivaqua"},
-        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, **(options or {})},
         unique_id=f"{DOMAIN}_vivaqua",
     )
     entry.add_to_hass(hass)
@@ -104,7 +113,7 @@ async def _setup_entry(hass: HomeAssistant, fetch_callable: Any) -> MockConfigEn
         "custom_components.be_water_prices.coordinator.get",
         return_value=fake,
     ):
-        assert await hass.config_entries.async_setup(entry.entry_id)
+        assert await hass.config_entries.async_setup(entry.entry_id) is loads
         await hass.async_block_till_done()
     return entry
 
@@ -3755,3 +3764,114 @@ async def test_a_postcode_that_still_resolves_here_is_left_alone(
             assert issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id) is None, (
                 postcode
             )
+
+
+async def _down(_session: Any) -> WaterTariff:
+    raise ExtractorError("HTTP 503 from upstream")
+
+
+@pytest.mark.asyncio
+async def test_a_first_refresh_that_fails_serves_the_archived_card(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With nothing cached and the utility down, the entry loads on the
+    card the project's archive captured, dated the capture day and
+    carrying the failure, and that card is what later failures serve."""
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    asked: list[tuple[str, str, date]] = []
+    row = {**tariff_to_dict(_fresh_tariff()), "_seen_on": "2026-09-10", "_sources": []}
+
+    async def archived(_session: Any, utility: str, commune: str, month: date) -> Any:
+        asked.append((utility, commune, month))
+        return row if len(asked) == 2 else None
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    entry = await _setup_entry(hass, _down)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    data = coordinator.data
+    assert data.tariff == _fresh_tariff()
+    assert data.fetched_at.date() == date(2026, 9, 10)
+    assert "HTTP 503" in data.last_error
+    today = dt_util.now().date()
+    assert asked == [
+        ("vivaqua", "default", today),
+        ("vivaqua", "default", today.replace(day=1) - timedelta(days=1)),
+    ]
+    # The next failure serves it as the cached snapshot, archive not asked.
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.data.tariff is data.tariff
+    assert len(asked) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_archive_is_not_asked_when_switched_off(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.const import CONF_CARD_ARCHIVE
+
+    asked = 0
+
+    async def archived(*_args: Any) -> Any:
+        nonlocal asked
+        asked += 1
+        return None
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    entry = await _setup_entry(hass, _down, options={CONF_CARD_ARCHIVE: False}, loads=False)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert asked == 0
+    # And with nothing archived the refresh fails as before.
+    entry = await _setup_entry(hass, _down, loads=False)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert asked == 2
+
+
+@pytest.mark.asyncio
+async def test_an_archived_commune_row_is_relabelled_for_the_household(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    tariff = replace(_fresh_tariff(), publication_label="Tarieven 2026 (25071)")
+    row = {**tariff_to_dict(tariff), "_seen_on": "2026-09-10", "_commune": "25071"}
+    asked: list[str] = []
+
+    async def archived(_session: Any, _utility: str, commune: str, _month: date) -> Any:
+        asked.append(commune)
+        return row
+
+    async def for_commune(_session: Any, _commune: str) -> WaterTariff:
+        raise ExtractorError("HTTP 503 from upstream")
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_COMMUNE: "25071",
+            CONF_COMMUNE_LABEL: "9000 - Gent-centrum (Gent)",
+        },
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(
+        id="farys",
+        label="Farys",
+        region="flanders",
+        fetch=_down,
+        fetch_for_commune=for_commune,
+    )
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert asked == ["25071"]
+    label = hass.data[DOMAIN][entry.entry_id].data.tariff.publication_label
+    assert label == "Tarieven 2026 (9000 - Gent-centrum (Gent))"

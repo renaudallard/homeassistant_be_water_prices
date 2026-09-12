@@ -74,6 +74,7 @@
           "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
           "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
           "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)",
+          "card_archive": "Das Kartenarchiv des Projekts lesen, wenn der Versorger nicht erreichbar ist und nichts zwischengespeichert ist (die Anfrage nennt Ihren Versorger und Ihre Gemeinde)",
           "commune": "Gemeinde (nur für Per-Gemeinde-Versorger: De Watergroep / Farys / Pidpa / Water-link)"
         }
       }
@@ -95,6 +96,7 @@
           "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
           "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
           "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)",
+          "card_archive": "Das Kartenarchiv des Projekts lesen, wenn der Versorger nicht erreichbar ist und nichts zwischengespeichert ist (die Anfrage nennt Ihren Versorger und Ihre Gemeinde)",
           "commune": "Gemeinde (nur für Per-Gemeinde-Versorger: De Watergroep / Farys / Pidpa / Water-link)"
         }
       }

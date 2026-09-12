@@ -74,7 +74,8 @@
           "gedomicilieerd_persons": "Registered residents (Flanders only)",
           "social_tariff": "Social tariff (Flanders, 80% reduction)",
           "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Pidpa / Water-link)",
-          "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)"
+          "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)",
+          "card_archive": "Read the project's card archive when the utility is unreachable and nothing is cached (the request names your utility and commune)"
         }
       }
     },
@@ -95,7 +96,8 @@
           "gedomicilieerd_persons": "Registered residents (Flanders only)",
           "social_tariff": "Social tariff (Flanders, 80% reduction)",
           "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Pidpa / Water-link)",
-          "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)"
+          "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)",
+          "card_archive": "Read the project's card archive when the utility is unreachable and nothing is cached (the request names your utility and commune)"
         }
       }
     }

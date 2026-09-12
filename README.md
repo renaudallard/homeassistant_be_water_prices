@@ -62,7 +62,7 @@ publication and how to parse it.
 - **Translated UI** — English, Dutch, French and German.
 - **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own, and a year holding a bucket that claims more than the days behind it could hold is not offered at all: that is a re-based or reset counter rather than water, and it would otherwise be proposed as your yearly consumption. The days behind it count because a meter that was away comes back with the whole absence in one bucket, and a year that really did have an outage is still a year worth offering.
 - **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive.
-- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale.
+- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. A restart while the utility is down loads the entry on the last card the project's daily archive captured (see *The card archive* below) instead of retrying setup until the utility is back; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
 - **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so it cannot notice a move in the decreed constants above; every Walloon parser fails outright if the CVA or FSE its page publishes leaves the constant behind, or if its page stops printing a CVA at all, which is what puts that move on the live check instead. Note what that means each 1 January: when CWaPE moves the CVA, every Walloon page picks it up at once and all nine Walloon extractors stop together, each entry holding its last good snapshot behind a stale-snapshot Repair, until a release carries the new `WALLONIA_CVA_EUR_PER_M3` / `WALLONIA_FSE_EUR_PER_M3` in `const.py`. That is deliberate: the constants are what the household is billed on, so failing open would bill everyone on last year's figure with nothing to show for it.
@@ -307,6 +307,13 @@ auto-resolves cleanly.
      are always created -- they report `unknown` until a meter is
      wired up through either path, and the next coordinator tick
      after that fills them in without an HA restart.
+   - **Read the project's card archive** — on by default. When a
+     refresh fails and the entry has nothing cached to serve (a restart
+     while the utility's site is down), the last card the project's
+     daily archive holds for your utility and commune is served instead
+     of failing setup. The request to GitHub names the utility and the
+     commune id and nothing else; untick the box and the integration
+     never contacts GitHub.
 
 ### Reconfiguring later
 
@@ -516,6 +523,18 @@ that triggers an immediate coordinator refresh; the issue
 auto-clears as soon as the next fetch returns a fresh snapshot. The
 daily live-check workflow opens a GitHub issue against the
 integration if the failure persists across CI runs.
+
+The cached snapshot lives in memory, so a restart while the utility is
+unreachable used to leave the entry retrying setup until the site was
+back. Now the coordinator asks the project's card archive (the
+[`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
+branch, one JSON per utility, commune and month; this month's row, then
+last month's) and loads on the card it captured, dated the day of the
+capture so the 35-day staleness clock runs from there, with the failure
+in `last_error`. Later failures serve that card as the cached snapshot;
+the next successful fetch replaces it. The request names the utility
+and the commune id and nothing else, and the *Read the project's card
+archive* box in the options turns it off.
 
 ### Price-history backfill
 
@@ -822,6 +841,13 @@ see them; the commune's label is inside each file.
    figure against the page without fetching it again. A month whose card
    is the same as the previous month's names that month's text, so the
    same page is not stored twelve times a year.
+
+The integration itself reads the branch in one case: a refresh that
+fails with nothing cached to serve, which is a restart while the
+utility's site is down. It asks for this month's row of its utility and
+commune (`default` without a commune), then last month's, and loads on
+the card it finds, dated the day it was captured, rather than retrying
+setup until the site is back. Every other refresh goes to the utility.
 
 ## License
 

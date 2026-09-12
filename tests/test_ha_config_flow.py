@@ -42,6 +42,7 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
+    CONF_CARD_ARCHIVE,
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
@@ -75,8 +76,13 @@ async def test_postcode_resolves_to_vivaqua_for_brussels(hass: HomeAssistant) ->
     assert result["title"] == "VIVAQUA"
     assert result["data"] == {CONF_UTILITY: "vivaqua"}
     # Postcode is persisted into options so future resolver-coverage
-    # migrations can auto-correct the utility (v2 schema).
-    assert result["options"] == {CONF_CONSUMPTION_M3_PER_YEAR: 100, CONF_POSTCODE: "1000"}
+    # migrations can auto-correct the utility (v2 schema); the card
+    # archive box is on unless unticked.
+    assert result["options"] == {
+        CONF_CARD_ARCHIVE: True,
+        CONF_CONSUMPTION_M3_PER_YEAR: 100,
+        CONF_POSTCODE: "1000",
+    }
 
 
 @pytest.mark.asyncio
