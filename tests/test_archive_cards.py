@@ -284,7 +284,7 @@ async def test_every_commune_of_a_per_commune_utility_gets_its_own_row(tmp_path:
         "yearly_fixed_fee": 102.0,
         "publication_label": "Tarieven 2026 (2)",
     }
-    coverage = (tmp_path / "coverage.md").read_text()
+    coverage = (tmp_path / "coverage/acme.md").read_text()
     assert "| commune | label | 2026-09 |" in coverage
     assert "| default |  | page json |" in coverage
     assert "| 1 | 9000 - Gent | page json |" in coverage
@@ -708,26 +708,29 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
         now=NOW,
         sleep=_no_sleep,
     )
-    coverage = (out / "coverage.md").read_text()
+    coverage = (out / "coverage/acme.md").read_text()
     text = _row(out)["_sources"][0]["text"]
-    assert "## acme" in coverage
+    assert "# acme" in coverage
     acme_json = f"[json]({branch}/acme/default/2026-09.json)"
     beta_json = f"[json]({branch}/beta/default/2026-09.json)"
     assert f"| default |  | [page]({branch}/{text}) {acme_json} |" in coverage
-    # The PDF is not uploaded yet: the cell says so without a link.
-    assert f"| default |  | pdf {beta_json} |" in coverage
+    # The PDF is not uploaded yet: its cell says so without a link.
+    beta = (out / "coverage/beta.md").read_text()
+    assert f"| default |  | pdf {beta_json} |" in beta
+    index = (out / "coverage.md").read_text()
+    assert "- [acme](coverage/acme.md): 1 rows, 2026-09 to 2026-09" in index
+    assert "- [beta](coverage/beta.md): 1 rows, 2026-09 to 2026-09" in index
     digest = hashlib.sha256(b"%PDF v1").hexdigest()
     (out / "pdfs.json").write_text(json.dumps({digest: f"water-2026-09/{digest}.pdf"}))
     ac._write_coverage(out, cards, branch)
     assert (
         f"| default |  | [pdf]({cards}/water-2026-09/{digest}.pdf) {beta_json} |"
-        in (out / "coverage.md").read_text()
+        in (out / "coverage/beta.md").read_text()
     )
     # Nothing to link to without the base URLs.
     ac._write_coverage(out)
-    coverage = (out / "coverage.md").read_text()
-    assert "| default |  | page json |" in coverage
-    assert "| default |  | pdf json |" in coverage
+    assert "| default |  | page json |" in (out / "coverage/acme.md").read_text()
+    assert "| default |  | pdf json |" in (out / "coverage/beta.md").read_text()
     again = await ac.archive(
         out,
         extractors=extractors,
@@ -738,7 +741,7 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
         sleep=_no_sleep,
     )
     assert again.unchanged == 2
-    first = (out / "coverage.md").read_text()
+    first = (out / "coverage/acme.md").read_text()
     await ac.archive(
         out,
         extractors=extractors,
@@ -748,7 +751,7 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
         now=NOW,
         sleep=_no_sleep,
     )
-    assert (out / "coverage.md").read_text() == first
+    assert (out / "coverage/acme.md").read_text() == first
 
 
 async def test_the_listing_is_refreshed_after_the_upload_and_the_old_index_dropped(
@@ -780,7 +783,7 @@ async def test_the_listing_is_refreshed_after_the_upload_and_the_old_index_dropp
     (out / "README.md").write_text("stale readme")
     ac._write_listings(out, base, branch)
     url = f"{base}/water-2026-09/{digest}.pdf"
-    coverage = (out / "coverage.md").read_text()
+    coverage = (out / "coverage/acme.md").read_text()
     assert f"| default |  | [pdf]({url}) [json]({branch}/acme/default/2026-09.json) |" in coverage
     assert f"| 1 | Gent | [pdf]({url}) [json]({branch}/acme/1/2026-09.json) |" in coverage
     assert not (out / "pdfs.md").exists()
@@ -799,6 +802,17 @@ def test_index_only_touches_nothing_but_the_listing(
     assert (tmp_path / "coverage.md").exists()
     assert (tmp_path / "README.md").exists()
     assert not (tmp_path / "pdfs.md").exists()
+
+
+def test_a_utility_that_left_the_branch_loses_its_sheet(tmp_path: Path) -> None:
+    (tmp_path / "coverage").mkdir()
+    (tmp_path / "coverage/gone.md").write_text("stale sheet")
+    row = tmp_path / "acme/default/2026-09.json"
+    row.parent.mkdir(parents=True)
+    row.write_text(json.dumps({"_sources": []}))
+    ac._write_coverage(tmp_path)
+    assert sorted(p.name for p in (tmp_path / "coverage").iterdir()) == ["acme.md"]
+    assert "| default |  | json |" in (tmp_path / "coverage/acme.md").read_text()
 
 
 def test_targets_skip_a_runner_blocked_utility_on_a_runner_only() -> None:

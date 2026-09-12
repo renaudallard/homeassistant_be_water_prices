@@ -126,11 +126,20 @@ _MANIFEST = "pdfs.json"
 # with be_electricity_prices: its releases are water-<YYYY-MM>, its
 # listings live under water/ in that repository's tree.
 _RELEASE_PREFIX = "water"
-# One table per utility of which months the branch holds, for the reader
+# One sheet per utility of which months the branch holds, for the reader
 # who wants to know whether a given month of a given commune is covered
 # without listing directories, each month linking to what it was parsed
-# from (a release lists PDFs by digest only) and to the JSON it produced.
+# from (a release lists PDFs by digest only) and to the JSON it produced;
+# and an index of the sheets, since one table of every commune grows by
+# a column a month.
 _COVERAGE = "coverage.md"
+_COVERAGE_DIR = "coverage"
+_LEGEND = (
+    "Each month links to what its tariff was parsed from and to what came out of it:",
+    "`pdf` is the card itself, in the cards repository's releases, `page` the text of",
+    "the page as it was read, and `json` the tariff as the integration parsed it, both",
+    "on this branch. A blank cell is a month the branch does not hold.",
+)
 # What a parse depends on: the extractors, the shared readers beside them
 # and the constants they key on.
 _PARSER_SOURCES = ("providers/*.py", "const.py")
@@ -151,13 +160,15 @@ Written daily by `.github/workflows/archive_cards.yml` running
 - `pdfs.json`: where each PDF is kept, as `<release tag>/<sha256>.pdf` in
   the releases of the cards repository (`be_price_cards`, shared with
   be_electricity_prices; this integration's releases are `water-<YYYY-MM>`).
-- `coverage.md`: which months the branch holds for each utility and
-  commune, each linking to the PDF or the page it was parsed from and to
-  the JSON above.
+- `coverage.md` and `coverage/<utility>.md`: which months the branch
+  holds for each utility and commune, each linking to the PDF or the page
+  it was parsed from and to the JSON above; one sheet per utility, the
+  index naming them.
 
 To get the original card of a utility, commune and month: open
-`coverage.md`, find the row, click `pdf` or `page`; `json` is what the
-integration parsed out of it. Months older than three years are removed.
+`coverage.md`, open the utility's sheet, find the row, click `pdf` or
+`page`; `json` is what the integration parsed out of it. Months older than
+three years are removed.
 """
 
 
@@ -674,46 +685,61 @@ def _cell(
 def _write_coverage(
     out: Path, pdf_base_url: str | None = None, archive_base_url: str | None = None
 ) -> None:
-    """Rewrite the coverage table from the rows on disk.
+    """Rewrite the coverage sheets from the rows on disk: one per utility
+    under ``coverage/`` and an index naming them.
 
-    Deterministic in its order, so a day that changed nothing rewrites the
-    file to the same bytes and the branch gets no commit for it.
+    Deterministic in their order, so a day that changed nothing rewrites
+    them to the same bytes and the branch gets no commit for it. A sheet
+    whose utility has no rows any more is removed.
     """
     held, kept = _kept_rows(out)
-    months = sorted({m for rows in held.values() for have in rows.values() for m in have})
-    lines = [
+    folder = out / _COVERAGE_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    index = [
         "# Coverage",
         "",
-        "One row per utility and commune (`default` is the no-commune fetch), one column",
-        "per month the branch holds. Each month links to what its tariff was parsed from",
-        "and to what came out of it: `pdf` is the card itself, in the cards repository's",
-        "releases, `page` the text of the page as it was read, and `json` the tariff as",
-        "the integration parsed it, both on this branch. A blank cell is a month the",
-        "branch does not hold.",
+        "One sheet per utility, each a table with a row per commune (`default` is the",
+        "no-commune fetch) and a column per month the branch holds.",
+        *_LEGEND,
         "",
     ]
     for utility in sorted(held):
-        lines += [
-            f"## {utility}",
+        rows = held[utility]
+        months = sorted({m for have in rows.values() for m in have})
+        lines = [
+            f"# {utility}",
+            "",
+            "One row per commune (`default` is the no-commune fetch), one column per month",
+            "the branch holds.",
+            *_LEGEND,
             "",
             "| commune | label | " + " | ".join(months) + " |",
             "| --- | --- | " + " | ".join("---" for _ in months) + " |",
         ]
-        by_commune = sorted(held[utility].items(), key=lambda item: (item[0] != _DEFAULT, item[0]))
+        by_commune = sorted(rows.items(), key=lambda item: (item[0] != _DEFAULT, item[0]))
         for commune, have in by_commune:
             label = next((h.label for _m, h in sorted(have.items(), reverse=True) if h.label), "")
             cells = [_cell(have.get(m), kept, pdf_base_url, archive_base_url) for m in months]
             lines.append(f"| {commune} | {label} | " + " | ".join(cells) + " |")
         lines.append("")
-    (out / _COVERAGE).write_text("\n".join(lines), encoding="utf-8")
+        (folder / f"{utility}.md").write_text("\n".join(lines), encoding="utf-8")
+        index.append(
+            f"- [{utility}]({_COVERAGE_DIR}/{utility}.md): {len(rows)} rows,"
+            f" {months[0]} to {months[-1]}"
+        )
+    for stale in folder.glob("*.md"):
+        if stale.stem not in held:
+            stale.unlink()
+    index.append("")
+    (out / _COVERAGE).write_text("\n".join(index), encoding="utf-8")
 
 
 def _write_listings(
     out: Path, pdf_base_url: str | None = None, archive_base_url: str | None = None
 ) -> None:
-    """The coverage table and the branch README, rewritten when out of date.
+    """The coverage sheets and the branch README, rewritten when out of date.
     The index of PDFs by release that earlier versions wrote is removed, the
-    coverage table having taken it over."""
+    coverage sheets having taken it over."""
     _write_coverage(out, pdf_base_url, archive_base_url)
     readme = out / "README.md"
     if not readme.exists() or readme.read_text(encoding="utf-8") != _README:
@@ -1041,7 +1067,7 @@ def main() -> int:
     parser.add_argument(
         "--index-only",
         action="store_true",
-        help="only rewrite coverage.md from what is on disk; no fetch",
+        help="only rewrite the coverage sheets from what is on disk; no fetch",
     )
     args = parser.parse_args()
     if args.index_only:

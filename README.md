@@ -788,9 +788,9 @@ current parser from its stored texts, the clock pinned to the day the
 row was captured, and rewritten where the parse came out differently
 (`--reparse` forces it, `--rerender` also renders every kept PDF afresh
 for a reader upgrade). `--index-only` rewrites the listing on the branch,
-`coverage.md` (per utility and commune, the months held, each linking to
-the PDF or the page it was parsed from and to the parsed JSON), without
-fetching anything.
+`coverage.md` and one sheet per utility under `coverage/` (per commune,
+the months held, each linking to the PDF or the page it was parsed from
+and to the parsed JSON), without fetching anything.
 
 [`.github/workflows/archive_cards.yml`](./.github/workflows/archive_cards.yml)
 runs the archiver every morning at 05:23 UTC against the `archive`
@@ -834,16 +834,17 @@ see them; the commune's label is inside each file.
    digest of the file.
 2. **The page or the PDF the parser read** is easiest through
    [`coverage.md`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/coverage.md)
-   at the branch root: one table per utility, a row per commune, a column
-   per month. Each month cell carries two links: `page` opens the text of
+   at the branch root, which names one sheet per utility under
+   `coverage/`: a row per commune, a column per month. Each month cell
+   carries two links: `page` opens the text of
    the page as it was read, on the branch (`pdf` downloads the card from
    the cards repository's releases instead, for a card parsed from a PDF),
-   and `json` opens the parsed row above. The same table is published
+   and `json` opens the parsed row above. The same sheets are published
    under
    [`water/`](https://github.com/renaudallard/be_price_cards/tree/main/water)
    in the cards repository itself, and each release's notes point there,
-   so a file seen on the releases page can be named too: search the table
-   for the file's name. Behind it is `pdfs.json`, which maps a digest to
+   so a file seen on the releases page can be named too: search that
+   repository for the file's name. Behind them is `pdfs.json`, which maps a digest to
    `water-<YYYY-MM>/<digest>.pdf` in those releases; the digest in a
    JSON's `_sources` is the same key.
 3. **The text the parser read** is under `texts/`, named by the digest
