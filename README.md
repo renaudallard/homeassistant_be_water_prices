@@ -257,7 +257,7 @@ auto-resolves cleanly.
    supported operator serves falls through to step 2.
 2. **Utility** *(only if step 1 didn't resolve)* — pick from the dropdown
    of registered utilities. For the seven postcodes genuinely split
-   between two or three operators at street level (1770 Liedekerke,
+   between two operators at street level (1770 Liedekerke,
    8020 Oostkamp, 8400 Oostende, 8490 Jabbeke, 9080 Lochristi, 9550
    Herzele, 9570 Lierde), the picker is pre-narrowed
    to just the candidate operators so you only see the choices that
