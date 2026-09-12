@@ -378,7 +378,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     async def async_step_choose(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Operator chooser shown when the postcode is split.
 
-        The user picks one of two or three operators that genuinely
+        The user picks one of the two operators that genuinely
         share the postcode at street level (e.g. 8400 Oostende, where
         DWG serves Stene and Farys serves Mariakerke).
         """

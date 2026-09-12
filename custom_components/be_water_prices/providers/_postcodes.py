@@ -49,7 +49,7 @@ Two layers of resolution:
      (post-filter) commune dropdowns and includes only postcodes
      that DWG serves and Farys doesn't.
 
-  3. 7 postcodes are genuinely split between two or three operators
+  3. 7 postcodes are genuinely split between two operators
      at street level (1770 Liedekerke, 8020 Oostkamp, 8400 Oostende,
      8490 Jabbeke, 9080 Lochristi, 9550 Herzele, 9570 Lierde). For these, ``resolve_candidates`` returns the full
      candidate tuple and the config flow asks the user to pick. The
@@ -88,7 +88,7 @@ Coverage:
   * 8000-9999 (DWG-served carve-out, 122 postcodes)     → DE WATERGROEP
   * 1770, 8020, 8400,
     8490, 9080,
-    9550, 9570       Real splits (two or three ops)     → multi-choice
+    9550, 9570       Real splits (two operators each)   → multi-choice
   * 8000-9999 (rest, mostly Oost-Vl. and West-Vl.)      → FARYS
   * everything else                                     → unresolved
 """
@@ -152,7 +152,7 @@ _AQUADUIN_POSTCODES: frozenset[int] = frozenset(
 # Maldegem, etc.). Re-run the refresh script if DWG's coverage
 # changes.
 #
-# Postcodes genuinely split between two or three operators at street
+# Postcodes genuinely split between two operators at street
 # level live in ``_SPLIT_POSTCODES`` below; the config flow asks the
 # user to pick one of the candidates rather than guessing.
 _DWG_POSTCODES_FLANDERS: frozenset[int] = frozenset(
@@ -861,7 +861,7 @@ _PER_POSTCODE: dict[str, str] = {
 }
 
 
-# Postcodes genuinely split between two or three operators at street
+# Postcodes genuinely split between two operators at street
 # level: the user can't be assigned automatically because the answer
 # depends on which street/parish of the postcode they live on. The
 # config flow shows a small chooser populated with this tuple; the

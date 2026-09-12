@@ -260,9 +260,9 @@ def test_resolve_candidates_returns_single_for_unambiguous() -> None:
 
 
 def test_resolve_candidates_returns_multiple_for_split_postcodes() -> None:
-    # The 8 real splits are postcodes where two or three operators
-    # genuinely share the postcode at street level; the config flow
-    # asks the user to pick.
+    # The 7 real splits are postcodes where two operators genuinely
+    # share the postcode at street level; the config flow asks the user
+    # to pick.
     assert _resolve_candidates("1770") == ("de_watergroep", "farys")  # Liedekerke
     assert _resolve_candidates("8020") == ("farys", "de_watergroep")  # Oostkamp
     assert _resolve_candidates("8400") == ("farys", "de_watergroep")  # Oostende
