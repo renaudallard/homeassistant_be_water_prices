@@ -809,15 +809,16 @@ to the releases of the shared cards
 repository [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
 (`water-<YYYY-MM>`, one per month the cards were seen in; the electricity
 integration's live beside them as `electricity-<YYYY-MM>`), rewrites the
-two listings so each links to a file that exists, publishes them under
-`water/` in that repository, and commits the branch when anything
-changed. The upload needs a fine-grained token with contents read and
-write on the cards repository in the `BE_WATER_CARDS` secret; without it
-the branch still gets the parsed cards and their texts and the step says
-so. A run that stores nothing, a refused push or an expired token files
-an issue labelled `archive-cards`, one per problem with a comment per
-further failing run, and the token's expiry is announced two weeks ahead
-the same way. A manual run can ask for `--reparse` or `--rerender`.
+index and the per-utility sheets so each month links to a file that
+exists, publishes them under `water/` in that repository, and commits
+the branch when anything changed. The upload needs a fine-grained token
+with contents read and write on the cards repository in the
+`BE_WATER_CARDS` secret; without it the branch still gets the parsed
+cards and their texts and the step says so. A run that stores nothing, a
+refused push or an expired token files an issue labelled `archive-cards`,
+one per problem with a comment per further failing run, and the token's
+expiry is announced two weeks ahead the same way. A manual run can ask
+for `--reparse` or `--rerender`.
 Water-link is skipped on a runner, as the checks skip it; an archive run
 from a residential address stores it.
 
