@@ -135,11 +135,17 @@ _ENERGY_MANAGER_TIMEOUT_S = 10.0
 # meter that poisons every bucket accumulates them by the month.
 _REFUSALS_BEFORE_UNREADABLE = 2
 
-# A single meter report that climbs more than this many m3 is held for one
-# reading before it is allowed to advance the high-water mark. A household
-# uses roughly 80-100 m3 a year, so a step this size in one report is a
-# garbage value far more often than real usage; a genuine catch-up after a
-# long outage is confirmed by the very next reading and accepted then.
+# What no household draws in a day: a year's water, near enough, in one of
+# them. Two things measure by it. A daily statistics bucket claiming more
+# than this, plus what the days standing behind it could hold, is a re-based
+# or reset register rather than water and is dropped. And two readings
+# further apart than this are about separate events: it is how far below a
+# held jump the next reading may stand and still confirm it, and how far
+# from the run before it a sub-baseline reading may stand and still join it.
+#
+# It was the bound on a single live report too, and _MAX_STEP_M3 took that
+# over because at ten times the size it tested nothing: a reading 90 m3
+# above where the meter stood was taken on sight and pinned the year.
 _IMPLAUSIBLE_JUMP_M3 = 100.0
 
 # The most one meter report may add to the year before it is held for
@@ -2214,10 +2220,10 @@ def _exceeds_a_day(change: float, entity_id: str, kind: str, gap_days: float = 0
     """Whether a bucket claims more water than the days behind it can hold.
 
     The live path holds a single report that climbs more than
-    ``_IMPLAUSIBLE_JUMP_M3`` until the next reading agrees with it. The
-    recorder path had no bound of any kind, so the same physical event was
-    arbitrated when it arrived as a reading and billed on sight when it
-    arrived as a statistics row.
+    ``_MAX_STEP_M3``, plus whatever the meter's absence could have added,
+    until the next reading agrees with it. The recorder path had no bound of
+    any kind, so the same physical event was arbitrated when it arrived as a
+    reading and billed on sight when it arrived as a statistics row.
 
     Two shapes reach here that :func:`_change_exceeds_the_register` cannot
     see, because it compares a day against its own register rather than
