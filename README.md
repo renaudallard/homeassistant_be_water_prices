@@ -786,6 +786,43 @@ the same way. A manual run can ask for `--reparse` or `--rerender`.
 Water-link is skipped on a runner, as the checks skip it; an archive run
 from a residential address stores it.
 
+**Finding a stored card by hand.** Everything on the
+[`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
+branch is addressed by the two ids the integration uses, which are the
+directory names: the utility (`pidpa`, `farys`, `inbw`, ...) and the
+commune, as the id the integration passes to the extractor (`geel` for
+Pidpa, the numeric id for Farys, the GUID for De Watergroep, the name for
+Water-link), or `default` for the no-commune fetch. Browse the branch to
+see them; the commune's label is inside each file.
+
+1. **The parsed card** is one JSON per month at
+   `<utility>/<commune>/<YYYY-MM>.json`, for example
+   [`pidpa/geel/2026-09.json`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/pidpa/geel/2026-09.json).
+   It holds the tariff exactly as the integration parsed it, plus
+   `_seen_on` (the day it was captured), `_commune` and `_commune_label`
+   for a commune row, and `_sources`: every page or document the parse
+   read, each with its text file under `texts/` and, for a PDF, the
+   digest of the file.
+2. **The page or the PDF the parser read** is easiest through
+   [`coverage.md`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/coverage.md)
+   at the branch root: one table per utility, a row per commune, a column
+   per month; click the month. A `page` cell opens the text of the page
+   as it was read, on the branch; a `pdf` cell downloads the card from the
+   cards repository's releases. The other way round,
+   [`pdfs.md`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/pdfs.md)
+   lists every kept PDF by release with each row it was read for. Both
+   listings are also published under
+   [`water/`](https://github.com/renaudallard/be_price_cards/tree/main/water)
+   in the cards repository itself, and each release's notes point there,
+   so a file seen on the releases page can be named too. Behind both is
+   `pdfs.json`, which maps a digest to `water-<YYYY-MM>/<digest>.pdf` in
+   those releases; the digest in a JSON's `_sources` is the same key.
+3. **The text the parser read** is under `texts/`, named by the digest
+   of the text itself and listed in the JSON's `_sources`, for checking a
+   figure against the page without fetching it again. A month whose card
+   is the same as the previous month's names that month's text, so the
+   same page is not stored twelve times a year.
+
 ## License
 
 BSD 2-Clause. See [LICENSE](./LICENSE).
