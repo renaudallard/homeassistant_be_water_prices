@@ -727,6 +727,41 @@ bytes. A provider that obtains a PDF some other way than through
 `fetch_pdf_text_layout` renders it with `render_pdf`, so the hook still
 sees it.
 
+### The card archive
+
+`scripts/archive_cards.py` walks every registered utility, fetches the
+tariff the integration would price on right now, once for the utility's
+default and once for each commune a per-commune utility lists, and
+writes what it parsed into a checkout of the `archive` branch:
+
+```bash
+python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa]
+```
+
+The branch holds, per utility and commune, one JSON file per month
+(`<utility>/<commune>/<YYYY-MM>.json`, `default` being the no-commune
+fetch, otherwise the commune id the integration uses with the commune's
+label inside the file), the text of every page and rendered PDF a parse
+read (`texts/<sha256>.txt`, stored once and shared between the rows that
+read it), and a manifest of where each PDF is kept. A water tariff is
+annual, so a month whose card is the same as the previous month's points
+at the texts that month already holds rather than storing the page again.
+A day on which nothing changed writes nothing; months older than three
+years are removed, with the texts nothing refers to any more.
+
+The PDFs themselves (Aquaduin's, Pidpa's and Water-link's cards) are kept
+under `--pdfs` for upload to the releases of the shared cards repository,
+named by their SHA-256; a card whose bytes have not changed is served the
+text the branch already holds instead of being rendered again. When the
+parser sources change, every stored month is replayed offline through the
+current parser from its stored texts, the clock pinned to the day the
+row was captured, and rewritten where the parse came out differently
+(`--reparse` forces it, `--rerender` also renders every kept PDF afresh
+for a reader upgrade). `--index-only` rewrites the two listings on the
+branch, `coverage.md` (per utility and commune, the months held, each
+linking to the PDF or the page it was parsed from) and `pdfs.md` (every
+kept PDF with the rows it was read for), without fetching anything.
+
 ## License
 
 BSD 2-Clause. See [LICENSE](./LICENSE).

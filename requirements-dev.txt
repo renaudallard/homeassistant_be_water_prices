@@ -15,6 +15,7 @@
 # that bumping the harness shows what else it moved.
 aiohttp==3.13.3
 beautifulsoup4==4.15.0
+freezegun==1.5.2
 homeassistant==2026.2.3
 mypy==2.3.1
 pdfplumber==0.11.9

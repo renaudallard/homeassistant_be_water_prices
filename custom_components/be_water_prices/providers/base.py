@@ -43,10 +43,10 @@ time.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     import aiohttp
@@ -156,6 +156,30 @@ class TransientFetchError(ExtractorError):
     so existing ``except ExtractorError`` callers keep treating it as a
     fetch failure.
     """
+
+
+def tariff_to_dict(tariff: WaterTariff) -> dict[str, Any]:
+    """The tariff as JSON-ready values, its dates as ISO strings.
+
+    What the card archive writes for a month and what its reader gets
+    back, so the two cannot drift apart.
+    """
+    out: dict[str, Any] = dataclasses.asdict(tariff)
+    out["valid_from"] = tariff.valid_from.isoformat()
+    out["valid_until"] = None if tariff.valid_until is None else tariff.valid_until.isoformat()
+    return out
+
+
+def tariff_from_dict(data: Mapping[str, Any]) -> WaterTariff:
+    """The inverse of :func:`tariff_to_dict`. Keys the dataclass has no
+    field for are ignored, so a stored row can carry its own metadata
+    beside the tariff."""
+    names = {f.name for f in dataclasses.fields(WaterTariff)}
+    values: dict[str, Any] = {k: v for k, v in data.items() if k in names}
+    values["valid_from"] = date.fromisoformat(values["valid_from"])
+    until = values.get("valid_until")
+    values["valid_until"] = None if until is None else date.fromisoformat(until)
+    return WaterTariff(**values)
 
 
 def carry_prior_year_card(tariff: WaterTariff, target_year: int) -> WaterTariff:
