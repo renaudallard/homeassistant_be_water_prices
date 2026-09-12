@@ -286,8 +286,8 @@ async def test_every_commune_of_a_per_commune_utility_gets_its_own_row(tmp_path:
     }
     coverage = (tmp_path / "coverage.md").read_text()
     assert "| commune | label | 2026-09 |" in coverage
-    assert "| default |  | page |" in coverage
-    assert "| 1 | 9000 - Gent | page |" in coverage
+    assert "| default |  | page json |" in coverage
+    assert "| 1 | 9000 - Gent | page json |" in coverage
 
     async def no_listing(_session: Any) -> tuple[CommuneOption, ...]:
         raise ExtractorError("the commune list has moved")
@@ -703,21 +703,23 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
     coverage = (out / "coverage.md").read_text()
     text = _row(out)["_sources"][0]["text"]
     assert "## acme" in coverage
-    assert f"| default |  | [page]({branch}/{text}) |" in coverage
+    acme_json = f"[json]({branch}/acme/default/2026-09.json)"
+    beta_json = f"[json]({branch}/beta/default/2026-09.json)"
+    assert f"| default |  | [page]({branch}/{text}) {acme_json} |" in coverage
     # The PDF is not uploaded yet: the cell says so without a link.
-    assert "| default |  | pdf |" in coverage
+    assert f"| default |  | pdf {beta_json} |" in coverage
     digest = hashlib.sha256(b"%PDF v1").hexdigest()
     (out / "pdfs.json").write_text(json.dumps({digest: f"water-2026-09/{digest}.pdf"}))
     ac._write_coverage(out, cards, branch)
     assert (
-        f"| default |  | [pdf]({cards}/water-2026-09/{digest}.pdf) |"
+        f"| default |  | [pdf]({cards}/water-2026-09/{digest}.pdf) {beta_json} |"
         in (out / "coverage.md").read_text()
     )
     # Nothing to link to without the base URLs.
     ac._write_coverage(out)
     coverage = (out / "coverage.md").read_text()
-    assert "| default |  | page |" in coverage
-    assert "| default |  | pdf |" in coverage
+    assert "| default |  | page json |" in coverage
+    assert "| default |  | pdf json |" in coverage
     again = await ac.archive(
         out,
         extractors=extractors,
@@ -741,12 +743,12 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
     assert (out / "coverage.md").read_text() == first
 
 
-async def test_a_person_can_get_from_a_kept_file_to_the_rows_that_read_it(
+async def test_the_listing_is_refreshed_after_the_upload_and_the_old_index_dropped(
     tmp_path: Path, renders: list[bytes]
 ) -> None:
-    """pdfs.md lists every kept file with the rows it was read for, linked
-    once the manifest says where it landed; --index-only rewrites both
-    listings without fetching anything."""
+    """--index-only rewrites the coverage table without fetching anything,
+    so a card uploaded after the walk gets its link, refreshes a stale
+    branch README and drops the PDF index earlier versions wrote."""
     out, pdfs = tmp_path / "out", tmp_path / "pdfs"
     session = _Session({PDF_URL: b"%PDF v1"})
 
@@ -760,33 +762,35 @@ async def test_a_person_can_get_from_a_kept_file_to_the_rows_that_read_it(
         fetch_for_commune=fetch_for_commune,
     )
     base = "https://cards.test/releases/download"
+    branch = "https://github.test/repo/blob/archive"
     await ac.archive(
         out, extractors=[extractor], pdf_dir=pdfs, pdf_base_url=base, now=NOW, sleep=_no_sleep
     )
     digest = hashlib.sha256(b"%PDF v1").hexdigest()
-    index = (out / "pdfs.md").read_text()
-    assert "## not uploaded yet" in index
-    assert f"| {digest[:12]}….pdf | acme / 1 / 2026-09<br>acme / default / 2026-09 |" in index
     (out / "pdfs.json").write_text(json.dumps({digest: f"water-2026-09/{digest}.pdf"}))
-    ac._write_pdf_index(out, base)
-    index = (out / "pdfs.md").read_text()
-    assert "## water-2026-09" in index
-    assert (
-        f"| [{digest[:12]}….pdf]({base}/water-2026-09/{digest}.pdf) | "
-        "acme / 1 / 2026-09<br>acme / default / 2026-09 |" in index
-    )
+    (out / "pdfs.md").write_text("stale index")
+    (out / "README.md").write_text("stale readme")
+    ac._write_listings(out, base, branch)
+    url = f"{base}/water-2026-09/{digest}.pdf"
+    coverage = (out / "coverage.md").read_text()
+    assert f"| default |  | [pdf]({url}) [json]({branch}/acme/default/2026-09.json) |" in coverage
+    assert f"| 1 | Gent | [pdf]({url}) [json]({branch}/acme/1/2026-09.json) |" in coverage
+    assert not (out / "pdfs.md").exists()
+    assert (out / "README.md").read_text() == ac._README
 
 
-def test_index_only_touches_nothing_but_the_two_listings(
+def test_index_only_touches_nothing_but_the_listing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(sys, "argv", ["archive_cards.py", "--out", str(tmp_path), "--index-only"])
     monkeypatch.setattr(
         ac, "all_extractors", lambda: (_ for _ in ()).throw(AssertionError("fetched"))
     )
+    (tmp_path / "pdfs.md").write_text("stale index")
     assert ac.main() == 0
     assert (tmp_path / "coverage.md").exists()
-    assert (tmp_path / "pdfs.md").exists()
+    assert (tmp_path / "README.md").exists()
+    assert not (tmp_path / "pdfs.md").exists()
 
 
 def test_targets_skip_a_runner_blocked_utility_on_a_runner_only() -> None:

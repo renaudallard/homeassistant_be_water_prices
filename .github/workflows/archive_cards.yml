@@ -122,7 +122,7 @@ jobs:
           [ -s "$manifest" ] || echo '{}' > "$manifest"
           ensure_release() {
             gh release view "$1" --repo "$CARDS_REPO" >/dev/null 2>&1 && return 0
-            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The PDF tariff cards seen in $2 that the archive branch of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: https://github.com/${CARDS_REPO}/blob/main/water/pdfs.md#$1 (and coverage.md beside it links each utility, commune and month to its file)."
+            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The PDF tariff cards seen in $2 that the archive branch of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: search for the file name in https://github.com/${CARDS_REPO}/blob/main/water/coverage.md, which links every utility, commune and month to its card and to what was parsed out of it."
           }
           for dir in tmp/pdfs/water-*/; do
             [ -d "$dir" ] || continue
@@ -174,9 +174,9 @@ jobs:
             done
 
       - name: Index the kept cards for people
-        # The walk wrote coverage.md and pdfs.md before today's uploads were
-        # in the manifest; rewrite them now so every month links to a file
-        # that exists. No fetch, a second or two.
+        # The walk wrote coverage.md before today's uploads were in the
+        # manifest; rewrite it now so every month links to a file that
+        # exists. No fetch, a second or two.
         env:
           CARDS_REPO: renaudallard/be_price_cards
         run: >-
@@ -185,12 +185,12 @@ jobs:
           --archive-base-url "${{ github.server_url }}/${{ github.repository }}/blob/archive"
 
       - name: Publish the listings in the cards repository
-        # The releases name files by digest; the listings that name the
-        # cards live beside them, under this integration's own directory
+        # The releases name files by digest; the listing that names the
+        # cards lives beside them, under this integration's own directory
         # of the shared repository, so a person on the releases page is one
         # click from the names. The root README is the same text the
         # electricity workflow writes, so neither rewrites the other's. A
-        # commit only when a listing changed.
+        # commit only when the listing changed.
         env:
           CARDS_TOKEN: ${{ secrets.BE_WATER_CARDS }}
           CARDS_REPO: renaudallard/be_price_cards
@@ -220,14 +220,13 @@ jobs:
             "was read is on the archive branch, and the coverage table links to it." \
             "" \
             "- \`coverage.md\`: per utility and commune, the months held, each linking to the" \
-            "  PDF or the page it was parsed from." \
-            "- \`pdfs.md\`: every kept card by release, with the utilities, communes and months" \
-            "  it was read for." \
+            "  PDF or the page it was parsed from and to the tariff as the integration parsed it." \
             "" \
             "The parsed cards themselves are the \`archive\` branch of" \
             "https://github.com/renaudallard/homeassistant_be_water_prices." \
             > tmp/cards/water/README.md
-          cp tmp/archive/coverage.md tmp/archive/pdfs.md tmp/cards/water/
+          cp tmp/archive/coverage.md tmp/cards/water/
+          rm -f tmp/cards/water/pdfs.md
           cd tmp/cards
           git add -A
           if git diff --cached --quiet; then
