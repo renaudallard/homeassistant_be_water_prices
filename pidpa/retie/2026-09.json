@@ -1,0 +1,29 @@
+{
+ "_commune": "retie",
+ "_commune_label": "Retie",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/769ed46418a94063465c2e4983b35faad482cd0530ce3407355fb29834e674dd.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/retie",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (retie)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/retie",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

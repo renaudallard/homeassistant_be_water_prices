@@ -1,0 +1,29 @@
+{
+ "_commune": "boechout",
+ "_commune_label": "Boechout",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/23d52f2332ffe999a682dbefce3eb52b2fa6858b0aa1d1f9251116adee7b4907.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/boechout",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (boechout)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/boechout",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

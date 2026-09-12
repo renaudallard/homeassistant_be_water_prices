@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/e0af9866c10991722d7796167967dfb393e6f83723b02aaf2b1d78573fd7b199.txt",
+   "url": "https://www.inasep.be/prix-de-leau-et-evolution",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 3.6734,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "INASEP votre eau au coût-vérité 2026",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "source_url": "https://www.inasep.be/prix-de-leau-et-evolution",
+ "utility": "inasep",
+ "valid_from": "2026-04-27",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 155.90800000000002,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

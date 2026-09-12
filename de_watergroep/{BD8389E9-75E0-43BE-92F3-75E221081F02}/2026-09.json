@@ -1,0 +1,29 @@
+{
+ "_commune": "{BD8389E9-75E0-43BE-92F3-75E221081F02}",
+ "_commune_label": "8540 - Deerlijk (Deerlijk)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/6c7953c9c8eb98c3d0b88e1be6d27b2cdc9cfd58df81b06257bee8ea48754a48.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={BD8389E9-75E0-43BE-92F3-75E221081F02}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({BD8389E9-75E0-43BE-92F3-75E221081F02})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

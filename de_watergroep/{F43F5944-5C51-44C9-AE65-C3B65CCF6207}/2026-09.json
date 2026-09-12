@@ -1,0 +1,29 @@
+{
+ "_commune": "{F43F5944-5C51-44C9-AE65-C3B65CCF6207}",
+ "_commune_label": "8531 - Bavikhove (Harelbeke)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/0da01228165aafad2da540a04a5c9593128dcab1f306e4d62b03bb9af302ccdc.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={F43F5944-5C51-44C9-AE65-C3B65CCF6207}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({F43F5944-5C51-44C9-AE65-C3B65CCF6207})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

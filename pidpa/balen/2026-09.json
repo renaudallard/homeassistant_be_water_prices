@@ -1,0 +1,29 @@
+{
+ "_commune": "balen",
+ "_commune_label": "Balen",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/72b8c4c9df687fd2e610fddde6d6341b3f2e395a5159b4fda6c0593a50b58a27.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/balen",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (balen)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/balen",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

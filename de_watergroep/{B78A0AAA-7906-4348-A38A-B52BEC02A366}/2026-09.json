@@ -1,0 +1,29 @@
+{
+ "_commune": "{B78A0AAA-7906-4348-A38A-B52BEC02A366}",
+ "_commune_label": "9961 - Boekhoute (Assenede)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/bc0e1768fc11cea3dc29b31c5393ec930e91175014dff22a7a0eb1d46c2bd39f.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={B78A0AAA-7906-4348-A38A-B52BEC02A366}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({B78A0AAA-7906-4348-A38A-B52BEC02A366})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

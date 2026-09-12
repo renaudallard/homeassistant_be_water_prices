@@ -1,0 +1,29 @@
+{
+ "_commune": "puurs-sint-amands",
+ "_commune_label": "Puurs-Sint-Amands",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/8b014b1073678e5cd8a614c0624e554f60cae790831f00c4ec4a8806d5bc6725.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/puurs-sint-amands",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (puurs-sint-amands)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/puurs-sint-amands",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

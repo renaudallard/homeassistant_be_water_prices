@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/fa994112058e07e064d76201ff1d78206758a10b3e138ed892a6d0d5dc381fdd.txt",
+   "url": "https://www.agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.3295,
+ "comfort_eur_per_m3": 4.659,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "AGSO Knokke-Heist tarieven 2026",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers",
+ "utility": "agso_knokke",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

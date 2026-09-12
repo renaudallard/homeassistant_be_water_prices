@@ -1,0 +1,29 @@
+{
+ "_commune": "25856",
+ "_commune_label": "9630 - Paulatem (Zwalm)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/1d8d8339a70bcdd24a373faa796dd9f24e772d484558c3ce0c2a1588bc9c432d.txt",
+   "url": "https://www.farys.be/nl/watertarieven?ajax_form=1#municipality=25856",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 3.0058,
+ "comfort_eur_per_m3": 6.0116,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Farys watertarieven 2026 (25856)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.farys.be/nl/watertarieven",
+ "utility": "farys",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

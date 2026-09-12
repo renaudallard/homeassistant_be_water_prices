@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/247a0d80cf8e024493d65aaf228ebcee047e8bdda4fa56698897b0af84c6f4f6.txt",
+   "url": "https://www.aiem.be/prix-de-l-eau",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 2.87,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "AIEM prix de l'eau 2026",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "source_url": "https://www.aiem.be/prix-de-l-eau",
+ "utility": "aiem",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 139.84000000000003,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

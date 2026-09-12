@@ -1,0 +1,29 @@
+{
+ "_commune": "bornem",
+ "_commune_label": "Bornem",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/9fb2c6a675a276067ee49098ffaa16aaa602edf8688a4890b1a0c1fb7b89d5bc.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/bornem",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (bornem)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/bornem",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

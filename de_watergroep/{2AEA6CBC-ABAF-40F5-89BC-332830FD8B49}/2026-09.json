@@ -1,0 +1,29 @@
+{
+ "_commune": "{2AEA6CBC-ABAF-40F5-89BC-332830FD8B49}",
+ "_commune_label": "9950 - Waarschoot (Lievegem)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/a88bd082f566ab8d95ef16736bc7a7c35ab46b207be870b062b74c9423c9c070.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={2AEA6CBC-ABAF-40F5-89BC-332830FD8B49}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({2AEA6CBC-ABAF-40F5-89BC-332830FD8B49})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

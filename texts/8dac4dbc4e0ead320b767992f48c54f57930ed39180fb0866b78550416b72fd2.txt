@@ -1,0 +1,1877 @@
+
+
+
+            
+
+
+
+    <!doctype html>
+    <html lang="nl">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+                
+                    <link rel="preconnect" href="https://cdn.glue.be" crossorigin>
+        
+                    <style>
+                :root {
+                    --color-primary: #DAECFE;
+                    --color-secondary: #e9f5ff;
+                    --color-accent: #3DBC6B;
+                    --color-accent-dark: #18ab4d;
+                }
+            </style>
+        
+            <link rel="icon" type="image/png" href="/favicon/aquaduin/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/svg+xml" href="/favicon/aquaduin/favicon.svg">
+    <link rel="shortcut icon" href="/favicon/aquaduin/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/aquaduin/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-title" content="Aquaduin">
+    <link rel="manifest" href="/favicon/aquaduin/site.webmanifest">
+
+        <script>sessionStorage.fontsLoaded && document.documentElement.classList.add('fonts-loaded');</script>
+        <style>[x-cloak] {display: none !important;}</style>
+        <script type="module">!function(){const e=document.createElement("link").relList;if(!(e&&e.supports&&e.supports("modulepreload"))){for(const e of document.querySelectorAll('link[rel="modulepreload"]'))r(e);new MutationObserver((e=>{for(const o of e)if("childList"===o.type)for(const e of o.addedNodes)if("LINK"===e.tagName&&"modulepreload"===e.rel)r(e);else if(e.querySelectorAll)for(const o of e.querySelectorAll("link[rel=modulepreload]"))r(o)})).observe(document,{childList:!0,subtree:!0})}function r(e){if(e.ep)return;e.ep=!0;const r=function(e){const r={};return e.integrity&&(r.integrity=e.integrity),e.referrerpolicy&&(r.referrerPolicy=e.referrerpolicy),"use-credentials"===e.crossorigin?r.credentials="include":"anonymous"===e.crossorigin?r.credentials="omit":r.credentials="same-origin",r}(e);fetch(e.href,r)}}();</script>
+<script type="module" src="/dist/head.U5IhYnfi.js" crossorigin onload="e=new CustomEvent(&#039;vite-script-loaded&#039;, {detail:{path: &#039;resources/js/head.js&#039;}});document.dispatchEvent(e);"></script>
+<link href="/dist/_commonjsHelpers.Cpj98o6Y.js" rel="modulepreload" crossorigin>
+        <script type="module" src="/dist/app.B646tn7M.js" crossorigin onload="e=new CustomEvent(&#039;vite-script-loaded&#039;, {detail:{path: &#039;resources/js/app.js&#039;}});document.dispatchEvent(e);"></script>
+<link href="/dist/_commonjsHelpers.Cpj98o6Y.js" rel="modulepreload" crossorigin>
+<link href="/dist/app.D8FGGVKQ.css" rel="stylesheet">
+            <title>Tarieven 2026 | Aquaduin</title>
+<script>dataLayer = [];
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NQ5QC37R');
+</script><meta name="keywords" content="Tarieven 2026">
+<meta name="description" content="Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening.">
+<meta name="referrer" content="no-referrer-when-downgrade">
+<meta name="robots" content="all">
+<meta content="nl" property="og:locale">
+<meta content="Aquaduin" property="og:site_name">
+<meta content="website" property="og:type">
+<meta content="https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026" property="og:url">
+<meta content="Tarieven 2026" property="og:title">
+<meta content="Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening." property="og:description">
+<meta content="https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1789128513" property="og:image">
+<meta content="1200" property="og:image:width">
+<meta content="630" property="og:image:height">
+<meta content="Tarieven 2026" property="og:image:alt">
+<meta content="https://www.youtube.com/channel/UCStEEfn3QTyfLeD7D3-HuOQ" property="og:see_also">
+<meta content="https://www.instagram.com/aquaduin/" property="og:see_also">
+<meta content="https://www.facebook.com/aquaduin/?locale=nl_NL" property="og:see_also">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:creator" content="@">
+<meta name="twitter:title" content="Tarieven 2026">
+<meta name="twitter:description" content="Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening.">
+<meta name="twitter:image" content="https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1789128513">
+<meta name="twitter:image:width" content="1200">
+<meta name="twitter:image:height" content="630">
+<meta name="twitter:image:alt" content="Tarieven 2026">
+<link href="https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026" rel="canonical">
+<link href="https://www.aquaduin.be/nl" rel="home">
+<link href="https://www.aquaduin.be/cpresources/68fa8040/css/user_tools.css?v=1789128511" rel="stylesheet"></head>
+    <body><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NQ5QC37R"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+            
+
+
+<header x-data="{ menuOpen:false }"
+    @keydown.escape="menuOpen = false, window.toggleScrollLock('#mobile-nav', menuOpen );"
+>
+            <nav class="hidden md:flex items-center bg-white h-[42px] relative z-60">
+            <ul class="container flex flex-wrap items-center justify-end gap-8">                    <li>
+                        <a
+                                                            href="https://www.aquaduin.be/nl/nieuws"
+                                                                                                                class="t-small font-bold hover:text-blue-700 transition-colors  "
+                        >Nieuws</a>
+                    </li>
+                                    <li>
+                        <a
+                                                            href="https://www.aquaduin.be/nl/over-ons/vacatures"
+                                                                                                                class="t-small font-bold hover:text-blue-700 transition-colors  "
+                        >Vacatures</a>
+                    </li>
+                                    <li>
+                        <a
+                                                            href="https://www.aquaduin.be/nl/zelf-regelen/tarieven"
+                                                                                                                class="t-small font-bold hover:text-blue-700 transition-colors  "
+                        >Tarieven</a>
+                    </li>
+                                    <li>
+                        <a
+                                                            href="https://svw.cevi.be/Burgertool/Compensatie/Registreer/C05"
+                                                                                        target="_blank" 
+                                                                                    class="t-small font-bold hover:text-blue-700 transition-colors  "
+                        >Rekeningnummer Compensatie</a>
+                    </li>
+                                    <li>
+                        <a
+                                                            href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne"
+                                                                                                                class="t-small font-bold hover:text-blue-700 transition-colors  "
+                        >Bezoekerscentrum De Doornpanne</a>
+                    </li>
+                </ul>
+        </nav>
+        <div class="bg-theme-primary shadow-header">
+        <div class="container flex justify-between items-center gap-4 min-[360px]:gap-8 pt-5 pb-4 lg:py-0 lg:min-h-[126px]">
+                                    <a class="inline-block relative z-50" href="https://www.aquaduin.be/nl/">
+                <span class="sr-only">Aquaduin</span>
+                    
+                                        
+    <svg  width="241" height="42" class="w-[150px] min-[360px]:w-[185px] h-auto xl:w-[241px]" role="img" aria-label="logo">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo"/>
+    </svg>
+
+            </a>
+            <div class="hidden lg:flex lg:flex-grow justify-end">
+                
+<nav>
+    <ul class="flex flex-wrap justify-end">
+                                                        <li class="group">
+                <a
+                                            href="https://www.aquaduin.be/nl/zelf-regelen"
+                                                                                class="inline-flex items-center gap-2 px-4 py-2.5 font-bold relative z-50  "
+                >
+                    Zelf regelen
+                                                
+                                                    
+    <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+    </svg>
+
+                                    </a>
+                                                        <div class="transform max-h-0 group-hover:max-h-screen group-focus-within:max-h-screen origin-top transition-opacity duration-300 ease-in-out overflow-hidden w-screen max-w-full backface-hidden absolute left-0 right-0 z-30 bg-theme-primary">
+                        <div class="container grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_2fr_1fr] items-start gap-6 md:gap-10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 group-hover:delay-400 group-focus-within:delay-400 ease-in-out pt-14 pb-10">
+                                                            <div class="w-full max-w-[290px] shrink-0">
+                                                                            <a href="https://www.aquaduin.be/nl/zelf-regelen/meterstand-doorgeven"
+                                            
+                                            class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors "
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
+                                                    <svg id="krcfnzeyht-a" class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.krcfnzeyht-c{fill:#114997}</style></defs><path d="M18.01 23.6c.53-1.81 3.2-6.34 9.6-8.64V8.88h.96v-4.8h7.36v4.8h.96v6.08c1.49.21 5.38 1.98 8.96 7.36 1.6 2.4 2.82 8.51 1.28 15.68-.85 3.09-4.1 9.28-10.24 10.56v6.08h-.96v5.44h-7.36v-5.44h-.96v-6.08c-2.67-1.07-8.38-4.16-9.92-9.28-.75-2.45-2.56-9.28.32-15.68Z" style="fill:#fff"/><path d="M28.52 60.84c-.39 0-.71-.32-.71-.71v-2.02h-.2c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h.2v-1.32h-.2c-.39 0-.71-.32-.71-.71v-5.65l-.13-.05C20.33 46.67 16 40.54 16 33.73v-3.64c0-6.81 4.33-12.94 10.77-15.23l.13-.05V9.16c0-.38.31-.7.7-.71h.2V7.14h-.2c-.39 0-.7-.32-.7-.71s.32-.71.71-.71h.2V3.7c0-.04.01-.08.03-.12l.03-.13c.01-.05.04-.08.06-.12l.08-.11.08-.07.12-.08c.13-.07.22-.08.32-.08h7.28c.39 0 .71.32.71.71v2.02h.2c.39 0 .71.32.71.71s-.32.71-.71.71h-.2v1.31h.2c.39 0 .71.32.71.71v5.64l.13.05c6.46 2.29 10.8 8.41 10.8 15.24v3.64c0 6.83-4.34 12.95-10.8 15.24l-.13.05v5.64c0 .39-.31.7-.7.71h-.2v1.32h.2c.39 0 .7.33.7.71s-.32.71-.71.71h-.2v2.02c0 .03 0 .07-.02.11l-.03.14-.07.12c-.14.22-.35.35-.59.35h-7.28Zm.71-1.42h5.86v-1.31h-5.86v1.31Zm0-2.73h5.87v-1.32h-5.87v1.32Zm-.91-2.74H36v-4.5l-.24.05c-1.21.27-2.41.41-3.58.41s-2.4-.14-3.61-.42l-.25-.06v4.51Zm-9.65-14.28c2.37 5.36 7.67 8.83 13.51 8.83s11.14-3.46 13.51-8.83l-.35-.2c-3.04 4.26-7.96 6.8-13.16 6.8s-10.12-2.54-13.16-6.8l-.35.2Zm13.51-24.33c-8.14 0-14.76 6.62-14.76 14.76s6.62 14.76 14.76 14.76 14.76-6.62 14.76-14.76-6.62-14.76-14.76-14.76Zm-3.86-.94.25-.06c1.22-.28 2.43-.42 3.61-.42s2.38.14 3.58.41l.24.06V9.88h-7.68v4.51Zm.9-5.94h5.87V7.15h-5.87v1.31Zm.01-2.73h5.87V4.42h-5.86v1.31Z" class="krcfnzeyht-c"/><path d="M22.61 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM28.07 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM33.53 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM38.99 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30H39.7v2.22ZM29.43 25.45c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h5.46c.39 0 .71.32.71.71s-.32.71-.71.71h-5.46ZM26.69 22.72c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h10.95c.39 0 .71.32.71.71s-.32.71-.71.71H26.69Z" class="krcfnzeyht-c"/></svg>
+                                                    <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
+                                                </div>
+                                                                                        Meterstand doorgeven
+                                        </a>
+                                                                            <a href="https://www.aquaduin.be/nl/zelf-regelen/aansluiting-aanvragen"
+                                            
+                                            class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors mt-2"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
+                                                    <svg class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="m22.42 7.2 2.26 1.51 10.57 10.57 6.04-2.26 6.79 7.55-2.26 6.04 9.81 9.81.75 2.26-2.26 4.53-4.53 5.28-6.04 3.77h-3.77l-9.81-10.57-6.04 2.26-7.55-8.3 2.26-4.53L8.07 23.8l-.75-2.26 4.53-6.79 3.02-3.02 7.55-4.53Z" style="fill:#fff"/><path d="M40.9 57.37c-.82 0-1.47-.24-1.92-.7l-9.59-9.87-5.03 1.9c-.1.04-.2.06-.3.06-.06 0-.12 0-.18-.02a.845.845 0 0 1-.42-.24l-7.62-7.85c-.12-.12-.19-.26-.22-.42s-.01-.32.05-.46l2.12-4.93L7.32 24.06l-.1-.12h-.01c-.57-.67-.58-1.56-.48-2.21.12-.82.46-1.72 1.02-2.76 1.09-2.01 2.93-4.29 5.2-6.41 2.26-2.12 4.66-3.83 6.76-4.8 1.08-.5 2.01-.79 2.85-.87.15-.01.31-.03.46-.03l.19.01c.55.03 1.06.22 1.46.53.08.05.12.08.16.12l.05.18h.14L35.3 18.29l5.15-1.94c.09-.03.17-.05.25-.06h.01a.919.919 0 0 1 .65.26l7.63 7.86c.11.12.19.26.22.42.03.16.01.31-.05.46l-2.17 5.05 9.59 9.88c.67.69.69 1.64.59 2.31-.12.82-.45 1.72-1.02 2.76-1.09 2.02-2.94 4.29-5.2 6.41-2.25 2.11-4.65 3.81-6.76 4.8-1.08.5-2.02.79-2.85.87-.14.01-.28.02-.42.02Zm4.09-22.45c-.06.12-.12.2-.19.27l-10.09 9.54c-.08.07-.16.12-.26.16l-3.36 1.26 9.1 9.39c.13.13.36.2.68.2.08 0 .17 0 .28-.01.6-.06 1.44-.32 2.3-.72 1.92-.9 4.23-2.54 6.32-4.5 2.1-1.97 3.88-4.16 4.88-6 .45-.83.75-1.64.84-2.22.07-.45.03-.77-.12-.94l-.12-.14h-.02l-8.97-9.24-1.28 2.97Zm-3.53-3.63a.83.83 0 0 1-.19.27l-10.06 9.51c-.08.08-.18.14-.29.18L22 44.61l2.28 2.34 4.84-1.82h.01l4.55-1.71 9.82-9.28 3.88-9.02-2.26-2.34-3.66 8.51Zm-24.04 8.6 3.34 3.45 9.41-3.55 9.82-9.28 3.87-9.01-3.34-3.45-3.98 1.51 2.43 2.49c.66.68.68 1.64.58 2.32-.12.81-.44 1.69-1.02 2.75-1.1 2.03-2.94 4.31-5.2 6.42-2.25 2.11-4.65 3.82-6.76 4.8-1.09.51-2.02.79-2.86.87-.14.01-.28.02-.42.02-.56 0-1.35-.12-1.92-.71l-2.34-2.41-1.62 3.77Zm7.02-27.26c-.26.49-.58 1-.94 1.53-.72 1.06-1.6 2.15-2.62 3.25-.5.54-1.05 1.09-1.64 1.64-.56.52-1.15 1.04-1.74 1.53-.58.47-1.16.92-1.73 1.32-1.14.8-2.24 1.46-3.29 1.94-.58.27-1.12.48-1.65.63l-.64.19 9.09 9.36.08.08 3.22 3.31c.13.13.36.2.67.2.08 0 .17 0 .28-.01.6-.06 1.44-.32 2.3-.72 1.93-.9 4.23-2.54 6.33-4.51 2.09-1.96 3.86-4.14 4.87-6 .46-.84.77-1.65.85-2.23.04-.24.04-.45.01-.61a.72.72 0 0 0-.15-.34L25.28 10.36l-.15.75c-.17.46-.4.99-.69 1.53ZM8.89 23.07c.1.02.21.03.33.03.07 0 .14 0 .22-.01.14-.01.28-.04.43-.08l.16-.04c.58-.13 1.15-.33 1.75-.61 1.93-.9 4.23-2.54 6.32-4.5s3.86-4.15 4.87-6c.24-.44.43-.85.57-1.23.14-.38.23-.72.27-1 .07-.46.03-.77-.12-.94l-.12-.14h-.09c-.12-.05-.29-.08-.48-.08H22.71c-.6.07-1.44.33-2.29.73-1.92.9-4.23 2.54-6.32 4.51-2.1 1.97-3.88 4.16-4.87 6-.45.83-.76 1.64-.85 2.23-.07.45-.02.76.13.94l.12.14h.12l.14.05h.02Z" style="fill:#114997"/></svg>
+                                                    <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
+                                                </div>
+                                                                                        Aansluiting aanvragen
+                                        </a>
+                                                                            <a href="https://www.aquaduin.be/nl/zelf-regelen/bouwen-verbouwen/keuring"
+                                            
+                                            class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors mt-2"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
+                                                    <svg class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="m1.5 14.64 12.16-6.78 11.4 6.78 12.92-6.78L62.3 21.42v27.87l-12.16 6.78-12.16-6.78-12.16 6.78L1.5 42.51V14.64Z" style="fill:#fff"/><path d="m38.08 50.2-12.16 6.91L.8 42.83V14.26l12.96-7.37 12.16 6.91 12.16-6.91 25.13 14.28v28.62l-12.96 7.33-12.16-6.91Zm-35.7-8.26 22.75 12.93V42.82l-12.17-6.87V22.07L2.38 16.05v25.88Zm48.65-12.96v25.88l10.58-6.02V22.96l-10.58 6.02ZM38.89 48.86l10.56 6V29.03L26.72 16.06v12.03l12.17 6.92v13.85Zm-12.17-6.03v12.03l10.56-6V36.82l-10.56 6Zm-11.37-7.37 10.58 6.02 10.57-6.01-10.58-6.02-10.57 6.01Zm-.8-13.39v12.04l10.56-6.01V16.07l-10.56 6Zm13.6-7.75-.71.35 22.8 12.97 10.6-6.03L38.08 8.68l-9.92 5.64Zm-24.98.38 10.58 6.02 10.41-5.92.17-.11-10.57-6.01L3.17 14.7Z" style="fill:#114997"/></svg>
+                                                    <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
+                                                </div>
+                                                                                        Keuring aanvragen
+                                        </a>
+                                                                    </div>
+                                                        <div class="grid grid-cols-2 gap-6 md:gap-10 ">
+                                                                                                    
+                                                                    <ul>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/bouwen-verbouwen"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Bouwen &amp; verbouwen</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/verhuizen"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Verhuizen</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/financieel"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Financieel</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/lek-check"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >LEK-check</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/formulieren"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Formulieren</a>
+                                            </li>
+                                                                            </ul>
+                                                                    <ul>
+                                                                            </ul>
+                                                            </div>
+                                                    </div>
+                    </div>
+                            </li>
+                                                        <li class="group">
+                <a
+                                            href="https://www.aquaduin.be/nl/over-water"
+                                                                                class="inline-flex items-center gap-2 px-4 py-2.5 font-bold relative z-50  "
+                >
+                    Over water
+                                                
+                                                    
+    <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+    </svg>
+
+                                    </a>
+                                                        <div class="transform max-h-0 group-hover:max-h-screen group-focus-within:max-h-screen origin-top transition-opacity duration-300 ease-in-out overflow-hidden w-screen max-w-full backface-hidden absolute left-0 right-0 z-30 bg-theme-primary">
+                        <div class="container grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_2fr_1fr] items-start gap-6 md:gap-10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 group-hover:delay-400 group-focus-within:delay-400 ease-in-out pt-14 pb-10">
+                                                            <div class="w-full max-w-[290px] shrink-0">
+                                                                            <a href="https://www.aquaduin.be/nl/formulieren/drinkwatercontrole"
+                                            
+                                            class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors "
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
+                                                    <svg class="text-blue-500 group-hover/tasks:animate-bounce z-1" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M32.5 75H68.5C69.6667 75 72 74.1 72 70.5C75.6667 70.5 83 68.4 83 60C83.3333 56 81.6 48 72 48V21.5C72 20.3333 71.3 18 68.5 18H62.5C62.8333 16.8333 62.8 14.5 60 14.5H56C56.1667 12.6667 55.2 9 50 9C48 8.66667 44 9.3 44 14.5H40.5C39.5 14.5 37.5 15.2 37.5 18H32.5C31 17.8333 28 18.3 28 21.5V70.5C28.1667 72 29.3 75 32.5 75Z" fill="white"/>
+<path d="M2.50004 41.5C2.33337 42.3333 2.60004 44 5.00004 44L4.5 46.5C3.83335 46.6667 2.50004 47.4 2.50004 49V71.5C2.16672 72.6667 2.30006 75 5.50006 75H20.5001C21.8334 75 24.5001 74.3 24.5001 71.5V50.5C24.5001 49.5 23.9001 47.2 21.5001 46V44L23.5001 43V37.5C23.6667 36.5 23.3001 34.5 20.5001 34.5H5.00004C4.16671 34.5 2.50004 35.1 2.50004 37.5V41.5Z" fill="white"/>
+<path d="M72.5378 71.0659C72.2627 73.681 70.3198 75.8511 67.5517 75.8529L32.7709 75.8774C29.773 75.8791 27.353 73.8806 27.353 70.7454L27.3617 21.7548C27.3617 19.1713 29.5693 16.9661 32.0292 16.9293L36.594 16.8628C36.782 15.1253 38.1626 13.7643 39.8983 13.7345L43.3158 13.675C43.9757 10.3681 46.803 7.90191 50.1648 8.0035C53.5265 8.10509 55.9099 10.6291 56.5645 13.6995L60.3459 13.7731C61.9702 13.8046 63.1053 15.2409 63.2393 16.8891L67.9173 16.8926C70.6836 17.1308 72.5778 19.3272 72.5761 22.1069L72.5639 46.991C78.6711 47.4552 83.8366 52.4015 83.995 58.6948C84.1604 65.2158 78.9097 70.6158 72.5378 71.0677V71.0659ZM61.3103 21.7286L61.3051 17.0012C61.3051 16.2235 60.6523 15.6595 59.9211 15.6315L55.5426 15.628C55.1926 15.628 54.7626 15.1253 54.7504 14.7679C54.6669 12.1179 52.5603 10.1018 50.069 10.03C47.5777 9.95822 45.3719 11.8061 45.1752 14.3826C45.1212 15.099 44.8844 15.6297 44.0644 15.6315L40.0515 15.6402C39.3569 15.6402 38.5091 16.2445 38.5108 17.0047L38.516 21.7286H61.3103ZM70.6123 21.9335C70.6123 20.2835 69.4075 19.0224 67.8581 18.8683L63.2515 18.8823L63.2149 21.4203C63.201 22.4414 62.2383 23.6605 61.0962 23.6605L38.8764 23.6658C37.5045 23.6658 36.5836 22.4572 36.5853 21.2346L36.5888 18.8858L32.515 18.8613C31.359 18.8543 29.383 19.7423 29.3812 21.3029L29.3569 71.0852C29.3569 72.6055 30.774 73.8789 32.2521 73.8771L67.8877 73.8666C69.3779 73.8666 70.4033 72.334 70.6436 71.0326C63.3594 70.4897 58.0739 63.755 59.6791 56.5159C60.8264 51.3383 65.3441 47.4622 70.6088 47.0138V21.9335H70.6123ZM81.8641 59.0591C81.8641 53.4034 77.3062 48.8179 71.6847 48.8179C66.0632 48.8179 61.5053 53.4034 61.5053 59.0591C61.5053 64.7148 66.0632 69.3004 71.6847 69.3004C77.3062 69.3004 81.8641 64.7148 81.8641 59.0591Z" fill="#114997"/>
+<path d="M24.9503 71.397C24.9434 73.8281 22.8664 75.9282 20.5857 75.9387L5.93213 76C3.47739 76.0105 1.03831 74.3325 1.03483 71.6264L1.00001 49.5938C0.996525 47.8388 2.2239 46.4918 3.60622 45.6914L3.62537 44.5091C2.54423 44.3952 1.61456 43.5265 1.60238 42.3985L1.54841 37.6483C1.52752 35.7479 2.82975 33.8983 4.91715 33.9L21.0784 33.921C23.1745 33.9245 24.2122 35.9493 24.2087 37.7989L24.2 42.1953C24.1982 43.3093 23.5471 44.2166 22.4277 44.4916C22.2954 44.7946 22.2971 45.4286 22.4155 45.7667C24.2296 46.6284 25.0182 48.345 25.013 50.3032L24.9521 71.4005L24.9503 71.397ZM22.1892 42.6034L22.2083 37.5134C22.2118 36.4327 21.6146 35.8355 20.5492 35.8372L4.84926 35.8687C4.02753 35.8687 3.49305 36.8006 3.50698 37.4696L3.61318 42.5946L22.1892 42.6017V42.6034ZM20.6415 73.9875C21.8358 73.9822 23.0266 72.6318 23.0283 71.4793L23.0457 49.9441C23.0457 48.7618 22.3981 47.8528 21.4075 47.3326C20.7947 47.0103 20.4517 46.5023 20.4291 45.8245L20.3873 44.5809L5.45163 44.5949C5.57349 45.5232 5.67099 46.5776 4.96068 47.0015C3.8987 47.6373 2.91158 48.394 2.91158 49.797L2.90287 71.2341C2.90287 73.0872 4.45232 74.0663 6.11145 74.0575L20.6415 73.9857V73.9875Z" fill="#114997"/>
+<path d="M43.6828 38.9514C41.4753 41.2862 38.0073 41.2214 35.8903 38.8796C34.5341 37.3786 34.1302 35.2119 35.0807 33.3588C36.1514 31.2674 37.4885 29.4564 38.9021 27.5717C39.1337 27.2634 39.6142 26.9762 39.9589 26.9954C40.3036 27.0147 40.751 27.337 40.9634 27.6575L44.4471 32.9051C45.7249 34.8301 45.2932 37.2454 43.6828 38.9497V38.9514ZM39.6299 38.7307C41.054 38.8113 42.2169 38.0792 42.8332 37.0318C43.446 35.9896 43.4582 34.6234 42.7409 33.562L39.8614 29.3092L36.9418 33.6478C36.2489 34.6777 36.2158 36.0001 36.8722 37.072C37.3945 37.925 38.3416 38.6572 39.6299 38.7325V38.7307Z" fill="#114997"/>
+<path d="M64.3341 46.5496H35.5613C34.9868 46.5496 34.5777 46.2571 34.4419 45.8297C34.3322 45.4794 34.6717 44.6404 35.234 44.6404L64.5883 44.6264C65.1367 44.6264 65.5406 45.243 65.5023 45.6073C65.4361 46.2221 65.1001 46.5496 64.3341 46.5496Z" fill="#114997"/>
+<path d="M56.4842 54.3422L35.3803 54.358C34.811 54.358 34.4228 53.8115 34.4263 53.3491C34.4298 52.927 34.8459 52.4138 35.396 52.4138L56.3954 52.3998C56.8846 52.3998 57.299 52.8376 57.3721 53.1809C57.4713 53.6451 57.1893 54.3405 56.4842 54.3405V54.3422Z" fill="#114997"/>
+<path d="M55.9374 62.2066H35.5474C34.9694 62.2084 34.5394 61.8861 34.4541 61.3957C34.374 60.935 34.797 60.2782 35.4011 60.2782L55.7042 60.2747C56.1551 60.2747 56.6234 60.7161 56.6756 61.0646C56.7383 61.478 56.4562 61.9299 55.9392 62.2084L55.9374 62.2066Z" fill="#114997"/>
+<path d="M64.6563 36.0526L49.9958 36.0702C49.4682 36.0702 49.0243 35.7479 48.9285 35.289C48.8485 34.9054 49.3081 34.1522 49.8443 34.1522L64.5902 34.1487C65.0341 34.1487 65.5042 34.6339 65.5407 34.9562C65.5877 35.3695 65.2517 36.0526 64.6563 36.0544V36.0526Z" fill="#114997"/>
+<path d="M69.4648 63.5676L65.5999 59.7632C65.2761 59.4445 65.4728 58.7666 65.7635 58.5266C66.0752 58.2692 66.7385 58.1588 67.0571 58.4741L69.9958 61.3852L76.3155 55.0236C76.5644 54.7731 77.3513 54.915 77.5724 55.1269C77.7935 55.3388 77.9624 56.0009 77.7082 56.2619L70.8837 63.254C70.6034 63.5413 69.8844 63.9827 69.4613 63.5676H69.4648Z" fill="#114997"/>
+<path d="M51.9506 14.556C51.9506 15.67 51.0523 16.5738 49.945 16.5738C48.8378 16.5738 47.9395 15.67 47.9395 14.556C47.9395 13.442 48.8378 12.5382 49.945 12.5382C51.0523 12.5382 51.9506 13.442 51.9506 14.556ZM50.3977 14.5157C50.3977 14.2653 50.1957 14.0603 49.945 14.0603C49.6943 14.0603 49.4924 14.2635 49.4924 14.5157C49.4924 14.7679 49.6943 14.9711 49.945 14.9711C50.1957 14.9711 50.3977 14.7679 50.3977 14.5157Z" fill="#114997"/>
+<path d="M16.9281 54.1303C18.1224 55.9992 17.9605 58.3059 16.519 59.9384C15.1088 61.5358 12.8073 62.0034 10.7965 60.9981C8.44793 59.8245 7.50433 57.0536 8.73693 54.675L11.9995 49.5412C12.1823 49.2522 12.6924 48.944 12.9936 48.937C13.3696 48.9282 13.831 49.2855 14.0608 49.6463L16.9281 54.1303ZM12.1248 59.5198C13.3922 59.8999 14.5204 59.4287 15.2133 58.6142C15.9793 57.7139 16.1412 56.3985 15.511 55.3669L13.011 51.2718C11.9647 52.7431 10.9915 54.1566 10.222 55.8012C9.51862 57.3058 10.5614 59.0504 12.1266 59.518L12.1248 59.5198Z" fill="#114997"/>
+<path d="M18.3693 66.06H7.68332C7.2533 66.0618 6.89118 65.4172 6.93645 65.0914C6.98694 64.7236 7.40303 64.1946 7.84001 64.1946L18.3223 64.2016C18.7105 64.2016 19.1179 64.7744 19.1667 65.1019C19.2102 65.4049 18.8463 66.06 18.3676 66.0618L18.3693 66.06Z" fill="#114997"/>
+<path d="M17.5005 70.3951H8.41101C8.01233 70.3951 7.70592 69.6086 7.78426 69.2986C7.86261 68.9886 8.30133 68.4596 8.70697 68.4596L17.2829 68.4491C17.6764 68.4491 18.1325 68.9816 18.2143 69.2899C18.2961 69.5981 17.9601 70.3951 17.5023 70.3951H17.5005Z" fill="#114997"/>
+<path d="M11.1949 40.7433C11.0487 41.1006 10.4724 41.4211 10.2043 41.4018C9.93621 41.3826 9.43656 40.9184 9.43308 40.6347L9.4087 38.4242C9.40522 38.0722 10.1033 37.7324 10.3854 37.7569C11.3899 37.841 11.6162 39.7099 11.1932 40.7433H11.1949Z" fill="#114997"/>
+<path d="M7.69394 40.2844C7.70613 40.8046 7.31441 41.3703 6.90181 41.3878C6.2385 41.4159 5.85201 40.9447 5.85549 40.3282L5.8642 38.68C5.86594 38.2193 6.24198 37.7236 6.72771 37.6711C7.08983 37.6325 7.64519 38.1335 7.65564 38.5171L7.69742 40.2844H7.69394Z" fill="#114997"/>
+<path d="M16.4614 40.0934C16.4788 40.6522 16.061 41.3686 15.5213 41.4018C15.2514 41.4194 14.6456 40.9254 14.6195 40.6522C14.4819 39.2002 14.4645 37.9706 15.4586 37.7289C15.7406 37.6606 16.3952 38.0266 16.4039 38.3279L16.4614 40.0952V40.0934Z" fill="#114997"/>
+<path d="M19.8979 40.6452C19.8945 40.999 19.252 41.3878 18.93 41.3405C18.6357 41.2968 18.1274 40.8238 18.1343 40.5016L18.1744 38.3945C18.1796 38.1055 18.8238 37.7149 19.1075 37.7411C19.4679 37.7727 19.9206 38.2824 19.9171 38.6729L19.8979 40.6452Z" fill="#114997"/>
+</svg>
+
+                                                    <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
+                                                </div>
+                                                                                        Drinkwatercontrole aanvragen
+                                        </a>
+                                                                    </div>
+                                                        <div class="grid grid-cols-2 gap-6 md:gap-10 ">
+                                                                                                    
+                                                                    <ul>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-water/de-digitale-watermeter"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >De digitale watermeter</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-water/waterkwaliteit"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Waterkwaliteit</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-water/waterwinning"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Waterwinning</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-water/waterscan"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Waterscan</a>
+                                            </li>
+                                                                            </ul>
+                                                                    <ul>
+                                                                            </ul>
+                                                            </div>
+                                                    </div>
+                    </div>
+                            </li>
+                                                        <li class="group">
+                <a
+                                            href="https://www.aquaduin.be/nl/over-ons"
+                                                                                class="inline-flex items-center gap-2 px-4 py-2.5 font-bold relative z-50  "
+                >
+                    Over ons
+                                                
+                                                    
+    <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+    </svg>
+
+                                    </a>
+                                                        <div class="transform max-h-0 group-hover:max-h-screen group-focus-within:max-h-screen origin-top transition-opacity duration-300 ease-in-out overflow-hidden w-screen max-w-full backface-hidden absolute left-0 right-0 z-30 bg-theme-primary">
+                        <div class="container grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_2fr_1fr] items-start gap-6 md:gap-10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 group-hover:delay-400 group-focus-within:delay-400 ease-in-out pt-14 pb-10">
+                                                            <div class="w-full max-w-[290px] shrink-0">
+                                                                            <a href="https://www.aquaduin.be/nl/over-ons/vacatures"
+                                            
+                                            class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors "
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
+                                                    <svg id="lkzgkncqeo-a" class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.lkzgkncqeo-d{fill:#114997}</style></defs><path d="M17.22 57.71V18.54c0-1.9 1.24-4.96 3.47-6.2L40.28 1.18c.33-.25 1.29-.6 2.48 0l2.48 1.49c.99.5 2.23.99 2.23 3.22v38.18c.25 1.74-.25 5.45-3.47 7.69L24.41 62.92c-.5.25-1.83.5-3.22-.5l-2.98-1.74c-.5-.25-.99-.79-.99-2.98Z" style="fill:#fff"/><path d="M37.34 39.36c-.15 0-.29-.02-.43-.07-1-.35-3.02-1.32-5.28-3.85-2.26-2.54-3.13-4.8-3.44-5.91a1.76 1.76 0 0 1 .37-1.64l1.87-2.09c.21-.23.5-.34.78-.3.29.04.55.22.7.5l1.49 2.71c.23.42.17.96-.14 1.31l-.79.89c.34.78.79 1.49 1.32 2.12.56.6 1.19 1.1 1.89 1.48l.79-.89c.31-.35.8-.41 1.17-.15l2.42 1.67c.25.17.41.46.44.78.03.32-.07.65-.27.88l-1.87 2.09c-.27.31-.65.48-1.04.48ZM31.1 26.41s-.06.01-.08.04l-1.87 2.09c-.17.18-.23.45-.16.7.86 3.48 5.08 8.2 8.17 9.16.22.08.46 0 .62-.18l1.87-2.09s.04-.07.04-.11c0-.04-.03-.08-.06-.1l-2.42-1.67s-.11-.02-.14.02l-1 1.12c-.12.13-.3.17-.45.1-.9-.44-1.72-1.05-2.42-1.82a9.2 9.2 0 0 1-1.62-2.7.524.524 0 0 1 .09-.51l1-1.12s.04-.11.02-.16l-1.49-2.71s-.06-.06-.1-.06Z" class="lkzgkncqeo-d"/><path d="M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29Z" class="lkzgkncqeo-d"/><path d="M46.64 3.11s-.07-.09-.12-.12L42.73.81c-.84-.49-1.95-.39-3.12.27L20.88 11.82c-.97.56-1.88 1.47-2.64 2.63-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11.7-1.08 1.53-1.91 2.41-2.41L43.73 3.84c.94-.54 1.81-.64 2.45-.27.16.09.37.03.46-.13.06-.11.06-.23 0-.33ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Z" class="lkzgkncqeo-d"/><path d="M22.6 16.64a.345.345 0 0 0-.12-.12l-3.79-2.17a.338.338 0 0 0-.45.11c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16.05-.08.07-.17.04-.26 0-.03-.02-.06-.04-.09Zm-3.97-1.55 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" class="lkzgkncqeo-d"/><path d="M18.24 14.46c.76-1.17 1.67-2.08 2.64-2.63L39.61 1.08c1.17-.66 2.27-.76 3.12-.27l3.79 2.18c.05.03.09.07.12.12.06.1.06.23 0 .33-.09.16-.3.22-.46.13-.65-.37-1.52-.27-2.45.27L24.99 14.58c-.87.5-1.71 1.33-2.41 2.41m-4.34-2.53c-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11m-4.35-2.53c.1-.15.29-.2.45-.11l3.79 2.17c.05.03.09.07.12.12.02.03.03.06.04.09.02.09 0 .18-.04.26m-4.36-2.53c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Zm-.37.56 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" style="fill:none;stroke:#114997;stroke-width:.5px"/></svg>
+                                                    <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
+                                                </div>
+                                                                                        Interesse in een job?
+                                        </a>
+                                                                    </div>
+                                                        <div class="grid grid-cols-2 gap-6 md:gap-10 ">
+                                                                                                    
+                                                                    <ul>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/missie-waarden"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Missie &amp; waarden</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/internationale-samenwerking"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Internationale samenwerking</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/engagementen"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Engagementen</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/organisatie"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Organisatie</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/publicaties"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Publicaties</a>
+                                            </li>
+                                                                            </ul>
+                                                                    <ul>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/geschiedenis"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Geschiedenis</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/kantoren"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Kantoren</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/nieuws/boek-100-jaar-iwva"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Boek &quot;100 jaar IWVA&quot;</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/watertoren"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Watertoren</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne/educatief-aanbod/begeleide-activiteiten/bedrijfsbezoek"
+                                                                                                                                                                target="_blank" 
+                                                                                                                                                            class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Bezoek Aquaduin</a>
+                                            </li>
+                                                                            </ul>
+                                                            </div>
+                                                            <a href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne"
+                                    
+                                    class="block relative rounded-base overflow-hidden"
+                                >
+                                    <img  class="w-full  lazyload" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="290" height="250" alt="Linus nylund At r0 Tuq L8o unsplash" style="" data-src="https://cdn.glue.be/https%3A%2F%2Fwww.aquaduin.be%2Fvolumes%2Fgeneral%2FUsed-during-development%2Flinus-nylund-At_r0TuqL8o-unsplash.jpg%3Fv%3D1731916846?dpr=2&amp;fm=webp&amp;w=290&amp;h=250&amp;fit=crop&amp;s=df5a99cf5264972b681ca989ba87ce4e">
+                                    <div class="w-full h-full absolute top-0 bottom-0 left-0 right-0 bg-gradient-cta">
+                                    </div>
+                                    <div class="flex items-center justify-start gap-2 absolute left-6 bottom-6 right-6 font-extrabold text-white">
+                                        Bezoekerscentrum De Doornpanne
+                                            
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="flex-shrink-0" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+
+                                    </div>
+                                </a>
+                                                    </div>
+                    </div>
+                            </li>
+                                                        <li class="group">
+                <a
+                                            href="https://www.aquaduin.be/nl/klantenservice"
+                                                                                class="inline-flex items-center gap-2 px-4 py-2.5 font-bold relative z-50  "
+                >
+                    Klantenservice
+                                                
+                                                    
+    <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+    </svg>
+
+                                    </a>
+                                                        <div class="transform max-h-0 group-hover:max-h-screen group-focus-within:max-h-screen origin-top transition-opacity duration-300 ease-in-out overflow-hidden w-screen max-w-full backface-hidden absolute left-0 right-0 z-30 bg-theme-primary">
+                        <div class="container grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[1fr_2fr_1fr] items-start gap-6 md:gap-10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-400 group-hover:delay-400 group-focus-within:delay-400 ease-in-out pt-14 pb-10">
+                                                            <div class="w-full max-w-[290px] shrink-0">
+                                                                            <a href="https://www.aquaduin.be/nl/storingen"
+                                            
+                                            class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors "
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
+                                                    <svg class="text-blue-500 group-hover/tasks:animate-bounce z-1" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M4.5 69H35C35.3333 69.6667 36.6 71 39 71H78.5C81 70.3333 84 68 82.5 64L62 31C61 29.1667 58 26.6 54 31L45 45.5L35 9.5L32 8.5H23L20.5 10.5L8 57.5H4.5C3.33333 57.5 1 58.2 1 61V66C1 67 1.7 69 4.5 69Z" fill="white"/>
+<path d="M83.8776 66.9415C83.3104 69.4171 80.985 71.9437 78.2071 71.9471L38.6615 72C36.9564 72.0017 35.5855 71.2294 34.4682 70.1144L3.68953 70.0871C1.5869 70.0854 -0.0119284 68.0156 6.70533e-05 66.1368L0.0360535 60.4561C0.0497626 58.3454 1.9262 56.7513 3.96543 56.4666L6.94716 56.366L18.9581 10.5842C19.479 8.59797 21.5628 7.10788 23.5318 7.08572L31.4008 7.00047C34.5299 6.96637 36.6377 8.77869 37.3745 11.6736L41.4821 27.8293L45.4184 43.1956L53.3251 30.0934C54.3207 28.4448 56.3103 27.623 58.0736 27.6367C59.9329 27.652 61.8539 28.5198 62.9009 30.223L82.7277 62.4559C83.5486 63.7926 84.3026 65.0883 83.8776 66.9415ZM36.8982 20.2374L34.6156 11.4486C34.1786 10.2381 33.0836 9.49134 31.7761 9.60557H24.0973C22.3751 9.51521 21.4823 10.6916 21.1121 12.1868L19.1089 20.2953C22.1506 21.1052 25.0963 21.3575 28.1774 21.349C31.1815 21.3421 34.0518 21.1273 36.8964 20.2374H36.8982ZM40.8755 35.6122L37.5425 22.735C34.3397 23.5739 31.3528 23.8824 28.1757 23.8842C24.8735 23.9336 21.6365 23.5415 18.4971 22.7521L15.1538 35.6821C23.2953 38.0366 32.8351 37.9888 40.8755 35.6122ZM78.3117 69.3744C79.5952 69.3744 80.4417 68.1605 80.913 67.6423C81.5213 66.4693 81.4476 65.4617 80.9507 64.3859L60.8017 31.6142C60.1197 30.5043 58.8053 30.1156 57.6657 30.2179C56.4748 30.3253 55.6419 31.0107 54.9839 32.0984L35.8785 63.6596C35.1228 64.9093 34.7818 66.0584 35.4758 67.4496C35.9916 68.4845 37.0918 69.3983 38.5398 69.3966L78.3134 69.3744H78.3117ZM42.1196 48.7195L43.6002 46.1144L41.5027 38.0468C35.9214 39.6954 30.2441 40.2189 24.4486 39.8131C21.0299 39.6204 17.7739 39.0629 14.506 38.0962L11.8379 48.0938C15.0013 49.1168 18.1904 49.8294 21.5165 50.155C25.8863 50.6273 30.1139 50.6137 34.4716 50.1499C37.0781 49.8754 39.5389 49.4066 42.1179 48.7195H42.1196ZM34.7458 60.809L40.1849 51.7696C32.6586 53.3671 25.0963 53.4694 17.5717 52.1634L11.1233 50.4432L8.76362 59.0802C9.06179 60.1867 9.94775 60.6777 11.0702 60.809H34.7458ZM33.1316 63.3544L11.5774 63.351C8.84416 63.1976 6.36966 61.6904 6.25656 58.9234L4.32529 58.9575C3.60042 58.9711 2.52426 59.648 2.51569 60.4714L2.45571 65.9203C2.44372 66.9569 3.21657 67.5604 4.21562 67.5604L32.8625 67.5536C32.3776 66.0482 32.5198 64.7388 33.1333 63.3527L33.1316 63.3544Z" fill="#114997"/>
+<path d="M59.7788 54.4139C59.7839 55.5562 59.0179 56.2705 58.0857 56.2893C57.1535 56.308 56.2932 55.6943 56.2949 54.6441L56.2984 41.2418C56.2984 40.3109 57.1757 39.6784 57.928 39.6119C58.6803 39.5454 59.7119 40.1421 59.7171 41.0611L59.7805 54.4139H59.7788Z" fill="#114997"/>
+<path d="M58.0754 64.2307C59.4003 64.2307 60.4745 63.1621 60.4745 61.8439C60.4745 60.5256 59.4003 59.457 58.0754 59.457C56.7504 59.457 55.6763 60.5256 55.6763 61.8439C55.6763 63.1621 56.7504 64.2307 58.0754 64.2307Z" fill="#114997"/>
+</svg>
+
+                                                    <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
+                                                </div>
+                                                                                        Storingen &amp; werken
+                                        </a>
+                                                                    </div>
+                                                        <div class="grid grid-cols-2 gap-6 md:gap-10 ">
+                                                                                                    
+                                                                    <ul>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/klantenservice/kenniscentrum"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Kenniscentrum</a>
+                                            </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/klantenservice"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Contact</a>
+                                            </li>
+                                                                            </ul>
+                                                                    <ul>
+                                                                            </ul>
+                                                            </div>
+                                                    </div>
+                    </div>
+                            </li>
+        
+            </ul>
+</nav>
+            </div>
+            <div class="flex md:flex-wrap items-center justify-start gap-3 relative z-50 shrink-0">
+                                    <div x-data="{ open: false }" class="hidden md:block relative">
+                                                <div
+                            x-cloak
+                            x-show="!$store.userMenu.loaded"
+                            class="inline-flex items-center justify-center rounded-full bg-blue-500 text-white size-[46px]"
+                        >
+                            <svg width="24" height="24" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <path opacity="0.2" fill="currentColor" d="M20.201,5.169c-8.254,0-14.946,6.692-14.946,14.946c0,8.255,6.692,14.946,14.946,14.946s14.946-6.691,14.946-14.946C35.146,11.861,28.455,5.169,20.201,5.169z M20.201,31.749c-6.425,0-11.634-5.208-11.634-11.634c0-6.425,5.209-11.634,11.634-11.634c6.425,0,11.633,5.209,11.633,11.634C31.834,26.541,26.626,31.749,20.201,31.749z"/>
+    <path fill="currentColor" d="M26.013,10.047l1.654-2.866c-2.198-1.272-4.743-2.012-7.466-2.012h0v3.312h0C22.32,8.481,24.301,9.057,26.013,10.047z">
+        <animateTransform attributeName="transform" type="rotate" from="0 20 20" to="360 20 20" dur="0.8s" repeatCount="indefinite"/>
+    </path>
+</svg>
+                        </div>
+                                                <a href="https://www.aquaduin.be/nl/account/inloggen"
+                            
+                            x-cloak
+                            x-show="$store.userMenu.loaded && !$store.userMenu.loggedIn"
+                            class="flex size-auto lg:size-[46px] xl:size-auto button shrink-0 bg-blue-500 text-white"
+                        >
+                                
+                            
+    <svg  width="16" height="16" role="img" aria-label="user">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#user"/>
+    </svg>
+
+                            <span class="hidden md:block lg:hidden xl:block">
+                                Mijn Aquaduin
+                            </span>
+                        </a>
+                                                <button
+                            type="button"
+                            x-cloak
+                            x-show="$store.userMenu.loggedIn"
+                            @click="open = !open"
+                            @keydown.escape="open = false"
+                            :aria-expanded="open.toString()"
+                            class="flex button button--account bg-white hover:bg-blue-300 text-blue-500"
+                        >
+                            <span
+                                x-text="$store.userMenu.initials"
+                                class="bg-orange-600 inline-flex items-center justify-center size-10 rounded-full text-white font-bold leading-none shrink-0"
+                            ></span>
+                                
+                                                    
+    <svg  width="11" height="8" class="hidden md:block lg:hidden xl:block transition-transform" :class="open && 'rotate-180'" role="img" aria-label="arrow-down">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+    </svg>
+
+                        </button>
+                                                <div
+                            x-show="open"
+                            x-cloak
+                            @click.outside="open = false"
+                            class="absolute right-0 top-full mt-2 w-64 bg-white rounded-br-base rounded-l-base shadow-lg overflow-hidden z-50"
+                        >
+                            
+<div class="pt-4 pb-3 px-4 border-b border-blue-300  text-blue-500">
+    <div class="font-bold" x-text="$store.userMenu.fullName"></div>
+    <div class="t-small text-blue-400" x-text="$store.userMenu.email"></div>
+</div>
+<nav>
+    <ul class="divide-y divide-blue-300 text-blue-500">
+        <li>
+            <a href="https://www.aquaduin.be/nl/mijn-aquaduin/mijn-account" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold">
+                Mijn account
+            </a>
+        </li>
+        <li x-show="$store.userMenu.customerDashboardUrl">
+            <a :href="$store.userMenu.customerDashboardUrl" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold">
+                Dashboard
+            </a>
+        </li>
+        <li>
+            <a href="https://www.aquaduin.be/nl/mijn-aquaduin" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold gap-2">
+                Overzicht klanten
+            </a>
+        </li>
+        <li>
+            <a href="https://www.aquaduin.be/nl/mijn-aquaduin/klant-toevoegen" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold">
+                Klant toevoegen
+            </a>
+        </li>
+    </ul>
+</nav>
+<a :href="$store.userMenu.logoutUrl" class="block text-link px-4 pt-3 pb-4 border-t border-blue-300 text-right text-blue-500">
+    Afmelden
+</a>
+                        </div>
+                    </div>
+                                                <button
+                    class="size-[46px] order-first md:order-none inline-flex items-center justify-center rounded-full text-white bg-theme-accent-dark hover:bg-theme-accent transition-colors"
+                    aria-controls="search-overlay"
+                    aria-label="Zoekoverlay openen"
+                    data-micromodal-trigger="search-overlay"
+                    @click="menuOpen = false"
+                    :class="{ 'hidden' : menuOpen }"
+                >
+                        
+                            
+    <svg  width="18" height="18" role="img" aria-label="search">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#search"/>
+    </svg>
+
+                </button>
+                <button
+                    class="lg:hidden size-[46px] rounded-full flex items-center justify-center transition-colors bg-blue-500 text-white"
+                    aria-controls="mobile-nav"
+                    :aria-expanded="menuOpen"
+                    :aria-label="!menuOpen ? 'Menuoverlay openen' : 'Menuoverlay sluiten'"
+                    @click="menuOpen = !menuOpen, window.toggleScrollLock('#mobile-nav', menuOpen );"
+                >
+                        
+                            
+    <svg  width="18" height="14" role="img" aria-label="hamburger">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#hamburger"/>
+    </svg>
+
+                </button>
+            </div>
+        </div>
+    </div>
+    <div
+        id="search-overlay"
+        aria-hidden="true"
+        class="modal fixed top-0 left-0 w-screen h-screen bg-blue-500/95 backdrop-blur z-60"
+    >
+        
+<div class="container pt-5 md:pt-[62px] lg:pt-[83px] text-white relative">
+    <div class="w-full flex items-center justify-between">
+            
+                                        
+    <svg  width="241" height="42" class="w-[185px] h-auto xl:w-[241px]" role="img" aria-label="logo">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo"/>
+    </svg>
+
+        <button
+            data-micromodal-close
+            class="z-10 size-[46px] flex items-center justify-center"
+            aria-label="Zoekoverlay sluiten"
+        >
+                
+                                        
+    <svg  width="21" height="21" class="w-[14px] h-auto lg:w-[21px] pointer-events-none" role="img" aria-label="close">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#close"/>
+    </svg>
+
+        </button>
+    </div>
+    <div class="bg-blue-600 size-[610px] md:size-[1020px] rounded-full absolute top-0 z-0 left-1/2 -translate-x-[50%] right-0 mx-auto mt-22">
+    </div>
+</div>
+<div class="container-xs mt-16 lg:mt-18 text-white relative z-10">
+    <h2 class="t-alpha text-center">Waar ben je naar op zoek?</h2>
+    
+
+<div class="bg-white px-4 py-6 lg:p-10 rounded-b-base rounded-tl-base mt-6 lg:mt-10">
+    <form action="https://www.aquaduin.be/nl/zoeken">
+        <div class="flex items-center gap-2 lg:gap-3">
+            <input x-ref="searchInput" type="search" class="w-full sm:w-auto flex-grow bg-blue-100 border border-blue-300 px-5 py-3 text-blue-500 font-bold rounded-lg" name="q" placeholder="Zoeken" value="">
+            <button type="submit" class="size-[46px] inline-flex items-center justify-center rounded-full bg-theme-accent-dark hover:bg-theme-accent transition-colors text-white flex-shrink-0">
+                    
+                            
+    <svg  width="18" height="18" role="img" aria-label="search">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#search"/>
+    </svg>
+
+            </button>
+        </div>
+    </form>
+</div>
+            <div class="mt-6 lg:mt-10">
+            <div class="flex items-center justify-between gap-4">
+                <div class="w-full h-[1px] bg-white/30"></div>
+                <h3 class="t-delta text-blue-300 whitespace-nowrap">Ga meteen naar</h3>
+                <div class="w-full h-[1px] bg-white/30"></div>
+            </div>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                                        <a href="https://www.aquaduin.be/nl/klantenservice/kenniscentrum"
+        
+        class="text-link inline-flex py-1 no-underline hover:underline"
+    >Kenniscentrum</a>
+                            </div>
+        </div>
+    </div>
+    </div>
+    <div
+        id="mobile-nav"
+        x-cloak
+        x-show="menuOpen"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menuoverlay"
+        class="size-full fixed inset-0 bg-theme-primary z-50 overflow-auto"
+    >
+        
+
+<div class="container flex justify-between items-center gap-4 min-[360px]:gap-8 pt-5 pb-4">
+    <a class="inline-block" href="https://www.aquaduin.be/nl/">
+        <span class="sr-only">Aquaduin</span>
+            
+                                        
+    <svg  width="241" height="42" class="w-[150px] min-[360px]:w-[185px] h-auto" role="img" aria-label="logo">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo"/>
+    </svg>
+
+    </a>
+    <button type="button"
+        class="size-[46px] rounded-full flex items-center justify-center bg-white"
+        aria-controls="mobile-nav"
+        :aria-expanded="menuOpen"
+        :aria-label="!menuOpen ? 'Menuoverlay openen' : 'Menuoverlay sluiten'"
+        @click="menuOpen = !menuOpen, window.toggleScrollLock('#mobile-nav', menuOpen );"
+    >
+            
+                            
+    <svg  width="14" height="14" role="img" aria-label="close">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#close"/>
+    </svg>
+
+    </button>
+</div>
+<div class="container flex flex-col justify-between min-h-[calc(100vh-82px)] pt-4 pb-6 px-10">
+    <div class="mmmenu mx-0 md:mx-4 lg:mx-0 overflow-hidden lg:hidden">
+        <ul class="mmmenu__root w-full">
+                            <li class="mmmenu__item">
+                                            <a class="mmmenu__link--parent flex py-3 text-[1.5rem] font-bold pr-2 border-b border-blue-300" href="#https://www.aquaduin.be/nl/zelf-regelen">
+                            Zelf regelen
+                                
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+
+                        </a>
+                        <ul class="mmmenu__sub">
+                            <li class="mmmenu__item">
+                                <button type="button"
+                                    class="mmmenu__back-link inline-flex items-center gap-2 font-bold py-3"
+                                >
+                                        
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+ Terug
+                                </button>
+                            </li>
+                            <li class="mmmenu__item mt-1">
+                                <h2 class="text-[1.75rem] font-bold">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/zelf-regelen"
+                                                                                                                                                                class=" "
+                                    >Zelf regelen</a>
+                                </h2>
+                            </li>
+                                                                                                <li class="mt-4">
+                                        <a href="https://www.aquaduin.be/nl/zelf-regelen/meterstand-doorgeven"
+                                            
+                                            class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
+                                                    <svg id="oxfzovnixd-a" class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.oxfzovnixd-c{fill:#114997}</style></defs><path d="M18.01 23.6c.53-1.81 3.2-6.34 9.6-8.64V8.88h.96v-4.8h7.36v4.8h.96v6.08c1.49.21 5.38 1.98 8.96 7.36 1.6 2.4 2.82 8.51 1.28 15.68-.85 3.09-4.1 9.28-10.24 10.56v6.08h-.96v5.44h-7.36v-5.44h-.96v-6.08c-2.67-1.07-8.38-4.16-9.92-9.28-.75-2.45-2.56-9.28.32-15.68Z" style="fill:#fff"/><path d="M28.52 60.84c-.39 0-.71-.32-.71-.71v-2.02h-.2c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h.2v-1.32h-.2c-.39 0-.71-.32-.71-.71v-5.65l-.13-.05C20.33 46.67 16 40.54 16 33.73v-3.64c0-6.81 4.33-12.94 10.77-15.23l.13-.05V9.16c0-.38.31-.7.7-.71h.2V7.14h-.2c-.39 0-.7-.32-.7-.71s.32-.71.71-.71h.2V3.7c0-.04.01-.08.03-.12l.03-.13c.01-.05.04-.08.06-.12l.08-.11.08-.07.12-.08c.13-.07.22-.08.32-.08h7.28c.39 0 .71.32.71.71v2.02h.2c.39 0 .71.32.71.71s-.32.71-.71.71h-.2v1.31h.2c.39 0 .71.32.71.71v5.64l.13.05c6.46 2.29 10.8 8.41 10.8 15.24v3.64c0 6.83-4.34 12.95-10.8 15.24l-.13.05v5.64c0 .39-.31.7-.7.71h-.2v1.32h.2c.39 0 .7.33.7.71s-.32.71-.71.71h-.2v2.02c0 .03 0 .07-.02.11l-.03.14-.07.12c-.14.22-.35.35-.59.35h-7.28Zm.71-1.42h5.86v-1.31h-5.86v1.31Zm0-2.73h5.87v-1.32h-5.87v1.32Zm-.91-2.74H36v-4.5l-.24.05c-1.21.27-2.41.41-3.58.41s-2.4-.14-3.61-.42l-.25-.06v4.51Zm-9.65-14.28c2.37 5.36 7.67 8.83 13.51 8.83s11.14-3.46 13.51-8.83l-.35-.2c-3.04 4.26-7.96 6.8-13.16 6.8s-10.12-2.54-13.16-6.8l-.35.2Zm13.51-24.33c-8.14 0-14.76 6.62-14.76 14.76s6.62 14.76 14.76 14.76 14.76-6.62 14.76-14.76-6.62-14.76-14.76-14.76Zm-3.86-.94.25-.06c1.22-.28 2.43-.42 3.61-.42s2.38.14 3.58.41l.24.06V9.88h-7.68v4.51Zm.9-5.94h5.87V7.15h-5.87v1.31Zm.01-2.73h5.87V4.42h-5.86v1.31Z" class="oxfzovnixd-c"/><path d="M22.61 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM28.07 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM33.53 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM38.99 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30H39.7v2.22ZM29.43 25.45c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h5.46c.39 0 .71.32.71.71s-.32.71-.71.71h-5.46ZM26.69 22.72c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h10.95c.39 0 .71.32.71.71s-.32.71-.71.71H26.69Z" class="oxfzovnixd-c"/></svg>
+                                                </div>
+                                                                                        Meterstand doorgeven
+                                        </a>
+                                    </li>
+                                                                    <li class="mt-2">
+                                        <a href="https://www.aquaduin.be/nl/zelf-regelen/aansluiting-aanvragen"
+                                            
+                                            class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
+                                                    <svg class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="m22.42 7.2 2.26 1.51 10.57 10.57 6.04-2.26 6.79 7.55-2.26 6.04 9.81 9.81.75 2.26-2.26 4.53-4.53 5.28-6.04 3.77h-3.77l-9.81-10.57-6.04 2.26-7.55-8.3 2.26-4.53L8.07 23.8l-.75-2.26 4.53-6.79 3.02-3.02 7.55-4.53Z" style="fill:#fff"/><path d="M40.9 57.37c-.82 0-1.47-.24-1.92-.7l-9.59-9.87-5.03 1.9c-.1.04-.2.06-.3.06-.06 0-.12 0-.18-.02a.845.845 0 0 1-.42-.24l-7.62-7.85c-.12-.12-.19-.26-.22-.42s-.01-.32.05-.46l2.12-4.93L7.32 24.06l-.1-.12h-.01c-.57-.67-.58-1.56-.48-2.21.12-.82.46-1.72 1.02-2.76 1.09-2.01 2.93-4.29 5.2-6.41 2.26-2.12 4.66-3.83 6.76-4.8 1.08-.5 2.01-.79 2.85-.87.15-.01.31-.03.46-.03l.19.01c.55.03 1.06.22 1.46.53.08.05.12.08.16.12l.05.18h.14L35.3 18.29l5.15-1.94c.09-.03.17-.05.25-.06h.01a.919.919 0 0 1 .65.26l7.63 7.86c.11.12.19.26.22.42.03.16.01.31-.05.46l-2.17 5.05 9.59 9.88c.67.69.69 1.64.59 2.31-.12.82-.45 1.72-1.02 2.76-1.09 2.02-2.94 4.29-5.2 6.41-2.25 2.11-4.65 3.81-6.76 4.8-1.08.5-2.02.79-2.85.87-.14.01-.28.02-.42.02Zm4.09-22.45c-.06.12-.12.2-.19.27l-10.09 9.54c-.08.07-.16.12-.26.16l-3.36 1.26 9.1 9.39c.13.13.36.2.68.2.08 0 .17 0 .28-.01.6-.06 1.44-.32 2.3-.72 1.92-.9 4.23-2.54 6.32-4.5 2.1-1.97 3.88-4.16 4.88-6 .45-.83.75-1.64.84-2.22.07-.45.03-.77-.12-.94l-.12-.14h-.02l-8.97-9.24-1.28 2.97Zm-3.53-3.63a.83.83 0 0 1-.19.27l-10.06 9.51c-.08.08-.18.14-.29.18L22 44.61l2.28 2.34 4.84-1.82h.01l4.55-1.71 9.82-9.28 3.88-9.02-2.26-2.34-3.66 8.51Zm-24.04 8.6 3.34 3.45 9.41-3.55 9.82-9.28 3.87-9.01-3.34-3.45-3.98 1.51 2.43 2.49c.66.68.68 1.64.58 2.32-.12.81-.44 1.69-1.02 2.75-1.1 2.03-2.94 4.31-5.2 6.42-2.25 2.11-4.65 3.82-6.76 4.8-1.09.51-2.02.79-2.86.87-.14.01-.28.02-.42.02-.56 0-1.35-.12-1.92-.71l-2.34-2.41-1.62 3.77Zm7.02-27.26c-.26.49-.58 1-.94 1.53-.72 1.06-1.6 2.15-2.62 3.25-.5.54-1.05 1.09-1.64 1.64-.56.52-1.15 1.04-1.74 1.53-.58.47-1.16.92-1.73 1.32-1.14.8-2.24 1.46-3.29 1.94-.58.27-1.12.48-1.65.63l-.64.19 9.09 9.36.08.08 3.22 3.31c.13.13.36.2.67.2.08 0 .17 0 .28-.01.6-.06 1.44-.32 2.3-.72 1.93-.9 4.23-2.54 6.33-4.51 2.09-1.96 3.86-4.14 4.87-6 .46-.84.77-1.65.85-2.23.04-.24.04-.45.01-.61a.72.72 0 0 0-.15-.34L25.28 10.36l-.15.75c-.17.46-.4.99-.69 1.53ZM8.89 23.07c.1.02.21.03.33.03.07 0 .14 0 .22-.01.14-.01.28-.04.43-.08l.16-.04c.58-.13 1.15-.33 1.75-.61 1.93-.9 4.23-2.54 6.32-4.5s3.86-4.15 4.87-6c.24-.44.43-.85.57-1.23.14-.38.23-.72.27-1 .07-.46.03-.77-.12-.94l-.12-.14h-.09c-.12-.05-.29-.08-.48-.08H22.71c-.6.07-1.44.33-2.29.73-1.92.9-4.23 2.54-6.32 4.51-2.1 1.97-3.88 4.16-4.87 6-.45.83-.76 1.64-.85 2.23-.07.45-.02.76.13.94l.12.14h.12l.14.05h.02Z" style="fill:#114997"/></svg>
+                                                </div>
+                                                                                        Aansluiting aanvragen
+                                        </a>
+                                    </li>
+                                                                    <li class="mt-2">
+                                        <a href="https://www.aquaduin.be/nl/zelf-regelen/bouwen-verbouwen/keuring"
+                                            
+                                            class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
+                                                    <svg class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="m1.5 14.64 12.16-6.78 11.4 6.78 12.92-6.78L62.3 21.42v27.87l-12.16 6.78-12.16-6.78-12.16 6.78L1.5 42.51V14.64Z" style="fill:#fff"/><path d="m38.08 50.2-12.16 6.91L.8 42.83V14.26l12.96-7.37 12.16 6.91 12.16-6.91 25.13 14.28v28.62l-12.96 7.33-12.16-6.91Zm-35.7-8.26 22.75 12.93V42.82l-12.17-6.87V22.07L2.38 16.05v25.88Zm48.65-12.96v25.88l10.58-6.02V22.96l-10.58 6.02ZM38.89 48.86l10.56 6V29.03L26.72 16.06v12.03l12.17 6.92v13.85Zm-12.17-6.03v12.03l10.56-6V36.82l-10.56 6Zm-11.37-7.37 10.58 6.02 10.57-6.01-10.58-6.02-10.57 6.01Zm-.8-13.39v12.04l10.56-6.01V16.07l-10.56 6Zm13.6-7.75-.71.35 22.8 12.97 10.6-6.03L38.08 8.68l-9.92 5.64Zm-24.98.38 10.58 6.02 10.41-5.92.17-.11-10.57-6.01L3.17 14.7Z" style="fill:#114997"/></svg>
+                                                </div>
+                                                                                        Keuring aanvragen
+                                        </a>
+                                    </li>
+                                                                                                                        <li class="mmmenu__item py-3 border-b border-blue-300 mt-4 ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/zelf-regelen/bouwen-verbouwen"
+                                                                                                                                                                class="font-bold block  "
+                                    >Bouwen &amp; verbouwen</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/zelf-regelen/verhuizen"
+                                                                                                                                                                class="font-bold block  "
+                                    >Verhuizen</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/zelf-regelen/financieel"
+                                                                                                                                                                class="font-bold block  "
+                                    >Financieel</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/zelf-regelen/lek-check"
+                                                                                                                                                                class="font-bold block  "
+                                    >LEK-check</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3   pb-8">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/formulieren"
+                                                                                                                                                                class="font-bold block  "
+                                    >Formulieren</a>
+                                </li>
+                                                    </ul>
+                                    </li>
+                            <li class="mmmenu__item">
+                                            <a class="mmmenu__link--parent flex py-3 text-[1.5rem] font-bold pr-2 border-b border-blue-300" href="#https://www.aquaduin.be/nl/over-water">
+                            Over water
+                                
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+
+                        </a>
+                        <ul class="mmmenu__sub">
+                            <li class="mmmenu__item">
+                                <button type="button"
+                                    class="mmmenu__back-link inline-flex items-center gap-2 font-bold py-3"
+                                >
+                                        
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+ Terug
+                                </button>
+                            </li>
+                            <li class="mmmenu__item mt-1">
+                                <h2 class="text-[1.75rem] font-bold">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-water"
+                                                                                                                                                                class=" "
+                                    >Over water</a>
+                                </h2>
+                            </li>
+                                                                                                <li class="mt-4">
+                                        <a href="https://www.aquaduin.be/nl/formulieren/drinkwatercontrole"
+                                            
+                                            class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
+                                                    <svg class="text-blue-500 z-1" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M32.5 75H68.5C69.6667 75 72 74.1 72 70.5C75.6667 70.5 83 68.4 83 60C83.3333 56 81.6 48 72 48V21.5C72 20.3333 71.3 18 68.5 18H62.5C62.8333 16.8333 62.8 14.5 60 14.5H56C56.1667 12.6667 55.2 9 50 9C48 8.66667 44 9.3 44 14.5H40.5C39.5 14.5 37.5 15.2 37.5 18H32.5C31 17.8333 28 18.3 28 21.5V70.5C28.1667 72 29.3 75 32.5 75Z" fill="white"/>
+<path d="M2.50004 41.5C2.33337 42.3333 2.60004 44 5.00004 44L4.5 46.5C3.83335 46.6667 2.50004 47.4 2.50004 49V71.5C2.16672 72.6667 2.30006 75 5.50006 75H20.5001C21.8334 75 24.5001 74.3 24.5001 71.5V50.5C24.5001 49.5 23.9001 47.2 21.5001 46V44L23.5001 43V37.5C23.6667 36.5 23.3001 34.5 20.5001 34.5H5.00004C4.16671 34.5 2.50004 35.1 2.50004 37.5V41.5Z" fill="white"/>
+<path d="M72.5378 71.0659C72.2627 73.681 70.3198 75.8511 67.5517 75.8529L32.7709 75.8774C29.773 75.8791 27.353 73.8806 27.353 70.7454L27.3617 21.7548C27.3617 19.1713 29.5693 16.9661 32.0292 16.9293L36.594 16.8628C36.782 15.1253 38.1626 13.7643 39.8983 13.7345L43.3158 13.675C43.9757 10.3681 46.803 7.90191 50.1648 8.0035C53.5265 8.10509 55.9099 10.6291 56.5645 13.6995L60.3459 13.7731C61.9702 13.8046 63.1053 15.2409 63.2393 16.8891L67.9173 16.8926C70.6836 17.1308 72.5778 19.3272 72.5761 22.1069L72.5639 46.991C78.6711 47.4552 83.8366 52.4015 83.995 58.6948C84.1604 65.2158 78.9097 70.6158 72.5378 71.0677V71.0659ZM61.3103 21.7286L61.3051 17.0012C61.3051 16.2235 60.6523 15.6595 59.9211 15.6315L55.5426 15.628C55.1926 15.628 54.7626 15.1253 54.7504 14.7679C54.6669 12.1179 52.5603 10.1018 50.069 10.03C47.5777 9.95822 45.3719 11.8061 45.1752 14.3826C45.1212 15.099 44.8844 15.6297 44.0644 15.6315L40.0515 15.6402C39.3569 15.6402 38.5091 16.2445 38.5108 17.0047L38.516 21.7286H61.3103ZM70.6123 21.9335C70.6123 20.2835 69.4075 19.0224 67.8581 18.8683L63.2515 18.8823L63.2149 21.4203C63.201 22.4414 62.2383 23.6605 61.0962 23.6605L38.8764 23.6658C37.5045 23.6658 36.5836 22.4572 36.5853 21.2346L36.5888 18.8858L32.515 18.8613C31.359 18.8543 29.383 19.7423 29.3812 21.3029L29.3569 71.0852C29.3569 72.6055 30.774 73.8789 32.2521 73.8771L67.8877 73.8666C69.3779 73.8666 70.4033 72.334 70.6436 71.0326C63.3594 70.4897 58.0739 63.755 59.6791 56.5159C60.8264 51.3383 65.3441 47.4622 70.6088 47.0138V21.9335H70.6123ZM81.8641 59.0591C81.8641 53.4034 77.3062 48.8179 71.6847 48.8179C66.0632 48.8179 61.5053 53.4034 61.5053 59.0591C61.5053 64.7148 66.0632 69.3004 71.6847 69.3004C77.3062 69.3004 81.8641 64.7148 81.8641 59.0591Z" fill="#114997"/>
+<path d="M24.9503 71.397C24.9434 73.8281 22.8664 75.9282 20.5857 75.9387L5.93213 76C3.47739 76.0105 1.03831 74.3325 1.03483 71.6264L1.00001 49.5938C0.996525 47.8388 2.2239 46.4918 3.60622 45.6914L3.62537 44.5091C2.54423 44.3952 1.61456 43.5265 1.60238 42.3985L1.54841 37.6483C1.52752 35.7479 2.82975 33.8983 4.91715 33.9L21.0784 33.921C23.1745 33.9245 24.2122 35.9493 24.2087 37.7989L24.2 42.1953C24.1982 43.3093 23.5471 44.2166 22.4277 44.4916C22.2954 44.7946 22.2971 45.4286 22.4155 45.7667C24.2296 46.6284 25.0182 48.345 25.013 50.3032L24.9521 71.4005L24.9503 71.397ZM22.1892 42.6034L22.2083 37.5134C22.2118 36.4327 21.6146 35.8355 20.5492 35.8372L4.84926 35.8687C4.02753 35.8687 3.49305 36.8006 3.50698 37.4696L3.61318 42.5946L22.1892 42.6017V42.6034ZM20.6415 73.9875C21.8358 73.9822 23.0266 72.6318 23.0283 71.4793L23.0457 49.9441C23.0457 48.7618 22.3981 47.8528 21.4075 47.3326C20.7947 47.0103 20.4517 46.5023 20.4291 45.8245L20.3873 44.5809L5.45163 44.5949C5.57349 45.5232 5.67099 46.5776 4.96068 47.0015C3.8987 47.6373 2.91158 48.394 2.91158 49.797L2.90287 71.2341C2.90287 73.0872 4.45232 74.0663 6.11145 74.0575L20.6415 73.9857V73.9875Z" fill="#114997"/>
+<path d="M43.6828 38.9514C41.4753 41.2862 38.0073 41.2214 35.8903 38.8796C34.5341 37.3786 34.1302 35.2119 35.0807 33.3588C36.1514 31.2674 37.4885 29.4564 38.9021 27.5717C39.1337 27.2634 39.6142 26.9762 39.9589 26.9954C40.3036 27.0147 40.751 27.337 40.9634 27.6575L44.4471 32.9051C45.7249 34.8301 45.2932 37.2454 43.6828 38.9497V38.9514ZM39.6299 38.7307C41.054 38.8113 42.2169 38.0792 42.8332 37.0318C43.446 35.9896 43.4582 34.6234 42.7409 33.562L39.8614 29.3092L36.9418 33.6478C36.2489 34.6777 36.2158 36.0001 36.8722 37.072C37.3945 37.925 38.3416 38.6572 39.6299 38.7325V38.7307Z" fill="#114997"/>
+<path d="M64.3341 46.5496H35.5613C34.9868 46.5496 34.5777 46.2571 34.4419 45.8297C34.3322 45.4794 34.6717 44.6404 35.234 44.6404L64.5883 44.6264C65.1367 44.6264 65.5406 45.243 65.5023 45.6073C65.4361 46.2221 65.1001 46.5496 64.3341 46.5496Z" fill="#114997"/>
+<path d="M56.4842 54.3422L35.3803 54.358C34.811 54.358 34.4228 53.8115 34.4263 53.3491C34.4298 52.927 34.8459 52.4138 35.396 52.4138L56.3954 52.3998C56.8846 52.3998 57.299 52.8376 57.3721 53.1809C57.4713 53.6451 57.1893 54.3405 56.4842 54.3405V54.3422Z" fill="#114997"/>
+<path d="M55.9374 62.2066H35.5474C34.9694 62.2084 34.5394 61.8861 34.4541 61.3957C34.374 60.935 34.797 60.2782 35.4011 60.2782L55.7042 60.2747C56.1551 60.2747 56.6234 60.7161 56.6756 61.0646C56.7383 61.478 56.4562 61.9299 55.9392 62.2084L55.9374 62.2066Z" fill="#114997"/>
+<path d="M64.6563 36.0526L49.9958 36.0702C49.4682 36.0702 49.0243 35.7479 48.9285 35.289C48.8485 34.9054 49.3081 34.1522 49.8443 34.1522L64.5902 34.1487C65.0341 34.1487 65.5042 34.6339 65.5407 34.9562C65.5877 35.3695 65.2517 36.0526 64.6563 36.0544V36.0526Z" fill="#114997"/>
+<path d="M69.4648 63.5676L65.5999 59.7632C65.2761 59.4445 65.4728 58.7666 65.7635 58.5266C66.0752 58.2692 66.7385 58.1588 67.0571 58.4741L69.9958 61.3852L76.3155 55.0236C76.5644 54.7731 77.3513 54.915 77.5724 55.1269C77.7935 55.3388 77.9624 56.0009 77.7082 56.2619L70.8837 63.254C70.6034 63.5413 69.8844 63.9827 69.4613 63.5676H69.4648Z" fill="#114997"/>
+<path d="M51.9506 14.556C51.9506 15.67 51.0523 16.5738 49.945 16.5738C48.8378 16.5738 47.9395 15.67 47.9395 14.556C47.9395 13.442 48.8378 12.5382 49.945 12.5382C51.0523 12.5382 51.9506 13.442 51.9506 14.556ZM50.3977 14.5157C50.3977 14.2653 50.1957 14.0603 49.945 14.0603C49.6943 14.0603 49.4924 14.2635 49.4924 14.5157C49.4924 14.7679 49.6943 14.9711 49.945 14.9711C50.1957 14.9711 50.3977 14.7679 50.3977 14.5157Z" fill="#114997"/>
+<path d="M16.9281 54.1303C18.1224 55.9992 17.9605 58.3059 16.519 59.9384C15.1088 61.5358 12.8073 62.0034 10.7965 60.9981C8.44793 59.8245 7.50433 57.0536 8.73693 54.675L11.9995 49.5412C12.1823 49.2522 12.6924 48.944 12.9936 48.937C13.3696 48.9282 13.831 49.2855 14.0608 49.6463L16.9281 54.1303ZM12.1248 59.5198C13.3922 59.8999 14.5204 59.4287 15.2133 58.6142C15.9793 57.7139 16.1412 56.3985 15.511 55.3669L13.011 51.2718C11.9647 52.7431 10.9915 54.1566 10.222 55.8012C9.51862 57.3058 10.5614 59.0504 12.1266 59.518L12.1248 59.5198Z" fill="#114997"/>
+<path d="M18.3693 66.06H7.68332C7.2533 66.0618 6.89118 65.4172 6.93645 65.0914C6.98694 64.7236 7.40303 64.1946 7.84001 64.1946L18.3223 64.2016C18.7105 64.2016 19.1179 64.7744 19.1667 65.1019C19.2102 65.4049 18.8463 66.06 18.3676 66.0618L18.3693 66.06Z" fill="#114997"/>
+<path d="M17.5005 70.3951H8.41101C8.01233 70.3951 7.70592 69.6086 7.78426 69.2986C7.86261 68.9886 8.30133 68.4596 8.70697 68.4596L17.2829 68.4491C17.6764 68.4491 18.1325 68.9816 18.2143 69.2899C18.2961 69.5981 17.9601 70.3951 17.5023 70.3951H17.5005Z" fill="#114997"/>
+<path d="M11.1949 40.7433C11.0487 41.1006 10.4724 41.4211 10.2043 41.4018C9.93621 41.3826 9.43656 40.9184 9.43308 40.6347L9.4087 38.4242C9.40522 38.0722 10.1033 37.7324 10.3854 37.7569C11.3899 37.841 11.6162 39.7099 11.1932 40.7433H11.1949Z" fill="#114997"/>
+<path d="M7.69394 40.2844C7.70613 40.8046 7.31441 41.3703 6.90181 41.3878C6.2385 41.4159 5.85201 40.9447 5.85549 40.3282L5.8642 38.68C5.86594 38.2193 6.24198 37.7236 6.72771 37.6711C7.08983 37.6325 7.64519 38.1335 7.65564 38.5171L7.69742 40.2844H7.69394Z" fill="#114997"/>
+<path d="M16.4614 40.0934C16.4788 40.6522 16.061 41.3686 15.5213 41.4018C15.2514 41.4194 14.6456 40.9254 14.6195 40.6522C14.4819 39.2002 14.4645 37.9706 15.4586 37.7289C15.7406 37.6606 16.3952 38.0266 16.4039 38.3279L16.4614 40.0952V40.0934Z" fill="#114997"/>
+<path d="M19.8979 40.6452C19.8945 40.999 19.252 41.3878 18.93 41.3405C18.6357 41.2968 18.1274 40.8238 18.1343 40.5016L18.1744 38.3945C18.1796 38.1055 18.8238 37.7149 19.1075 37.7411C19.4679 37.7727 19.9206 38.2824 19.9171 38.6729L19.8979 40.6452Z" fill="#114997"/>
+</svg>
+
+                                                </div>
+                                                                                        Drinkwatercontrole aanvragen
+                                        </a>
+                                    </li>
+                                                                                                                        <li class="mmmenu__item py-3 border-b border-blue-300 mt-4 ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-water/de-digitale-watermeter"
+                                                                                                                                                                class="font-bold block  "
+                                    >De digitale watermeter</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-water/waterkwaliteit"
+                                                                                                                                                                class="font-bold block  "
+                                    >Waterkwaliteit</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-water/waterwinning"
+                                                                                                                                                                class="font-bold block  "
+                                    >Waterwinning</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3   pb-8">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-water/waterscan"
+                                                                                                                                                                class="font-bold block  "
+                                    >Waterscan</a>
+                                </li>
+                                                    </ul>
+                                    </li>
+                            <li class="mmmenu__item">
+                                            <a class="mmmenu__link--parent flex py-3 text-[1.5rem] font-bold pr-2 border-b border-blue-300" href="#https://www.aquaduin.be/nl/over-ons">
+                            Over ons
+                                
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+
+                        </a>
+                        <ul class="mmmenu__sub">
+                            <li class="mmmenu__item">
+                                <button type="button"
+                                    class="mmmenu__back-link inline-flex items-center gap-2 font-bold py-3"
+                                >
+                                        
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+ Terug
+                                </button>
+                            </li>
+                            <li class="mmmenu__item mt-1">
+                                <h2 class="text-[1.75rem] font-bold">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons"
+                                                                                                                                                                class=" "
+                                    >Over ons</a>
+                                </h2>
+                            </li>
+                                                                                                <li class="mt-4">
+                                        <a href="https://www.aquaduin.be/nl/over-ons/vacatures"
+                                            
+                                            class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
+                                                    <svg id="ntrvwwdvvp-a" class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.ntrvwwdvvp-d{fill:#114997}</style></defs><path d="M17.22 57.71V18.54c0-1.9 1.24-4.96 3.47-6.2L40.28 1.18c.33-.25 1.29-.6 2.48 0l2.48 1.49c.99.5 2.23.99 2.23 3.22v38.18c.25 1.74-.25 5.45-3.47 7.69L24.41 62.92c-.5.25-1.83.5-3.22-.5l-2.98-1.74c-.5-.25-.99-.79-.99-2.98Z" style="fill:#fff"/><path d="M37.34 39.36c-.15 0-.29-.02-.43-.07-1-.35-3.02-1.32-5.28-3.85-2.26-2.54-3.13-4.8-3.44-5.91a1.76 1.76 0 0 1 .37-1.64l1.87-2.09c.21-.23.5-.34.78-.3.29.04.55.22.7.5l1.49 2.71c.23.42.17.96-.14 1.31l-.79.89c.34.78.79 1.49 1.32 2.12.56.6 1.19 1.1 1.89 1.48l.79-.89c.31-.35.8-.41 1.17-.15l2.42 1.67c.25.17.41.46.44.78.03.32-.07.65-.27.88l-1.87 2.09c-.27.31-.65.48-1.04.48ZM31.1 26.41s-.06.01-.08.04l-1.87 2.09c-.17.18-.23.45-.16.7.86 3.48 5.08 8.2 8.17 9.16.22.08.46 0 .62-.18l1.87-2.09s.04-.07.04-.11c0-.04-.03-.08-.06-.1l-2.42-1.67s-.11-.02-.14.02l-1 1.12c-.12.13-.3.17-.45.1-.9-.44-1.72-1.05-2.42-1.82a9.2 9.2 0 0 1-1.62-2.7.524.524 0 0 1 .09-.51l1-1.12s.04-.11.02-.16l-1.49-2.71s-.06-.06-.1-.06Z" class="ntrvwwdvvp-d"/><path d="M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29Z" class="ntrvwwdvvp-d"/><path d="M46.64 3.11s-.07-.09-.12-.12L42.73.81c-.84-.49-1.95-.39-3.12.27L20.88 11.82c-.97.56-1.88 1.47-2.64 2.63-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11.7-1.08 1.53-1.91 2.41-2.41L43.73 3.84c.94-.54 1.81-.64 2.45-.27.16.09.37.03.46-.13.06-.11.06-.23 0-.33ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Z" class="ntrvwwdvvp-d"/><path d="M22.6 16.64a.345.345 0 0 0-.12-.12l-3.79-2.17a.338.338 0 0 0-.45.11c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16.05-.08.07-.17.04-.26 0-.03-.02-.06-.04-.09Zm-3.97-1.55 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" class="ntrvwwdvvp-d"/><path d="M18.24 14.46c.76-1.17 1.67-2.08 2.64-2.63L39.61 1.08c1.17-.66 2.27-.76 3.12-.27l3.79 2.18c.05.03.09.07.12.12.06.1.06.23 0 .33-.09.16-.3.22-.46.13-.65-.37-1.52-.27-2.45.27L24.99 14.58c-.87.5-1.71 1.33-2.41 2.41m-4.34-2.53c-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11m-4.35-2.53c.1-.15.29-.2.45-.11l3.79 2.17c.05.03.09.07.12.12.02.03.03.06.04.09.02.09 0 .18-.04.26m-4.36-2.53c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Zm-.37.56 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" style="fill:none;stroke:#114997;stroke-width:.5px"/></svg>
+                                                </div>
+                                                                                        Interesse in een job?
+                                        </a>
+                                    </li>
+                                                                                                                        <li class="mmmenu__item py-3 border-b border-blue-300 mt-4 ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/missie-waarden"
+                                                                                                                                                                class="font-bold block  "
+                                    >Missie &amp; waarden</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/internationale-samenwerking"
+                                                                                                                                                                class="font-bold block  "
+                                    >Internationale samenwerking</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/engagementen"
+                                                                                                                                                                class="font-bold block  "
+                                    >Engagementen</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/organisatie"
+                                                                                                                                                                class="font-bold block  "
+                                    >Organisatie</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/publicaties"
+                                                                                                                                                                class="font-bold block  "
+                                    >Publicaties</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/geschiedenis"
+                                                                                                                                                                class="font-bold block  "
+                                    >Geschiedenis</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/kantoren"
+                                                                                                                                                                class="font-bold block  "
+                                    >Kantoren</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/nieuws/boek-100-jaar-iwva"
+                                                                                                                                                                class="font-bold block  "
+                                    >Boek &quot;100 jaar IWVA&quot;</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/watertoren"
+                                                                                                                                                                class="font-bold block  "
+                                    >Watertoren</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3   pb-8">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne/educatief-aanbod/begeleide-activiteiten/bedrijfsbezoek"
+                                                                                                                            target="_blank" 
+                                                                                                                        class="font-bold block  "
+                                    >Bezoek Aquaduin</a>
+                                </li>
+                                                    </ul>
+                                    </li>
+                            <li class="mmmenu__item">
+                                            <a class="mmmenu__link--parent flex py-3 text-[1.5rem] font-bold pr-2 " href="#https://www.aquaduin.be/nl/klantenservice">
+                            Klantenservice
+                                
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+
+                        </a>
+                        <ul class="mmmenu__sub">
+                            <li class="mmmenu__item">
+                                <button type="button"
+                                    class="mmmenu__back-link inline-flex items-center gap-2 font-bold py-3"
+                                >
+                                        
+                                                    
+    <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+ Terug
+                                </button>
+                            </li>
+                            <li class="mmmenu__item mt-1">
+                                <h2 class="text-[1.75rem] font-bold">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/klantenservice"
+                                                                                                                                                                class=" "
+                                    >Klantenservice</a>
+                                </h2>
+                            </li>
+                                                                                                <li class="mt-4">
+                                        <a href="https://www.aquaduin.be/nl/storingen"
+                                            
+                                            class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
+                                        >
+                                                                                            <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
+                                                    <svg class="text-blue-500 z-1" width="84" height="84" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M4.5 69H35C35.3333 69.6667 36.6 71 39 71H78.5C81 70.3333 84 68 82.5 64L62 31C61 29.1667 58 26.6 54 31L45 45.5L35 9.5L32 8.5H23L20.5 10.5L8 57.5H4.5C3.33333 57.5 1 58.2 1 61V66C1 67 1.7 69 4.5 69Z" fill="white"/>
+<path d="M83.8776 66.9415C83.3104 69.4171 80.985 71.9437 78.2071 71.9471L38.6615 72C36.9564 72.0017 35.5855 71.2294 34.4682 70.1144L3.68953 70.0871C1.5869 70.0854 -0.0119284 68.0156 6.70533e-05 66.1368L0.0360535 60.4561C0.0497626 58.3454 1.9262 56.7513 3.96543 56.4666L6.94716 56.366L18.9581 10.5842C19.479 8.59797 21.5628 7.10788 23.5318 7.08572L31.4008 7.00047C34.5299 6.96637 36.6377 8.77869 37.3745 11.6736L41.4821 27.8293L45.4184 43.1956L53.3251 30.0934C54.3207 28.4448 56.3103 27.623 58.0736 27.6367C59.9329 27.652 61.8539 28.5198 62.9009 30.223L82.7277 62.4559C83.5486 63.7926 84.3026 65.0883 83.8776 66.9415ZM36.8982 20.2374L34.6156 11.4486C34.1786 10.2381 33.0836 9.49134 31.7761 9.60557H24.0973C22.3751 9.51521 21.4823 10.6916 21.1121 12.1868L19.1089 20.2953C22.1506 21.1052 25.0963 21.3575 28.1774 21.349C31.1815 21.3421 34.0518 21.1273 36.8964 20.2374H36.8982ZM40.8755 35.6122L37.5425 22.735C34.3397 23.5739 31.3528 23.8824 28.1757 23.8842C24.8735 23.9336 21.6365 23.5415 18.4971 22.7521L15.1538 35.6821C23.2953 38.0366 32.8351 37.9888 40.8755 35.6122ZM78.3117 69.3744C79.5952 69.3744 80.4417 68.1605 80.913 67.6423C81.5213 66.4693 81.4476 65.4617 80.9507 64.3859L60.8017 31.6142C60.1197 30.5043 58.8053 30.1156 57.6657 30.2179C56.4748 30.3253 55.6419 31.0107 54.9839 32.0984L35.8785 63.6596C35.1228 64.9093 34.7818 66.0584 35.4758 67.4496C35.9916 68.4845 37.0918 69.3983 38.5398 69.3966L78.3134 69.3744H78.3117ZM42.1196 48.7195L43.6002 46.1144L41.5027 38.0468C35.9214 39.6954 30.2441 40.2189 24.4486 39.8131C21.0299 39.6204 17.7739 39.0629 14.506 38.0962L11.8379 48.0938C15.0013 49.1168 18.1904 49.8294 21.5165 50.155C25.8863 50.6273 30.1139 50.6137 34.4716 50.1499C37.0781 49.8754 39.5389 49.4066 42.1179 48.7195H42.1196ZM34.7458 60.809L40.1849 51.7696C32.6586 53.3671 25.0963 53.4694 17.5717 52.1634L11.1233 50.4432L8.76362 59.0802C9.06179 60.1867 9.94775 60.6777 11.0702 60.809H34.7458ZM33.1316 63.3544L11.5774 63.351C8.84416 63.1976 6.36966 61.6904 6.25656 58.9234L4.32529 58.9575C3.60042 58.9711 2.52426 59.648 2.51569 60.4714L2.45571 65.9203C2.44372 66.9569 3.21657 67.5604 4.21562 67.5604L32.8625 67.5536C32.3776 66.0482 32.5198 64.7388 33.1333 63.3527L33.1316 63.3544Z" fill="#114997"/>
+<path d="M59.7788 54.4139C59.7839 55.5562 59.0179 56.2705 58.0857 56.2893C57.1535 56.308 56.2932 55.6943 56.2949 54.6441L56.2984 41.2418C56.2984 40.3109 57.1757 39.6784 57.928 39.6119C58.6803 39.5454 59.7119 40.1421 59.7171 41.0611L59.7805 54.4139H59.7788Z" fill="#114997"/>
+<path d="M58.0754 64.2307C59.4003 64.2307 60.4745 63.1621 60.4745 61.8439C60.4745 60.5256 59.4003 59.457 58.0754 59.457C56.7504 59.457 55.6763 60.5256 55.6763 61.8439C55.6763 63.1621 56.7504 64.2307 58.0754 64.2307Z" fill="#114997"/>
+</svg>
+
+                                                </div>
+                                                                                        Storingen &amp; werken
+                                        </a>
+                                    </li>
+                                                                                                                        <li class="mmmenu__item py-3 border-b border-blue-300 mt-4 ">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/klantenservice/kenniscentrum"
+                                                                                                                                                                class="font-bold block  "
+                                    >Kenniscentrum</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3   pb-8">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/klantenservice"
+                                                                                                                                                                class="font-bold block  "
+                                    >Contact</a>
+                                </li>
+                                                    </ul>
+                                    </li>
+                                        <li class="pt-8 ">
+                    <a
+                                                    href="https://www.aquaduin.be/nl/nieuws"
+                                                                                                class="font-bold py-3 flex md:mx-4 lg:mx-0 border-b border-blue-300  "
+                    >Nieuws</a>
+                </li>
+                            <li class=" ">
+                    <a
+                                                    href="https://www.aquaduin.be/nl/over-ons/vacatures"
+                                                                                                class="font-bold py-3 flex md:mx-4 lg:mx-0 border-b border-blue-300  "
+                    >Vacatures</a>
+                </li>
+                            <li class=" ">
+                    <a
+                                                    href="https://www.aquaduin.be/nl/zelf-regelen/tarieven"
+                                                                                                class="font-bold py-3 flex md:mx-4 lg:mx-0 border-b border-blue-300  "
+                    >Tarieven</a>
+                </li>
+                            <li class=" ">
+                    <a
+                                                    href="https://svw.cevi.be/Burgertool/Compensatie/Registreer/C05"
+                                                                            target="_blank" 
+                                                                        class="font-bold py-3 flex md:mx-4 lg:mx-0 border-b border-blue-300  "
+                    >Rekeningnummer Compensatie</a>
+                </li>
+                            <li class=" pb-8">
+                    <a
+                                                    href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne"
+                                                                                                class="font-bold py-3 flex md:mx-4 lg:mx-0   "
+                    >Bezoekerscentrum De Doornpanne</a>
+                </li>
+                    </ul>
+    </div>
+    <div class="flex flex-col items-center">
+                                <div x-cloak x-show="!$store.userMenu.loaded" class="flex items-center justify-center size-[46px] text-blue-500">
+                <svg width="24" height="24" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <path opacity="0.2" fill="currentColor" d="M20.201,5.169c-8.254,0-14.946,6.692-14.946,14.946c0,8.255,6.692,14.946,14.946,14.946s14.946-6.691,14.946-14.946C35.146,11.861,28.455,5.169,20.201,5.169z M20.201,31.749c-6.425,0-11.634-5.208-11.634-11.634c0-6.425,5.209-11.634,11.634-11.634c6.425,0,11.633,5.209,11.633,11.634C31.834,26.541,26.626,31.749,20.201,31.749z"/>
+    <path fill="currentColor" d="M26.013,10.047l1.654-2.866c-2.198-1.272-4.743-2.012-7.466-2.012h0v3.312h0C22.32,8.481,24.301,9.057,26.013,10.047z">
+        <animateTransform attributeName="transform" type="rotate" from="0 20 20" to="360 20 20" dur="0.8s" repeatCount="indefinite"/>
+    </path>
+</svg>
+            </div>
+                        <div x-cloak x-show="$store.userMenu.loggedIn" class="w-full rounded-base bg-white overflow-hidden mb-4">
+                
+<div class="pt-4 pb-3 px-4 border-b border-blue-300  text-blue-500">
+    <div class="font-bold" x-text="$store.userMenu.fullName"></div>
+    <div class="t-small text-blue-400" x-text="$store.userMenu.email"></div>
+</div>
+<nav>
+    <ul class="divide-y divide-blue-300 text-blue-500">
+        <li>
+            <a href="https://www.aquaduin.be/nl/mijn-aquaduin/mijn-account" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold">
+                Mijn account
+            </a>
+        </li>
+        <li x-show="$store.userMenu.customerDashboardUrl">
+            <a :href="$store.userMenu.customerDashboardUrl" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold">
+                Dashboard
+            </a>
+        </li>
+        <li>
+            <a href="https://www.aquaduin.be/nl/mijn-aquaduin" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold gap-2">
+                Overzicht klanten
+            </a>
+        </li>
+        <li>
+            <a href="https://www.aquaduin.be/nl/mijn-aquaduin/klant-toevoegen" class="flex items-center px-4 py-2.5 hover:bg-blue-50 transition-colors font-bold">
+                Klant toevoegen
+            </a>
+        </li>
+    </ul>
+</nav>
+<a :href="$store.userMenu.logoutUrl" class="block text-link px-4 pt-3 pb-4 border-t border-blue-300 text-right text-blue-500">
+    Afmelden
+</a>
+            </div>
+                        <a href="https://www.aquaduin.be/e-loket"
+                
+                x-cloak
+                x-show="$store.userMenu.loaded && !$store.userMenu.loggedIn"
+               class="button bg-blue-500 text-white"
+            >
+                    
+                            
+    <svg  width="16" height="16" role="img" aria-label="user">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#user"/>
+    </svg>
+
+                Mijn Aquaduin
+            </a>
+                                <div class="mt-6 pb-4">
+            
+
+<ul class="flex gap-6">
+            <li>
+            <a href="https://www.facebook.com/aquaduin/?locale=nl_NL" target="_blank" rel="noopener" aria-label="Link to Facebook of Aquaduin - NL">
+                    
+                            
+    <svg  width="24" height="24" role="img" aria-label="facebook">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#facebook"/>
+    </svg>
+
+            </a>
+        </li>
+            <li>
+            <a href="https://www.instagram.com/aquaduin/" target="_blank" rel="noopener" aria-label="Link to Instagram of Aquaduin - NL">
+                    
+                            
+    <svg  width="24" height="24" role="img" aria-label="instagram">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#instagram"/>
+    </svg>
+
+            </a>
+        </li>
+            <li>
+            <a href="https://www.youtube.com/channel/UCStEEfn3QTyfLeD7D3-HuOQ" target="_blank" rel="noopener" aria-label="Link to YouTube of Aquaduin - NL">
+                    
+                            
+    <svg  width="24" height="24" role="img" aria-label="youtube">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#youtube"/>
+    </svg>
+
+            </a>
+        </li>
+    </ul>
+        </div>
+    </div>
+</div>
+    </div>
+</header>
+    <main id="content" class="print-scope">
+                                    
+    
+
+<div class="container-sm mt-8 md:mt-16">
+    
+
+
+        
+        
+        
+                    
+            
+                
+        
+        
+                    
+            
+                
+        
+        
+                    
+            
+        
+<nav aria-label="U bevindt zich hier:" class="">
+    <ol class="flex w-full items-center" data-breadcrumbs>
+                                                        <li class="flex items-center line-clamp-1 flex-shrink-0">
+                                    <a href="https://www.aquaduin.be/nl/"
+                       class="block whitespace-nowrap underline hover:no-underline text-xxs font-bold mt-1 "
+                                           >
+                            
+                            
+    <svg  width="14" height="15" role="img" aria-label="tap">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#tap"/>
+    </svg>
+
+                    </a>
+                    <span aria-hidden="true" class="mx-2 opacity-50">
+                            
+                                        
+    <svg  width="6" height="9" class="mt-[2px]" role="img" aria-label="caret">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#caret"/>
+    </svg>
+
+                    </span>
+                            </li>
+                                                        <li class="flex items-center line-clamp-1 flex-shrink-0">
+                                    <a href="https://www.aquaduin.be/nl/zelf-regelen"
+                        class="block whitespace-nowrap underline hover:no-underline text-xxs font-bold mt-1 text-ellipsis overflow-hidden"
+                                            >Zelf regelen</a>
+                    <span aria-hidden="true" class="mx-2 opacity-50">
+                            
+                                        
+    <svg  width="6" height="9" class="mt-[2px]" role="img" aria-label="caret">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#caret"/>
+    </svg>
+
+                    </span>
+                            </li>
+                                                        <li class="flex items-center line-clamp-1 flex-shrink-0">
+                                    <a href="https://www.aquaduin.be/nl/zelf-regelen/tarieven"
+                        class="block whitespace-nowrap underline hover:no-underline text-xxs font-bold mt-1 text-ellipsis overflow-hidden"
+                                            >Tarieven</a>
+                    <span aria-hidden="true" class="mx-2 opacity-50">
+                            
+                                        
+    <svg  width="6" height="9" class="mt-[2px]" role="img" aria-label="caret">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#caret"/>
+    </svg>
+
+                    </span>
+                            </li>
+                                                        <li class="flex items-center line-clamp-1 flex-shrink-0">
+                                    <span class="block whitespace-nowrap text-xxs font-bold mt-1"
+                        aria-current="page"
+                    >Tarieven 2026</span>
+                            </li>
+            </ol>
+</nav>
+    <h1 class="t-alpha mt-4">Tarieven 2026</h1>
+    </div>
+
+        <div class="mt-12 md:mt-16 text">
+                        
+
+    <div class="container-sm">
+                    <div class="richtext">
+            <h2>1. Productie en levering van drinkwater (excl 6% BTW)</h2>
+        </div>
+        
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 table_block">
+                    
+
+    <div class="container">
+                    <h2 class="t-beta">Huishoudelijke klanten</h2>
+                <div class="overflow-x-auto mt-4 md:mt-6">
+                <table class="table ">
+        <thead>
+            <tr>
+                                                        <th style="text-align: left;width: 25%;">Tariefschijf</th>
+                                                        <th style="text-align: left;">basistarief per m³* (variabel)</th>
+                                                        <th style="text-align: left;">comforttarief per m³* (variabel)</th>
+                                                        <th style="text-align: left;">Eenheidsprijs per jaar (vast)</th>
+                                                        <th style="text-align: left;">Korting per gedomicilieerde persoon per jaar (vast)</th>
+                            </tr>
+        </thead>
+        <tbody>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p>Drinkwater</p>
+</td>
+                                                                    <td
+                            data-label="basistarief per m³* (variabel)"
+                            style="text-align: left;"><p>€ 2,3317</p>
+</td>
+                                                                    <td
+                            data-label="comforttarief per m³* (variabel)"
+                            style="text-align: left;"><p>€ 4,6634</p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 50,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><ul>
+<li>€ 10,00</li>
+</ul>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p>Afvoer afvalwater [1]</p>
+</td>
+                                                                    <td
+                            data-label="basistarief per m³* (variabel)"
+                            style="text-align: left;"><p>€ 1,9752</p>
+</td>
+                                                                    <td
+                            data-label="comforttarief per m³* (variabel)"
+                            style="text-align: left;"><p>€ 3,9144</p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 30,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><ul>
+<li>€ 6,00</li>
+</ul>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p>Zuivering afvalwater [2]</p>
+</td>
+                                                                    <td
+                            data-label="basistarief per m³* (variabel)"
+                            style="text-align: left;"><p>€ 1,7019</p>
+</td>
+                                                                    <td
+                            data-label="comforttarief per m³* (variabel)"
+                            style="text-align: left;"><p>€ 3,4038</p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 20,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><ul>
+<li>€ 4,00</li>
+</ul>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p><strong>Integrale waterprijs</strong></p>
+</td>
+                                                                    <td
+                            data-label="basistarief per m³* (variabel)"
+                            style="text-align: left;"><p><strong>€ 6,0088</strong></p>
+</td>
+                                                                    <td
+                            data-label="comforttarief per m³* (variabel)"
+                            style="text-align: left;"><p><strong>€ 11,9816</strong></p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p><strong>€ 100,00</strong></p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><p><strong>- € 20,00</strong></p>
+</td>
+                                    </tr>
+                    </tbody>
+    </table>
+
+        </div>
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 text">
+                        
+
+    <div class="container-sm">
+                    <div class="richtext">
+            <p>* Voor meer info omtrent het basis- en comforttarief, klik <a href="https://www.aquaduin.be/nl/zelf-regelen/financieel/verbruik-vanaf-2016/informatie-drinkwaterfactuur" target="_blank">hier</a>.</p>
+        </div>
+        
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 table_block">
+                    
+
+    <div class="container">
+                    <h2 class="t-beta">Niet-huishoudelijke klanten</h2>
+                <div class="overflow-x-auto mt-4 md:mt-6">
+                <table class="table ">
+        <thead>
+            <tr>
+                                                        <th style="text-align: left;width: 25%;">Tariefschijf</th>
+                                                        <th style="text-align: left;">&lt; 500 m³ (variabel)</th>
+                                                        <th style="text-align: left;width: 16%;">500 &lt; 60.000 m³ (variabel)</th>
+                                                        <th style="text-align: left;width: 16%;">&gt; 60.000 m³ (variabel)</th>
+                                                        <th style="text-align: left;">Eenheidsprijs per jaar (vast)</th>
+                                                        <th style="text-align: left;">Korting per gedomicilieerde persoon per jaar (vast)</th>
+                            </tr>
+        </thead>
+        <tbody>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p>Drinkwater</p>
+</td>
+                                                                    <td
+                            data-label="&lt; 500 m³ (variabel)"
+                            style="text-align: left;"><p>€ 2,4098</p>
+</td>
+                                                                    <td
+                            data-label="500 &lt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p>€ 2,1535</p>
+</td>
+                                                                    <td
+                            data-label="&gt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p>€ 1,4136</p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 50,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><ul>
+<li>€ 10,00</li>
+</ul>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p>Afvoer afvalwater [1]</p>
+</td>
+                                                                    <td
+                            data-label="&lt; 500 m³ (variabel)"
+                            style="text-align: left;"><p>€ 2,2173</p>
+</td>
+                                                                    <td
+                            data-label="500 &lt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p>€ 2,2173</p>
+</td>
+                                                                    <td
+                            data-label="&gt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p>€ 2,2173</p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 30,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><ul>
+<li>€ 6,00</li>
+</ul>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p>Zuivering afvalwater [2]</p>
+</td>
+                                                                    <td
+                            data-label="&lt; 500 m³ (variabel)"
+                            style="text-align: left;"><p>€ 1,9281</p>
+</td>
+                                                                    <td
+                            data-label="500 &lt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p>€ 1,9281</p>
+</td>
+                                                                    <td
+                            data-label="&gt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p>€ 1,9281</p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 20,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><ul>
+<li>€ 4,00</li>
+</ul>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label="Tariefschijf"
+                            style="text-align: left;"><p><strong>Integrale waterprijs</strong></p>
+</td>
+                                                                    <td
+                            data-label="&lt; 500 m³ (variabel)"
+                            style="text-align: left;"><p><strong>€ 6,5552</strong></p>
+</td>
+                                                                    <td
+                            data-label="500 &lt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p><strong>€ 6,2989</strong></p>
+</td>
+                                                                    <td
+                            data-label="&gt; 60.000 m³ (variabel)"
+                            style="text-align: left;"><p><strong>€ 5,5590</strong></p>
+</td>
+                                                                    <td
+                            data-label="Eenheidsprijs per jaar (vast)"
+                            style="text-align: left;"><p>€ 100,00</p>
+</td>
+                                                                    <td
+                            data-label="Korting per gedomicilieerde persoon per jaar (vast)"
+                            style="text-align: left;"><p><strong>- € 20,00</strong></p>
+</td>
+                                    </tr>
+                    </tbody>
+    </table>
+
+        </div>
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 text">
+                        
+
+    <div class="container-sm">
+                    <div class="richtext">
+            <p>Beschikt u over een ondernemingsnummer of een BTW-nummer en is uw waterverbruik relevant tot uw zelfstandige actviteit(en), dan kan u een <a href="https://www.aquaduin.be/volumes/general/Formulieren/Administratie/aanvraag_tot_wijziging_tariefcode.pdf?v=1782370521" target="_blank">wijziging van tariefcode</a> aanvragen.</p><p><i>[1] De gemeentelijke saneringsbijdrage is bestemd voor de aanleg en het onderhoud van de rioleringen en de aansluitingen erop, het grachtenstelsel en kleinschalige waterzuiveringsinstallaties.  Deze materie behoort tot de bevoegdheid van uw gemeente.</i><br /><i>Alveringem, De Panne, Nieuwpoort en Veurne hebben deze bevoegdheid overgedragen aan Aquaduin.</i><br /><i>Diksmuide heeft deze bevoegdheid overgedragen aan Infrax. Koksijde werkt in eigen beheer.</i><br /><br /><i>[2] De bovengemeentelijke saneringsbijdrage voor de zuivering van afvalwater is bestemd voor de grote zuiveringsinstallaties en de collectoren die het afvalwater er naartoe brengen.</i><br /><i>Deze materie behoort tot de bevoegdheid van het Vlaamse Gewest.</i></p><h2>2. Capaciteitsvergoedingen (excl 6% BTW)</h2>
+        </div>
+        
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 table_block">
+                    
+
+    <div class="container">
+                <div class="overflow-x-auto ">
+                <table class="table ">
+        <thead>
+            <tr>
+                                                        <th style="text-align: left;"></th>
+                                                        <th style="text-align: left;"></th>
+                            </tr>
+        </thead>
+        <tbody>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>Capaciteitsvergoeding (€/jaar) [3]</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>2024</p>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>15 en 20 mm (DN15 en DN20)</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>gratis</p>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>40 mm (DN40)</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>€ 253,2266</p>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>50 mm (DN50)</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>€ 379,8398</p>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>65 mm (DN65)</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>€ 569,7536</p>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>80 mm (DN80)</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>€ 822,9801</p>
+</td>
+                                    </tr>
+                                            <tr>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>&gt;= 100 mm (&gt;= DN100)</p>
+</td>
+                                                                    <td
+                            data-label=""
+                            style="text-align: left;"><p>€ 2.532,2533</p>
+</td>
+                                    </tr>
+                    </tbody>
+    </table>
+
+        </div>
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 text">
+                        
+
+    <div class="container-sm">
+                    <div class="richtext">
+            <p><i>[3] Via de capaciteitsvergoeding, die aangerekend wordt voor het gebruik van een teller met grote diameter, draagt u bij tot de kostprijs van de teller.</i></p><h2>3. Exploitatiekost Collectieve IBA</h2><p>De jaarlijkse kost wanneer de IBA wordt geïnstalleerd en <strong>onderhouden</strong> door de IWVA bij <strong>niet-huishoudelijke</strong> abonnees bedraagt <strong>€ 388,08</strong>.</p><p>De BTW bedraagt 21% voor personen met enkel een eigen waterwinning en 6% bij gemengd verbruik of enkel drinkwaterverbruik.</p><p><a href="https://www.aquaduin.be/volumes/general/Paginas/Zelf-regelen/Tarieven/overzicht-tarieven-2026.pdf?v=1774021955" target="_blank">Download hier een overzicht van onze tarieven</a>.</p>
+        </div>
+        
+    </div>
+            </div>
+    <div class="mt-12 md:mt-16 cta_block">
+                    
+
+<div class="container-sm">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 bg-white rounded-base p-6">
+                <div class="py-3 col-span-2">
+            <div class="richtext">
+                <h2 class="t-section">Vlaamse Milieumaatschappij (VMM)</h2>
+                <p>Wil u weten wat de nieuwe tariefstructuur betekent voor uw waterfactuur? Dat kunt u berekenen op de website van de Vlaamse Milieumaatschappij.</p>
+            </div>
+                            <div class="mt-4">
+                    
+
+    <a href="https://www.vmm.be"
+        
+        class="button button--primary"
+    >
+                Website VMM
+    </a>
+                </div>
+                    </div>
+    </div>
+</div>
+            </div>
+
+    </main>
+    
+
+
+
+
+<footer class="bg-blue-500 pb-10 mt-8 md:mt-16 relative">
+    <div class="relative">
+        <button x-data
+                @click="window.scrollTo({top: 0, behavior: 'smooth'});"
+                class="size-16 rounded-full bg-white text-theme-accent-dark hover:bg-theme-accent-dark hover:text-white transition-all flex items-center justify-center absolute left-0 right-0 mx-auto bottom-0 -mb-8 hover:-mb-7 cursor-pointer shadow-scrolltop">
+                
+                                        
+    <svg  width="18" height="16" class="-rotate-90" role="img" aria-label="arrow">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+    </svg>
+
+        </button>
+            
+                                        
+    <svg  width="1512" height="97" class="w-screen max-w-full h-auto text-theme-secondary" role="img" aria-label="footer-top">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#footer-top"/>
+    </svg>
+
+    </div>
+    <div class="container pt-16 md:pt-22">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-start gap-10 text-white text-center md:text-left">
+            <div class="flex flex-col items-center md:block">
+                    
+                            
+    <svg  width="228" height="61" role="img" aria-label="logo-baseline">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo-baseline"/>
+    </svg>
+
+                
+
+    <a href="https://www.aquaduin.be/nl/nieuwsbrief"
+        
+        class="button button--white mt-8 lg:mt-16"
+    >
+                Nieuwsbrief
+    </a>
+            </div>
+            <div class="hidden md:block">
+                <ul>
+                                            <li class=" ">
+                                                            <div class="t-delta">Zelf regelen</div>
+                                                    </li>
+                                            <li class="mt-4 ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/meterstand-doorgeven"
+                                                                                                                                                class="inline-block py-2  "
+                                >Meterstand doorgeven</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/aansluiting-aanvragen"
+                                                                                                                                                class="inline-block py-2  "
+                                >Aansluiting aanvragen</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/zelf-regelen/bouwen-verbouwen/keuring"
+                                                                                                                                                class="inline-block py-2  "
+                                >Keuring aanvragen</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/storingen"
+                                                                                                                                                class="inline-block py-2  "
+                                >Storingen &amp; werken</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://svw.cevi.be/Burgertool/Compensatie/Registreer/C05"
+                                                                                                                target="_blank" 
+                                                                                                            class="inline-block py-2  "
+                                >Rekeningnummer Compensatie</a>
+                                                    </li>
+                                    </ul>
+            </div>
+            <div class="hidden md:block">
+                <ul>
+                                            <li class=" ">
+                                                            <div class="t-delta">Over Aquaduin</div>
+                                                    </li>
+                                            <li class="mt-4 ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/over-ons/engagementen"
+                                                                                                                                                class="inline-block py-2  "
+                                >Engagementen</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/over-ons/organisatie"
+                                                                                                                                                class="inline-block py-2  "
+                                >Organisatie</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/over-ons/vacatures"
+                                                                                                                                                class="inline-block py-2  "
+                                >Vacatures</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/nieuws"
+                                                                                                                                                class="inline-block py-2  "
+                                >Nieuws</a>
+                                                    </li>
+                                            <li class=" ">
+                                                            <a
+                                                                            href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne"
+                                                                                                                                                class="inline-block py-2  "
+                                >Bezoekerscentrum De Doornpanne</a>
+                                                    </li>
+                                    </ul>
+            </div>
+            <div class="w-full flex flex-col items-center md:items-start gap-4">
+                                    <div class="t-delta">Aquaduin / IWVA ov</div>
+                                <p class="mt-0 t-small py-2">
+                    Doornpannestraat 1<br />
+8670 Koksijde
+                </p>
+                <a href="https://www.aquaduin.be/nl/klantenservice"
+                    
+                   class="button button--footer ">
+                    <div class="bg-green-500 size-[10px] rounded-full">
+                    </div>
+                    Klantenservice
+                </a>
+                
+
+<ul class="mt-6 md:mt-18 pb-4 md:pb-0 pl-2 inline-flex flex-wrap justify-start items-center gap-6 md:gap-3">
+            <li>
+            <a href="https://www.facebook.com/aquaduin/?locale=nl_NL" target="_blank" rel="noopener" aria-label="Link to Facebook of Aquaduin - NL">
+                    
+                            
+    <svg  width="24" height="24" role="img" aria-label="facebook">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#facebook"/>
+    </svg>
+
+            </a>
+        </li>
+            <li>
+            <a href="https://www.instagram.com/aquaduin/" target="_blank" rel="noopener" aria-label="Link to Instagram of Aquaduin - NL">
+                    
+                            
+    <svg  width="24" height="24" role="img" aria-label="instagram">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#instagram"/>
+    </svg>
+
+            </a>
+        </li>
+            <li>
+            <a href="https://www.youtube.com/channel/UCStEEfn3QTyfLeD7D3-HuOQ" target="_blank" rel="noopener" aria-label="Link to YouTube of Aquaduin - NL">
+                    
+                            
+    <svg  width="24" height="24" role="img" aria-label="youtube">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#youtube"/>
+    </svg>
+
+            </a>
+        </li>
+    </ul>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-between mt-10 md:mt-16 text-white">
+            <ul class="w-full md:w-auto text-center md:text-left">
+                <li class="block md:inline-block md:mr-6 t-small">&copy; 2026 Aquaduin</li>
+                                    <li class="inline-block mt-4 md:mt-0 mr-6">
+                        <a
+                                                            href="https://www.aquaduin.be/nl/disclaimer"
+                                                                                                                class="t-small underline md:no-underline hover:underline  "
+                        >Disclaimer</a>
+                    </li>
+                                    <li class="inline-block mt-4 md:mt-0 md:mr-6">
+                        <a
+                                                            href="https://www.aquaduin.be/nl/privacy"
+                                                                                                                class="t-small underline md:no-underline hover:underline  "
+                        >Privacyverklaring</a>
+                    </li>
+                            </ul>
+            <div class="w-full md:w-auto flex items-center justify-center md:justify-end gap-1 mt-6 md:mt-0">
+                <span>made by</span>
+                <a href="https://www.glue.be" target="_blank" rel="noopener">
+                    <span class="sr-only t-small">Glue</span>
+                        
+                                        
+    <svg  width="65" height="20" class="ml-2 text-green-600" role="img" aria-label="glue">
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#glue"/>
+    </svg>
+
+                </a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","author":{"@id":"https://www.aquaduin.be#identity"},"copyrightHolder":{"@id":"https://www.aquaduin.be#identity"},"copyrightYear":"2026","creator":{"@id":"https://glue.be/#creator"},"dateCreated":"2026-03-20T16:13:54+01:00","dateModified":"2026-07-06T09:32:34+02:00","datePublished":"2026-03-20T16:24:00+01:00","description":"Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening.","headline":"Tarieven 2026","image":{"@type":"ImageObject","url":"https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1789128513"},"inLanguage":"nl","mainEntityOfPage":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026","name":"Tarieven 2026","publisher":{"@id":"https://glue.be/#creator"},"url":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026"},{"@id":"https://www.aquaduin.be#identity","@type":"LocalBusiness","address":{"@type":"PostalAddress","addressCountry":"België","addressLocality":"Koksijde","postalCode":"8670","streetAddress":"Doornpannestraat 1"},"description":"Aquaduin is een waterbedrijf dat drinkwater levert aan de regio rond Koksijde, België. Het beheert zowel de productie als de distributie van drinkwater en staat ook in voor de afvoer en zuivering van afvalwater.","email":"info@aquaduin.be","image":{"@type":"ImageObject","height":"214","url":"https://www.aquaduin.be/volumes/general/logo_aquaduin.jpg?v=1779270861","width":"800"},"logo":{"@type":"ImageObject","height":"60","url":"https://www.aquaduin.be/volumes/general/_600x60_fit_center-center_82_none/17293/logo_aquaduin.png?v=1789128517","width":"224"},"name":"Aquaduin / IWVA OV","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Monday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Tuesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Wednesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Thursday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Friday"],"opens":"08:00:00"}],"priceRange":"$","sameAs":["https://www.facebook.com/aquaduin/?locale=nl_NL","https://www.instagram.com/aquaduin/","https://www.youtube.com/channel/UCStEEfn3QTyfLeD7D3-HuOQ"],"telephone":"058 53 38 33","url":"https://www.aquaduin.be"},{"@id":"https://glue.be/#creator","@type":"LocalBusiness","address":{"@type":"PostalAddress","addressCountry":"België","addressLocality":"Gent","postalCode":"9000","streetAddress":"Dok Noord 4E"},"description":"We zijn online whizzkids, digitale strategen, maar ook communicatiespecialisten, online marketeers, designers, developers, UI/UX experten, … met een hart voor ‘all things digital’. Samen schrijven we jouw digitaal verhaal.","email":"hello@glue.be","name":"Glue","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Monday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Tuesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Wednesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Thursday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Friday"],"opens":"08:00:00"}],"priceRange":"$","telephone":"+32 9 336 78 08","url":"https://glue.be/"},{"@type":"BreadcrumbList","description":"Breadcrumbs list","itemListElement":[{"@type":"ListItem","item":"https://www.aquaduin.be/nl","name":"Home","position":1},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen","name":"Zelf regelen","position":2},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen/tarieven","name":"Tarieven","position":3},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026","name":"Tarieven 2026","position":4}],"name":"Breadcrumbs"}]}</script>
+<script>
+    var user_tools = {
+        elementId: 5305,
+        siteId: 3,
+    };
+</script>
+<script src="https://www.aquaduin.be/cpresources/68fa8040/js/user_tools.js?v=1789128511"></script></body>
+    </html>

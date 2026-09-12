@@ -1,0 +1,29 @@
+{
+ "_commune": "{4BA22577-FBC0-4EC5-B9C0-F72DE8CBDED1}",
+ "_commune_label": "8587 - Helkijn (Spiere-Helkijn)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/0125a086d2ab8b2cf4216775b90b7fc149d1413469afb32a12ea53f61880d55a.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={4BA22577-FBC0-4EC5-B9C0-F72DE8CBDED1}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({4BA22577-FBC0-4EC5-B9C0-F72DE8CBDED1})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/da75b4b65b0a8268882ed409951c41e200c859449b3dffdafdd34d4fa71e07ff.txt",
+   "url": "https://www.vivaqua.be/en/the-domestic-linear-rate/",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": 2.4716981132075473,
+ "publication_label": "Price from January 1st 2026 (VAT included 6 %)",
+ "region": "brussels",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 2.5754716981132075,
+ "source_url": "https://www.vivaqua.be/en/the-domestic-linear-rate/",
+ "utility": "vivaqua",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 37.95283018867924,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

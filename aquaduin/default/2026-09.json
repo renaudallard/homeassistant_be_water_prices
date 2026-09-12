@@ -1,0 +1,33 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/8dac4dbc4e0ead320b767992f48c54f57930ed39180fb0866b78550416b72fd2.txt",
+   "url": "https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026",
+   "variant": "text"
+  },
+  {
+   "pdf": "999f1ac0e9e24f681e1b64011faa8824dd22290709fdb1d5e969bac0b30e26fc",
+   "text": "texts/c3c3320b6007009a0decd6f4201f206dc08a731895e669aaac2f34eb95449dae.txt",
+   "url": "https://www.aquaduin.be/volumes/general/Paginas/Zelf-regelen/Tarieven/overzicht-tarieven-2026.pdf?v=1774021955",
+   "variant": "layout"
+  }
+ ],
+ "basis_eur_per_m3": 5.9908,
+ "comfort_eur_per_m3": 11.9816,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Aquaduin overzicht tarieven 2026",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "source_url": "https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026",
+ "utility": "aquaduin",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

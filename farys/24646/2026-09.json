@@ -1,0 +1,29 @@
+{
+ "_commune": "24646",
+ "_commune_label": "8730 - Sint-Joris (Beernem)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/bc87b883ad4376f3c22e1f56e19a2b87ac7ab381739ef86b28e40cf39bc23ee9.txt",
+   "url": "https://www.farys.be/nl/watertarieven?ajax_form=1#municipality=24646",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 3.0058,
+ "comfort_eur_per_m3": 6.0116,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Farys watertarieven 2026 (24646)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.farys.be/nl/watertarieven",
+ "utility": "farys",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

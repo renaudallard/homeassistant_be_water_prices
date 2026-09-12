@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/02315f1c161547e5acd13cb79c263fcaae6b3ef3d87d214b80fba08d4e17b72c.txt",
+   "url": "https://www.cile.be/facturation/le-prix-de-leau",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 3.5552,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "CILE prix de l'eau 2026",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "source_url": "https://www.cile.be/facturation/le-prix-de-leau",
+ "utility": "cile",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 153.544,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

@@ -1,0 +1,29 @@
+{
+ "_commune": "{B16693DD-D205-4B2C-B43D-5D40F87ECCEE}",
+ "_commune_label": "9988 - Waterland-Oudeman (Sint-Laureins)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/d30c92ed3be8db880322c9bab400f5d3f476a678260c7c2b39c5e339a804f8b8.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={B16693DD-D205-4B2C-B43D-5D40F87ECCEE}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({B16693DD-D205-4B2C-B43D-5D40F87ECCEE})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

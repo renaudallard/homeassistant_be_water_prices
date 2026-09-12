@@ -1,0 +1,29 @@
+{
+ "_commune": "{FC5B9742-6199-4F68-AE95-58AC8C28103B}",
+ "_commune_label": "8740 - Pittem (Pittem)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/4e6684f70f0a00c3faddb378cdb8bbc686328988d8c8e142e3fd20ed2327aa81.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={FC5B9742-6199-4F68-AE95-58AC8C28103B}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({FC5B9742-6199-4F68-AE95-58AC8C28103B})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

@@ -1,0 +1,29 @@
+{
+ "_commune": "kalmthout",
+ "_commune_label": "Kalmthout",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/62f38851f3e199f2234d7f2cb2f37fc3e6b99e908b14c04af1b9e55390799336.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/kalmthout",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (kalmthout)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/kalmthout",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

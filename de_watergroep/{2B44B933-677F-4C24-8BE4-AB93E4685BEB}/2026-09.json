@@ -1,0 +1,29 @@
+{
+ "_commune": "{2B44B933-677F-4C24-8BE4-AB93E4685BEB}",
+ "_commune_label": "3078 - Everberg (Kortenberg)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/5b64af8cffb20fdd327cc50a11a07f491ed2c97f5a9e85b3d2bbc2fb924aaa0e.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={2B44B933-677F-4C24-8BE4-AB93E4685BEB}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({2B44B933-677F-4C24-8BE4-AB93E4685BEB})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.7019,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

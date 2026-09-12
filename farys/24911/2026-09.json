@@ -1,0 +1,29 @@
+{
+ "_commune": "24911",
+ "_commune_label": "9200 - Grembergen (Dendermonde)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/a746d7cf4b419c8e5c5b452fad211cd4a6e9c5d57adcf8f212f9a4b6b4431f8f.txt",
+   "url": "https://www.farys.be/nl/watertarieven?ajax_form=1#municipality=24911",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 3.0058,
+ "comfort_eur_per_m3": 6.0116,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Farys watertarieven 2026 (24911)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.farys.be/nl/watertarieven",
+ "utility": "farys",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

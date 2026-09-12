@@ -1,0 +1,29 @@
+{
+ "_commune": "{719D97DF-C2F6-4EA3-809A-6C155DB46CC0}",
+ "_commune_label": "8880 - Ledegem (Ledegem)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/f711dcfdcd9b39111a691b7d9b202036610bb43055d595a11073c907554ffddf.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={719D97DF-C2F6-4EA3-809A-6C155DB46CC0}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({719D97DF-C2F6-4EA3-809A-6C155DB46CC0})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

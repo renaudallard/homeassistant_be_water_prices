@@ -1,0 +1,29 @@
+{
+ "_commune": "{3D90CED9-D833-4FC0-89AE-CC07F5334805}",
+ "_commune_label": "3740 - Munsterbilzen (KMO-zone Genk-Zuid) (Bilzen-Hoeselt)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/5192e3a0e49e1853e59a5e8d49c5437e70cb79ad4f8d2e4a45f95588366b04a1.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={3D90CED9-D833-4FC0-89AE-CC07F5334805}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({3D90CED9-D833-4FC0-89AE-CC07F5334805})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

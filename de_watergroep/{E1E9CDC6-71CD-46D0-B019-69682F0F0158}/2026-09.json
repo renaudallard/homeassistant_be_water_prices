@@ -1,0 +1,29 @@
+{
+ "_commune": "{E1E9CDC6-71CD-46D0-B019-69682F0F0158}",
+ "_commune_label": "8930 - Rekkem (Menen)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/108baba0d3c6b80a2b7d21b89f275e4ab7ce86dc7561422507357d5eb8aedd72.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={E1E9CDC6-71CD-46D0-B019-69682F0F0158}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({E1E9CDC6-71CD-46D0-B019-69682F0F0158})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

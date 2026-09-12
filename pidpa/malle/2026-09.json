@@ -1,0 +1,29 @@
+{
+ "_commune": "malle",
+ "_commune_label": "Malle",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/8f3d24d175e114e8039b9b407467007d23a5f337d0792d8f5e54b283b6cccf37.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/malle",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (malle)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/malle",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

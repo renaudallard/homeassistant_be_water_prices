@@ -1,0 +1,29 @@
+{
+ "_commune": "{01585DF4-2CF0-4E5D-9AAA-77EACC14D6FB}",
+ "_commune_label": "8792 - Desselgem (Waregem)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/ba51a6838d6d8eae5145bb3c820ff3e5736a4db833be7fb8f39cc96028a612e0.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={01585DF4-2CF0-4E5D-9AAA-77EACC14D6FB}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({01585DF4-2CF0-4E5D-9AAA-77EACC14D6FB})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

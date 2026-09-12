@@ -1,0 +1,29 @@
+{
+ "_commune": "heist-op-den-berg",
+ "_commune_label": "Heist-Op-Den-Berg",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/00d4f9d933196a7740adbf1ee378e12f0741998ba694fd2205bda0f3e3589a8d.txt",
+   "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/heist-op-den-berg",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.1888,
+ "comfort_eur_per_m3": 4.3776,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Pidpa per-commune tarieven 2026 (heist-op-den-berg)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/heist-op-den-berg",
+ "utility": "pidpa",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

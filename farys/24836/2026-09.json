@@ -1,0 +1,29 @@
+{
+ "_commune": "24836",
+ "_commune_label": "9850 - Hansbeke (Deinze)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/14adf8a28411719e956b00546d756dc23eb2bd24899755580fb2f43c2b57aa7a.txt",
+   "url": "https://www.farys.be/nl/watertarieven?ajax_form=1#municipality=24836",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 3.0058,
+ "comfort_eur_per_m3": 6.0116,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Farys watertarieven 2026 (24836)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.farys.be/nl/watertarieven",
+ "utility": "farys",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

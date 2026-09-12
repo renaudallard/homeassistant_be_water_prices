@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <!-- Mirrored from ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 03 Nov 2025 14:28:39 GMT -->
+  <!-- Added by HTTrack --><meta
+    http-equiv="content-type"
+    content="text/html;charset=utf-8"
+  /><!-- /Added by HTTrack -->
+  <head>
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="../../../../static/assets/img/faviconf700.jpg?v=1.0.1"
+    />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="google-site-verification"
+      content="49J83xICoKxK_IQI5aaShfaQN-AM47HeOoK7vvLZW4M"
+    />
+    <link
+      rel="stylesheet"
+      href="../../../../static/ieg-minify.css"
+      media="all"
+    />
+    <link rel="stylesheet" href="../../../../static/center.css" media="all" />
+    <link
+      rel="stylesheet"
+      href="../../../../static/leaflet-minify.css"
+      media="all"
+    />
+    <link
+      rel="stylesheet"
+      href="../../../../static/ieg-print-minify.css"
+      media="print"
+    />
+    <script src="../../../../../kit.fontawesome.com/7cd00359db.js"></script>
+    <script
+      crossorigin="anonymous"
+      src="https://baps.safeonweb.be/?redirected_from=https%3A%2F%2Fpolyfill.io%2Fv3%2Fpolyfill.min.js%3Ffeatures%3Ddefault%252CIntersectionObserver"
+    ></script>
+    <script
+      crossorigin="anonymous"
+      src="https://baps.safeonweb.be/?redirected_from=https%3A%2F%2Fpolyfill.io%2Fv3%2Fpolyfill.min.js%3Ffeatures%3DObject.setPrototypeOf"
+    ></script>
+    <script src="../../../../../www.google.com/recaptcha/api0769.js?render=6Lcp5sIUAAAAACdcTzorto8hMyvszR60FcAcfc9o"></script>
+    <meta
+      name="viewport"
+      content="width=device-width,minimum-scale=1,initial-scale=1"
+    />
+    <meta charset="utf-8" />
+    <title>IEG - Structure du prix de l’eau</title>
+    <meta name="description" />
+    <link rel="alternate" hreflang="fr-BE" href="index.html" />
+    <meta name="next-head-count" content="5" />
+    <link
+      rel="preload"
+      href="../../../../_next/static/development/pages/__page8d0d.js?ts=1762179874924"
+      as="script"
+    />
+    <link
+      rel="preload"
+      href="../../../../_next/static/development/pages/_app8d0d.js?ts=1762179874924"
+      as="script"
+    />
+    <link
+      rel="preload"
+      href="../../../../_next/static/runtime/webpack8d0d.js?ts=1762179874924"
+      as="script"
+    />
+    <link
+      rel="preload"
+      href="../../../../_next/static/runtime/main8d0d.js?ts=1762179874924"
+      as="script"
+    />
+    <link
+      rel="preload"
+      href="../../../../_next/static/webpack/static/runtime/main.js.f9b924cd669b51cc9c8d.hot-update8d0d.js?ts=1762179874924"
+      as="script"
+    />
+  </head>
+  <body>
+    <div id="__next">
+      <header class="main-header">
+        <a
+          class="main-header__logo col_1_3"
+          href="../../../../index.html"
+          title="Site IEG"
+          ><img
+            src="../../../../static/assets/img/ieg_logo.png"
+            alt="Logo IEG"
+            loading="lazy"
+        /></a>
+        <div class="main-header__toggle-menu">
+          <div>
+            <svg
+              aria-hidden="true"
+              focusable="false"
+              data-prefix="fas"
+              data-icon="bars"
+              class="svg-inline--fa fa-bars fa-w-14 menu-burger"
+              role="img"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 448 512"
+            >
+              <path
+                fill="currentColor"
+                d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"
+              ></path>
+            </svg>
+          </div>
+        </div>
+        <div class="main-header__content">
+          <div class="main-header__top">
+            <div class="main-header__lang">
+              <div>
+                <a
+                  class="lang-choice selected-lang"
+                  lang="fr"
+                  hreflang="fr/"
+                  href="index.html"
+                  >fr</a
+                >
+              </div>
+              <div>
+                <a
+                  class="lang-choice"
+                  lang="nl"
+                  hreflang="nl/"
+                  href="../../../../nl/index.html"
+                  >nl</a
+                >
+              </div>
+              <div>
+                <a
+                  class="lang-choice"
+                  lang="en"
+                  hreflang="en/"
+                  href="../../../../en/index.html"
+                  >en</a
+                >
+              </div>
+            </div>
+            <ul class="main-header__links">
+              <li><a href="../../../../fr/contact/index.html">Contact</a></li>
+            </ul>
+            <div class="main-header__search">
+              <div class="input-search">
+                <input type="text" class="input" placeholder="Rechercher" /><i
+                  class="icon-search"
+                ></i>
+              </div>
+            </div>
+          </div>
+          <div class="main-header__menu">
+            <nav>
+              <ul class="menubar">
+                <li class="">
+                  <a href="../../../../expansion-economique/index.html"
+                    ><span>Expansion Economique</span
+                    ><button href="#"><i class="icon-chevron-down"></i></button
+                  ></a>
+                  <ul>
+                    <li>
+                      <a
+                        href="../../../../expansion-economique/accompagnement/index.html"
+                        >Accompagnement d’entreprise</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../expansion-economique/nos-infrastructures/index.html"
+                        >Nos infrastructures</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../expansion-economique/secteurs-d-activites/index.html"
+                        >Secteurs d’activités</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../expansion-economique/parcs-d-activites/index.html"
+                        >Parcs d&#x27;activités</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../expansion-economique/b-wapi-mag/index.html"
+                        >B-Wapi Mag</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../expansion-economique/labeleco/index.html"
+                        >Labeléco</a
+                      >
+                    </li>
+                  </ul>
+                </li>
+                <li class="">
+                  <a href="../../../index.html"
+                    ><span>Eau</span
+                    ><button href="#"><i class="icon-chevron-down"></i></button
+                  ></a>
+                  <ul>
+                    <li>
+                      <a href="../../../nos-conseils/index.html"
+                        >Nos conseils</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../production-et-distribution-d-eau/index.html"
+                        >Production et distribution d’eau</a
+                      >
+                    </li>
+                    <li><a href="../../index.html">Espace client</a></li>
+                  </ul>
+                </li>
+                <li class="">
+                  <a href="../../../../energie/index.html"
+                    ><span>Energie</span
+                    ><button href="#"><i class="icon-chevron-down"></i></button
+                  ></a>
+                  <ul>
+                    <li>
+                      <a href="../../../../energie/guichet/index.html"
+                        >Guichet</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../energie/production-et-distribution-d-energie/index.html"
+                        >Production et distribution d’énergie</a
+                      >
+                    </li>
+                    <li>
+                      <a href="../../../../energie/projet-zelda/index.html"
+                        >Projet Zelda³ dans votre PAE</a
+                      >
+                    </li>
+                  </ul>
+                </li>
+                <li class="">
+                  <a href="../../../../sport-et-loisirs/index.html"
+                    ><span>Sport &amp; Loisirs</span
+                    ><button href="#"><i class="icon-chevron-down"></i></button
+                  ></a>
+                  <ul>
+                    <li>
+                      <a href="../../../../sport-et-loisirs/piscines/index.html"
+                        >Piscines</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../sport-et-loisirs/futurosport/index.html"
+                        >Futurosport</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../sport-et-loisirs/aire-de-jeux/index.html"
+                        >Aire de jeux</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../sport-et-loisirs/piste-dathletisme/index.html"
+                        >Piste d&#x27;athlétisme</a
+                      >
+                    </li>
+                    <li>
+                      <a
+                        href="../../../../sport-et-loisirs/stade-le-canonnier/index.html"
+                        >Stade « Le Canonnier »</a
+                      >
+                    </li>
+                  </ul>
+                </li>
+                <li class="">
+                  <a href="../../../../actualites/index.html"
+                    ><span>Actualités</span></a
+                  >
+                </li>
+                <li class="">
+                  <a href="../../../../ieg/index.html"
+                    ><span>IEG</span
+                    ><button href="#"><i class="icon-chevron-down"></i></button
+                  ></a>
+                  <ul>
+                    <li>
+                      <a href="../../../../ieg/nos-communes/index.html"
+                        >Nos communes</a
+                      >
+                    </li>
+                    <li>
+                      <a href="../../../../ieg/structure/index.html"
+                        >Structure</a
+                      >
+                    </li>
+                    <li>
+                      <a href="../../../../ieg/equipe/index.html">Equipe</a>
+                    </li>
+                    <li>
+                      <a href="../../../../ieg/missions/index.html">Missions</a>
+                    </li>
+                    <li>
+                      <a href="../../../../ieg/marches-publics/index.html"
+                        >Marchés publics</a
+                      >
+                    </li>
+                    <li>
+                      <a href="../../../../ieg/emploi/index.html">Emploi</a>
+                    </li>
+                    <li>
+                      <a href="../../../../ieg/partenaires/index.html"
+                        >Partenaires</a
+                      >
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+      <div id="page-page" class="water">
+        <section class="hero">
+          <div class="hero__overlay">
+            <span class="overline">Vous êtes ici</span>
+            <ul
+              vocab="https://schema.org/"
+              typeof="BreadcrumbList"
+              class="breadcrumb"
+            >
+              <li
+                property="itemListElement"
+                typeof="ListItem"
+                class="breadcrumb__item"
+              >
+                <a
+                  property="item"
+                  typeof="WebPage"
+                  href="../../../../index.html"
+                  ><span property="name">Accueil<!-- --> </span></a
+                ><meta property="position" content="1" /><i
+                  class="icon-chevron-down"
+                ></i>
+              </li>
+              <li
+                property="itemListElement"
+                typeof="ListItem"
+                class="breadcrumb__item"
+              >
+                <a property="item" typeof="WebPage" href="../../../index.html"
+                  ><span property="name">Eau</span></a
+                ><meta property="position" content="2" /><i
+                  class="icon-chevron-down"
+                ></i>
+              </li>
+              <li
+                property="itemListElement"
+                typeof="ListItem"
+                class="breadcrumb__item"
+              >
+                <a property="item" typeof="WebPage" href="../../index.html"
+                  ><span property="name">Espace client</span></a
+                ><meta property="position" content="3" /><i
+                  class="icon-chevron-down"
+                ></i>
+              </li>
+              <li
+                property="itemListElement"
+                typeof="ListItem"
+                class="breadcrumb__item"
+              >
+                <a property="item" typeof="WebPage" href="../index.html"
+                  ><span property="name">Facturation</span></a
+                ><meta property="position" content="4" /><i
+                  class="icon-chevron-down"
+                ></i>
+              </li>
+              <li
+                property="itemListElement"
+                typeof="ListItem"
+                class="breadcrumb__item"
+              >
+                <a
+                  property="item"
+                  typeof="WebPage"
+                  href="../../../../fr/site-plan/index.html"
+                  tabindex="-1"
+                  ><span property="name">Structure du prix de l’eau</span></a
+                ><meta property="position" content="5" />
+              </li>
+            </ul>
+            <h1>Structure du prix de l’eau</h1>
+          </div>
+          <div class="hero__item">
+            <img
+              src="../../../../../wp.ieg.be/wp-content/uploads/2019/10/Structure-du-prix-de-l-eau.jpg"
+              loading="lazy"
+            />
+          </div>
+        </section>
+        <div class="container container_content content">
+          <div class="clearfix">
+            <section
+              class="col_1_1 col-md_1_1 col-lg_1_2 col-xl_2_3 container-content_content"
+            >
+              <div class="margin_no_top">
+                <p>
+                  A partir du 1er janvier 2026, le prix du m³ d’eau distribuée par IEG est établi comme suit :
+                </p>
+                <p>CVD : Coût Vérité de Distribution : 2,3800€/m³</p>
+                <p>
+                  CVA : Coût Vérité d’Assainissement : 2,7480€/m³ (hors exonération/exemption)
+                </p>
+                <p>
+                  La redevance annuelle est calculée selon la formule suivante : (20 x CVD) + (30 x CVA) et est composée comme suit :
+                </p>
+                <p>•    redevance annuelle à la distribution : 20 x CVD</p>
+                <p>•    redevance annuelle à l’assainissement : 30 x CVA</p>
+                <p>
+                  Le calcul du prix de l’eau s’effectue selon la tranche de consommation annuelle de la manière suivante :
+                </p>
+                <p>• Consommations de 1 à 30m³ : 50% CVD par m³</p>
+                <p>
+                  • Consommations de 31 à 5.000m³ : 100% CVD + CVA par m³
+                </p>
+                <p>
+                  • Consommations de 5.001 à 50.000m³ : 90% CVD + CVA par m³
+                </p>
+                <p>
+                  • Une contribution au fonds social de l’eau de 0,0339€ est perçue sur chaque m³ consommé
+                </p>
+                <p>• TVA de 6%</p>
+				<p>Le prix au m³ est de 5,4700 € ttc</p>
+                <p>
+                 La facturation de votre consommation est équitablement établie au prorata du nombre de jours couverts par chacun des tarifs en vigueur.
+                </p>
+                <p>IEG – Clientèle – Eau</p>
+              </div>
+              <div class="margin_bottom"></div>
+            </section>
+            <aside
+              class="col_1_1 col-md_1_1 col-lg_1_2 col-xl_1_3 container-content_aside"
+            >
+              <div class="margin_big_bottom">
+                <div class="address-card">
+                  <div class="address-card__infos address-card-infos">
+                    <span class="address-card-infos__title">Adresse</span>
+                    <address class="address-card-infos__address">
+                      <p class="infos-card__content">
+                        Rue de la Solidarité,
+                        80https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/https://ieg.be/wp.ieg.be/wp-content/
+                        <br />7700 Mouscron
+                      </p>
+                    </address>
+                  </div>
+                  <div
+                    class="address-card__map"
+                    style="position: relative"
+                  ></div>
+                  <div class="address-card__infos address-card-infos">
+                    <a
+                      class="infos-card__content_link"
+                      href="https://maps.google.com/maps/dir//Rue de la Solidarité, 807700 Mouscron"
+                      target="_blank"
+                      ><i class="fas fa-location-arrow link-menu__icon"></i
+                      >ITINERAIRE</a
+                    >
+                  </div>
+                </div>
+                <div class="infos-card">
+                  <span class="infos-card__title">Email</span
+                  ><span>contact eau@ieg.be</span>
+                </div>
+                <div class="infos-card">
+                  <span class="infos-card__title">Numero de telephone</span
+                  >056/85.24.00
+                </div>
+              </div>
+              <ul class="link-menu">
+                <li class="link-menu__item">
+                  <span>Partager cette page sur vos réseaux</span>
+                  <ul class="link-menu link-menu_sub">
+                    <li class="link-menu__item">
+                      <a href="#"
+                        ><div
+                          aria-label="facebook"
+                          role="button"
+                          tabindex="0"
+                          class="SocialMediaShareButton SocialMediaShareButton--facebook"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            focusable="false"
+                            data-prefix="fab"
+                            data-icon="facebook-square"
+                            class="svg-inline--fa fa-facebook-square fa-w-14"
+                            role="img"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 448 512"
+                          >
+                            <path
+                              fill="currentColor"
+                              d="M400 32H48A48 48 0 0 0 0 80v352a48 48 0 0 0 48 48h137.25V327.69h-63V256h63v-54.64c0-62.15 37-96.48 93.67-96.48 27.14 0 55.52 4.84 55.52 4.84v61h-31.27c-30.81 0-40.42 19.12-40.42 38.73V256h68.78l-11 71.69h-57.78V480H400a48 48 0 0 0 48-48V80a48 48 0 0 0-48-48z"
+                            ></path>
+                          </svg>
+                          Facebook
+                        </div></a
+                      >
+                    </li>
+                    <li class="link-menu__item">
+                      <a href="#"
+                        ><div
+                          aria-label="linkedin"
+                          role="button"
+                          tabindex="0"
+                          class="SocialMediaShareButton SocialMediaShareButton--linkedin"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            focusable="false"
+                            data-prefix="fab"
+                            data-icon="linkedin"
+                            class="svg-inline--fa fa-linkedin fa-w-14"
+                            role="img"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 448 512"
+                          >
+                            <path
+                              fill="currentColor"
+                              d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9V416z"
+                            ></path>
+                          </svg>
+                          Linkedin
+                        </div></a
+                      >
+                    </li>
+                    <li class="link-menu__item">
+                      <a href="#"
+                        ><div
+                          aria-label="twitter"
+                          role="button"
+                          tabindex="0"
+                          class="SocialMediaShareButton SocialMediaShareButton--twitter"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            focusable="false"
+                            data-prefix="fab"
+                            data-icon="twitter-square"
+                            class="svg-inline--fa fa-twitter-square fa-w-14"
+                            role="img"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 448 512"
+                          >
+                            <path
+                              fill="currentColor"
+                              d="M400 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48zm-48.9 158.8c.2 2.8.2 5.7.2 8.5 0 86.7-66 186.6-186.6 186.6-37.2 0-71.7-10.8-100.7-29.4 5.3.6 10.4.8 15.8.8 30.7 0 58.9-10.4 81.4-28-28.8-.6-53-19.5-61.3-45.5 10.1 1.5 19.2 1.5 29.6-1.2-30-6.1-52.5-32.5-52.5-64.4v-.8c8.7 4.9 18.9 7.9 29.6 8.3a65.447 65.447 0 0 1-29.2-54.6c0-12.2 3.2-23.4 8.9-33.1 32.3 39.8 80.8 65.8 135.2 68.6-9.3-44.5 24-80.6 64-80.6 18.9 0 35.9 7.9 47.9 20.7 14.8-2.8 29-8.3 41.6-15.8-4.9 15.2-15.2 28-28.8 36.1 13.2-1.4 26-5.1 37.8-10.2-8.9 13.1-20.1 24.7-32.9 34z"
+                            ></path>
+                          </svg>
+                          Twitter
+                        </div></a
+                      >
+                    </li>
+                    <li class="link-menu__item">
+                      <a href="#"
+                        ><div
+                          aria-label="email"
+                          role="button"
+                          tabindex="0"
+                          class="SocialMediaShareButton SocialMediaShareButton--email"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            focusable="false"
+                            data-prefix="fas"
+                            data-icon="envelope-square"
+                            class="svg-inline--fa fa-envelope-square fa-w-14"
+                            role="img"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 448 512"
+                          >
+                            <path
+                              fill="currentColor"
+                              d="M400 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V80c0-26.51-21.49-48-48-48zM178.117 262.104C87.429 196.287 88.353 196.121 64 177.167V152c0-13.255 10.745-24 24-24h272c13.255 0 24 10.745 24 24v25.167c-24.371 18.969-23.434 19.124-114.117 84.938-10.5 7.655-31.392 26.12-45.883 25.894-14.503.218-35.367-18.227-45.883-25.895zM384 217.775V360c0 13.255-10.745 24-24 24H88c-13.255 0-24-10.745-24-24V217.775c13.958 10.794 33.329 25.236 95.303 70.214 14.162 10.341 37.975 32.145 64.694 32.01 26.887.134 51.037-22.041 64.72-32.025 61.958-44.965 81.325-59.406 95.283-70.199z"
+                            ></path>
+                          </svg>
+                          Email
+                        </div></a
+                      >
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </aside>
+          </div>
+          <div class="text_center"></div>
+        </div>
+        <section id="accreditations">
+          <ul class="accreditations-list">
+            <li class="accreditations-list__item col_1_2 col-md_1_3 col-lg_1_3">
+              <a href="#" title="logo_FEDER" target="_blank"
+                ><img
+                  src="../../../../../wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER.jpg"
+                  alt="logo_FEDER"
+                  loading="lazy"
+              /></a>
+            </li>
+            <li class="accreditations-list__item col_1_2 col-md_1_3 col-lg_1_3">
+              <a href="#" title="logo interreg v2" target="_blank"
+                ><img
+                  src="../../../../../wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2.jpg"
+                  alt="logo interreg v2"
+                  loading="lazy"
+              /></a>
+            </li>
+            <li class="accreditations-list__item col_1_2 col-md_1_3 col-lg_1_3">
+              <a href="#" title="wp-acteur" target="_blank"
+                ><img
+                  src="../../../../../wp.ieg.be/wp-content/uploads/2019/11/wp-acteur.jpg"
+                  alt="wp-acteur"
+                  loading="lazy"
+              /></a>
+            </li>
+          </ul>
+        </section>
+      </div>
+      <footer class="footer">
+        <div class="footer__main">
+          <div class="footer__logos col_1_1 col-md_1_2 col-xl_1_4">
+            <img
+              src="../../../../static/assets/img/ieg_logo_white.png"
+              loading="lazy"
+            />
+          </div>
+          <div class="footer__infos col_1_1 col-md_1_2 col-xl_1_4">
+            <span class="footer__title overline">informations de contact</span>
+            <address>
+              Rue de la solidarité, 80 <br />7700 Mouscron<br /><br /><span
+                >Tél:<a href="tel:00 32 (0) 56 85 24 00"
+                  >00 32 (0) 56 85 24 00</a
+                ></span
+              ><span>Email:<a href="mailto:info@ieg.be">info@ieg.be</a></span>
+            </address>
+          </div>
+          <div class="footer__links col_1_1 col-md_1_2 col-xl_1_4">
+            <span class="footer__title overline">Acces rapide</span>
+            <ul>
+              <li><a href="../../../../contact/index.html">Contact</a></li>
+              <li>
+                <a href="../../releve-d-index/index.html">Relevé d’index</a>
+              </li>
+              <li>
+                <a href="../../../../plan-de-site/index.html">Plan de site</a>
+              </li>
+            </ul>
+          </div>
+          <div class="footer__socials col_1_1 col-md_1_2 col-xl_1_4">
+            <span class="footer__title overline">Rejoindre nos reseaux</span>
+            <ul>
+              <li>
+                <a href="https://wp.ieg.be/sport-et-loisirs/" target="_blank"
+                  >Sport &amp; Loisirs</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__mentions">
+          <span>IEG 2019</span>
+          <ul class="footer__mentions-links">
+            <li>
+              <a href="../../../../mentions-legales/index.html"
+                >Mentions légales</a
+              >
+            </li>
+            <li>
+              <a
+                href="../../../../politique-de-protection-de-la-vie-privee/index.html"
+                >Politique de Protection de la Vie Privée</a
+              >
+            </li>
+          </ul>
+        </div>
+      </footer>
+    </div>
+    <script src="../../../../_next/static/development/dll/dll_90e8ea1802b868f0c4488d0d.js?ts=1762179874924"></script>
+    <script id="__NEXT_DATA__" type="application/json">
+      {
+        "dataManager": "[]",
+        "props": {
+          "initialI18nStore": {
+            "fr": {
+              "common": {
+                "you are here": "Vous êtes ici",
+                "search": "Rechercher",
+                "back": "Retour",
+                "home": "Accueil",
+                "follow-us": "Rejoindre nos reseaux",
+                "rapid-access": "Acces rapide",
+                "contact-informations": "informations de contact",
+                "download-file": "Telecharger le document",
+                "go-to-article": "Aller vers l'article",
+                "actuality": "actualité",
+                "actualities": "actualités",
+                "read_more": "Lire plus",
+                "economy": "Expansion economique",
+                "energy": "Energie",
+                "hobby": "Sport \u0026 Loisirs",
+                "water": "Eau",
+                "general": "Général",
+                "search-label": "Effectuer une nouvelle recherche",
+                "contact-us": "Nous contacter",
+                "name": "Nom",
+                "firstName": "Prenom",
+                "email": "Email",
+                "subject": "Sujet",
+                "message": "Message",
+                "form-has-been-send": "Le formulaire a bien été envoyé",
+                "reading-meter": "Relevé de compteur",
+                "meter-reading-has-been-send": "Le relevé a bien été envoyé",
+                "address": "Adresse",
+                "reference": "Reference",
+                "reading-meter-number": "N° de compteur",
+                "red-number": "Chiffres rouges (m³)",
+                "black-number": "Chiffres noirs (index)",
+                "send-reading-meter": "Envoyer le relevé",
+                "gender": "M / Mme",
+                "view-all-actualities": "Voir toutes les actualités",
+                "archives": "Archives",
+                "none": "IEG",
+                "phone": "Téléphone",
+                "meterReadingPhoto": "Photo du compteur",
+                "meterReadingDate": "Date de relevé de compteur"
+              }
+            }
+          },
+          "initialLanguage": "fr",
+          "i18nServerInstance": null,
+          "pageProps": {
+            "namespacesRequired": ["common"],
+            "pageDatas": {
+              "id": 990,
+              "link": "https://wp.ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/",
+              "title": { "rendered": "Structure du prix de l’eau" },
+              "content": {
+                "rendered": "\n\u003cp\u003eA partir du 1er janvier\n2026, le prix du m³ d’eau distribuée par IEG est établi comme suit : \u003c/p\u003e\n\n\n\n\u003cp\u003eCVD : Coût Vérité de\nDistribution : 2,3800€/m³\u003c/p\u003e\n\n\n\n\u003cp\u003eCVA : Coût Vérité\nd’Assainissement : 2,7480€/m³ (hors exonération/exemption)\u003c/p\u003e\n\n\n\n\u003cp\u003eLa redevance annuelle est\ncalculée selon la formule suivante : (20 x CVD) + (30 x CVA) et est composée\ncomme suit :\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; redevance annuelle à la distribution : 20 x\nCVD\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; redevance annuelle à l’assainissement : 30\nx CVA\u003c/p\u003e\n\n\n\n\u003cp\u003eLe calcul du prix de l’eau\ns’effectue selon la tranche de consommation annuelle de la manière suivante :\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Consommations de 1 à 30m³ : 50% CVD par m³\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Consommations de 31 à 5.000m³ : 100% CVD +\nCVA par m³\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Consommations de 5.001 à 50.000m³ : 90% CVD\n+ CVA par m³\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Une contribution au fonds social de l’eau\nde 0,0339€ est perçue sur chaque m³ consommé\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; TVA de 6%\u003c/p\u003e\n\n\n\n\u003cp\u003eLe prix au m³ est de 5,4700 € ttc \u003c/p\u003e\n\n\n\n\u003cp\u003e La facturation de votre consommation est équitablement établie au prorata du nombre de jours couverts par chacun des tarifs en vigueur.\u003c/p\u003e\n\n\n\n\u003cp\u003eIEG\n– Clientèle \u0026#8211; Eau\u003c/p\u003e\n",
+                "protected": false
+              },
+              "parent": 875,
+              "translations": { "fr": 990 },
+              "acf": {
+                "type": "Standard",
+                "page_category": "water",
+                "photo_gallery": {
+                  "gallery": [[]],
+                  "partners": [
+                    [],
+                    [
+                      {
+                        "id": 1494,
+                        "title": "logo_FEDER",
+                        "caption": "",
+                        "full_image_url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER.jpg",
+                        "thumbnail_image_url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-150x150.jpg",
+                        "large_srcset": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-1024x256.jpg 1024w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-300x75.jpg 300w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-768x192.jpg 768w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER.jpg 1200w",
+                        "medium_srcset": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-300x75.jpg 300w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-768x192.jpg 768w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER-1024x256.jpg 1024w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo_FEDER.jpg 1200w",
+                        "url": "",
+                        "target": ""
+                      },
+                      {
+                        "id": 1521,
+                        "title": "logo interreg v2",
+                        "caption": "",
+                        "full_image_url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2.jpg",
+                        "thumbnail_image_url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-150x150.jpg",
+                        "large_srcset": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-1024x256.jpg 1024w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-300x75.jpg 300w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-768x192.jpg 768w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2.jpg 1200w",
+                        "medium_srcset": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-300x75.jpg 300w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-768x192.jpg 768w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2-1024x256.jpg 1024w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/logo-interreg-v2.jpg 1200w",
+                        "url": "",
+                        "target": ""
+                      },
+                      {
+                        "id": 1492,
+                        "title": "wp-acteur",
+                        "caption": "",
+                        "full_image_url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur.jpg",
+                        "thumbnail_image_url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-150x150.jpg",
+                        "large_srcset": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-1024x256.jpg 1024w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-300x75.jpg 300w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-768x192.jpg 768w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur.jpg 1200w",
+                        "medium_srcset": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-300x75.jpg 300w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-768x192.jpg 768w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur-1024x256.jpg 1024w, https://ieg.be/wp.ieg.be/wp-content/uploads/2019/11/wp-acteur.jpg 1200w",
+                        "url": "",
+                        "target": ""
+                      }
+                    ]
+                  ]
+                },
+                "main_picture": {
+                  "url": "https://ieg.be/wp.ieg.be/wp-content/uploads/2019/10/Structure-du-prix-de-l-eau.jpg"
+                },
+                "address": {
+                  "title": "Adresse",
+                  "fullAddress": "Rue de la Solidarité 80 – 7700 Mouscron",
+                  "content": "Rue de la Solidarité, 80\r\n7700 Mouscron"
+                },
+                "phone": {
+                  "title": "Numero de telephone",
+                  "content": "056/85.24.00"
+                },
+                "email": { "title": "Email", "content": "contact eau@ieg.be" },
+                "social_network": {
+                  "title": "Partager cette page sur vos réseaux",
+                  "content": ["Facebook", "Linkedin", "Twitter", "Email"]
+                },
+                "children_pages": { "title": "En savoir plus", "content": [] },
+                "linked_pages": {
+                  "title": "A découvrir également",
+                  "content": []
+                },
+                "buttons": { "back_button": { "label": "Retour", "link": "" } },
+                "website": { "title": "Site Web", "content": "" }
+              },
+              "breadCrumb": [
+                { "title": "Eau", "url": "https://ieg.be/eau/" },
+                {
+                  "title": "Espace client",
+                  "url": "https://ieg.be/eau/espace-client/"
+                },
+                {
+                  "title": "Facturation",
+                  "url": "https://ieg.be/eau/espace-client/facturation/"
+                },
+                {
+                  "title": "Structure du prix de l’eau",
+                  "url": "https://ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/"
+                }
+              ],
+              "contentToDisplay": "\n\u003cp\u003eA partir du 1er janvier\n2026, le prix du m³ d’eau distribuée par IEG est établi comme suit : \u003c/p\u003e\n\n\n\n\u003cp\u003eCVD : Coût Vérité de\nDistribution : 2,3800€/m³\u003c/p\u003e\n\n\n\n\u003cp\u003eCVA : Coût Vérité\nd’Assainissement : 2,7480€/m³ (hors exonération/exemption)\u003c/p\u003e\n\n\n\n\u003cp\u003eLa redevance annuelle est\ncalculée selon la formule suivante : (20 x CVD) + (30 x CVA) et est composée\ncomme suit :\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; redevance annuelle à la distribution : 20 x\nCVD\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; redevance annuelle à l’assainissement : 30\nx CVA\u003c/p\u003e\n\n\n\n\u003cp\u003eLe calcul du prix de l’eau\ns’effectue selon la tranche de consommation annuelle de la manière suivante :\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Consommations de 1 à 30m³ : 50% CVD par m³\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Consommations de 31 à 5.000m³ : 100% CVD +\nCVA par m³\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Consommations de 5.001 à 50.000m³ : 90% CVD\n+ CVA par m³\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; Une contribution au fonds social de l’eau\nde 0,0339€ est perçue sur chaque m³ consommé\u003c/p\u003e\n\n\n\n\u003cp\u003e•\u0026nbsp;\u0026nbsp;\u0026nbsp; TVA de 6%\u003c/p\u003e\n\n\n\n\u003cp\u003eLe prix au m³ est de 5,4700 € ttc \u003c/p\u003e\n\n\n\n\u003cp\u003e La facturation de votre consommation est équitablement établie au prorata du nombre de jours couverts par chacun des tarifs en vigueur.\u003c/p\u003e\n\n\n\n\u003cp\u003eIEG\n– Clientèle \u0026#8211; Eau\u003c/p\u003e\n"
+            },
+            "translatePages": {
+              "fr": "https://ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/"
+            },
+            "language": "fr"
+          },
+          "menus": {
+            "ID": 23,
+            "name": "Menu principal francais",
+            "slug": "menu-principal-francais",
+            "description": "",
+            "count": 30,
+            "items": [
+              {
+                "id": 141,
+                "order": 1,
+                "parent": 0,
+                "title": "Expansion Economique",
+                "url": "https://wp.ieg.be/expansion-economique/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 135,
+                "object": "page",
+                "object_slug": "expansion-economique",
+                "type": "post_type",
+                "type_label": "Page",
+                "children": [
+                  {
+                    "id": 268,
+                    "order": 2,
+                    "parent": 141,
+                    "title": "Accompagnement d’entreprise",
+                    "url": "https://ieg.be/expansion-economique/accompagnement/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 251,
+                    "object": "page",
+                    "object_slug": "accompagnement",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 269,
+                    "order": 3,
+                    "parent": 141,
+                    "title": "Nos infrastructures",
+                    "url": "https://ieg.be/expansion-economique/nos-infrastructures/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 263,
+                    "object": "page",
+                    "object_slug": "nos-infrastructures",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 271,
+                    "order": 4,
+                    "parent": 141,
+                    "title": "Secteurs d’activités",
+                    "url": "https://ieg.be/expansion-economique/secteurs-d-activites/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 260,
+                    "object": "page",
+                    "object_slug": "secteurs-d-activites",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 270,
+                    "order": 5,
+                    "parent": 141,
+                    "title": "Parcs d'activités",
+                    "url": "https://ieg.be/expansion-economique/parcs-d-activites/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 257,
+                    "object": "page",
+                    "object_slug": "parcs-d-activites",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 1704,
+                    "order": 6,
+                    "parent": 141,
+                    "title": "B-Wapi Mag",
+                    "url": "https://ieg.be/expansion-economique/b-wapi-mag/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 1665,
+                    "object": "page",
+                    "object_slug": "b-wapi-mag",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 1893,
+                    "order": 7,
+                    "parent": 141,
+                    "title": "Labeléco",
+                    "url": "https://ieg.be/expansion-economique/labeleco/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 1843,
+                    "object": "page",
+                    "object_slug": "labeleco",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  }
+                ]
+              },
+              {
+                "id": 144,
+                "order": 8,
+                "parent": 0,
+                "title": "Eau",
+                "url": "https://wp.ieg.be/eau/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 48,
+                "object": "page",
+                "object_slug": "eau",
+                "type": "post_type",
+                "type_label": "Page",
+                "children": [
+                  {
+                    "id": 148,
+                    "order": 9,
+                    "parent": 144,
+                    "title": "Nos conseils",
+                    "url": "https://ieg.be/eau/nos-conseils/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 64,
+                    "object": "page",
+                    "object_slug": "nos-conseils",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 147,
+                    "order": 10,
+                    "parent": 144,
+                    "title": "Production et distribution d’eau",
+                    "url": "https://ieg.be/eau/production-et-distribution-d-eau/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 58,
+                    "object": "page",
+                    "object_slug": "production-et-distribution-d-eau",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 146,
+                    "order": 11,
+                    "parent": 144,
+                    "title": "Espace client",
+                    "url": "https://ieg.be/eau/espace-client/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 54,
+                    "object": "page",
+                    "object_slug": "espace-client",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  }
+                ]
+              },
+              {
+                "id": 143,
+                "order": 12,
+                "parent": 0,
+                "title": "Energie",
+                "url": "https://wp.ieg.be/energie/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 125,
+                "object": "page",
+                "object_slug": "energie",
+                "type": "post_type",
+                "type_label": "Page",
+                "children": [
+                  {
+                    "id": 266,
+                    "order": 13,
+                    "parent": 143,
+                    "title": "Guichet",
+                    "url": "https://ieg.be/energie/guichet/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 244,
+                    "object": "page",
+                    "object_slug": "guichet",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 267,
+                    "order": 14,
+                    "parent": 143,
+                    "title": "Production et distribution d’énergie",
+                    "url": "https://ieg.be/energie/production-et-distribution-d-energie/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 247,
+                    "object": "page",
+                    "object_slug": "production-et-distribution-d-energie",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 1664,
+                    "order": 15,
+                    "parent": 143,
+                    "title": "Projet Zelda³ dans votre PAE",
+                    "url": "https://ieg.be/energie/projet-zelda/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 1657,
+                    "object": "page",
+                    "object_slug": "projet-zelda",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  }
+                ]
+              },
+              {
+                "id": 142,
+                "order": 16,
+                "parent": 0,
+                "title": "Sport \u0026 Loisirs",
+                "url": "https://wp.ieg.be/sport-et-loisirs/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 130,
+                "object": "page",
+                "object_slug": "sport-et-loisirs",
+                "type": "post_type",
+                "type_label": "Page",
+                "children": [
+                  {
+                    "id": 232,
+                    "order": 17,
+                    "parent": 142,
+                    "title": "Piscines",
+                    "url": "https://ieg.be/sport-et-loisirs/piscines/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 200,
+                    "object": "page",
+                    "object_slug": "piscines",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 274,
+                    "order": 18,
+                    "parent": 142,
+                    "title": "Futurosport",
+                    "url": "https://ieg.be/sport-et-loisirs/futurosport/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 238,
+                    "object": "page",
+                    "object_slug": "futurosport",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 272,
+                    "order": 19,
+                    "parent": 142,
+                    "title": "Aire de jeux",
+                    "url": "https://ieg.be/sport-et-loisirs/aire-de-jeux/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 241,
+                    "object": "page",
+                    "object_slug": "aire-de-jeux",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 838,
+                    "order": 20,
+                    "parent": 142,
+                    "title": "Piste d'athlétisme",
+                    "url": "https://ieg.be/sport-et-loisirs/piste-dathletisme/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 834,
+                    "object": "page",
+                    "object_slug": "piste-dathletisme",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 3327,
+                    "order": 21,
+                    "parent": 142,
+                    "title": "Stade « Le Canonnier »",
+                    "url": "https://ieg.be/sport-et-loisirs/stade-le-canonnier/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 3208,
+                    "object": "page",
+                    "object_slug": "stade-le-canonnier",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  }
+                ]
+              },
+              {
+                "id": 145,
+                "order": 22,
+                "parent": 0,
+                "title": "Actualités",
+                "url": "https://wp.ieg.be/actualites/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 42,
+                "object": "page",
+                "object_slug": "actualites",
+                "type": "post_type",
+                "type_label": "Page"
+              },
+              {
+                "id": 751,
+                "order": 23,
+                "parent": 0,
+                "title": "IEG",
+                "url": "https://wp.ieg.be/ieg/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 503,
+                "object": "page",
+                "object_slug": "ieg",
+                "type": "post_type",
+                "type_label": "Page",
+                "children": [
+                  {
+                    "id": 757,
+                    "order": 24,
+                    "parent": 751,
+                    "title": "Nos communes",
+                    "url": "https://ieg.be/ieg/nos-communes/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 746,
+                    "object": "page",
+                    "object_slug": "nos-communes",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 759,
+                    "order": 25,
+                    "parent": 751,
+                    "title": "Structure",
+                    "url": "https://ieg.be/ieg/structure/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 558,
+                    "object": "page",
+                    "object_slug": "structure",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 753,
+                    "order": 26,
+                    "parent": 751,
+                    "title": "Equipe",
+                    "url": "https://ieg.be/ieg/equipe/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 560,
+                    "object": "page",
+                    "object_slug": "equipe",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 756,
+                    "order": 27,
+                    "parent": 751,
+                    "title": "Missions",
+                    "url": "https://ieg.be/ieg/missions/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 562,
+                    "object": "page",
+                    "object_slug": "missions",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 755,
+                    "order": 28,
+                    "parent": 751,
+                    "title": "Marchés publics",
+                    "url": "https://ieg.be/ieg/marches-publics/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 564,
+                    "object": "page",
+                    "object_slug": "marches-publics",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 752,
+                    "order": 29,
+                    "parent": 751,
+                    "title": "Emploi",
+                    "url": "https://ieg.be/ieg/emploi/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 566,
+                    "object": "page",
+                    "object_slug": "emploi",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  },
+                  {
+                    "id": 758,
+                    "order": 30,
+                    "parent": 751,
+                    "title": "Partenaires",
+                    "url": "https://ieg.be/ieg/partenaires/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 568,
+                    "object": "page",
+                    "object_slug": "partenaires",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  }
+                ]
+              }
+            ],
+            "meta": {
+              "links": {
+                "collection": "https://wp.ieg.be/wp-json/wp/v2/menus/",
+                "self": "https://wp.ieg.be/wp-json/wp/v2/menus/23"
+              }
+            }
+          },
+          "footerMenus": {
+            "ID": 26,
+            "name": "Menu pied de page francais",
+            "slug": "menu-pied-de-page-francais",
+            "description": "",
+            "count": 3,
+            "items": [
+              {
+                "id": 681,
+                "order": 1,
+                "parent": 0,
+                "title": "Contact",
+                "url": "https://wp.ieg.be/contact/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 512,
+                "object": "page",
+                "object_slug": "contact",
+                "type": "post_type",
+                "type_label": "Page"
+              },
+              {
+                "id": 748,
+                "order": 2,
+                "parent": 0,
+                "title": "Relevé d’index",
+                "url": "https://wp.ieg.be/eau/espace-client/releve-d-index/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 682,
+                "object": "page",
+                "object_slug": "releve-d-index",
+                "type": "post_type",
+                "type_label": "Page"
+              },
+              {
+                "id": 1069,
+                "order": 3,
+                "parent": 0,
+                "title": "Plan de site",
+                "url": "https://wp.ieg.be/plan-de-site/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 1054,
+                "object": "page",
+                "object_slug": "plan-de-site",
+                "type": "post_type",
+                "type_label": "Page"
+              }
+            ],
+            "meta": {
+              "links": {
+                "collection": "https://wp.ieg.be/wp-json/wp/v2/menus/",
+                "self": "https://wp.ieg.be/wp-json/wp/v2/menus/26"
+              }
+            }
+          },
+          "secondaryFooterMenu": {
+            "ID": 29,
+            "name": "Menu pied de page secondaire francais",
+            "slug": "menu-pied-de-page-secondaire-francais",
+            "description": "",
+            "count": 2,
+            "items": [
+              {
+                "id": 345,
+                "order": 1,
+                "parent": 0,
+                "title": "Mentions légales",
+                "url": "https://wp.ieg.be/mentions-legales/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 339,
+                "object": "page",
+                "object_slug": "mentions-legales",
+                "type": "post_type",
+                "type_label": "Page"
+              },
+              {
+                "id": 3500,
+                "order": 2,
+                "parent": 0,
+                "title": "Politique de Protection de la Vie Privée",
+                "url": "https://wp.ieg.be/politique-de-protection-de-la-vie-privee/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 3492,
+                "object": "page",
+                "object_slug": "politique-de-protection-de-la-vie-privee",
+                "type": "post_type",
+                "type_label": "Page"
+              }
+            ],
+            "meta": {
+              "links": {
+                "collection": "https://wp.ieg.be/wp-json/wp/v2/menus/",
+                "self": "https://wp.ieg.be/wp-json/wp/v2/menus/29"
+              }
+            }
+          },
+          "socialMenus": {
+            "ID": 32,
+            "name": "Menu reseaux sociaux francais",
+            "slug": "menu-reseaux-sociaux-francais",
+            "description": "",
+            "count": 2,
+            "items": [
+              {
+                "id": 3304,
+                "order": 1,
+                "parent": 0,
+                "title": "Sport \u0026amp; Loisirs",
+                "url": "https://wp.ieg.be/sport-et-loisirs/",
+                "attr": "",
+                "target": "",
+                "classes": "",
+                "xfn": "",
+                "description": "",
+                "object_id": 130,
+                "object": "page",
+                "object_slug": "sport-et-loisirs",
+                "type": "post_type",
+                "type_label": "Page",
+                "children": [
+                  {
+                    "id": 3305,
+                    "order": 2,
+                    "parent": 3304,
+                    "title": "Stade « Le Canonnier »",
+                    "url": "https://wp.ieg.be/sport-et-loisirs/stade-le-canonnier/",
+                    "attr": "",
+                    "target": "",
+                    "classes": "",
+                    "xfn": "",
+                    "description": "",
+                    "object_id": 3208,
+                    "object": "page",
+                    "object_slug": "stade-le-canonnier",
+                    "type": "post_type",
+                    "type_label": "Page"
+                  }
+                ]
+              }
+            ],
+            "meta": {
+              "links": {
+                "collection": "https://wp.ieg.be/wp-json/wp/v2/menus/",
+                "self": "https://wp.ieg.be/wp-json/wp/v2/menus/32"
+              }
+            }
+          },
+          "language": "fr",
+          "namespacesRequired": ["common"]
+        },
+        "page": "/__page",
+        "query": {},
+        "buildId": "development",
+        "dynamicBuildId": false
+      }
+    </script>
+    <script
+      async=""
+      id="__NEXT_PAGE__/__page"
+      src="../../../../_next/static/development/pages/__page8d0d.js?ts=1762179874924"
+    ></script>
+    <script
+      async=""
+      id="__NEXT_PAGE__/_app"
+      src="../../../../_next/static/development/pages/_app8d0d.js?ts=1762179874924"
+    ></script>
+    <script
+      src="../../../../_next/static/runtime/webpack8d0d.js?ts=1762179874924"
+      async=""
+    ></script>
+    <script
+      src="../../../../_next/static/runtime/main8d0d.js?ts=1762179874924"
+      async=""
+    ></script>
+    <script
+      src="../../../../_next/static/webpack/static/runtime/main.js.f9b924cd669b51cc9c8d.hot-update8d0d.js?ts=1762179874924"
+      async=""
+    ></script>
+  </body>
+  <!-- Mirrored from ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/ by HTTrack Website Copier/3.x [XR&CO'2014], Mon, 03 Nov 2025 14:28:41 GMT -->
+</html>

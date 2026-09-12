@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/fe22be9aa648dea40bf6a805903be078f0f61f786520a1781c795d69ff2e649e.txt",
+   "url": "http://www.eauxducondroz.be/Prix.htm",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 3.05,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "AIEC tarifs au 01/04/2026",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "source_url": "http://www.eauxducondroz.be/Prix.htm",
+ "utility": "aiec",
+ "valid_from": "2026-04-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 143.44,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

@@ -1,0 +1,29 @@
+{
+ "_commune": "{9E50352F-F993-4097-8832-DA95FB90A849}",
+ "_commune_label": "8750 - Zwevezele (Wingene)",
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/41e98768d81a05b81b33710d3dd120c91d53447d1379175e98fed7054f828873.txt",
+   "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={9E50352F-F993-4097-8832-DA95FB90A849}",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": 2.9251,
+ "comfort_eur_per_m3": 5.8502,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "De Watergroep tarieven 2026 ({9E50352F-F993-4097-8832-DA95FB90A849})",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
+ "utility": "de_watergroep",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}

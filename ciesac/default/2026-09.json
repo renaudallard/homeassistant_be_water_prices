@@ -1,0 +1,27 @@
+{
+ "_seen_on": "2026-09-12",
+ "_sources": [
+  {
+   "text": "texts/c274fcb08b93951be2f92040eadc79d94156482cf55e58929d0cbac67920c455.txt",
+   "url": "https://callmepower.be/fr/eau/distributeurs/ciesac",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 2.9,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "CIESAC tarifs (via Callmepower) 2026",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "source_url": "https://callmepower.be/fr/eau/distributeurs/ciesac",
+ "utility": "ciesac",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 140.44,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}
