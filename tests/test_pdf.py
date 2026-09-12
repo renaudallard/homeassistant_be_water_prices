@@ -463,3 +463,82 @@ async def test_read_text_capped_survives_a_codec_without_a_replace_handler() -> 
     """idna passes the codec lookup and then refuses errors="replace"."""
     resp = _FakeResp([b"caf\xc3\xa9 75,00 euro"], content_length=None, charset="idna")
     assert await _pdf._read_text_capped(resp, "u") == "café 75,00 euro"  # type: ignore[arg-type]
+
+
+class _CountingSession(_FakeSession):
+    """Counts the requests it was asked for."""
+
+    def __init__(self, resp: _FakeResp) -> None:
+        super().__init__(resp)
+        self.requests = 0
+
+    def get(self, *_a: object, **_k: object) -> _CountingSession:
+        self.requests += 1
+        return self
+
+
+def _direct(body: bytes, content_type: str) -> _RedirectedResp:
+    resp = _RedirectedResp("https://water-link.be/x", body=body)
+    resp.history = ()
+    resp.content_type = content_type
+    return resp
+
+
+async def test_the_text_memo_serves_a_repeat_read_without_a_second_request() -> None:
+    """Inside memoise_text_fetches a URL is fetched once and served from the
+    store after that; outside the block every call asks the server."""
+    session = _CountingSession(_direct(b"hello", "text/html"))
+    store: dict[str, str] = {}
+    with _pdf.memoise_text_fetches(store):
+        assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]
+        assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]
+    assert session.requests == 1
+    assert store == {"https://water-link.be/x": "hello"}
+    assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]
+    assert session.requests == 2
+
+
+async def test_a_stored_text_is_served_without_any_request() -> None:
+    """A store seeded ahead of the block answers without touching the
+    session at all: how the archiver replays a month it kept."""
+    session = _CountingSession(_direct(b"live", "text/html"))
+    with _pdf.memoise_text_fetches({"https://water-link.be/x": "stored"}):
+        assert await _pdf.fetch_text(session, "https://water-link.be/x") == "stored"  # type: ignore[arg-type]
+    assert session.requests == 0
+
+
+async def test_render_pdf_is_the_seam_for_bytes_that_came_another_way() -> None:
+    """Bytes a provider obtained outside the reader render through the same
+    hook the reader uses; without a hook they render in a thread."""
+    seen: list[tuple[str, str, bytes]] = []
+
+    async def hook(variant: str, url: str, payload: bytes, renderer: Any) -> str:
+        seen.append((variant, url, payload))
+        return "hooked"
+
+    with _pdf.render_through(hook):
+        assert await _pdf.render_pdf("layout", "u", b"%PDF x", lambda p: "rendered") == "hooked"
+    assert seen == [("layout", "u", b"%PDF x")]
+    assert await _pdf.render_pdf("layout", "u", b"%PDF x", lambda p: "rendered") == "rendered"
+
+
+async def test_render_hook_sees_the_bytes_and_decides_the_text() -> None:
+    """Inside render_through the PDF reader hands its validated bytes and
+    its own renderer to the hook and takes the hook's text; the memo keeps
+    that text under the reader's own key."""
+    session = _CountingSession(_direct(b"%PDF-1.4 card", "application/pdf"))
+    seen: list[tuple[str, str, bytes]] = []
+
+    async def hook(variant: str, url: str, payload: bytes, renderer: Any) -> str:
+        seen.append((variant, url, payload))
+        assert renderer is _pdf.extract_pdf_text_layout
+        return "from the hook"
+
+    store: dict[str, str] = {}
+    with _pdf.memoise_text_fetches(store), _pdf.render_through(hook):
+        text = await _pdf.fetch_pdf_text_layout(session, "https://water-link.be/x")  # type: ignore[arg-type]
+        again = await _pdf.fetch_pdf_text_layout(session, "https://water-link.be/x")  # type: ignore[arg-type]
+    assert text == again == "from the hook"
+    assert seen == [("layout", "https://water-link.be/x", b"%PDF-1.4 card")]
+    assert session.requests == 1
+    assert store == {"layout\0https://water-link.be/x": "from the hook"}

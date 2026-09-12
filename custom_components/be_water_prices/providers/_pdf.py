@@ -39,6 +39,9 @@ import math
 import re
 import unicodedata
 import zlib
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from io import BytesIO
 from urllib.parse import urlparse
 
@@ -329,8 +332,60 @@ def extract_pdf_text_layout(payload: bytes) -> str:
     return text
 
 
+# A memo of fetched texts, keyed by URL for a page and by ``layout\0<url>``
+# for a rendered PDF, that a caller can install around a block: the card
+# archiver and the live check read every utility in one walk, and the
+# archiver's replay serves a stored month's texts from it with no network.
+# Off by default; the coordinator wants a live read on every tick.
+_TEXT_MEMO: ContextVar[dict[str, str] | None] = ContextVar("_TEXT_MEMO", default=None)
+
+
+@contextmanager
+def memoise_text_fetches(store: dict[str, str]) -> Iterator[None]:
+    """Serve repeat reads of one URL from ``store`` inside this block."""
+    token = _TEXT_MEMO.set(store)
+    try:
+        yield
+    finally:
+        _TEXT_MEMO.reset(token)
+
+
+# How downloaded PDF bytes become text, when someone other than the reader
+# wants a say. The card archiver keys the render on the bytes' hash, so a
+# card that has not changed since it was stored is neither rendered nor
+# parsed again, and it keeps the bytes it has not seen before. None, the
+# default everywhere in Home Assistant, renders in a worker thread.
+RenderHook = Callable[[str, str, bytes, Callable[[bytes], str]], Awaitable[str]]
+_RENDER_HOOK: ContextVar[RenderHook | None] = ContextVar("_RENDER_HOOK", default=None)
+
+
+@contextmanager
+def render_through(hook: RenderHook) -> Iterator[None]:
+    """Route every PDF render inside this block through ``hook``."""
+    token = _RENDER_HOOK.set(hook)
+    try:
+        yield
+    finally:
+        _RENDER_HOOK.reset(token)
+
+
+async def render_pdf(variant: str, url: str, payload: bytes, render: Callable[[bytes], str]) -> str:
+    """Turn validated PDF bytes into text, through the render hook when one
+    is installed and in a worker thread otherwise. A provider that receives
+    a card some other way than through the reader must call this too, or
+    the archiver never sees the bytes."""
+    hook = _RENDER_HOOK.get()
+    if hook is None:
+        return await asyncio.to_thread(render, payload)
+    return await hook(variant, url, payload, render)
+
+
 async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str:
     """Download ``url`` and return its text with the table layout kept."""
+    memo = _TEXT_MEMO.get()
+    key = f"layout\0{url}"
+    if memo is not None and key in memo:
+        return memo[key]
     try:
         async with session.get(
             url,
@@ -349,7 +404,10 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
         # the tariff card, and quoting it put a stranger's page into a
         # sensor attribute and the diagnostics dump.
         raise ExtractorError(f"the answer from {url} ({content_type}) has no PDF signature")
-    return await asyncio.to_thread(extract_pdf_text_layout, payload)
+    text = await render_pdf("layout", url, payload, extract_pdf_text_layout)
+    if memo is not None:
+        memo[key] = text
+    return text
 
 
 async def fetch_text(
@@ -367,6 +425,9 @@ async def fetch_text(
     is not sent by the server). The risk is bounded -- worst case is
     a MitM serving stale tariff numbers, no credentials are involved.
     """
+    memo = _TEXT_MEMO.get()
+    if memo is not None and url in memo:
+        return memo[url]
     try:
         kwargs: dict[str, object] = {
             "headers": {"User-Agent": USER_AGENT},
@@ -378,9 +439,12 @@ async def fetch_text(
             if not 200 <= resp.status < 300:
                 raise _http_error(url, resp.status)
             _guard_redirect(url, resp)
-            return await _read_text_capped(resp, url)
+            body = await _read_text_capped(resp, url)
     except (aiohttp.ClientError, TimeoutError) as err:
         raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
+    if memo is not None:
+        memo[url] = body
+    return body
 
 
 _NUMERIC_SEPARATORS = (

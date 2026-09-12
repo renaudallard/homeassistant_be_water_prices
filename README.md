@@ -717,6 +717,16 @@ Actions IP ranges. Reachable from residential IPs; rerun either
 script locally to drift-check Water-link. The skip is keyed on the
 runner's `GITHUB_ACTIONS` variable, so a local run does check it.
 
+The readers in `providers/_pdf.py` carry two seams for scripts that walk
+every utility in one go, both off in Home Assistant itself: a text memo
+(`memoise_text_fetches`) that serves a page or a rendered PDF read twice
+in one walk from memory, and a render hook (`render_through`) that is
+handed the bytes of every downloaded PDF before they are rendered, so a
+caller can skip the render of a card it has already seen or keep the
+bytes. A provider that obtains a PDF some other way than through
+`fetch_pdf_text_layout` renders it with `render_pdf`, so the hook still
+sees it.
+
 ## License
 
 BSD 2-Clause. See [LICENSE](./LICENSE).
