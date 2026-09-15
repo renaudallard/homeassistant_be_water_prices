@@ -1,0 +1,45 @@
+Tarieven Water-Link
+Geldig vanaf 1 januari 2026
+Excl 6% BTW Incl 6 % BTW
+Waterverbruik bemeterde contracten HUISHOUDELIJK Water Afvoer * Zuivering Totaal
+Vaste kost
+1 Vastrecht per wooneenheid 50,0000 30,0000 20,0000 100,0000 106,0000
+Korting per gedomicilieerde inwoner -10,0000 -6,0000 -4,0000 -20,0000 -21,2000
+2 Capaciteitsvergoeding
+DN 30 138,7700 138,7700 147,0962
+DN 40 382,0600 382,0600 404,9836
+DN 50 471,8600 471,8600 500,1716
+Combinatiewatermeter DN 65 532,9100 532,9100 564,8846
+DN 80 954,8100 954,8100 1012,0986
+Combinatiewatermeter DN 80 1026,9800 1026,9800 1088,5988
+DN 100 1415,5800 1415,5800 1500,5148
+Combinatiewatermeter DN 100 1498,8400 1498,8400 1588,7704
+DN 150 1776,4000 1776,4000 1882,9840
+Variabele prijs (Verbruik)
+Integrale waterprijs: prijs per verbruikte m³ BASISTARIEF (*)
+Antwerpen 1,6692 1,3345 1,7019 4,7056 4,9879
+Beveren-Kruibeke-Zwijndrecht 1,6692 1,9572 1,7019 5,3283 5,6480
+Edegem 1,6692 1,9572 1,7019 5,3283 5,6480
+Hove 1,6692 1,9572 1,7019 5,3283 5,6480
+Mortsel 1,6692 1,9572 1,7019 5,3283 5,6480
+Integrale waterprijs: prijs per verbruikte m³ COMFORTTARIEF (*)
+Antwerpen 3,3384 2,6690 3,4038 9,4112 9,9759
+Beveren-Kruibeke-Zwijndrecht 3,3384 3,9144 3,4038 10,6566 11,2960
+Edegem 3,3384 3,9144 3,4038 10,6566 11,2960
+Hove 3,3384 3,9144 3,4038 10,6566 11,2960
+Mortsel 3,3384 3,9144 3,4038 10,6566 11,2960
+Gemeentelijke saneringsbijdrage afvoer: prijs per verbruikte m³ (ook voor IBA's *) BASIS
+Gemeentelijke saneringsvergoeding afvoer: prijs per verbruikte m³ voor kleinverbruikers eigen
+waterwinners
+Hemiksem 1,9572 2,0746
+Ranst 1,9572 2,0746
+Schoten 1,9572 2,0746
+Gemeentelijke saneringsbijdrage afvoer: prijs per verbruikte m³ (ook voor IBA's *) COMFORT
+Gemeentelijke saneringsvergoeding afvoer: prijs per verbruikte m³ voor kleinverbruikers eigen
+waterwinners
+Hemiksem 3,9144 4,1493
+Ranst 3,9144 4,1493
+Schoten 3,9144 4,1493
+In geval van sociale korting wordt een korting van 80% toegekend op alle bovenstaande tarieven
+* Voor een IBA onder het beheer van rio-link is de gemeentelijke saneringsbijdrage de som van de
+gemeentelijke en bovengemeentelijke saneringsbijdragen.

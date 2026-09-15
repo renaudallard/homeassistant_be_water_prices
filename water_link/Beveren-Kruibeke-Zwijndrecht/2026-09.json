@@ -1,0 +1,35 @@
+{
+ "_commune": "Beveren-Kruibeke-Zwijndrecht",
+ "_commune_label": "Beveren-Kruibeke-Zwijndrecht",
+ "_seen_on": "2026-09-15",
+ "_sources": [
+  {
+   "text": "texts/91a779b8676c54c8a78cbe61d6ac9b2453f2103b807f63f806edb19794fda0b0.txt",
+   "url": "https://water-link.be/informatie/tarieven-en-kortingen/tarieven/antwerpen",
+   "variant": "text"
+  },
+  {
+   "pdf": "36ebc7a3bd2a7c4c163ccc192d3fb79113074a9baa8b4b40fc99041bf2023086",
+   "text": "texts/8cea3e21edc660849031f356c512b393cce6fa7ad67125cf0faa19b2b8799f6a.txt",
+   "url": "https://water-link.be/sites/default/files/2026-01/2026%20HH.pdf",
+   "variant": "layout"
+  }
+ ],
+ "basis_eur_per_m3": 1.6692,
+ "comfort_eur_per_m3": 3.3384,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": null,
+ "publication_label": "Water-link tarieven huishoudelijk 2026 (Beveren-Kruibeke-Zwijndrecht)",
+ "region": "flanders",
+ "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
+ "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "source_url": "https://water-link.be/sites/default/files/2026-01/2026%20HH.pdf",
+ "utility": "water_link",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 100.0,
+ "yearly_fixed_fee_per_resident_discount": 20.0
+}
