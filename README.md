@@ -533,7 +533,8 @@ unreachable used to leave the entry retrying setup until the site was
 back. Now the coordinator asks the project's card archive (the
 [`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
 branch, one JSON per utility, commune and month; this month's row, then
-last month's) and loads on the card it captured, dated the day of the
+back a month at a time for up to a year, stopping at the first one that
+holds a card) and loads on the card it captured, dated the day of the
 capture so the 35-day staleness clock runs from there, with the failure
 in `last_error`. Later failures serve that card as the cached snapshot;
 the next successful fetch replaces it. Once the snapshot has gone stale,
@@ -543,6 +544,12 @@ staleness window follows the archive rather than standing on the first
 card it adopted until Home Assistant restarts. The request names the
 utility and the commune id and nothing else, and the *Read the project's
 card archive* box in the options turns it off.
+
+Water-link is the one operator the daily run cannot reach, since its CDN
+turns away the datacenter addresses GitHub's runners use. Its rows are
+stored by hand from a residential address instead, so a Water-link entry
+falls back on whatever the last such run captured; the year-long walk
+above is what keeps that card reachable between runs.
 
 ### Price-history backfill
 
@@ -872,9 +879,10 @@ The integration itself reads the branch in two cases: a refresh that
 fails with nothing to serve, which is a restart or a fresh install while
 the utility's site is down, and a failing refresh whose snapshot has gone
 stale. It asks for this month's row of its utility and commune
-(`default` without a commune), then last month's, and loads on the card
-it finds, dated the day it was captured, rather than retrying setup until
-the site is back or standing on a card the archive has already replaced.
+(`default` without a commune), then back a month at a time for up to a
+year, and loads on the first card it finds, dated the day it was
+captured, rather than retrying setup until the site is back or standing
+on a card the archive has already replaced.
 Every other refresh goes to the utility.
 
 ## License

@@ -3930,7 +3930,42 @@ async def test_the_archive_is_not_asked_when_switched_off(
     # And with nothing archived the refresh fails as before.
     entry = await _setup_entry(hass, _down, loads=False)
     assert entry.state is ConfigEntryState.SETUP_RETRY
-    assert asked == 2
+    # A full miss walks a year of months and gives up there.
+    assert asked == 12
+
+
+@pytest.mark.asyncio
+async def test_the_archive_is_walked_back_month_by_month(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The row of a utility the daily run cannot reach is only as recent
+    as the last hand-run, so the walk goes back a month at a time and
+    stops at the first month that holds one."""
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    months = [dt_util.now().date()]
+    for _ in range(5):
+        months.append(months[-1].replace(day=1) - timedelta(days=1))
+    stored = months[-1]
+    row = {
+        **tariff_to_dict(_fresh_tariff()),
+        "_seen_on": stored.isoformat(),
+        "_sources": [],
+    }
+    asked: list[date] = []
+
+    async def archived(_session: Any, _utility: str, _commune: str, month: date) -> Any:
+        asked.append(month)
+        return row if (month.year, month.month) == (stored.year, stored.month) else None
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    entry = await _setup_entry(hass, _down)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.data.fetched_at.date() == stored
+    assert coordinator.data.snapshot_stale
+    # One month per ask, newest first, and nothing beyond the hit.
+    assert asked == months
 
 
 @pytest.mark.asyncio

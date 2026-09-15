@@ -105,6 +105,17 @@ _LOGGER = logging.getLogger(__name__)
 # refresh it wedged never re-armed the daily tick.
 _FETCH_BUDGET_S = 180
 
+# How many months back a failed refresh looks for a stored card, newest
+# first and stopping at the first one it finds. The daily run files a row
+# a month, so this month and the one before it cover an outage. The rest
+# is for the utility the runner cannot reach, whose rows reach the branch
+# only when someone runs the archiver from a residential address, and for
+# a month the archiver spent locked out of a publication. A water tariff
+# is annual, so the oldest card this can reach is last year's, the card
+# every extractor already stands on in January, and the staleness clock
+# still runs from the day it was captured.
+_ARCHIVE_MONTHS_BACK = 12
+
 # Bumped only if the persisted YTD cycle dict changes shape incompatibly.
 # The minor version carries shape changes so a rollback degrades to a
 # re-bootstrap instead of a failed setup; see _YtdStore.
@@ -1134,8 +1145,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         once what is held has gone stale. The entry then loads on that
         card, stale after the usual 35 days, instead of retrying setup
         until the utility is back. This month's row first, since the
-        archive writes one per month, then last month's for the first days
-        of a month.
+        archive writes one per month, then back a month at a time: last
+        month's covers the first days of a month, and the ones before it a
+        utility the daily run cannot reach at all.
         """
         if not self.entry.options.get(CONF_CARD_ARCHIVE, DEFAULT_CARD_ARCHIVE):
             return None
@@ -1144,12 +1156,15 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             str(commune) if commune and self._extractor.fetch_for_commune is not None else "default"
         )
         session = async_get_clientsession(self.hass)
-        today = dt_util.now().date()
+        month = dt_util.now().date()
         row: dict[str, Any] | None = None
-        for month in (today, today.replace(day=1) - timedelta(days=1)):
+        for _ in range(_ARCHIVE_MONTHS_BACK):
             row = await _archived_row(session, self._extractor.id, key, month)
             if row is not None:
                 break
+            # The first of the month, a day back: the last day of the one
+            # before, whatever its length.
+            month = month.replace(day=1) - timedelta(days=1)
         if row is None:
             return None
         try:
