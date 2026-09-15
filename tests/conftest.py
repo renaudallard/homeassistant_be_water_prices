@@ -46,8 +46,9 @@ if str(ROOT) not in sys.path:
 
 @pytest.fixture(autouse=True)
 def _card_archive_holds_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep the suite off GitHub: a refresh with nothing cached asks the
-    project's card archive, and only the tests of that path answer it."""
+    """Keep the suite off GitHub: a failing refresh with nothing fresh to
+    serve asks the project's card archive, and only the tests of that path
+    answer it."""
 
     async def nothing(*_args: object) -> None:
         return None

@@ -3781,7 +3781,14 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
     from custom_components.be_water_prices.providers.base import tariff_to_dict
 
     asked: list[tuple[str, str, date]] = []
-    row = {**tariff_to_dict(_fresh_tariff()), "_seen_on": "2026-09-10", "_sources": []}
+    # Recent enough that the adopted card is not stale, so the refresh
+    # below has no reason to ask the archive a second time.
+    seen_on = dt_util.now().date() - timedelta(days=5)
+    row = {
+        **tariff_to_dict(_fresh_tariff()),
+        "_seen_on": seen_on.isoformat(),
+        "_sources": [],
+    }
 
     async def archived(_session: Any, utility: str, commune: str, month: date) -> Any:
         asked.append((utility, commune, month))
@@ -3792,7 +3799,7 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
     coordinator = hass.data[DOMAIN][entry.entry_id]
     data = coordinator.data
     assert data.tariff == _fresh_tariff()
-    assert data.fetched_at.date() == date(2026, 9, 10)
+    assert data.fetched_at.date() == seen_on
     assert "HTTP 503" in data.last_error
     today = dt_util.now().date()
     assert asked == [
@@ -3804,6 +3811,102 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
     await hass.async_block_till_done()
     assert coordinator.data.tariff is data.tariff
     assert len(asked) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_stale_snapshot_follows_the_archive(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An outage that outlives the staleness window keeps up with the
+    archive: a failing refresh on a stale snapshot asks again and takes
+    the capture that is newer than what it holds, and keeps what it holds
+    when the archive has nothing newer."""
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    today = dt_util.now().date()
+
+    def _row(label: str, days_ago: int) -> dict[str, Any]:
+        return {
+            **tariff_to_dict(replace(_fresh_tariff(), publication_label=label)),
+            "_seen_on": (today - timedelta(days=days_ago)).isoformat(),
+            "_sources": [],
+        }
+
+    # Both captures are stale whatever the hour, so the run does not turn
+    # on where the 35-day boundary falls today.
+    older = _row("VIVAQUA archived in the spring", 45)
+    newer = _row("VIVAQUA archived in the summer", 40)
+    holds = {"row": older}
+    asked = 0
+
+    async def archived(_session: Any, _utility: str, _commune: str, month: date) -> Any:
+        nonlocal asked
+        asked += 1
+        return holds["row"] if month == today else None
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    entry = await _setup_entry(hass, _down)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.data.snapshot_stale
+    assert coordinator.data.tariff.publication_label == "VIVAQUA archived in the spring"
+    assert asked == 1
+
+    holds["row"] = newer
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.data.tariff.publication_label == "VIVAQUA archived in the summer"
+    assert coordinator.data.fetched_at.date() == today - timedelta(days=40)
+    assert asked == 2
+
+    # The archive answering with an older capture than the one being
+    # served leaves it where it is.
+    holds["row"] = older
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.data.tariff.publication_label == "VIVAQUA archived in the summer"
+    assert asked == 3
+
+
+@pytest.mark.asyncio
+async def test_a_failing_refresh_folds_the_year_once(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whichever card a failing refresh ends up serving, the year is
+    folded once: the cycle counts the rounds it has seen, so a second fold
+    in the same refresh would let one meter reading confirm itself."""
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    today = dt_util.now().date()
+    row = {
+        **tariff_to_dict(_fresh_tariff()),
+        "_seen_on": (today - timedelta(days=45)).isoformat(),
+        "_sources": [],
+    }
+
+    async def archived(_session: Any, _utility: str, _commune: str, month: date) -> Any:
+        return row if month == today else None
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    entry = await _setup_entry(hass, _down)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    # Stale, so the refresh below asks the archive, and the archive has
+    # nothing newer than the card it already handed over.
+    assert coordinator.data.snapshot_stale
+
+    folds = 0
+    fold = coordinator._compute_ytd
+
+    async def counted(tariff: WaterTariff) -> Any:
+        nonlocal folds
+        folds += 1
+        return await fold(tariff)
+
+    monkeypatch.setattr(coordinator, "_compute_ytd", counted)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert folds == 1
 
 
 @pytest.mark.asyncio

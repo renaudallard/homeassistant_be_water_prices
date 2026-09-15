@@ -59,9 +59,11 @@ UPDATE_INTERVAL_HOURS = 24
 
 # The project's own daily capture of every utility's card, one JSON per
 # utility, commune and month on the archive branch (scripts/archive_cards.py
-# writes it). Read only when a refresh fails with nothing cached to serve,
-# a restart while the utility is down, so the entry loads on the last card
-# the archive saw instead of retrying setup until the utility is back.
+# writes it). Read when a refresh fails with nothing to serve, a restart
+# while the utility is down, and again once what is held has gone stale, so
+# the entry loads on the last card the archive saw instead of retrying setup
+# until the utility is back, and keeps up with the archive while it stays
+# away.
 CARD_ARCHIVE_URL = (
     "https://raw.githubusercontent.com/renaudallard/homeassistant_be_water_prices/archive"
 )

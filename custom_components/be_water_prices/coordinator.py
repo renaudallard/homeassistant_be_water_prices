@@ -1056,8 +1056,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         The last good snapshot, with the failure scrubbed into last_error
         and the stale check re-run, so a dashboard sees the age and the
         reason rather than every sensor going blank. With no snapshot to
-        fall back on the refresh fails, which on a first refresh is the
-        entry's "not ready" reason.
+        fall back on, or with one that has gone stale and a newer card in
+        the project's archive, the archived card is served instead. With
+        neither the refresh fails, which on a first refresh is the entry's
+        "not ready" reason.
         """
         if out_of_time:
             # A bare TimeoutError, whose str() is empty. The parse thread
@@ -1070,48 +1072,66 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         scrubbed = scrub_tokens(
             str(failure), sensitive_tokens(self.entry), placeholder="**redacted**"
         )
-        if self._last_good is None:
+        held = self._last_good
+        # Nothing to serve, or what is held has gone stale: ask the
+        # archive. Asking again on a stale snapshot is what carries an
+        # outage that outlives the staleness window: the archive files a
+        # row a month, and an entry that adopted one in January would
+        # otherwise serve that same January card until Home Assistant
+        # restarts, Repair card and all. Only a capture newer than what is
+        # held replaces it.
+        card: tuple[WaterTariff, datetime] | None = None
+        if held is None or self._is_stale(held.tariff, held.fetched_at):
             archived = await self._from_card_archive()
-            if archived is None:
-                raise UpdateFailed(scrubbed) from failure
+            if archived is not None and (held is None or archived[1] > held.fetched_at):
+                card = archived
+        if card is not None:
+            tariff, fetched_at = card
             _LOGGER.warning(
                 "water tariff fetch failed (%s), serving the card archived on %s: %s",
                 type(failure).__name__,
-                archived.fetched_at.date(),
+                fetched_at.date(),
                 scrubbed,
             )
-            # From here on it is the last good snapshot, ageing like one.
-            self._last_good = archived
-            data = replace(archived, last_error=scrubbed)
-            self._sync_repair_issue(data)
-            return data
-        _LOGGER.warning(
-            "water tariff fetch failed (%s), serving cached: %s",
-            type(failure).__name__,
-            scrubbed,
-        )
-        stale = self._is_stale(self._last_good.tariff, self._last_good.fetched_at)
-        ytd_m3, ytd_cost = await self._compute_ytd(self._last_good.tariff)
-        cached = CoordinatorData(
-            tariff=self._last_good.tariff,
-            fetched_at=self._last_good.fetched_at,
-            snapshot_age_hours=self._age_hours(self._last_good.fetched_at),
-            snapshot_stale=stale,
+        elif held is not None:
+            tariff, fetched_at = held.tariff, held.fetched_at
+            _LOGGER.warning(
+                "water tariff fetch failed (%s), serving cached: %s",
+                type(failure).__name__,
+                scrubbed,
+            )
+        else:
+            raise UpdateFailed(scrubbed) from failure
+        # One fold a round, whichever card is being served: the cycle
+        # counts the rounds it has seen, and two in the same refresh would
+        # have a reading confirm itself.
+        ytd_m3, ytd_cost = await self._compute_ytd(tariff)
+        data = CoordinatorData(
+            tariff=tariff,
+            fetched_at=fetched_at,
+            snapshot_age_hours=self._age_hours(fetched_at),
+            snapshot_stale=self._is_stale(tariff, fetched_at),
             last_error=scrubbed,
-            projected_annual_cost_eur=self._project_cost(self._last_good.tariff),
+            projected_annual_cost_eur=self._project_cost(tariff),
             current_year_cost_eur=ytd_cost,
             ytd_consumption_m3=ytd_m3,
         )
-        self._sync_repair_issue(cached)
-        return cached
+        if card is not None:
+            # From here on the archived card is the last good snapshot,
+            # ageing like one. The failure is not part of it; the round
+            # that serves it writes its own.
+            self._last_good = replace(data, last_error="")
+        self._sync_repair_issue(data)
+        return data
 
-    async def _from_card_archive(self) -> CoordinatorData | None:
-        """The last card the project's archive holds for this entry, dated
-        the day it was captured; None when the archive is switched off,
+    async def _from_card_archive(self) -> tuple[WaterTariff, datetime] | None:
+        """The last card the project's archive holds for this entry and the
+        moment it was captured; None when the archive is switched off,
         unreachable, or has nothing for this utility and commune.
 
-        Asked only when a refresh failed with nothing cached, which is a
-        restart while the utility is down: the entry then loads on that
+        Asked when a refresh failed with nothing to serve, which is a
+        restart or a fresh install while the utility is down, and again
+        once what is held has gone stale. The entry then loads on that
         card, stale after the usual 35 days, instead of retrying setup
         until the utility is back. This month's row first, since the
         archive writes one per month, then last month's for the first days
@@ -1142,17 +1162,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 tariff, commune_id=key, commune_label=self.entry.options.get(CONF_COMMUNE_LABEL)
             )
         # The archive walks at 05:23 UTC; the hour only feeds the age.
-        fetched_at = datetime(seen_on.year, seen_on.month, seen_on.day, 6, tzinfo=UTC)
-        ytd_m3, ytd_cost = await self._compute_ytd(tariff)
-        return CoordinatorData(
-            tariff=tariff,
-            fetched_at=fetched_at,
-            snapshot_age_hours=self._age_hours(fetched_at),
-            snapshot_stale=self._is_stale(tariff, fetched_at),
-            projected_annual_cost_eur=self._project_cost(tariff),
-            current_year_cost_eur=ytd_cost,
-            ytd_consumption_m3=ytd_m3,
-        )
+        return tariff, datetime(seen_on.year, seen_on.month, seen_on.day, 6, tzinfo=UTC)
 
     @callback
     def async_retire(self) -> None:

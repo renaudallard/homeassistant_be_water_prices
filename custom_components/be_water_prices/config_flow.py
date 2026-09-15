@@ -250,9 +250,9 @@ def _options_schema(
             device_class=SensorDeviceClass.WATER,
         )
     )
-    # Whether a refresh that fails with nothing cached may serve the card
-    # the project's daily archive holds for this utility and commune. The
-    # request names both, so it is the household's call.
+    # Whether a refresh that fails with nothing fresh to serve may take
+    # the card the project's daily archive holds for this utility and
+    # commune. The request names both, so it is the household's call.
     fields[
         vol.Required(
             CONF_CARD_ARCHIVE,
