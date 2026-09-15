@@ -58,7 +58,15 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import RecorderUnavailable, _cost_basis
+
+# _archived_row is bound here at import, before conftest swaps the
+# module's own name for the stub that keeps the suite off GitHub, so
+# the tests below read the real one.
+from custom_components.be_water_prices.coordinator import (
+    RecorderUnavailable,
+    _archived_row,
+    _cost_basis,
+)
 from custom_components.be_water_prices.providers.base import (
     ExtractorError,
     WaterExtractor,
@@ -3768,6 +3776,57 @@ async def test_a_postcode_that_still_resolves_here_is_left_alone(
 
 async def _down(_session: Any) -> WaterTariff:
     raise ExtractorError("HTTP 503 from upstream")
+
+
+_ARCHIVE = "https://raw.githubusercontent.com/renaudallard/homeassistant_be_water_prices/archive"
+
+
+@pytest.mark.asyncio
+async def test_an_archived_row_is_addressed_by_utility_commune_and_month(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Where a stored row is read from: the archive branch, the utility,
+    the commune id with everything that is not a path percent-encoded so
+    De Watergroep's braces reach the file of that name, and the month."""
+    from custom_components.be_water_prices import coordinator as module
+
+    asked: list[str] = []
+    session: Any = None
+
+    async def fetch(_session: Any, url: str) -> str:
+        asked.append(url)
+        return '{"utility": "swde"}'
+
+    monkeypatch.setattr(module, "fetch_text", fetch)
+    assert await _archived_row(session, "swde", "default", date(2026, 9, 15)) == {"utility": "swde"}
+    await _archived_row(session, "pidpa", "geel", date(2026, 1, 7))
+    await _archived_row(session, "de_watergroep", "{004FE42A-CC2E}", date(2026, 12, 31))
+    assert asked == [
+        f"{_ARCHIVE}/swde/default/2026-09.json",
+        f"{_ARCHIVE}/pidpa/geel/2026-01.json",
+        f"{_ARCHIVE}/de_watergroep/%7B004FE42A-CC2E%7D/2026-12.json",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_archived_row_is_no_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A month the branch does not hold answers 404, and a truncated or
+    rewritten file is not a card. Both leave the caller with nothing to
+    serve rather than an exception out of a failing refresh."""
+    from custom_components.be_water_prices import coordinator as module
+
+    answers: list[Any] = [ExtractorError("HTTP 404"), "not json", "[]", '"a string"']
+    session: Any = None
+
+    async def fetch(_session: Any, _url: str) -> str:
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return str(answer)
+
+    monkeypatch.setattr(module, "fetch_text", fetch)
+    for _ in range(4):
+        assert await _archived_row(session, "swde", "default", date(2026, 9, 15)) is None
 
 
 @pytest.mark.asyncio
