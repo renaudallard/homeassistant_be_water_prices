@@ -164,11 +164,13 @@ def _choose_schema(candidates: tuple[str, ...]) -> vol.Schema:
 def _commune_for_postcode(utility_id: str, postcode: str | None) -> str | None:
     """The commune an operator bills ``postcode`` at, when it says.
 
-    Two operators do today. Water-link's card bills 2070, Zwijndrecht and
-    Burcht, in the ring group rather than at the Antwerpen default the
-    no-commune path would otherwise serve. Pidpa's Nijlen, Wommelgem and
-    Kasterlee publish a lower gemeentelijke saneringsbijdrage than the
-    other 60 communes its Geel default stands for.
+    Three operators do today. Water-link's card bills 2070, Zwijndrecht and
+    Burcht, and Hove, Mortsel and Edegem in the ring group rather than at
+    the Antwerpen default the no-commune path would otherwise serve.
+    Pidpa's Nijlen, Wommelgem and Kasterlee publish a lower gemeentelijke
+    saneringsbijdrage than the other 60 communes its Geel default stands
+    for. Farys bills Drogenbos and the four Zaventem cards away from its
+    Gent-centrum default.
     """
     if not postcode:
         return None

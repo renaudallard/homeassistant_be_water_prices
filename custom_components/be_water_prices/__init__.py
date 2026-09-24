@@ -259,7 +259,7 @@ def _drop_phantom_commune_if_blocked(hass: HomeAssistant, entry: ConfigEntry) ->
 def _adopt_commune_for_postcode(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Give an entry with no commune the one its postcode is billed at.
 
-    Four operators bill some postcodes on a card other than the one their
+    Three operators bill some postcodes on a card other than the one their
     no-commune fetch serves, and each names them in its own
     ``commune_for_postcode``. The config flow reads that hook, but only
     to fill in a form field, so it reaches new entries alone: one created
