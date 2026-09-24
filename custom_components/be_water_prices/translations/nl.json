@@ -76,6 +76,9 @@
           "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)",
           "card_archive": "Het kaartarchief van het project lezen wanneer de maatschappij onbereikbaar is en er geen recente kaart gecachet is (de aanvraag noemt uw maatschappij en gemeente)",
           "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Pidpa / Water-link)"
+        },
+        "data_description": {
+          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend."
         }
       }
     },
@@ -98,6 +101,9 @@
           "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)",
           "card_archive": "Het kaartarchief van het project lezen wanneer de maatschappij onbereikbaar is en er geen recente kaart gecachet is (de aanvraag noemt uw maatschappij en gemeente)",
           "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Pidpa / Water-link)"
+        },
+        "data_description": {
+          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend."
         }
       }
     }

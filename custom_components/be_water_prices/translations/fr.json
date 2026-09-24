@@ -76,6 +76,9 @@
           "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
           "card_archive": "Lire l'archive des cartes du projet quand le distributeur est injoignable et qu'aucune carte récente n'est en cache (la requête nomme votre distributeur et votre commune)",
           "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Pidpa / Water-link)"
+        },
+        "data_description": {
+          "commune": "Là où le distributeur facture votre code postal sur une commune précise, celle-ci est présélectionnée, et la vider ne tient pas : elle revient au prochain rechargement. Choisissez une autre commune pour être tarifé sur une autre carte."
         }
       }
     },
@@ -98,6 +101,9 @@
           "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
           "card_archive": "Lire l'archive des cartes du projet quand le distributeur est injoignable et qu'aucune carte récente n'est en cache (la requête nomme votre distributeur et votre commune)",
           "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Pidpa / Water-link)"
+        },
+        "data_description": {
+          "commune": "Là où le distributeur facture votre code postal sur une commune précise, celle-ci est présélectionnée, et la vider ne tient pas : elle revient au prochain rechargement. Choisissez une autre commune pour être tarifé sur une autre carte."
         }
       }
     }

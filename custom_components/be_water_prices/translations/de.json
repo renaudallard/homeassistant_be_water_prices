@@ -76,6 +76,9 @@
           "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)",
           "card_archive": "Das Kartenarchiv des Projekts lesen, wenn der Versorger nicht erreichbar ist und keine aktuelle Karte zwischengespeichert ist (die Anfrage nennt Ihren Versorger und Ihre Gemeinde)",
           "commune": "Gemeinde (nur für Per-Gemeinde-Versorger: De Watergroep / Farys / Pidpa / Water-link)"
+        },
+        "data_description": {
+          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden."
         }
       }
     },
@@ -98,6 +101,9 @@
           "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)",
           "card_archive": "Das Kartenarchiv des Projekts lesen, wenn der Versorger nicht erreichbar ist und keine aktuelle Karte zwischengespeichert ist (die Anfrage nennt Ihren Versorger und Ihre Gemeinde)",
           "commune": "Gemeinde (nur für Per-Gemeinde-Versorger: De Watergroep / Farys / Pidpa / Water-link)"
+        },
+        "data_description": {
+          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden."
         }
       }
     }
