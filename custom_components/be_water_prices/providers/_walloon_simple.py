@@ -64,7 +64,7 @@ from ..const import (
 )
 from ._html import fetch_and_parse
 from ._pdf import to_float
-from .base import ExtractorError, WaterExtractor, WaterTariff, carry_prior_year_card
+from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -366,7 +366,7 @@ def detect_published_year(text: str, *, today: date | None = None) -> int | None
     these pages carry historic references and archive links, and only a
     year adjacent to now can be the one in force.
     """
-    now = (today or date.today()).year
+    now = (today or belgian_today()).year
     # The patterns are tried in order of how much they say. "Tarifs YYYY"
     # names the card; "1er janvier YYYY" dates a rate on it, and the SPGE
     # lines an INASEP page keeps under a new "Tarifs" heading still carry
@@ -432,7 +432,7 @@ def build_tariff(
         fse_eur_per_m3=fse,
         vat_rate=DEFAULT_VAT_RATE,
     )
-    return carry_prior_year_card(tariff, date.today().year)
+    return carry_prior_year_card(tariff, belgian_today().year)
 
 
 def parse_tariff(
@@ -450,7 +450,7 @@ def parse_tariff(
         tag.decompose()
     text = soup.get_text(" ", strip=True)
     check_spge_constants(text, utility_id=utility_id, logger=_LOGGER)
-    target = year or detect_published_year(text) or date.today().year
+    target = year or detect_published_year(text) or belgian_today().year
     return build_tariff(
         utility_id=utility_id,
         cvd=cvd,

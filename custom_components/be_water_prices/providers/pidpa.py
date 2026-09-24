@@ -102,7 +102,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup, Tag
@@ -117,6 +116,7 @@ from .base import (
     ExtractorError,
     WaterExtractor,
     WaterTariff,
+    belgian_today,
     carry_prior_year_card,
 )
 
@@ -244,7 +244,7 @@ def _parse_year_header(text: str) -> list[int]:
 
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     """Parse a captured Pidpa Tariefplan PDF (extracted via pdfplumber)."""
-    target = year or date.today().year
+    target = year or belgian_today().year
     years = _parse_year_header(text)
     if not years:
         raise ExtractorError("could not locate the (excl. BTW) year header in Pidpa PDF")
@@ -388,7 +388,7 @@ def parse_commune_tariff(
     ``commune_label`` replaces the slug in the publication label; the
     no-commune fetch uses it to say the page stands in for the province.
     """
-    target = year or date.today().year
+    target = year or belgian_today().year
     asked = target
     soup = BeautifulSoup(html, "html.parser")
     table = _find_year_table(soup, year=target)

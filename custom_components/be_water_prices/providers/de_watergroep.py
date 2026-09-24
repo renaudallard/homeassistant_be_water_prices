@@ -55,7 +55,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -70,6 +69,7 @@ from .base import (
     TransientFetchError,
     WaterExtractor,
     WaterTariff,
+    belgian_today,
     carry_prior_year_card,
 )
 
@@ -288,7 +288,7 @@ async def _fetch_commune_ajax(
     errors are :class:`ExtractorError`; the caller decides what to
     label the parsed tariff with.
     """
-    target = year or date.today().year
+    target = year or belgian_today().year
     url = COMMUNE_DETAIL_URL_FMT.format(year=target)
 
     async def read() -> str:
@@ -348,7 +348,7 @@ async def _newest_commune_card(
     card is published; last year's endpoint still answers, and its card
     stands in like every other utility's prior-year fallback.
     """
-    target = date.today().year
+    target = belgian_today().year
     try:
         return await _commune_card(session, commune, label, target)
     except TransientFetchError:

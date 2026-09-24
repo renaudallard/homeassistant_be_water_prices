@@ -179,7 +179,7 @@ async def test_in_january_last_years_commune_card_stands_until_31_march(
         def today(cls) -> date:
             return date(2027, 1, 5)
 
-    monkeypatch.setattr(de_watergroep, "date", _FakeDate)
+    monkeypatch.setattr(de_watergroep, "belgian_today", _FakeDate.today)
     monkeypatch.setattr(_html, "fetch_html", AsyncMock(side_effect=AssertionError("news ladder")))
     card = fixture_html("dewatergroep_halle_2026.html")
     answers = {

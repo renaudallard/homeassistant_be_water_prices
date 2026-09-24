@@ -131,13 +131,14 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
     from unittest.mock import AsyncMock, patch
 
     from custom_components.be_water_prices.providers import aquaduin
+    from custom_components.be_water_prices.providers.base import belgian_today
 
     # The fallback fetches last year's URL, so the stand-in has to be last
     # year's card: it states the year it applies from, and the parser holds
     # the link's year to it.
     # Re-dated relative to the fixture's own year, not to the clock: with
     # the clock at 2027 "last year" is 2026 and the swap became a no-op.
-    prior = date.today().year - 1
+    prior = belgian_today().year - 1
     text = _pdf_text().replace(
         "Overzicht tarieven per 1 januari 2026",
         f"Overzicht tarieven per 1 januari {prior}",
@@ -154,7 +155,7 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
         tariff = await aquaduin.fetch(session=None)  # type: ignore[arg-type]
     assert mock.await_count == 2
     # Prior-year fallback pushes valid_until to March 31 of the target year.
-    assert tariff.valid_until == date(date.today().year, 3, 31)
+    assert tariff.valid_until == date(belgian_today().year, 3, 31)
 
 
 def test_find_pdf_href_accepts_the_cms_dedupe_suffix() -> None:

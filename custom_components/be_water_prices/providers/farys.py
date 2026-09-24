@@ -52,7 +52,6 @@ import asyncio
 import json
 import logging
 import re
-from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -80,6 +79,7 @@ from .base import (
     TransientFetchError,
     WaterExtractor,
     WaterTariff,
+    belgian_today,
     carry_prior_year_card,
 )
 
@@ -278,7 +278,7 @@ def parse_tariff(
         )
 
     active = _active_period_year(soup)
-    clock = date.today().year
+    clock = belgian_today().year
     if year is None and active is not None and active > clock:
         # The page dates the card, so a card served early is applied as
         # published. Nothing downstream checks valid_from, so say so: the

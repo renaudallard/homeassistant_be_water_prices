@@ -68,7 +68,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import date
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -83,6 +82,7 @@ from .base import (
     TransientFetchError,
     WaterExtractor,
     WaterTariff,
+    belgian_today,
     carry_prior_year_card,
 )
 
@@ -182,7 +182,7 @@ def parse_tariff(
     templated January path for callers that only have the text, such as
     the fixture tests and the drift check.
     """
-    target = year or date.today().year
+    target = year or belgian_today().year
     # The card states the year it applies from. Dating it from the file
     # name or the page URL alone meant a link left pointing at an older
     # card was served as this year's, and carry_prior_year_card and the
@@ -260,7 +260,7 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int, str
     is not the templated path whenever the card was uploaded outside
     January.
     """
-    target = date.today().year
+    target = belgian_today().year
     try:
         url = await _pdf_url_for(session, target)
         return await fetch_pdf_text_layout(session, url), target, url
@@ -278,13 +278,13 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int, str
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     text, year, url = await _fetch_pdf_text(session)
     tariff = await asyncio.to_thread(parse_tariff, text, year=year, source_url=url)
-    return carry_prior_year_card(tariff, date.today().year)
+    return carry_prior_year_card(tariff, belgian_today().year)
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
     text, year, url = await _fetch_pdf_text(session)
     tariff = await asyncio.to_thread(parse_tariff, text, year=year, commune=commune, source_url=url)
-    return carry_prior_year_card(tariff, date.today().year)
+    return carry_prior_year_card(tariff, belgian_today().year)
 
 
 # Anchored on the start-of-line: each commune row in the PDF starts at

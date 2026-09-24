@@ -240,7 +240,7 @@ def test_a_card_served_ahead_of_the_calendar_is_priced_and_flagged(
         def today(cls) -> date:
             return date(2026, 6, 1)
 
-    monkeypatch.setattr(farys, "date", _FakeDate)
+    monkeypatch.setattr(farys, "belgian_today", _FakeDate.today)
     raw = fixture_html("farys_gent_2026.json")
     needle = "value=\\u00222026\\u0022\\u003E2026"
     assert raw.count(needle) == 1, "the active period button moved; the test needs updating"

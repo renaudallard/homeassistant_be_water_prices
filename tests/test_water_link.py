@@ -216,7 +216,6 @@ async def test_transient_error_on_the_tariff_page_propagates() -> None:
 
 
 async def test_hard_error_falls_back_to_prior_year() -> None:
-    from datetime import date
     from unittest.mock import AsyncMock, patch
 
     from custom_components.be_water_prices.providers import _html, water_link
@@ -232,7 +231,7 @@ async def test_hard_error_falls_back_to_prior_year() -> None:
     ):
         _out, year, _url = await water_link._fetch_pdf_text(session=None)  # type: ignore[arg-type]
     assert mock.await_count == 2
-    assert year == date.today().year - 1
+    assert year == water_link.belgian_today().year - 1
 
 
 async def test_tariff_cites_the_pdf_it_actually_read() -> None:
@@ -256,7 +255,7 @@ async def test_tariff_cites_the_pdf_it_actually_read() -> None:
 
     page = _tariff_page(2026).replace("2026-01", "2026-02")
     with (
-        patch.object(water_link, "date", _FakeDate),
+        patch.object(water_link, "belgian_today", _FakeDate.today),
         patch.object(_html, "fetch_html", new=AsyncMock(return_value=page)),
         patch.object(water_link, "fetch_pdf_text_layout", new=AsyncMock(return_value=_pdf_text())),
     ):

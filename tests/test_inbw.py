@@ -73,8 +73,8 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
         def today(cls) -> date:
             return date(2027, 1, 5)
 
-    monkeypatch.setattr(inbw, "date", _FakeDate)
-    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    monkeypatch.setattr(inbw, "belgian_today", _FakeDate.today)
+    monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     t = parse_tariff(fixture_html("inbw_2026.html"))
     assert t.valid_from == date(2026, 1, 1)
     # Dated last year, so it stands until 31 March of this one.

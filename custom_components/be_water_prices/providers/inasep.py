@@ -64,7 +64,7 @@ from ..const import REGION_WALLONIA
 from ._html import fetch_and_parse
 from ._pdf import to_float
 from ._walloon_simple import build_tariff, check_spge_constants, detect_published_year
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     # The block is headed "Tarifs YYYY": date the card from that rather
     # than the clock, so a page still on last year's card in January
     # looks stale instead of being relabelled as this year's.
-    target = year or detect_published_year(text) or date.today().year
+    target = year or detect_published_year(text) or belgian_today().year
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,

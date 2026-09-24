@@ -56,7 +56,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import date
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -70,6 +69,7 @@ from .base import (
     TransientFetchError,
     WaterExtractor,
     WaterTariff,
+    belgian_today,
     carry_prior_year_card,
 )
 
@@ -145,7 +145,7 @@ async def _discover_pdf_url(session: aiohttp.ClientSession, year: int) -> str:
 
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     """Parse a captured Aquaduin tariff PDF (extracted via pdfplumber)."""
-    target = year or date.today().year
+    target = year or belgian_today().year
     # The card states the year it applies from. Dating it from the file
     # name or the page URL alone meant a link left pointing at an older
     # card was served as this year's, and carry_prior_year_card and the
@@ -189,7 +189,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     fails and the coordinator keeps serving the cached card with the
     stale-snapshot Repair up until the new card is published.
     """
-    target = date.today().year
+    target = belgian_today().year
     try:
         pdf_url = await _discover_pdf_url(session, target)
         text = await fetch_pdf_text_layout(session, pdf_url)

@@ -51,7 +51,7 @@ def test_parses_2026_components(monkeypatch: pytest.MonkeyPatch) -> None:
             return date(2026, 9, 6)
 
     # From 2027 the card stands until 31 March; the year's own end is asserted.
-    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     t = parse_tariff(fixture_html("swde_2026.html"), year=2026)
 
     assert t.cvd_eur_per_m3 == 3.24

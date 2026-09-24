@@ -45,11 +45,29 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Protocol
+from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
     import aiohttp
+
+# Resolved once, at import: the registry is built off the event loop, and
+# the lookup reads the zone file.
+_BELGIUM = ZoneInfo("Europe/Brussels")
+
+
+def belgian_today() -> date:
+    """Today's date in Belgium, whatever zone the process clock is in.
+
+    The operators turn their cards over on the Belgian calendar, and the
+    coordinator judges a card by Home Assistant's own date. date.today()
+    follows the process clock instead, which Home Assistant never moves to
+    its configured zone: in a container started without TZ it runs on UTC,
+    so for the first hour of 1 January every extractor still asked for
+    last year's card, and the coordinator found it stale on arrival.
+    """
+    return datetime.now(_BELGIUM).date()
 
 
 @dataclass(frozen=True, kw_only=True)

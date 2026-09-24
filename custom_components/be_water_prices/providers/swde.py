@@ -66,7 +66,6 @@ daily live check only validates ranges.
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup, Tag
@@ -79,7 +78,7 @@ from ..const import (
 from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents
 from ._walloon_simple import build_tariff, hold_to_constant, warn_constant_drift
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -164,7 +163,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     # served as this year's and the staleness check can never notice, so
     # the label says which it is rather than implying the page said so.
     stated = year is not None
-    target = year or date.today().year
+    target = year or belgian_today().year
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,

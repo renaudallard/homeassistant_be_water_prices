@@ -55,7 +55,7 @@ def _fake_today(module: object, monkeypatch: pytest.MonkeyPatch, today: date) ->
         def today(cls) -> date:
             return today
 
-    monkeypatch.setattr(module, "date", _FakeDate)
+    monkeypatch.setattr(module, "belgian_today", _FakeDate.today)
 
 
 def _card(year: int) -> WaterTariff:
@@ -98,5 +98,22 @@ def test_agso_page_still_on_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_farys_page_still_on_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
     _fake_today(farys, monkeypatch, date(2027, 1, 5))
     t = farys.parse_tariff(fixture_html("farys_gent_2026.json"))
+    assert t.valid_from == date(2026, 1, 1)
+    assert t.valid_until == date(2027, 3, 31)
+
+
+def test_the_card_year_follows_the_belgian_calendar(freezer) -> None:  # type: ignore[no-untyped-def]
+    """Half past midnight on 1 January in Brussels is still 31 December on
+    a process clock running UTC, which is what a container started without
+    TZ has. date.today() read the old year there, the extractor served last
+    year's card with its own 31 December, and the coordinator, going by
+    Home Assistant's date, found it stale on arrival."""
+    from custom_components.be_water_prices.providers import vivaqua
+    from custom_components.be_water_prices.providers.base import belgian_today
+
+    freezer.move_to("2026-12-31 23:30:00+00:00")
+    assert date.today() == date(2026, 12, 31)
+    assert belgian_today() == date(2027, 1, 1)
+    t = vivaqua.parse_tariff(fixture_html("vivaqua_linear_2026.html"))
     assert t.valid_from == date(2026, 1, 1)
     assert t.valid_until == date(2027, 3, 31)

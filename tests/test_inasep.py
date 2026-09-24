@@ -80,7 +80,7 @@ def test_dates_the_cvd_from_the_day_the_page_says_it_applies(
             return date(2026, 9, 6)
 
     # From 2027 the card stands until 31 March; the year's own end is asserted.
-    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     t = parse_tariff(fixture_html("inasep_2026.html"), year=2026)
     assert t.valid_from == date(2026, 4, 27)
     assert t.valid_until == date(2026, 12, 31)
@@ -115,8 +115,8 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
         def today(cls) -> date:
             return date(2027, 1, 5)
 
-    monkeypatch.setattr(inasep, "date", _FakeDate)
-    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    monkeypatch.setattr(inasep, "belgian_today", _FakeDate.today)
+    monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     t = parse_tariff(fixture_html("inasep_2026.html"))
     assert t.valid_from == date(2026, 4, 27)
     # Dated last year, so it stands until 31 March of this one.

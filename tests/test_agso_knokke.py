@@ -89,7 +89,7 @@ def test_in_january_the_newest_started_year_is_served(monkeypatch: pytest.Monkey
         def today(cls) -> date:
             return date(2027, 1, 5)
 
-    monkeypatch.setattr(agso_knokke, "date", _FakeDate)
+    monkeypatch.setattr(agso_knokke, "belgian_today", _FakeDate.today)
     t = parse_tariff(fixture_html("agso_knokke_2026.html"))
     assert t.basis_eur_per_m3 == 2.3295
     assert t.valid_from.year == 2026
@@ -130,17 +130,13 @@ def test_an_undated_neighbour_does_not_make_a_dated_card_this_year_s() -> None:
     # The same page read a year early: the dearest table is 2026 and
     # nothing places it, so it is refused rather than served as 2025.
     with pytest.raises(ExtractorError, match="ahead of 2025"):
+        from datetime import date
+
         import custom_components.be_water_prices.providers.agso_knokke as agso
 
-        real = agso.date
+        real = agso.belgian_today
         try:
-
-            class _D(real):  # type: ignore[misc, valid-type]
-                @classmethod
-                def today(cls) -> object:
-                    return real(2025, 6, 1)
-
-            agso.date = _D  # type: ignore[misc]
+            agso.belgian_today = lambda: date(2025, 6, 1)  # type: ignore[misc]
             parse_tariff(broken)
         finally:
-            agso.date = real  # type: ignore[misc]
+            agso.belgian_today = real  # type: ignore[misc]

@@ -56,7 +56,6 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup, Tag
@@ -64,7 +63,7 @@ from bs4 import BeautifulSoup, Tag
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import extract_amounts, fetch_and_parse
-from .base import ExtractorError, WaterExtractor, WaterTariff, carry_prior_year_card
+from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -176,7 +175,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if not ranked:
         raise ExtractorError("none of the AGSO Knokke tables carry an Integrale waterprijs row")
 
-    target = year or date.today().year
+    target = year or belgian_today().year
     # Prefer the table the page itself labels with the year we want, then
     # the newest one that has already started. Picking by price instead
     # meant a page publishing next year's card early was read as this

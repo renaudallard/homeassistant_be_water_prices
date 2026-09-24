@@ -53,7 +53,6 @@ import asyncio
 import logging
 import re
 import ssl
-from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup, Tag
@@ -70,7 +69,7 @@ from ._walloon_simple import (
     hold_to_constant,
     warn_constant_drift,
 )
-from .base import ExtractorError, WaterExtractor, WaterTariff
+from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -177,7 +176,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     # The page says "Tarifs YYYY": date the card from that rather than the
     # clock, so a page still on last year's card in January looks stale
     # instead of being relabelled as this year's.
-    target = year or detect_published_year(soup.get_text(" ", strip=True)) or date.today().year
+    target = year or detect_published_year(soup.get_text(" ", strip=True)) or belgian_today().year
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,

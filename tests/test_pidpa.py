@@ -134,7 +134,7 @@ def test_per_commune_falls_back_to_latest_year_on_rollover(
         def today(cls) -> date:
             return date(2099, 1, 1)
 
-    monkeypatch.setattr(pidpa, "date", _FakeDate)
+    monkeypatch.setattr(pidpa, "belgian_today", _FakeDate.today)
     html = fixture_html("pidpa_geel_2026.html")
     t = parse_commune_tariff(html, commune_slug="geel")  # year=None -> 2099
     # Fixture tops out at 2026, so the still-in-force 2026 column is served.
@@ -172,7 +172,7 @@ async def test_default_fetch_reads_the_commune_page(monkeypatch: pytest.MonkeyPa
         def today(cls) -> date:
             return date(2026, 9, 6)
 
-    monkeypatch.setattr(pidpa, "date", _FakeDate)
+    monkeypatch.setattr(pidpa, "belgian_today", _FakeDate.today)
     with (
         patch.object(
             _html, "fetch_html", new=AsyncMock(return_value=fixture_html("pidpa_geel_2026.html"))
@@ -286,7 +286,7 @@ def test_a_tab_past_the_year_asked_for_is_not_a_fallback(monkeypatch: pytest.Mon
         def today(cls) -> date:
             return date(2026, 9, 6)
 
-    monkeypatch.setattr(pidpa, "date", _FakeDate)
+    monkeypatch.setattr(pidpa, "belgian_today", _FakeDate.today)
     page = fixture_html("pidpa_geel_2026.html")
     assert page.count("-tab-2026") >= 1
     with pytest.raises(ExtractorError, match="2026"):

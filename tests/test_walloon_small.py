@@ -217,7 +217,7 @@ def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.Monkey
         def today(cls) -> date:
             return date(2026, 9, 6)
 
-    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     page = (
         "<html><body><p>Tarifs 2025. Coût vérité distribution (CVD) : 2,870 €/m³. "
         "Coût vérité assainissement (CVA) : 2,748 €/m³.</p></body></html>"
@@ -259,7 +259,7 @@ def test_a_page_still_on_last_years_card_stands_until_31_march(
         def today(cls) -> date:
             return today
 
-    monkeypatch.setattr(_walloon_simple, "date", _FakeDate)
+    monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     page = (
         "<html><body><p>Tarifs 2026. Coût vérité distribution (CVD) : 2,870 €/m³. "
         "Coût vérité assainissement (CVA) : 2,748 €/m³.</p></body></html>"
