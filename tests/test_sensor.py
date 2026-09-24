@@ -82,6 +82,24 @@ def test_last_reset_advances_on_mid_cycle_drop() -> None:
     assert sensor.last_reset == reset
 
 
+def test_a_drop_across_an_unknown_state_still_resets() -> None:
+    """An unknown state in between must not erase the comparison point.
+
+    The recorder skips a state that is not a number and measures the next
+    one against the last number it compiled. A tick with no meter at all
+    followed by a different meter's lower year used to go out under the
+    calendar-year reset, booked as a negative delta.
+    """
+    sensor = _sensor("ytd_consumption")
+    jan1 = _jan_1_local()
+    sensor._note_value(50.0)
+    sensor._note_value(None)
+    assert sensor._last_native == 50.0
+    sensor._note_value(0.5)
+    reset = sensor.last_reset
+    assert reset is not None and reset > jan1
+
+
 async def test_the_drop_guard_survives_a_restart() -> None:
     """A restart must not forget a drop, nor the value it was measured against.
 

@@ -398,9 +398,15 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
         # as a reset for TOTAL_INCREASING; for plain TOTAL it records the drop as
         # a negative long-term-statistics delta unless last_reset advances. Move
         # last_reset to now on a decrease so HA opens a fresh cycle instead.
-        if self.entity_description.last_reset_fn is None:
+        #
+        # An unknown state is not a value and does not replace the last one.
+        # The recorder skips it and measures the next number against the last
+        # number it compiled, so a drop across it is still a drop: forgetting
+        # the reference there let a meter change that went through a tick
+        # with no meter at all book the whole difference as a negative delta.
+        if self.entity_description.last_reset_fn is None or value is None:
             return
-        if value is not None and self._last_native is not None and value < self._last_native:
+        if self._last_native is not None and value < self._last_native:
             self._reset_at = dt_util.now()
         self._last_native = value
 
