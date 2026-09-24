@@ -3883,6 +3883,8 @@ async def test_a_stale_snapshot_follows_the_archive(
     from custom_components.be_water_prices import coordinator as module
     from custom_components.be_water_prices.providers.base import tariff_to_dict
 
+    # The coordinator reads Brussels time; so must the months asked for.
+    await hass.config.async_set_time_zone("Europe/Brussels")
     today = dt_util.now().date()
 
     def _row(label: str, days_ago: int) -> dict[str, Any]:
@@ -4003,6 +4005,8 @@ async def test_the_archive_is_walked_back_month_by_month(
     from custom_components.be_water_prices import coordinator as module
     from custom_components.be_water_prices.providers.base import tariff_to_dict
 
+    # The coordinator reads Brussels time; so must the months asked for.
+    await hass.config.async_set_time_zone("Europe/Brussels")
     months = [dt_util.now().date()]
     for _ in range(5):
         months.append(months[-1].replace(day=1) - timedelta(days=1))
