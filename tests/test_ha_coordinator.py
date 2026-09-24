@@ -4096,3 +4096,42 @@ async def test_a_card_archived_this_morning_is_not_dated_after_now(
     data = hass.data[DOMAIN][entry.entry_id].data
     assert data.fetched_at <= dt_util.utcnow()
     assert not data.snapshot_stale
+
+
+@pytest.mark.asyncio
+async def test_an_archive_that_does_not_answer_is_not_walked_past(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rate limit or a 5xx says nothing about whether the month is held.
+    Read as a miss, the walk went on to an older month and served it,
+    which in January is last year's card."""
+    import json
+
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import (
+        TransientFetchError,
+        tariff_to_dict,
+    )
+
+    # The coordinator reads Brussels time; so must the month asked for.
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    today = dt_util.now().date()
+    older = {
+        **tariff_to_dict(_fresh_tariff()),
+        "_seen_on": (today - timedelta(days=40)).isoformat(),
+        "_sources": [],
+    }
+    asked: list[str] = []
+
+    async def fetch(_session: Any, url: str) -> str:
+        asked.append(url)
+        if f"/{today:%Y-%m}.json" in url:
+            raise TransientFetchError("HTTP 429 fetching the archive")
+        return json.dumps(older)
+
+    monkeypatch.setattr(module, "fetch_text", fetch)
+    # The real reader, which conftest swaps out for the whole suite.
+    monkeypatch.setattr(module, "_archived_row", _archived_row)
+    entry = await _setup_entry(hass, _down, loads=False)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert len(asked) == 1

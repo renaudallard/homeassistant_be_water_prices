@@ -534,9 +534,11 @@ back. Now the coordinator asks the project's card archive (the
 [`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
 branch, one JSON per utility, commune and month; this month's row, then
 back a month at a time for up to a year, stopping at the first one that
-holds a card) and loads on the card it captured, dated the day of the
-capture so the 35-day staleness clock runs from there, with the failure
-in `last_error`. Later failures serve that card as the cached snapshot;
+holds a card, or as soon as GitHub fails to answer, since a month it
+could not read may still hold one) and loads on the card it captured,
+dated the day of the capture so the 35-day staleness clock runs from
+there, with the failure in `last_error`. Later failures serve that card
+as the cached snapshot;
 the next successful fetch replaces it. Once the snapshot has gone stale,
 a failing refresh asks the archive again and takes the card if it was
 captured later than the one being served, so an outage longer than the
@@ -883,7 +885,10 @@ stale. It asks for this month's row of its utility and commune
 (`default` without a commune), then back a month at a time for up to a
 year, and loads on the first card it finds, dated the day it was
 captured, rather than retrying setup until the site is back or standing
-on a card the archive has already replaced.
+on a card the archive has already replaced. A month GitHub does not
+answer for (a network failure, a 5xx, a rate limit) ends the walk rather
+than being skipped: an older month in its place would be an older card,
+last year's in January.
 Every other refresh goes to the utility.
 
 ## License

@@ -89,7 +89,7 @@ from .const import (
     UPDATE_INTERVAL_HOURS,
 )
 from .pricing import compute_annual_cost, compute_ytd_cost
-from .providers import ExtractorError, WaterTariff, get
+from .providers import ExtractorError, TransientFetchError, WaterTariff, get
 from .providers._pdf import fetch_text
 from .providers._postcodes import resolve_candidates
 from .providers.base import WaterExtractor, relabel_with_human_commune, tariff_from_dict
@@ -857,10 +857,16 @@ async def _archived_row(
     session: aiohttp.ClientSession, utility: str, commune: str, month: date
 ) -> dict[str, Any] | None:
     """The row the project's card archive holds for that utility, commune
-    and month, or None: not held, unreachable or not a row."""
+    and month, or None when it holds none or what it holds is not a row.
+
+    Raises :class:`TransientFetchError` when the archive could not be
+    asked (a network failure, a 5xx, a rate limit): that says nothing
+    about whether the month is held."""
     url = f"{CARD_ARCHIVE_URL}/{utility}/{quote(commune, safe='')}/{month:%Y-%m}.json"
     try:
         body = await fetch_text(session, url)
+    except TransientFetchError:
+        raise
     except ExtractorError:
         return None
     try:
@@ -1159,7 +1165,18 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         month = dt_util.now().date()
         row: dict[str, Any] | None = None
         for _ in range(_ARCHIVE_MONTHS_BACK):
-            row = await _archived_row(session, self._extractor.id, key, month)
+            try:
+                row = await _archived_row(session, self._extractor.id, key, month)
+            except TransientFetchError as err:
+                # This month may well be held; the archive just did not say.
+                # Walking on would take an older month in its place, which
+                # in January is last year's card, so stop and let the next
+                # refresh ask again. The URL in the message names the
+                # commune, so only the kind of failure is logged.
+                _LOGGER.debug(
+                    "card archive unreachable for %s (%s)", self._extractor.id, type(err).__name__
+                )
+                return None
             if row is not None:
                 break
             # The first of the month, a day back: the last day of the one
