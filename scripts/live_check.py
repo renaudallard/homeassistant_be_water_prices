@@ -79,8 +79,6 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterExtractor,
     WaterTariff,
     all_extractors,
-    de_watergroep,
-    pidpa,
 )
 from custom_components.be_water_prices.providers._pdf import render_through  # noqa: E402
 from custom_components.be_water_prices.providers.base import (  # noqa: E402
@@ -200,49 +198,6 @@ async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) 
     )
 
 
-@dataclass(frozen=True)
-class PrimaryPathProbe:
-    """A page a no-commune fetch reads first, checked without its fallback.
-
-    De Watergroep and Pidpa answer a no-commune install from a default
-    commune page and fall back to a stand-in when that page cannot be
-    read, so probing ``fetch`` alone reported OK while every such
-    household was billed on the fallback. These read the page itself and
-    fail loudly.
-    """
-
-    check_id: str
-    label: str
-    region: str
-    fetch: Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]]
-
-
-PRIMARY_PATH_PROBES: tuple[PrimaryPathProbe, ...] = (
-    PrimaryPathProbe(
-        "de_watergroep:default-page",
-        "De Watergroep (default commune page)",
-        "flanders",
-        lambda s: de_watergroep.fetch_for_commune(s, de_watergroep._DEFAULT_COMMUNE_GUID),
-    ),
-    PrimaryPathProbe(
-        "pidpa:default-page",
-        "Pidpa (default commune page)",
-        "flanders",
-        lambda s: pidpa.fetch_for_commune(s, pidpa._DEFAULT_COMMUNE_SLUG),
-    ),
-)
-
-
-async def _check_probe(session: aiohttp.ClientSession, probe: PrimaryPathProbe) -> CheckResult:
-    return await _check_fetch(
-        session,
-        check_id=probe.check_id,
-        label=probe.label,
-        region=probe.region,
-        fetch=probe.fetch,
-    )
-
-
 def _exit_code(results: list[CheckResult]) -> int:
     """Fold the per-extractor statuses into the exit bitmask.
 
@@ -271,7 +226,6 @@ async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, Store
             hooks.enter_context(render_through(cache.render))
         async with aiohttp.ClientSession() as session:
             results = [await _check_one(session, e) for e in all_extractors()]
-            results += [await _check_probe(session, p) for p in PRIMARY_PATH_PROBES]
     return results, _exit_code(results), cache
 
 

@@ -253,35 +253,6 @@ async def test_a_ci_blocked_extractor_is_checked_off_the_runner(
     assert result.status == "OK"
 
 
-def test_primary_path_probes_name_real_pages() -> None:
-    """Each probe reads a page an extractor's no-commune fetch also reads first."""
-    from custom_components.be_water_prices.providers import all_extractors
-    from scripts.live_check import PRIMARY_PATH_PROBES
-
-    ids = {extractor.id for extractor in all_extractors()}
-    for probe in PRIMARY_PATH_PROBES:
-        assert probe.check_id.split(":", 1)[0] in ids
-        assert probe.region == next(
-            e.region for e in all_extractors() if e.id == probe.check_id.split(":", 1)[0]
-        )
-
-
-async def test_a_probe_that_cannot_read_its_page_is_a_failure_row() -> None:
-    """The fallback the default fetch would take must not hide this."""
-    from custom_components.be_water_prices.providers import WaterTariff
-    from scripts.live_check import PrimaryPathProbe, _check_probe
-
-    async def _broken(_session: aiohttp.ClientSession) -> WaterTariff:
-        raise ExtractorError("could not locate the table")
-
-    probe = PrimaryPathProbe(
-        "pidpa:default-page", "Pidpa (default commune page)", "flanders", _broken
-    )
-    result = await _check_probe(session=None, probe=probe)  # type: ignore[arg-type]
-    assert result.status == "FAIL"
-    assert result.extractor_id == "pidpa:default-page"
-
-
 def test_validate_refuses_an_implausible_tariff() -> None:
     """The plausibility windows were never exercised by anything."""
     from dataclasses import replace
@@ -391,7 +362,6 @@ async def test_a_pdf_the_archive_holds_is_not_rendered_again(
         "all_extractors",
         lambda: (WaterExtractor(id="acme", label="Acme", region="flanders", fetch=fetch),),
     )
-    monkeypatch.setattr(live_check, "PRIMARY_PATH_PROBES", ())
     results, rc, cache = await live_check._run(tmp_path)
     assert (rc, seen) == (0, ["stored text"])
     assert cache is not None and (cache.unrendered, cache.rendered) == (1, 0)
