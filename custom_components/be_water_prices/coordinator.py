@@ -1176,8 +1176,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             tariff = relabel_with_human_commune(
                 tariff, commune_id=key, commune_label=self.entry.options.get(CONF_COMMUNE_LABEL)
             )
-        # The archive walks at 05:23 UTC; the hour only feeds the age.
-        return tariff, datetime(seen_on.year, seen_on.month, seen_on.day, 6, tzinfo=UTC)
+        # The archive walks at 05:23 UTC; the hour only feeds the age. A
+        # row written today can be read before that hour, and a manual run
+        # writes at any hour, so never date the capture after now: a
+        # snapshot from the future counts as stale, and a card captured
+        # this morning raised the stale-snapshot Repair for a whole day.
+        captured = datetime(seen_on.year, seen_on.month, seen_on.day, 6, tzinfo=UTC)
+        return tariff, min(captured, dt_util.utcnow())
 
     @callback
     def async_retire(self) -> None:

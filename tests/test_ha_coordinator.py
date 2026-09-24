@@ -4072,3 +4072,27 @@ async def test_an_archived_commune_row_is_relabelled_for_the_household(
     assert asked == ["25071"]
     label = hass.data[DOMAIN][entry.entry_id].data.tariff.publication_label
     assert label == "Tarieven 2026 (9000 - Gent-centrum (Gent))"
+
+
+@pytest.mark.asyncio
+async def test_a_card_archived_this_morning_is_not_dated_after_now(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, freezer: Any
+) -> None:
+    """A capture is stamped 06:00 UTC on the day it was seen. Read before
+    that hour, a row written the same morning (or by a manual run in the
+    night) came out dated in the future, which counts as stale, and the
+    entry loaded on a card captured minutes ago with the Repair up."""
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    freezer.move_to("2026-09-01 05:40:00+00:00")
+    row = {**tariff_to_dict(_fresh_tariff()), "_seen_on": "2026-09-01", "_sources": []}
+
+    async def archived(_session: Any, _utility: str, _commune: str, _month: date) -> Any:
+        return row
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    entry = await _setup_entry(hass, _down)
+    data = hass.data[DOMAIN][entry.entry_id].data
+    assert data.fetched_at <= dt_util.utcnow()
+    assert not data.snapshot_stale
