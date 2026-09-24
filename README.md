@@ -621,8 +621,9 @@ menu **→ Download diagnostics** dumps the active config, the last
 parsed `WaterTariff` (every component plus validity window), the
 fetch metadata, and the projected and running costs. The postcode, the
 commune and the water-meter entity id are redacted, and the commune is
-scrubbed out of the publication label, the source URL and the error
-text, so the file can go on an issue as it is. An entry that has not
+scrubbed out of every other value too: the publication label, the source
+URL, the error text and the price-history gate, which names the commune
+it was drawn for. The file can go on an issue as it is. An entry that has not
 loaded dumps its state and config with an empty snapshot. Attach it
 when reporting an issue.
 

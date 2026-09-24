@@ -204,3 +204,34 @@ async def test_the_dump_of_an_entry_that_did_not_load_carries_its_config(hass) -
     assert dump["entry"]["data"][CONF_UTILITY] == "vivaqua"
     assert dump["snapshot"] is None
     await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_the_backfill_gate_does_not_carry_the_commune_out(hass) -> None:  # type: ignore[no-untyped-def]
+    """The price backfill's gate ends in the commune id.
+
+    It sits in the entry's data under a key of its own, so the key-based
+    redaction let it through and the dump named the household's town.
+    """
+    import json
+
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.be_water_prices.const import CONF_UTILITY, DOMAIN
+    from custom_components.be_water_prices.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+    from custom_components.be_water_prices.statistics import DATA_BACKFILL_YEAR
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa", DATA_BACKFILL_YEAR: "2026:pidpa:2026:nijlen"},
+        options={CONF_COMMUNE: "nijlen", CONF_COMMUNE_LABEL: "Nijlen"},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    dump = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert "nijlen" not in json.dumps(dump).lower()
+    # The rest of the gate is still there to read.
+    assert dump["entry"]["data"][DATA_BACKFILL_YEAR].startswith("2026:pidpa:2026:")

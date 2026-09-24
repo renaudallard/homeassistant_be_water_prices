@@ -71,16 +71,19 @@ async def async_get_config_entry_diagnostics(
         if data is not None
         else None
     )
+    # The key-based redaction only catches the fields named after the
+    # commune. Values built from it travel under other keys: the tariff's
+    # source_url / publication_label, any last_error, and the price
+    # backfill's gate, which carries the commune as its last term. Scrub
+    # the commune out of every value as well.
+    tokens = sensitive_tokens(entry)
     return {
         "entry": {
             "state": entry.state.value,
-            "data": async_redact_data(dict(entry.data), _REDACT_KEYS),
-            "options": async_redact_data(dict(entry.options), _REDACT_KEYS),
+            "data": scrub_tokens(async_redact_data(dict(entry.data), _REDACT_KEYS), tokens),
+            "options": scrub_tokens(async_redact_data(dict(entry.options), _REDACT_KEYS), tokens),
         },
-        # The tariff's source_url / publication_label and any last_error can
-        # embed the configured commune slug or label verbatim, bypassing the
-        # key-based redaction above; scrub those values out of the snapshot.
-        "snapshot": scrub_tokens(snapshot, sensitive_tokens(entry)),
+        "snapshot": scrub_tokens(snapshot, tokens),
     }
 
 
