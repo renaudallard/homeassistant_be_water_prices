@@ -803,8 +803,9 @@ read (`texts/<sha256>.txt`, stored once and shared between the rows that
 read it), and a manifest of where each PDF is kept. A water tariff is
 annual, so a month whose card is the same as the previous month's points
 at the texts that month already holds rather than storing the page again.
-A day on which nothing changed writes nothing; months older than three
-years are removed, with the texts nothing refers to any more.
+A day on which nothing changed writes nothing; months more than twelve
+before the running one are removed, with the texts nothing refers to any
+more.
 
 The PDFs themselves (Aquaduin's, Pidpa's and Water-link's cards) are kept
 under `--pdfs` for upload to the releases of the shared cards repository,

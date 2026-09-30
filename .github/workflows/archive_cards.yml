@@ -178,9 +178,9 @@ jobs:
               jq -s '.[0] + .[1]' "$manifest" landed.json > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
             fi
           done
-          # Same retention as the branch: a month older than three years goes.
+          # Same retention as the branch: a month more than twelve back goes.
           # Only this integration's releases, not the electricity or gas ones.
-          cutoff="water-$(date -u -d '-36 months' +%Y-%m)"
+          cutoff="water-$(date -u -d '-12 months' +%Y-%m)"
           gh release list --repo "$CARDS_REPO" --json tagName --jq '.[].tagName' \
             | while read -r tag; do
               case "$tag" in water-*) ;; *) continue ;; esac

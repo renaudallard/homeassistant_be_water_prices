@@ -122,6 +122,9 @@ _VOLATILE_KEYS = ("_seen_on",)
 # The digest of the parser sources the branch was last replayed with.
 _PARSER_STAMP = "parser.txt"
 _MANIFEST = "pdfs.json"
+# The running month and the twelve before it, the same retention the
+# electricity and gas namespaces keep.
+_KEEP_MONTHS = 12
 # This integration's namespace in the cards repository, which it shares
 # with be_electricity_prices: its releases are water-<YYYY-MM>, its
 # listings live under water/ in that repository's tree.
@@ -167,8 +170,8 @@ Written daily by `.github/workflows/archive_cards.yml` running
 
 To get the original card of a utility, commune and month: open
 `coverage.md`, open the utility's sheet, find the row, click `pdf` or
-`page`; `json` is what the integration parsed out of it. Months older than
-three years are removed.
+`page`; `json` is what the integration parsed out of it. Months more than
+twelve before the running one are removed.
 """
 
 
@@ -958,7 +961,7 @@ async def archive(
     out: Path,
     *,
     only: set[str] | None = None,
-    keep_months: int = 36,
+    keep_months: int = _KEEP_MONTHS,
     pdf_dir: Path | None = None,
     pdf_base_url: str | None = None,
     archive_base_url: str | None = None,
@@ -1029,7 +1032,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out", type=Path, required=True, help="archive checkout")
     parser.add_argument("--only", action="append", default=[], help="restrict to a utility id")
-    parser.add_argument("--keep-months", type=int, default=36)
+    parser.add_argument("--keep-months", type=int, default=_KEEP_MONTHS)
     parser.add_argument(
         "--pdfs",
         type=Path,
