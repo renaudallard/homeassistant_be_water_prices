@@ -22,11 +22,11 @@ The cards themselves are kept too. With ``--pdfs DIR`` every PDF whose
 bytes the branch has not recorded yet is written to
 ``DIR/water-<YYYY-MM>/<sha256>.pdf`` and the workflow uploads each
 directory as the assets of the release of that name in the cards
-repository shared with be_electricity_prices. Where each one landed is
-recorded in ``<out>/pdfs.json``; a row's ``_sources`` entry names its PDF
-by digest alone. The same digest keeps a daily run cheap: a card whose
-bytes have not changed is served the text the branch already holds for it
-instead of being rendered again.
+repository shared with the electricity and gas integrations. Where each
+one landed is recorded in ``<out>/pdfs.json``; a row's ``_sources`` entry
+names its PDF by digest alone. The same digest keeps a daily run cheap: a
+card whose bytes have not changed is served the text the branch already
+holds for it instead of being rendered again.
 
 A parser fix reaches the stored months on its own. Every row carries the
 texts its parse read, so the run replays each row through the current
@@ -126,8 +126,8 @@ _MANIFEST = "pdfs.json"
 # electricity and gas namespaces keep.
 _KEEP_MONTHS = 12
 # This integration's namespace in the cards repository, which it shares
-# with be_electricity_prices: its releases are water-<YYYY-MM>, its
-# listings live under water/ in that repository's tree.
+# with the electricity and gas integrations: its releases are
+# water-<YYYY-MM>, its listings live under water/ in that repository's tree.
 _RELEASE_PREFIX = "water"
 # One sheet per utility of which months the branch holds, for the reader
 # who wants to know whether a given month of a given commune is covered
@@ -161,8 +161,9 @@ Written daily by `.github/workflows/archive_cards.yml` running
   once and shared between the rows that read it. Each row lists its own
   under `_sources`, and names a PDF it read by SHA-256.
 - `pdfs.json`: where each PDF is kept, as `<release tag>/<sha256>.pdf` in
-  the releases of the cards repository (`be_price_cards`, shared with
-  be_electricity_prices; this integration's releases are `water-<YYYY-MM>`).
+  the releases of the cards repository (`be_price_cards`, shared with the
+  electricity and gas integrations; this integration's releases are
+  `water-<YYYY-MM>`).
 - `coverage.md` and `coverage/<utility>.md`: which months the branch
   holds for each utility and commune, each linking to the PDF or the page
   it was parsed from and to the JSON above; one sheet per utility, the
