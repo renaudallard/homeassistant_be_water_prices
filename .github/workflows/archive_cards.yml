@@ -179,8 +179,9 @@ jobs:
             fi
           done
           # Same retention as the branch: a month more than twelve back goes.
-          # Only this integration's releases, not the electricity or gas ones.
-          cutoff="water-$(date -u -d '-12 months' +%Y-%m)"
+          # Only this integration's releases, not the electricity or gas ones,
+          # and counted from the 1st so no day of the month shifts the cutoff.
+          cutoff="water-$(date -u -d "$(date -u +%Y-%m-01) -12 months" +%Y-%m)"
           gh release list --repo "$CARDS_REPO" --json tagName --jq '.[].tagName' \
             | while read -r tag; do
               case "$tag" in water-*) ;; *) continue ;; esac
