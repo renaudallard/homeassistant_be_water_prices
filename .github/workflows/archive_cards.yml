@@ -96,17 +96,17 @@ jobs:
       - name: Keep the cards themselves
         id: keep
         # The PDFs go to the releases of be_price_cards, a repository shared
-        # with be_electricity_prices: this integration's releases are named
-        # water-<YYYY-MM> after the month the cards were seen in, the files
-        # by their SHA-256. Few water utilities publish a PDF, so a month
-        # holds a handful of files, but a card is a card and it belongs
-        # with the others rather than on a git branch. GitHub caps a release
-        # at a thousand assets; should a month ever overflow it spills into
-        # water-YYYY-MM-2, and the manifest on the branch says which release
-        # holds each file. Needs a fine-grained token with contents read and
-        # write on that repository in the BE_WATER_CARDS secret; without it
-        # the step says so and the branch still gets the parsed cards and
-        # their texts.
+        # with the electricity and gas integrations: this integration's
+        # releases are named water-<YYYY-MM> after the month the cards were
+        # seen in, the files by their SHA-256. Few water utilities publish a
+        # PDF, so a month holds a handful of files, but a card is a card and
+        # it belongs with the others rather than on a git branch. GitHub caps
+        # a release at a thousand assets; should a month ever overflow it
+        # spills into water-YYYY-MM-2, and the manifest on the branch says
+        # which release holds each file. Needs a fine-grained token with
+        # contents read and write on that repository in the BE_WATER_CARDS
+        # secret; without it the step says so and the branch still gets the
+        # parsed cards and their texts.
         env:
           GH_TOKEN: ${{ secrets.BE_WATER_CARDS }}
           CARDS_REPO: renaudallard/be_price_cards
@@ -179,7 +179,7 @@ jobs:
             fi
           done
           # Same retention as the branch: a month older than three years goes.
-          # Only this integration's releases; the electricity ones are not ours.
+          # Only this integration's releases, not the electricity or gas ones.
           cutoff="water-$(date -u -d '-36 months' +%Y-%m)"
           gh release list --repo "$CARDS_REPO" --json tagName --jq '.[].tagName' \
             | while read -r tag; do
@@ -205,8 +205,8 @@ jobs:
         # cards live beside them, under this integration's own directory
         # of the shared repository, so a person on the releases page is one
         # click from the names. The root README is the same text the
-        # electricity workflow writes, so neither rewrites the other's. A
-        # commit only when a sheet changed.
+        # electricity and gas workflows write, so none of the three rewrites
+        # another's. A commit only when a sheet changed.
         env:
           CARDS_TOKEN: ${{ secrets.BE_WATER_CARDS }}
           CARDS_REPO: renaudallard/be_price_cards
@@ -218,14 +218,15 @@ jobs:
           printf '%s\n' \
             "# Price cards" \
             "" \
-            "The original tariff cards the Belgian price integrations refer to, kept as" \
-            "release assets named by their SHA-256, one namespace per integration:" \
+            "The tariff cards the Belgian price integrations read, kept as release assets" \
+            "named by their SHA-256. One namespace per integration, whose own README says" \
+            "what it keeps beside the cards:" \
             "" \
             "- \`electricity/\`: homeassistant_be_electricity_prices, releases \`electricity-<YYYY-MM>\`." \
-            "- \`water/\`: be_water_prices, releases \`water-<YYYY-MM>\`." \
+            "- \`gas/\`: homeassistant_be_gas_prices, releases \`gas-<YYYY-MM>\`." \
+            "- \`water/\`: homeassistant_be_water_prices, releases \`water-<YYYY-MM>\`." \
             "" \
-            "Each directory holds the listings that name the files: which contract and month" \
-            "a card is, and where to download it. Nothing here is edited by hand." \
+            "Nothing here is edited by hand." \
             > tmp/cards/README.md
           printf '%s\n' \
             "# Water cards" \

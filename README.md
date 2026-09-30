@@ -829,7 +829,8 @@ manual run walks them unless its `communes` input is unticked, and
 to the releases of the shared cards
 repository [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
 (`water-<YYYY-MM>`, one per month the cards were seen in; the electricity
-integration's live beside them as `electricity-<YYYY-MM>`), rewrites the
+and gas integrations' live beside them as `electricity-<YYYY-MM>` and
+`gas-<YYYY-MM>`), rewrites the
 index and the per-utility sheets so each month links to a file that
 exists, publishes them under `water/` in that repository, and commits
 the branch when anything changed. The upload needs a fine-grained token
