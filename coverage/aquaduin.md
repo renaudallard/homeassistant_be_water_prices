@@ -7,6 +7,6 @@ Each month links to what its tariff was parsed from and to what came out of it:
 the page as it was read, and `json` the tariff as the integration parsed it, both
 on this branch. A blank cell is a month the branch does not hold.
 
-| commune | label | 2026-09 |
-| --- | --- | --- |
-| default |  | [pdf](https://github.com/renaudallard/be_price_cards/releases/download/water-2026-09/999f1ac0e9e24f681e1b64011faa8824dd22290709fdb1d5e969bac0b30e26fc.pdf) [json](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/aquaduin/default/2026-09.json) |
+| commune | label | 2026-09 | 2026-10 |
+| --- | --- | --- | --- |
+| default |  | [pdf](https://github.com/renaudallard/be_price_cards/releases/download/water-2026-09/999f1ac0e9e24f681e1b64011faa8824dd22290709fdb1d5e969bac0b30e26fc.pdf) [json](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/aquaduin/default/2026-09.json) | [pdf](https://github.com/renaudallard/be_price_cards/releases/download/water-2026-09/999f1ac0e9e24f681e1b64011faa8824dd22290709fdb1d5e969bac0b30e26fc.pdf) [json](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/aquaduin/default/2026-10.json) |
