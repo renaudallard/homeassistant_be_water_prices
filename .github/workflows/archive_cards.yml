@@ -262,13 +262,29 @@ jobs:
               commit -q -m "Water listings of $(date -u +%Y-%m-%d)"
           git push -q origin HEAD:main
 
+      - name: Commit and push what changed
+        id: push
+        run: |
+          cd tmp/archive
+          git add -A
+          if git diff --cached --quiet; then
+            echo "no card changed today"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Cards seen on $(date -u +%Y-%m-%d)"
+          git push origin archive
+
       - name: Warn before the upload token expires
         # A fine-grained token lives a year at most, and the first sign of
         # its expiry would otherwise be the failure issue on the morning
         # after. GitHub reports a fine-grained token's expiry in a response
         # header, so ask, and file an issue while there are still two weeks
         # to make a new one and update the secret. Runs even when an earlier
-        # step failed: the warning is worth having either way.
+        # step failed: the warning is worth having either way. After the
+        # push, so a failure here cannot keep the day's rows from being
+        # pushed.
         if: always()
         env:
           CARDS_TOKEN: ${{ secrets.BE_WATER_CARDS }}
@@ -298,20 +314,6 @@ jobs:
             --body token_body.md \
             --fingerprint token_fingerprint.txt \
             --workflow .github/workflows/archive_cards.yml
-
-      - name: Commit and push what changed
-        id: push
-        run: |
-          cd tmp/archive
-          git add -A
-          if git diff --cached --quiet; then
-            echo "no card changed today"
-            exit 0
-          fi
-          git -c user.name="github-actions[bot]" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "Cards seen on $(date -u +%Y-%m-%d)"
-          git push origin archive
 
       - name: File the failure as an issue
         # Nobody watches the Actions tab. A run that stored nothing, a push
