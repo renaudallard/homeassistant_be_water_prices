@@ -46,6 +46,12 @@ jobs:
     timeout-minutes: ${{ github.event.inputs.rerender == 'true' && 180 || 60 }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The token the job writes the archive branch with would stay in
+          # .git/config for the walk, which runs third-party code. The
+          # repository is public, so nothing before the push needs it, and
+          # the push is given it as a header of its own.
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
@@ -264,6 +270,8 @@ jobs:
 
       - name: Commit and push what changed
         id: push
+        env:
+          PUSH_TOKEN: ${{ github.token }}
         run: |
           cd tmp/archive
           git add -A
@@ -274,7 +282,10 @@ jobs:
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -q -m "Cards seen on $(date -u +%Y-%m-%d)"
-          git push origin archive
+          # The token as an authorization header on this call only, as
+          # actions/checkout would have stored it, never in .git/config.
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)" \
+              push origin archive
 
       - name: Warn before the upload token expires
         # A fine-grained token lives a year at most, and the first sign of

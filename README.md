@@ -834,7 +834,9 @@ and gas integrations' live beside them as `electricity-<YYYY-MM>` and
 `gas-<YYYY-MM>`), rewrites the
 index and the per-utility sheets so each month links to a file that
 exists, publishes them under `water/` in that repository, and commits
-the branch when anything changed. The upload needs a fine-grained token
+the branch when anything changed. The job's own token, which writes the
+branch, is not kept in the checkout while the walk runs third-party
+code; only the push is given it. The upload needs a fine-grained token
 with contents read and write on the cards repository in the
 `BE_WATER_CARDS` secret; without it the branch still gets the parsed
 cards and their texts and the step says so. A run that stores nothing, a
