@@ -263,10 +263,24 @@ jobs:
             echo "listings unchanged"
             exit 0
           fi
-          git -c user.name="github-actions[bot]" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "Water listings of $(date -u +%Y-%m-%d)"
-          git push -q origin HEAD:main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Water listings of $(date -u +%Y-%m-%d)"
+          # The electricity and gas archives push to the same main, and the
+          # concurrency group only queues runs of this repository, so their
+          # daily push can land between this step's clone and its push. The
+          # only path the three trees share is the root README.md, which all
+          # three write with the same text, so a rejected push fetches,
+          # rebases and tries again without a conflict. Should one of the
+          # texts drift, -X theirs (the commit being replayed) keeps this
+          # job's, which lists all three namespaces.
+          for attempt in 1 2 3 4 5; do
+            git push -q origin HEAD:main && exit 0
+            [ "$attempt" -lt 5 ] || break
+            sleep $((attempt * 3))
+            git pull -q --rebase -X theirs origin main
+          done
+          exit 1
 
       - name: Commit and push what changed
         id: push

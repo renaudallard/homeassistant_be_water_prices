@@ -846,3 +846,82 @@ def test_main_fails_the_run_only_when_nothing_was_archived(
     assert ac.main() == 1
     monkeypatch.setattr(ac, "all_extractors", lambda: (_extractor(_page_fetch()),))
     assert ac.main() == 0
+
+
+def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> None:
+    """The electricity and gas archives push to the cards repository's main
+    too, and one can land between this step's clone and its push. The step's
+    own shell must rebase and land rather than fail the run."""
+    import os
+    import subprocess
+
+    import yaml  # type: ignore[import-untyped]
+
+    def git(*args: str, cwd: Path) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    git("init", "-q", "-b", "main", cwd=seed)
+    (seed / "README.md").write_text("# Price cards\n")
+    git("add", "README.md", cwd=seed)
+    git("commit", "-q", "-m", "start", cwd=seed)
+    git("clone", "-q", "--bare", str(seed), str(origin), cwd=tmp_path)
+    other = tmp_path / "electricity"
+    git("clone", "-q", "--depth=1", f"file://{origin}", str(other), cwd=tmp_path)
+    (other / "electricity").mkdir()
+    (other / "electricity" / "row.json").write_text("{}\n")
+    git("add", "-A", cwd=other)
+    git("commit", "-q", "-m", "Cards seen", cwd=other)
+
+    work = tmp_path / "work"
+    (work / "tmp" / "archive" / "coverage").mkdir(parents=True)
+    (work / "tmp" / "archive" / "coverage.md").write_text("# Coverage\n")
+    (work / "tmp" / "archive" / "coverage" / "farys.md").write_text("# Farys\n")
+
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    (stubs / "sleep").write_text("#!/bin/sh\nexit 0\n")
+    # The commit message asks for the date between the clone and the push:
+    # the other archive's push lands there, as it can on a runner.
+    (stubs / "date").write_text(
+        f"#!/bin/sh\ngit -C {other} push -q origin HEAD:main >/dev/null 2>&1\necho 2026-10-01\n"
+    )
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/archive_cards.yml").read_text()
+    )
+    steps = workflow["jobs"]["archive"]["steps"]
+    script = next(
+        s["run"] for s in steps if s.get("name") == "Publish the listings in the cards repository"
+    )
+    token = "t0ken"
+    env = {
+        **os.environ,
+        "PATH": f"{stubs}:{os.environ['PATH']}",
+        "CARDS_TOKEN": token,
+        "CARDS_REPO": "renaudallard/be_price_cards",
+        # The step's GitHub URL, token and all, is the local origin here.
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
+        "GIT_CONFIG_VALUE_0": (
+            f"https://x-access-token:{token}@github.com/renaudallard/be_price_cards.git"
+        ),
+    }
+    done = subprocess.run(
+        ["bash", "-e", "-c", script], cwd=work, env=env, capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr
+    log = git("log", "--format=%s", "main", cwd=origin).splitlines()
+    assert log[:2] == ["Water listings of 2026-10-01", "Cards seen"]
+    assert git("show", "main:electricity/row.json", cwd=origin) == "{}\n"
+    assert git("show", "main:water/coverage/farys.md", cwd=origin) == "# Farys\n"
