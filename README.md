@@ -379,10 +379,6 @@ you paid is worth more than a tidy chart.
   recompute immediately (in-memory, no extra recorder or network call).
   A live update never defers the 24 h tariff refresh above, however often
   the meter reports.
-- **Rolling and projected year** — the meter's history is read once a
-  day. `projected_year_consumption` and `projected_year_end_cost` then
-  move with each meter reading, like the running figures they extend;
-  the rolling year moves with the daily read.
   The January 1 meter reading is anchored once from the recorder and
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the
@@ -495,6 +491,10 @@ you paid is worth more than a tidy chart.
   There is no safe automatic answer (summing would double-count a
   sub-meter and over-bill a rainwater or well meter), so a Repair card
   asks you to pick one in the options; it clears once you do.
+- **Rolling and projected year** — the meter's history is read once a
+  day. `projected_year_consumption` and `projected_year_end_cost` then
+  move with each meter reading, like the running figures they extend;
+  the rolling year moves with the daily read.
 
 ### Keeping the projection honest
 
