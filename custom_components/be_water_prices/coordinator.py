@@ -1431,17 +1431,22 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         metered = self._metered
         if metered is None or metered.meter != self._meter_entity_id:
             return YearFigures()
-        now = dt_util.now()
         rolling = _rolling_year_m3(metered.days, metered.read_on)
-        rest = _rest_of_year_m3(metered.days, now.date())
+        # The year the published figure was folded for, not the one the
+        # clock reads now: a tick that folds 31 December and returns after
+        # midnight would otherwise add last year's whole rest to a year
+        # that has closed.
+        year = self._ytd.year
         projected = end_cost = None
-        if rest is not None and ytd_m3 is not None:
-            projected = ytd_m3 + rest
-            if ytd_cost is not None:
-                so_far = self._ytd_cost_from_m3(tariff, ytd_m3, now.year)
-                whole = self._annual_cost(tariff, projected)
-                if so_far is not None and whole is not None:
-                    end_cost = round(ytd_cost + whole - so_far, 2)
+        if year is not None and ytd_m3 is not None:
+            rest = _rest_of_year_m3(metered.days, _priced_on(year))
+            if rest is not None:
+                projected = ytd_m3 + rest
+                if ytd_cost is not None:
+                    so_far = self._ytd_cost_from_m3(tariff, ytd_m3, year)
+                    whole = self._annual_cost(tariff, projected)
+                    if so_far is not None and whole is not None:
+                        end_cost = round(ytd_cost + whole - so_far, 2)
         return YearFigures(
             rolling_m3=rolling,
             rolling_cost_eur=None if rolling is None else self._annual_cost(tariff, rolling),
@@ -1788,11 +1793,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         local midnight while its recorder query runs would otherwise price
         the closing year at one day elapsed and hand back a fee of nothing.
         """
-        today = dt_util.now().date()
-        if today.year != year:
-            # The clock moved on mid-round. Price the year the round is
-            # about, which is the one its consumption belongs to.
-            today = date(year, 12, 31) if today.year > year else date(year, 1, 1)
+        today = _priced_on(year)
         jan1 = date(year, 1, 1)
         elapsed = (today - jan1).days + 1  # include today
         days_in_year = 366 if calendar.isleap(year) else 365
@@ -1903,6 +1904,19 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             year_figures=self._year_figures(self.data.tariff, ytd_m3, ytd_cost),
         )
         self.async_update_listeners()
+
+
+def _priced_on(year: int) -> date:
+    """The day a round folded for ``year`` is priced on.
+
+    Today, unless the clock moved on mid-round. Then the year the round is
+    about, which is the one its consumption belongs to: its last day when
+    the clock is already past it, its first when the clock stepped back.
+    """
+    today = dt_util.now().date()
+    if today.year == year:
+        return today
+    return date(year, 12, 31) if today.year > year else date(year, 1, 1)
 
 
 def _cost_basis(

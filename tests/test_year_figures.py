@@ -182,8 +182,11 @@ def _a_year_of_water() -> list[dict[str, Any]]:
     return _buckets(_span(_TODAY - timedelta(days=396), _TODAY - timedelta(days=1)))
 
 
-async def _setup_entry(hass: HomeAssistant, rows: Any) -> MockConfigEntry:
-    """Set an entry up on a meter at 100 m³ whose year so far is 20 m³."""
+async def _setup_entry(
+    hass: HomeAssistant, rows: Any, ytd: AsyncMock | None = None
+) -> MockConfigEntry:
+    """Set an entry up on a meter at 100 m³ whose year so far is 20 m³,
+    or whatever ``ytd`` has the recorder say."""
     await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
     entry = MockConfigEntry(
@@ -204,7 +207,7 @@ async def _setup_entry(hass: HomeAssistant, rows: Any) -> MockConfigEntry:
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=ytd or AsyncMock(return_value=20.0)),
         patch(_FULL_YEAR, new=AsyncMock(return_value=None)),
         patch(_ROWS, new=rows),
     ):
@@ -358,4 +361,30 @@ async def test_a_running_bill_held_by_its_floor_carries_into_the_year_end(
     figures = coordinator._year_figures(tariff, 20.0, on_today + 5.0)
     assert figures.projected_end_cost_eur == pytest.approx(
         compute_annual_cost(tariff, 46.75, 1) + 5.0
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_tick_that_returns_after_midnight_projects_the_year_it_folded(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """A tick folding 31 December whose recorder query ends in January.
+
+    Read off the clock, the projection added last year's whole rest to the
+    year just closed and published 180.75 m3 for a 90 m3 year.
+    """
+    freezer.move_to("2026-12-31 22:59:50+00:00")  # 23:59:50 in Brussels
+    rows = AsyncMock(return_value=_buckets(_span(date(2025, 11, 1), date(2026, 12, 30))))
+
+    async def _past_midnight(*_args: Any) -> float:
+        freezer.tick(timedelta(seconds=20))
+        return 90.0
+
+    entry = await _setup_entry(hass, rows, AsyncMock(side_effect=_past_midnight))
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert dt_util.now().year == 2027
+    assert coordinator.data.ytd_consumption_m3 == 90.0
+    assert coordinator.data.year_figures.projected_m3 == 90.0
+    assert coordinator.data.year_figures.projected_end_cost_eur == compute_annual_cost(
+        _tariff(), 90.0, 1
     )
