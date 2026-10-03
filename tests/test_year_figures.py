@@ -52,6 +52,7 @@ from custom_components.be_water_prices.const import (
 )
 from custom_components.be_water_prices.coordinator import (
     RecorderUnavailable,
+    YearFigures,
     _metered_m3,
     _recorder_ytd_m3,
     _rest_of_year_m3,
@@ -420,3 +421,38 @@ async def test_a_refused_day_is_not_warned_about_on_every_read(
         await _recorder_ytd_m3(hass, "sensor.water_meter", date(2026, 1, 1), _TODAY)
     refused = [r for r in caplog.records if "ignoring a single change of 500.0" in r.getMessage()]
     assert [r.levelno for r in refused] == [logging.WARNING]
+
+
+@pytest.mark.asyncio
+async def test_a_read_of_another_meter_is_not_kept(hass: HomeAssistant, freezer: Any) -> None:
+    """The Energy dashboard can point at another meter with no reload. The
+    old meter's year is not that meter's, even when its own read fails."""
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.data.year_figures.rolling_m3 == pytest.approx(91.25)
+    hass.states.async_set("sensor.other_meter", "40")
+    with (
+        patch.object(
+            coordinator, "async_resolve_meter_entity", AsyncMock(return_value="sensor.other_meter")
+        ),
+        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_ROWS, new=AsyncMock(side_effect=RecorderUnavailable("locked"))),
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert coordinator.data.year_figures == YearFigures()
+
+
+@pytest.mark.asyncio
+async def test_a_meter_that_goes_away_takes_its_year_along(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.data.year_figures.rolling_m3 == pytest.approx(91.25)
+    with patch.object(coordinator, "async_resolve_meter_entity", AsyncMock(return_value=None)):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert coordinator.data.year_figures == YearFigures()
