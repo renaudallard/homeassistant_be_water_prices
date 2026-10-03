@@ -33,7 +33,7 @@ import json
 import logging
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from functools import partial
@@ -170,6 +170,16 @@ _IMPLAUSIBLE_JUMP_M3 = 100.0
 _MAX_STEP_M3 = 30.0
 
 _SECONDS_PER_DAY = 86400.0
+
+# How far back the year figures read the meter: the rolling year's 365
+# closed days and the month before them, which proves the meter was already
+# running when the year opened. Last year's remaining days fall inside it.
+_METERED_DAYS = 365 + 31
+
+# How long a read of them stands in for one the recorder could not answer.
+# Long enough to ride out a locked or restarting database, short enough
+# that a recorder which stays broken does not publish an old year as today's.
+_METERED_HOLD = timedelta(days=7)
 
 # What a day out of sight may add to the step bound. A household uses
 # 80-100 m3 in a year, so a full cubic metre a day is already several
@@ -841,6 +851,19 @@ def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
     )
 
 
+@dataclass(frozen=True)
+class YearFigures:
+    """The rolling year and the calendar year's projection, read off the meter.
+
+    Each is ``None`` until the meter's statistics cover the days it needs.
+    """
+
+    rolling_m3: float | None = None
+    rolling_cost_eur: float | None = None
+    projected_m3: float | None = None
+    projected_end_cost_eur: float | None = None
+
+
 @dataclass
 class CoordinatorData:
     tariff: WaterTariff
@@ -851,6 +874,16 @@ class CoordinatorData:
     projected_annual_cost_eur: float | None = None
     current_year_cost_eur: float | None = None
     ytd_consumption_m3: float | None = None
+    year_figures: YearFigures = field(default_factory=YearFigures)
+
+
+@dataclass(frozen=True)
+class _MeteredDays:
+    """Each closed day's water as the recorder held it for ``meter`` on ``read_on``."""
+
+    meter: str
+    read_on: date
+    days: dict[date, float]
 
 
 async def _archived_row(
@@ -939,6 +972,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # with no reload at all, and that is a different year's worth of
         # water.
         self._projection_checked: tuple[str, int, float] | None = None
+        # The meter's closed days back to a month before the rolling year,
+        # read once a day: the rolling year and the rest of the calendar
+        # year, taken from last year's same days, both come off it.
+        self._metered: _MeteredDays | None = None
         self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
         super().__init__(
             hass,
@@ -1003,6 +1040,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             projected_annual_cost_eur=self._project_cost(tariff),
             current_year_cost_eur=ytd_cost,
             ytd_consumption_m3=ytd_m3,
+            year_figures=self._year_figures(tariff, ytd_m3, ytd_cost),
         )
         self._last_good = data
         self._sync_repair_issue(data)
@@ -1132,6 +1170,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             projected_annual_cost_eur=self._project_cost(tariff),
             current_year_cost_eur=ytd_cost,
             ytd_consumption_m3=ytd_m3,
+            year_figures=self._year_figures(tariff, ytd_m3, ytd_cost),
         )
         if card is not None:
             # From here on the archived card is the last good snapshot,
@@ -1338,9 +1377,77 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _project_cost(self, tariff: WaterTariff) -> float | None:
         opts = self.entry.options
         consumption = float(opts.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3))
+        return self._annual_cost(tariff, consumption)
+
+    def _annual_cost(self, tariff: WaterTariff, m3: float) -> float | None:
+        """A year's bill for ``m3`` on ``tariff``, for this household."""
+        opts = self.entry.options
         persons = int(opts.get(CONF_PERSONS, DEFAULT_PERSONS))
         social = bool(opts.get(CONF_SOCIAL_TARIFF, False))
-        return compute_annual_cost(tariff, consumption, persons, social_tariff=social)
+        return compute_annual_cost(tariff, m3, persons, social_tariff=social)
+
+    async def _read_metered_days(self, meter: str) -> None:
+        """Read the meter's closed days for :meth:`_year_figures`.
+
+        Once a day: the days are closed, so a second read the same day
+        finds the same water. A read that fails keeps what an earlier one
+        found for this meter for up to :data:`_METERED_HOLD`, so a database
+        hiccup leaves the figures a day behind rather than unknown until
+        the next tick.
+        """
+        today = dt_util.now().date()
+        held = self._metered
+        if held is not None and held.meter == meter and held.read_on == today:
+            return
+        start = today - timedelta(days=_METERED_DAYS)
+        end = today - timedelta(days=1)
+        try:
+            rows = await _recorder_daily_rows(self.hass, meter, start, end)
+        except RecorderUnavailable as err:
+            _LOGGER.debug("could not read the last year of %s: %s", meter, err)
+            if held is not None and (held.meter != meter or today - held.read_on > _METERED_HOLD):
+                self._metered = None
+            return
+        admitted, _refused = _admitted_changes(rows, meter, start, end)
+        days = {
+            dt_util.as_local(datetime.fromtimestamp(bucket, UTC)).date(): m3
+            for bucket, m3 in admitted
+            if bucket is not None
+        }
+        self._metered = _MeteredDays(meter=meter, read_on=today, days=days)
+
+    def _year_figures(
+        self, tariff: WaterTariff, ytd_m3: float | None, ytd_cost: float | None
+    ) -> YearFigures:
+        """The rolling year and the year-end projection on ``tariff``.
+
+        The rolling year is the 365 closed days before the last read,
+        priced as a year. The projection is the year so far plus last
+        year's same remaining days, and its cost is the running bill plus
+        what that rest adds to it: a running bill its floor holds above
+        today's card carries into the year end rather than being priced
+        away.
+        """
+        metered = self._metered
+        if metered is None or metered.meter != self._meter_entity_id:
+            return YearFigures()
+        now = dt_util.now()
+        rolling = _rolling_year_m3(metered.days, metered.read_on)
+        rest = _rest_of_year_m3(metered.days, now.date())
+        projected = end_cost = None
+        if rest is not None and ytd_m3 is not None:
+            projected = ytd_m3 + rest
+            if ytd_cost is not None:
+                so_far = self._ytd_cost_from_m3(tariff, ytd_m3, now.year)
+                whole = self._annual_cost(tariff, projected)
+                if so_far is not None and whole is not None:
+                    end_cost = round(ytd_cost + whole - so_far, 2)
+        return YearFigures(
+            rolling_m3=rolling,
+            rolling_cost_eur=None if rolling is None else self._annual_cost(tariff, rolling),
+            projected_m3=projected,
+            projected_end_cost_eur=end_cost,
+        )
 
     async def async_resolve_meter_entity(self) -> str | None:
         """Return the water-meter entity_id to query for YTD computations.
@@ -1581,6 +1688,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._meter_entity_id = meter
             self.async_setup_live_tracking()
         if not meter:
+            self._metered = None
             return None, None
         # Before anything reads the meter or folds the cycle, not after:
         # this awaits a recorder query, and an await between the fold and
@@ -1593,6 +1701,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             await self._sync_projection_issue(meter)
         except Exception:
             _LOGGER.exception("could not check the projection against a metered year")
+        # Before the fold for the same reason.
+        try:
+            await self._read_metered_days(meter)
+        except Exception:
+            _LOGGER.exception("could not read the last year of %s", meter)
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         recorder_m3: float | None = None
@@ -1777,14 +1890,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # forward on every draw and never come due.
         # snapshot_age_hours is deliberately left alone: a meter draw says
         # nothing about how old the tariff snapshot is, and refreshing it here
-        # changed an attribute on every entity on every reading, so all eight
-        # sensors wrote a recorder row per draw instead of the two that
+        # changed an attribute on every entity on every reading, so every
+        # sensor wrote a recorder row per draw instead of the ones that
         # actually moved. It advances on the daily tick, as it already does on
         # an install with no meter at all.
+        # The year-end projection is the year so far plus a rest that only
+        # the daily tick reads, so it moves with the year.
         self.data = replace(
             self.data,
             ytd_consumption_m3=ytd_m3,
             current_year_cost_eur=ytd_cost,
+            year_figures=self._year_figures(self.data.tariff, ytd_m3, ytd_cost),
         )
         self.async_update_listeners()
 
@@ -2142,16 +2258,40 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     Collapsing both into ``None`` is what every year-stamp and deferral
     guard in this module was re-deriving one call later.
     """
-    total = 0.0
-    # How many buckets a guard refused, and how many it admitted. The
-    # first-bucket trim below is not a refusal: it is a boundary artefact,
-    # not evidence about the year. A year every guard rejects sums to the
-    # same 0.0 as a year with no statistics at all, and the caller may anchor an empty year at zero
-    # but not an unreadable one: a cumulative meter that republishes 0 on
-    # a nightly reconnect leaves every bucket carrying the whole register,
-    # all of them dropped, and the year restarted at zero with the water
-    # already used lost until January.
-    admitted = 0
+    rows = await _recorder_daily_rows(hass, entity_id, start, end)
+    admitted, refused = _admitted_changes(rows, entity_id, start, end)
+    if not admitted and refused > _REFUSALS_BEFORE_UNREADABLE:
+        # Every bucket the year had was refused, and there were enough of
+        # them to mean something. A handful is not enough: on 1 and 2
+        # January a year has one or two buckets, and if a reset or a
+        # backwards day is what they hold, the year really has used
+        # nothing yet and anchoring it at zero is right.
+        raise RecorderUnavailable(
+            f"every one of {refused} daily buckets for {entity_id} was refused; "
+            "the year cannot be read rather than being empty"
+        )
+    # No admitted change is negative any more, but the floor stays: it
+    # costs nothing and the sensor must never read negative.
+    return max(0.0, sum(m3 for _bucket, m3 in admitted))
+
+
+def _admitted_changes(
+    rows: list[Any], entity_id: str, start: date, end: date
+) -> tuple[list[tuple[float | None, float]], int]:
+    """The daily changes in ``rows`` over ``[start, end]`` that read as water.
+
+    Returns each admitted change with the start of the bucket it was
+    booked in, and how many buckets a guard refused.
+    """
+    # The first-bucket trim below is not a refusal: it is a boundary
+    # artefact, not evidence about the year. A year every guard rejects
+    # sums to the same 0.0 as a year with no statistics at all, and the
+    # caller may anchor an empty year at zero but not an unreadable one: a
+    # cumulative meter that republishes 0 on a nightly reconnect leaves
+    # every bucket carrying the whole register, all of them dropped, and
+    # the year restarted at zero with the water already used lost until
+    # January.
+    admitted: list[tuple[float | None, float]] = []
     refused = 0
     # A register drop waiting for the bucket after it, see below.
     pending_drop = 0.0
@@ -2169,7 +2309,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     # bucket of their own sit between this and the next one, and their
     # water is in whichever bucket comes next.
     previous = dt_util.start_of_local_day(start).timestamp() - _SECONDS_PER_DAY
-    for index, row in enumerate(await _recorder_daily_rows(hass, entity_id, start, end)):
+    for index, row in enumerate(rows):
         delta = row.get("change")
         if delta is None:
             continue
@@ -2225,8 +2365,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
             if _exceeds_a_day(netted, entity_id, "netted", gap_days):
                 refused += 1
                 continue
-            total += netted
-            admitted += 1
+            admitted.append((bucket, netted))
             continue
         if _change_exceeds_the_register(row):
             # A register cannot consume more than it reads. Home Assistant
@@ -2246,21 +2385,8 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
         if _exceeds_a_day(float(delta), entity_id, "single", gap_days):
             refused += 1
             continue
-        total += float(delta)
-        admitted += 1
-    if not admitted and refused > _REFUSALS_BEFORE_UNREADABLE:
-        # Every bucket the year had was refused, and there were enough of
-        # them to mean something. A handful is not enough: on 1 and 2
-        # January a year has one or two buckets, and if a reset or a
-        # backwards day is what they hold, the year really has used
-        # nothing yet and anchoring it at zero is right.
-        raise RecorderUnavailable(
-            f"every one of {refused} daily buckets for {entity_id} was refused; "
-            "the year cannot be read rather than being empty"
-        )
-    # Nothing above can push the total below zero any more, but the floor
-    # stays: it costs nothing and the sensor must never read negative.
-    return max(0.0, total)
+        admitted.append((bucket, float(delta)))
+    return admitted, refused
 
 
 def _exceeds_a_day(change: float, entity_id: str, kind: str, gap_days: float = 0.0) -> bool:
@@ -2422,6 +2548,69 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
         days += 1
         total += float(delta)
     days_in_year = 366 if calendar.isleap(year) else 365
-    if not (before_year and into_december) or 3 * days < 2 * days_in_year:
+    if not (before_year and into_december) or not _enough_days(days, days_in_year):
         return None
     return total
+
+
+def _enough_days(days: int, length: int) -> bool:
+    """Whether buckets on ``days`` of a period's ``length`` days cover it.
+
+    Two days in three, which a household away for the summer clears and a
+    meter that was down for most of the period does not.
+    """
+    return 3 * days >= 2 * length
+
+
+def _metered_m3(days: Mapping[date, float], start: date, end: date) -> float | None:
+    """What the meter recorded over ``[start, end]``, or ``None`` unless it
+    recorded all of it.
+
+    ``days`` holds each day's admitted water. The window is judged the way
+    :func:`_recorder_full_year_m3` judges a calendar year: a bucket in the
+    month before it proves the meter was already running when it opened,
+    one in its last month that it still was when it closed, and buckets on
+    two days in three in between that it was not away for most of it. An
+    empty window holds no water.
+    """
+    if end < start:
+        return 0.0
+    month = timedelta(days=31)
+    if not any(start - month <= day < start for day in days):
+        return None
+    if not any(end - month < day <= end for day in days):
+        return None
+    inside = [m3 for day, m3 in days.items() if start <= day <= end]
+    if not _enough_days(len(inside), (end - start).days + 1):
+        return None
+    return sum(inside)
+
+
+def _rolling_year_m3(days: Mapping[date, float], today: date) -> float | None:
+    """What the meter recorded over the 365 days before ``today``.
+
+    Closed days only: the figure is read once a tick, and a part of today
+    frozen in it until the next one would be neither a day nor nothing.
+    """
+    return _metered_m3(days, today - timedelta(days=365), today - timedelta(days=1))
+
+
+def _rest_of_year_m3(days: Mapping[date, float], today: date) -> float | None:
+    """What the meter recorded last year from tomorrow's date to 31 December.
+
+    The stand-in for what the rest of this year will use. Water follows the
+    household's own season, a garden in summer or a pool filled in May, so
+    last year's same days say more about it than a share of a yearly total.
+    """
+    tomorrow = today + timedelta(days=1)
+    try:
+        start = tomorrow.replace(year=tomorrow.year - 1)
+    except ValueError:  # 29 February has no twin
+        start = date(tomorrow.year - 1, 2, 28)
+    rest = _metered_m3(days, start, date(today.year - 1, 12, 31))
+    if rest is not None and calendar.isleap(today.year - 1):
+        leap_day = date(today.year - 1, 2, 29)
+        if start <= leap_day:
+            # Nor has last year's in a year without one.
+            rest -= days.get(leap_day, 0.0)
+    return rest

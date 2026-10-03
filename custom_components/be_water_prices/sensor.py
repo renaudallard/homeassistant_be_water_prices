@@ -177,6 +177,22 @@ def _ytd_consumption(data: CoordinatorData) -> float | None:
     return data.ytd_consumption_m3
 
 
+def _rolling_year_consumption(data: CoordinatorData) -> float | None:
+    return data.year_figures.rolling_m3
+
+
+def _rolling_year_cost(data: CoordinatorData) -> float | None:
+    return data.year_figures.rolling_cost_eur
+
+
+def _projected_year_consumption(data: CoordinatorData) -> float | None:
+    return data.year_figures.projected_m3
+
+
+def _projected_year_end_cost(data: CoordinatorData) -> float | None:
+    return data.year_figures.projected_end_cost_eur
+
+
 SENSORS: tuple[WaterSensorDescription, ...] = (
     WaterSensorDescription(
         key="yearly_fee",
@@ -261,6 +277,42 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
         value_fn=_ytd_consumption,
         last_reset_fn=_jan_1_local,
     ),
+    # The four below are levels revised both ways, not accumulators, so
+    # MEASUREMENT for the same reason as projected_annual_cost. That rules
+    # out the WATER device class on the volumes, which Home Assistant only
+    # accepts with TOTAL or TOTAL_INCREASING.
+    WaterSensorDescription(
+        key="rolling_year_consumption",
+        translation_key="rolling_year_consumption",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=_rolling_year_consumption,
+    ),
+    WaterSensorDescription(
+        key="rolling_year_cost",
+        translation_key="rolling_year_cost",
+        native_unit_of_measurement=EUR_PER_YEAR,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=_rolling_year_cost,
+    ),
+    WaterSensorDescription(
+        key="projected_year_consumption",
+        translation_key="projected_year_consumption",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=_projected_year_consumption,
+    ),
+    WaterSensorDescription(
+        key="projected_year_end_cost",
+        translation_key="projected_year_end_cost",
+        native_unit_of_measurement=CURRENCY_EURO,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=_projected_year_end_cost,
+    ),
 )
 
 
@@ -271,12 +323,12 @@ def _is_applicable(desc: WaterSensorDescription, *, region: str) -> bool:
     for Brussels or Wallonia entries leaves it permanently ``unknown``,
     which is just noise on the device card.
 
-    The YTD pair (current_year_cost + ytd_consumption) is always
-    created: even without a configured water meter the entities show
-    as ``unavailable`` until the user wires one up via the OptionsFlow
-    OR via the Energy dashboard. Adding the meter via the OptionsFlow
-    triggers a reload; adding it via the Energy dashboard now also
-    surfaces values on the next coordinator tick without requiring an
+    The meter-driven sensors (the YTD pair and the rolling and projected
+    year) are always created: even without a configured water meter the
+    entities show as ``unavailable`` until the user wires one up via the
+    OptionsFlow OR via the Energy dashboard. Adding the meter via the
+    OptionsFlow triggers a reload; adding it via the Energy dashboard now
+    also surfaces values on the next coordinator tick without requiring an
     HA restart, because the entity is already there waiting.
     """
     return not (desc.key == "comfort_rate" and region != REGION_FLANDERS)

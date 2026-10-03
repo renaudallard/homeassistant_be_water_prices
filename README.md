@@ -59,6 +59,7 @@ publication and how to parse it.
 - **Postcode auto-resolution** — enter your postcode and the right utility is picked automatically. Fall through to a manual picker for the long tail.
 - **Projected annual cost** — every entry has a `projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
 - **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice. Only one meter is billed: if the dashboard lists several water sources the first is used, a warning says how many are being ignored, and the override field is how you pick.
+- **Rolling year and year-end projection** — what your meter recorded over the last 365 days and what a year like that costs at today's tariff, and where this year's consumption and bill will stand on 31 December, the rest of the year taken from your meter's same days last year.
 - **Translated UI** — English, Dutch, French and German.
 - **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own, and a year holding a bucket that claims more than the days behind it could hold is not offered at all: that is a re-based or reset counter rather than water, and it would otherwise be proposed as your yearly consumption. The days behind it count because a meter that was away comes back with the whole absence in one bucket, and a year that really did have an outage is still a year worth offering.
 - **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive.
@@ -181,11 +182,11 @@ entry and `sensor.de_watergroep_projected_annual_cost` for a De
 Watergroep one. The table below lists the suffix; rename the device
 and the prefix follows.
 
-Up to eight entities per entry: `comfort_rate` only appears for
-Flemish utilities; `current_year_cost` and `year_to_date_consumption`
-are always created and report `unknown` until a water meter is wired up
-(explicit override in the OptionsFlow, or auto-discovered from the
-Energy dashboard). The next coordinator tick after the meter shows
+Up to twelve entities per entry: `comfort_rate` only appears for
+Flemish utilities; `current_year_cost`, `year_to_date_consumption` and
+the four rolling and projected year sensors are always created and
+report `unknown` until a water meter is wired up (explicit override in
+the OptionsFlow, or auto-discovered from the Energy dashboard). The next coordinator tick after the meter shows
 up fills in the values without an HA restart. Re-pointing the Energy
 dashboard at a different water meter is picked up the same way: the
 following tick re-anchors on the new meter and live tracking moves
@@ -215,6 +216,10 @@ All five of the rows above are **tariff-card figures**: they are what your opera
 | `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
 | `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure only goes **down for a reason**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease. The one thing that can lower it is the recorder, and only when it has already reported for this year and its latest answer is at or above every earlier one, so its history is intact. That is what takes back a meter spike small enough to have been admitted, which used to stand until January — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover, a confirmed meter swap, or pointing the integration at a different meter. The mark is measured for a household, so changing your commune, `gedomicilieerd_persons` or `social_tariff` rebuilds it from what you owe now rather than holding the old figure. Returns `unknown` until a water meter is configured in the options step. The meter's unit must be one Home Assistant can convert to m³ (`m³`, `L`, `gal`, `ft³`, `CCF`, …), or one that needs no converting because it already is cubic metres: no unit at all, or the ASCII spelling `m3`. A sensor labelled with anything else is refused rather than read as cubic metres, which is what a lowercase `l` used to do at 1000× the bill. |
 | `year_to_date_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark, so the only thing that lowers it mid-year is a recorder answer with the year's own statistics behind it. Companion to `current_year_cost`. A daily statistics bucket claiming more than 100 m³ is ignored: no household draws that in a day, so it reads as a counter re-based onto the real meter reading or a register reset rather than water. That bound grows with the days behind the bucket, by the same cubic metre a day, because a bucket is not always one day of water: Home Assistant compiles nothing while a meter is away and puts the whole absence in the bucket it comes back in, so read as one day a real catch-up looked like a re-based register and was thrown away. The live meter is bounded too, and more tightly: one report may advance the year by 30 m³ before it is held for confirmation and put to the recorder, since an hour of a domestic connection at full bore is about 20 m³ and a household uses 80-100 m³ in a year. A meter that has been out of sight gets more room, in proportion to how long it was away: it comes back showing everything drawn while it was down, and the allowance grows by a cubic metre for each day of the gap, which is several times what any household draws in one. That gap is measured across restarts, since Home Assistant being down is the longest a meter goes unseen. The recorder is not short of that water, whatever the gap: Home Assistant carries the running total forward and attributes the whole increase to the moment the meter comes back, so the two agree again as soon as it does. A recorder answer read in the same round still settles a step that goes beyond what the gap allows. And a recorder answer that still has the year behind it settles the round outright: it reads the same meter's own statistics for the whole year, so water it has no record of did not flow. The figure resumes as soon as a reading and the recorder agree. |
+| `rolling_year_consumption` | m³ the meter recorded over the 365 days before today. See [Rolling year and year-end projection](#rolling-year-and-year-end-projection). |
+| `rolling_year_cost` | VAT-incl EUR/year for `rolling_year_consumption` billed as a year on today's card: what a year like your last one costs at today's prices. |
+| `projected_year_consumption` | m³ `year_to_date_consumption` will stand at on 31 December: the year so far plus what the meter recorded over the same remaining days last year. |
+| `projected_year_end_cost` | VAT-incl EUR `current_year_cost` will stand at on 31 December, on today's card. |
 
 Each sensor exposes `utility`, `region`, `valid_from`, `valid_until`,
 `publication_label`, `source_url`, `snapshot_age_hours`, `snapshot_stale`
@@ -374,6 +379,10 @@ you paid is worth more than a tidy chart.
   recompute immediately (in-memory, no extra recorder or network call).
   A live update never defers the 24 h tariff refresh above, however often
   the meter reports.
+- **Rolling and projected year** — the meter's history is read once a
+  day. `projected_year_consumption` and `projected_year_end_cost` then
+  move with each meter reading, like the running figures they extend;
+  the rolling year moves with the daily read.
   The January 1 meter reading is anchored once from the recorder and
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the
@@ -517,6 +526,38 @@ already yields the figure this wants.
 The year-to-date sensors are unaffected either way: they always read the
 meter, never this setting.
 
+### Rolling year and year-end projection
+
+Four sensors read the meter's own history rather than the consumption
+you typed:
+
+- `rolling_year_consumption` is what the meter recorded over the 365
+  days before today. Today is left out: the history is read once a day,
+  and part of a day frozen in the figure until the next read would be
+  neither the day nor nothing.
+- `rolling_year_cost` bills that volume as a year on today's card, fees,
+  household size and social tariff included. It is what a year like the
+  last one costs at today's prices, an indication rather than a forecast.
+- `projected_year_consumption` is the year so far plus what the meter
+  recorded over the same remaining days last year, so the rest of the
+  year follows your own season (a garden in summer, a pool filled in May)
+  rather than an average day.
+- `projected_year_end_cost` is `current_year_cost` plus what those days
+  add on today's card: their water through whatever is left of the
+  blocks, and the rest of the year's fees. A running bill held above
+  today's card by its high-water mark stays in it.
+
+A window only counts if the meter covered it, by the rule the Repair
+above applies to a calendar year: a statistics bucket in the month
+before it, one in its last month, and buckets on at least two days in
+three in between. Each day goes through the same checks as the year to
+date, so a bucket claiming more water than the days behind it could hold
+is dropped, and a register that went backwards is netted against the day
+after it. Until the recorder holds about a year of the meter, all four
+report `unknown`. A read that fails keeps the last one for up to a week,
+so a database hiccup leaves the figures a day behind rather than
+`unknown`.
+
 ### Failure mode
 
 If a refresh fails, or does not finish within three minutes, the
@@ -590,9 +631,10 @@ daily tick checks the gate too, so an install that never restarts
 between January and the card landing still gets the rewrite. If the
 snapshot is stale it waits instead, so a year is never filled in with
 rates that had already expired. The window also stops at the tariff's own
-`valid_until`. The YTD sensors
-(`current_year_cost`, `year_to_date_consumption`) are intentionally excluded
-because their values come from the user's actual meter history.
+`valid_until`. The meter-driven sensors
+(`current_year_cost`, `year_to_date_consumption` and the rolling and
+projected year) are intentionally excluded because their values come from
+the user's actual meter history.
 
 To re-run the backfill on demand (e.g. after fixing a wrong tariff
 or extending coverage to an earlier date), call the
@@ -627,7 +669,8 @@ and clears nothing, and says so in the log at info level.
 **Settings → Devices & services → Belgian Water Prices →** three-dot
 menu **→ Download diagnostics** dumps the active config, the last
 parsed `WaterTariff` (every component plus validity window), the
-fetch metadata, and the projected and running costs. The postcode, the
+fetch metadata, the projected and running costs, and the rolling and
+projected year. The postcode, the
 commune and the water-meter entity id are redacted, and the commune is
 scrubbed out of every other value too: the publication label, the source
 URL, the error text and the price-history gate, which names the commune

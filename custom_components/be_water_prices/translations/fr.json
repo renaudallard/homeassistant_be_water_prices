@@ -133,6 +133,18 @@
       },
       "ytd_consumption": {
         "name": "Consommation depuis le 1er janvier"
+      },
+      "rolling_year_consumption": {
+        "name": "Consommation sur 12 mois glissants"
+      },
+      "rolling_year_cost": {
+        "name": "Coût sur 12 mois glissants"
+      },
+      "projected_year_consumption": {
+        "name": "Consommation annuelle prévue"
+      },
+      "projected_year_end_cost": {
+        "name": "Coût prévu en fin d'année"
       }
     }
   },

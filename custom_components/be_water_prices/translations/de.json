@@ -133,6 +133,18 @@
       },
       "ytd_consumption": {
         "name": "Verbrauch dieses Jahr"
+      },
+      "rolling_year_consumption": {
+        "name": "Verbrauch der letzten 12 Monate"
+      },
+      "rolling_year_cost": {
+        "name": "Kosten der letzten 12 Monate"
+      },
+      "projected_year_consumption": {
+        "name": "Erwarteter Jahresverbrauch"
+      },
+      "projected_year_end_cost": {
+        "name": "Erwartete Kosten zum Jahresende"
       }
     }
   },

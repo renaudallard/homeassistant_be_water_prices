@@ -117,7 +117,11 @@
       "all_in_basis": {"name": "All-in basis rate"},
       "projected_annual_cost": {"name": "Projected annual cost"},
       "current_year_cost": {"name": "Current year cost"},
-      "ytd_consumption": {"name": "Year-to-date consumption"}
+      "ytd_consumption": {"name": "Year-to-date consumption"},
+      "rolling_year_consumption": {"name": "Rolling year consumption"},
+      "rolling_year_cost": {"name": "Rolling year cost"},
+      "projected_year_consumption": {"name": "Projected year consumption"},
+      "projected_year_end_cost": {"name": "Projected year-end cost"}
     }
   },
   "services": {

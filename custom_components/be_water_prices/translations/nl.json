@@ -133,6 +133,18 @@
       },
       "ytd_consumption": {
         "name": "Verbruik dit jaar"
+      },
+      "rolling_year_consumption": {
+        "name": "Verbruik afgelopen 12 maanden"
+      },
+      "rolling_year_cost": {
+        "name": "Kosten afgelopen 12 maanden"
+      },
+      "projected_year_consumption": {
+        "name": "Verwacht jaarverbruik"
+      },
+      "projected_year_end_cost": {
+        "name": "Verwachte kosten op het jaareinde"
       }
     }
   },

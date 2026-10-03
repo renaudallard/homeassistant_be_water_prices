@@ -66,6 +66,7 @@ async def async_get_config_entry_diagnostics(
             "projected_annual_cost_eur": data.projected_annual_cost_eur,
             "current_year_cost_eur": data.current_year_cost_eur,
             "ytd_consumption_m3": data.ytd_consumption_m3,
+            "year_figures": asdict(data.year_figures),
             "last_error": data.last_error,
         }
         if data is not None
