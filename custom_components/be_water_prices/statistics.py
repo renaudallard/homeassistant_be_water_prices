@@ -70,12 +70,14 @@ ATTR_CLEAR = "clear"
 # the flat line into the new year automatically.
 DATA_BACKFILL_YEAR = "backfill_year"
 
-# Sensor keys eligible for backfill: MEASUREMENT-class scalars derivable
-# from the latest tariff. The TOTAL-class YTD sensors are excluded on
-# purpose -- their values come from the user's water meter history.
 # How many hourly rows to build between yields to the event loop.
 _BACKFILL_YIELD_EVERY = 744  # a long month
 
+# Sensor keys eligible for backfill: the card's rates and fee, read
+# straight off the latest tariff. The meter-driven sensors are excluded on
+# purpose, since their values come from the user's water meter history,
+# and so is the projected annual cost, which is computed from the
+# configured consumption rather than read off the card.
 _BACKFILL_KEYS: tuple[str, ...] = (
     "yearly_fee",
     "basis_rate",
