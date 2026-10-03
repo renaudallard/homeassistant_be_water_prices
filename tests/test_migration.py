@@ -57,6 +57,15 @@ async def test_an_entry_from_a_newer_release_says_why_it_cannot_load(
     assert await hass.config_entries.async_setup(entry.entry_id) is False
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.MIGRATION_ERROR
+    # Releases after 2026.2.3 refuse a newer entry themselves, before the
+    # integration is asked; the older ones leave it to async_migrate_entry.
+    # Either way one error says which version the entry carries.
     ours = [r.getMessage() for r in caplog.records if r.name.startswith("custom_components")]
-    assert len(ours) == 1
-    assert "newer release (version 3" in ours[0]
+    theirs = [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "homeassistant.config_entries" and "version 3" in r.getMessage()
+    ]
+    assert len(ours) + len(theirs) == 1
+    if ours:
+        assert "newer release (version 3" in ours[0]
