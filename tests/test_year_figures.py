@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -207,6 +209,17 @@ async def _setup_entry(
         unique_id=f"{DOMAIN}_vivaqua",
     )
     entry.add_to_hass(hass)
+    with _card_and_recorder(rows, ytd, full_year):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    return entry
+
+
+@contextmanager
+def _card_and_recorder(
+    rows: Any, ytd: AsyncMock | None = None, full_year: AsyncMock | None = None
+) -> Iterator[None]:
+    """The card a setup fetches and the recorder it reads."""
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _tariff()
@@ -218,9 +231,7 @@ async def _setup_entry(
         patch(_FULL_YEAR, new=full_year or AsyncMock(return_value=None)),
         patch(_ROWS, new=rows),
     ):
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
-    return entry
+        yield
 
 
 def _state(hass: HomeAssistant, key: str) -> float:
@@ -488,3 +499,116 @@ async def test_setup_does_not_wait_on_the_meters_year(hass: HomeAssistant, freez
     assert rows.await_count == 1
     assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
     assert _state(hass, "projected_year_consumption") == pytest.approx(20.0 + 26.75)
+
+
+# --- the read kept across a restart -------------------------------------------
+
+
+async def _restart(hass: HomeAssistant, entry: MockConfigEntry, rows: Any) -> None:
+    """Reload the entry, as a restart sets it up, on a recorder answering ``rows``."""
+    with _card_and_recorder(rows):
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+
+
+@pytest.mark.asyncio
+async def test_a_restart_on_the_day_of_the_read_reads_nothing(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    rows = AsyncMock(return_value=[])
+    await _restart(hass, entry, rows)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert rows.await_count == 0
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+
+
+@pytest.mark.asyncio
+async def test_a_restart_publishes_the_last_read_until_the_next_one_lands(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    freezer.tick(timedelta(days=1))
+    release = asyncio.Event()
+    wetter = _buckets(_span(_TODAY - timedelta(days=395), _TODAY, 0.5))
+
+    async def _rows(*_args: Any) -> list[dict[str, Any]]:
+        await release.wait()
+        return wetter
+
+    rows = AsyncMock(side_effect=_rows)
+    await _restart(hass, entry, rows)
+    assert rows.await_count == 1
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+    release.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(182.5)
+
+
+@pytest.mark.asyncio
+async def test_a_read_older_than_the_hold_is_not_restored(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    freezer.tick(timedelta(days=8))
+    release = asyncio.Event()
+
+    async def _rows(*_args: Any) -> list[dict[str, Any]]:
+        await release.wait()
+        return []
+
+    await _restart(hass, entry, AsyncMock(side_effect=_rows))
+    state = hass.states.get("sensor.vivaqua_rolling_year_consumption")
+    assert state is not None
+    assert state.state == "unknown"
+    release.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+
+@pytest.mark.parametrize("day, m3", [("yesterday", 1.0), ("2026-09-14", "a lot")])
+@pytest.mark.asyncio
+async def test_a_record_that_is_not_a_read_is_read_again(
+    hass: HomeAssistant, freezer: Any, hass_storage: dict[str, Any], day: str, m3: Any
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    key = f"{DOMAIN}.{entry.entry_id}.metered"
+    assert hass_storage[key]["data"]["read_on"] == _TODAY.isoformat()
+    hass_storage[key]["data"]["days"][day] = m3
+    rows = AsyncMock(return_value=_a_year_of_water())
+    await _restart(hass, entry, rows)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert rows.await_count == 1
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+
+
+@pytest.mark.asyncio
+async def test_removing_the_entry_removes_its_read(
+    hass: HomeAssistant, freezer: Any, hass_storage: dict[str, Any]
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    key = f"{DOMAIN}.{entry.entry_id}.metered"
+    assert key in hass_storage
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert key not in hass_storage
+
+
+@pytest.mark.asyncio
+async def test_a_read_landing_after_removal_does_not_bring_the_file_back(
+    hass: HomeAssistant, freezer: Any, hass_storage: dict[str, Any]
+) -> None:
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(days=1))
+    with patch(_ROWS, new=AsyncMock(return_value=_a_year_of_water())):
+        await coordinator._read_metered_days("sensor.water_meter")
+    await hass.async_block_till_done()
+    assert f"{DOMAIN}.{entry.entry_id}.metered" not in hass_storage

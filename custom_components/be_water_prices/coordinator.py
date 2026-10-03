@@ -121,6 +121,9 @@ _ARCHIVE_MONTHS_BACK = 12
 # re-bootstrap instead of a failed setup; see _YtdStore.
 _YTD_STORE_VERSION = 1
 _YTD_STORE_MINOR_VERSION = 2
+# The meter's days behind the year figures, in a Store of their own: they
+# are read once a day and have nothing to do with the YTD cycle's shape.
+_METERED_STORE_VERSION = 1
 # Debounce window for the live path's best-effort Store flush. The daily
 # tick and a clean unload save authoritatively; this only bounds how much of
 # the climbing high-water mark a hard crash between ticks can lose.
@@ -325,9 +328,15 @@ def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
     )
 
 
-async def async_remove_ytd_store(hass: HomeAssistant, entry_id: str) -> None:
-    """Delete an entry's persisted YTD cycle anchor."""
+async def async_remove_stores(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete an entry's persisted YTD cycle anchor and its meter's days."""
     await _ytd_store(hass, entry_id).async_remove()
+    await _metered_store(hass, entry_id).async_remove()
+
+
+def _metered_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
+    """The per-entry Store holding the last read of the meter's days."""
+    return Store(hass, _METERED_STORE_VERSION, f"{DOMAIN}.{entry_id}.metered")
 
 
 @dataclass(frozen=True)
@@ -986,6 +995,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._meter_history_deferred = defer_meter_history
         self.meter_history_pending = False
         self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
+        self._metered_store = _metered_store(hass, entry.entry_id)
         super().__init__(
             hass,
             _LOGGER,
@@ -1427,6 +1437,16 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if bucket is not None
         }
         self._metered = _MeteredDays(meter=meter, read_on=today, days=days)
+        if self._owns_the_entry():
+            # Only for the entry this coordinator still speaks for: a read
+            # that lands after a removal would bring the file back.
+            await self._metered_store.async_save(
+                {
+                    "meter": meter,
+                    "read_on": today.isoformat(),
+                    "days": {day.isoformat(): m3 for day, m3 in days.items()},
+                }
+            )
 
     async def _read_meter_history(self, meter: str) -> None:
         """The two reads of a year of the meter: the projection check and
@@ -1636,6 +1656,26 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             _LOGGER.warning("the persisted YTD cycle is not readable; starting a fresh one")
             return
         self._ytd = cycle
+
+    async def async_load_metered_days(self) -> None:
+        """Restore the last read of the meter's days before the first refresh.
+
+        That refresh leaves the read out, so without this the year figures
+        read ``unknown`` after every restart until the read setup starts
+        lands; with it they stand where they stood, and a restart on the
+        day of the read makes none at all. A record older than
+        :data:`_METERED_HOLD` is not adopted, for the reason a failed read
+        stops standing in after it.
+        """
+        try:
+            data = await self._metered_store.async_load()
+        except Exception:
+            _LOGGER.exception("could not load the meter's days; reading them afresh")
+            return
+        held = _metered_from_record(data)
+        if held is None or dt_util.now().date() - held.read_on > _METERED_HOLD:
+            return
+        self._metered = held
 
     async def async_save_ytd_state(self) -> None:
         """Flush a pending cycle change to the Store on a clean unload / reload.
@@ -2054,6 +2094,30 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         # allowance back from the first reading rather than being handed
         # one on the strength of an unknown.
         seen_at=_figure(figures["seen_at"]),
+    )
+
+
+def _metered_from_record(data: object) -> _MeteredDays | None:
+    """The persisted read of the meter's days, or None when the record
+    does not describe one. The file is in .storage where anyone can edit
+    it, and a bad one costs a read, not the entry."""
+    if not isinstance(data, dict):
+        return None
+    meter = data.get("meter")
+    stored = data.get("days")
+    if not isinstance(meter, str) or not isinstance(stored, dict):
+        return None
+    try:
+        read_on = date.fromisoformat(str(data.get("read_on")))
+        days = {date.fromisoformat(str(day)): _figure(m3) for day, m3 in stored.items()}
+    except ValueError:
+        return None
+    if any(m3 is None for m3 in days.values()):
+        return None
+    return _MeteredDays(
+        meter=meter,
+        read_on=read_on,
+        days={day: m3 for day, m3 in days.items() if m3 is not None},
     )
 
 

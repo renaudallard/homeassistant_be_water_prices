@@ -500,8 +500,10 @@ you paid is worth more than a tidy chart.
   four year sensors and the projection Repair is two reads of a year of
   hourly statistics, which on a database on a NAS can take seconds. So
   that refresh leaves them out, and they run right after startup instead
-  of inside it. Until they land, the four year sensors report `unknown`
-  and the projection Repair is not raised.
+  of inside it. The year sensors' read is kept across restarts, so they
+  show what they showed before it until the new read lands, and a restart
+  on the day of that read does not make it again. The projection Repair
+  makes its own read after every restart and is raised once it is in.
 
 ### Keeping the projection honest
 
@@ -562,8 +564,8 @@ date, so a bucket claiming more water than the days behind it could hold
 is dropped, and a register that went backwards is netted against the day
 after it. Until the recorder holds about a year of the meter, all four
 report `unknown`. A read that fails keeps the last one for up to a week,
-so a database hiccup leaves the figures a day behind rather than
-`unknown`.
+across restarts too, so a database hiccup leaves the figures a day behind
+rather than `unknown`.
 
 ### Failure mode
 

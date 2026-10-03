@@ -86,6 +86,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # restart does not re-anchor the running cost down to the recorder's
     # trailing daily total.
     await coordinator.async_load_ytd_state()
+    # And the last read of the meter's days, which the first refresh leaves
+    # for later: the year figures stand where they stood meanwhile.
+    await coordinator.async_load_metered_days()
     # Own the teardown before the first refresh, not after: that refresh
     # resolves the meter and subscribes to it, so a ConfigEntryNotReady
     # here would otherwise leave a live listener behind on every retry.
@@ -211,14 +214,14 @@ def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Delete the entry's persisted YTD anchor when it is removed.
+    """Delete the entry's persisted YTD anchor and meter's days when it is removed.
 
-    Unload alone leaves the Store file behind, so removing and re-adding the
+    Unload alone leaves the Store files behind, so removing and re-adding the
     same utility used to restore a baseline belonging to the deleted entry.
     """
-    from .coordinator import async_remove_ytd_store
+    from .coordinator import async_remove_stores
 
-    await async_remove_ytd_store(hass, entry.entry_id)
+    await async_remove_stores(hass, entry.entry_id)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
