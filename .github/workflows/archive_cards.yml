@@ -284,6 +284,13 @@ jobs:
 
       - name: Commit and push what changed
         id: push
+        # Whatever happened to the cards repository. The branch is what the
+        # integration falls back on, and an expired upload token or a
+        # listings push that lost its races would otherwise stop it until
+        # someone noticed. Nothing here depends on the uploads: a PDF the
+        # manifest does not name is offered again by the next run, and the
+        # coverage sheets list it unlinked until then.
+        if: ${{ !cancelled() && steps.store.outcome == 'success' }}
         env:
           PUSH_TOKEN: ${{ github.token }}
         run: |

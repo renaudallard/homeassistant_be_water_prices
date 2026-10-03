@@ -883,11 +883,13 @@ branch, is not kept in the checkout while the walk runs third-party
 code; only the push is given it. The upload needs a fine-grained token
 with contents read and write on the cards repository in the
 `BE_WATER_CARDS` secret; without it the branch still gets the parsed
-cards and their texts and the step says so. A run that stores nothing, a
-refused push or an expired token files an issue labelled `archive-cards`,
-one per problem with a comment per further failing run, and the token's
-expiry is announced two weeks ahead the same way. A manual run can ask
-for `--reparse` or `--rerender`.
+cards and their texts and the step says so. An upload or a listings push
+that fails, an expired token among them, does not hold the branch back
+either: the PDFs it missed are offered again by the next run. A run that
+stores nothing, a refused push or an expired token files an issue
+labelled `archive-cards`, one per problem with a comment per further
+failing run, and the token's expiry is announced two weeks ahead the
+same way. A manual run can ask for `--reparse` or `--rerender`.
 Water-link is skipped on a runner, as the checks skip it; an archive run
 from a residential address stores it.
 
