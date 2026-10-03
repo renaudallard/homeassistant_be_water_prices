@@ -115,6 +115,12 @@ async def test_no_repair_card_for_an_entry_that_is_no_longer_loaded(hass: HomeAs
         coordinator._sync_repair_issue(stale)
         assert registry.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
 
+        # The state above was only pretended, so unload for real: the
+        # coordinator's refresh timer is still armed and would outlive the
+        # test.
+        entry.mock_state(hass, ConfigEntryState.LOADED)
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
 
 async def test_a_late_refresh_does_not_write_the_store_of_a_removed_entry(
     hass: HomeAssistant, hass_storage: dict[str, Any]
