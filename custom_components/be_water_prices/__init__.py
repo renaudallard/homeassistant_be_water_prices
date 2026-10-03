@@ -79,7 +79,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # commune can be given the right one back.
     _adopt_commune_for_postcode(hass, entry)
     options_changed = entry.options != original_options
-    coordinator = WaterCoordinator(hass, entry)
+    # Its first refresh leaves the reads of the meter's year out, since
+    # Home Assistant waits on it; they are started below once it is in.
+    coordinator = WaterCoordinator(hass, entry, defer_meter_history=True)
     # Restore the persisted YTD baseline before the first refresh so a
     # restart does not re-anchor the running cost down to the recorder's
     # trailing daily total.
@@ -119,6 +121,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # and re-points itself if a later tick resolves a different one; the
     # teardown for whichever subscription is current was registered above.
     coordinator.async_setup_live_tracking()
+    # The reads of the meter's year the first refresh left out. Each covers
+    # a year of hourly statistics, and on a slow database the two took
+    # seconds of a startup stage every integration shares. Tied to the
+    # entry, so an unload cancels them.
+    if coordinator.meter_history_pending:
+        entry.async_create_background_task(
+            hass,
+            coordinator.async_read_meter_history(),
+            f"{DOMAIN} meter history {entry.entry_id}",
+        )
     # Register the OptionsFlow reload listener BEFORE the backfill so
     # any backfill failure (recorder not ready, parser exception,
     # future code addition that raises) does not leave the listener

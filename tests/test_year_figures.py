@@ -40,6 +40,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -186,7 +187,10 @@ def _a_year_of_water() -> list[dict[str, Any]]:
 
 
 async def _setup_entry(
-    hass: HomeAssistant, rows: Any, ytd: AsyncMock | None = None
+    hass: HomeAssistant,
+    rows: Any,
+    ytd: AsyncMock | None = None,
+    full_year: AsyncMock | None = None,
 ) -> MockConfigEntry:
     """Set an entry up on a meter at 100 m³ whose year so far is 20 m³,
     or whatever ``ytd`` has the recorder say."""
@@ -211,7 +215,7 @@ async def _setup_entry(
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(_YTD, new=ytd or AsyncMock(return_value=20.0)),
-        patch(_FULL_YEAR, new=AsyncMock(return_value=None)),
+        patch(_FULL_YEAR, new=full_year or AsyncMock(return_value=None)),
         patch(_ROWS, new=rows),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -456,3 +460,31 @@ async def test_a_meter_that_goes_away_takes_its_year_along(
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert coordinator.data.year_figures == YearFigures()
+
+
+@pytest.mark.asyncio
+async def test_setup_does_not_wait_on_the_meters_year(hass: HomeAssistant, freezer: Any) -> None:
+    """Home Assistant waits on setup inside a startup stage every
+    integration shares, and each of the two reads covers a year of the
+    meter's hourly statistics. They run once setup has returned."""
+    freezer.move_to(_NOW)
+    release = asyncio.Event()
+
+    async def _full_year(*_args: Any) -> None:
+        await release.wait()
+
+    full_year = AsyncMock(side_effect=_full_year)
+    rows = AsyncMock(return_value=_a_year_of_water())
+    entry = await _setup_entry(hass, rows, full_year=full_year)
+    assert entry.state is ConfigEntryState.LOADED
+    assert full_year.await_count == 1
+    assert rows.await_count == 0
+    state = hass.states.get("sensor.vivaqua_rolling_year_consumption")
+    assert state is not None
+    assert state.state == "unknown"
+    with patch(_ROWS, new=rows):
+        release.set()
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert rows.await_count == 1
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+    assert _state(hass, "projected_year_consumption") == pytest.approx(20.0 + 26.75)

@@ -495,6 +495,13 @@ you paid is worth more than a tidy chart.
   day. `projected_year_consumption` and `projected_year_end_cost` then
   move with each meter reading, like the running figures they extend;
   the rolling year moves with the daily read.
+- **Startup** — Home Assistant waits on each integration's first refresh,
+  with 300 s for all of them together, and the meter's history behind the
+  four year sensors and the projection Repair is two reads of a year of
+  hourly statistics, which on a database on a NAS can take seconds. So
+  that refresh leaves them out, and they run right after startup instead
+  of inside it. Until they land, the four year sensors report `unknown`
+  and the projection Repair is not raised.
 
 ### Keeping the projection honest
 

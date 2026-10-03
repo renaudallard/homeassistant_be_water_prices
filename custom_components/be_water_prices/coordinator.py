@@ -912,7 +912,9 @@ async def _archived_row(
 class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     """Fetches the configured utility's tariff once a day."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, *, defer_meter_history: bool = False
+    ) -> None:
         self.entry = entry
         utility_id = entry.data[CONF_UTILITY]
         self._extractor: WaterExtractor = get(utility_id)
@@ -976,6 +978,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # read once a day: the rolling year and the rest of the calendar
         # year, taken from last year's same days, both come off it.
         self._metered: _MeteredDays | None = None
+        # Whether the next refresh leaves those two reads of the meter's year
+        # out: asked for by setup only, whose first refresh Home Assistant
+        # waits on inside a startup stage every integration shares. Set
+        # pending by the refresh that left them out, for setup to start
+        # async_read_meter_history once it no longer holds startup up.
+        self._meter_history_deferred = defer_meter_history
+        self.meter_history_pending = False
         self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
         super().__init__(
             hass,
@@ -1419,6 +1428,49 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         }
         self._metered = _MeteredDays(meter=meter, read_on=today, days=days)
 
+    async def _read_meter_history(self, meter: str) -> None:
+        """The two reads of a year of the meter: the projection check and
+        the days behind the year figures.
+
+        Advisory, so a failure logs and is dropped rather than taking the
+        tick down and blanking every sensor on the entry.
+        """
+        try:
+            await self._sync_projection_issue(meter)
+        except Exception:
+            _LOGGER.exception("could not check the projection against a metered year")
+        try:
+            await self._read_metered_days(meter)
+        except Exception:
+            _LOGGER.exception("could not read the last year of %s", meter)
+
+    async def async_read_meter_history(self) -> None:
+        """Make the reads setup's own refresh left out, and publish the
+        year figures they give.
+
+        Started by setup as a background task once its refresh is in, so
+        Home Assistant does not wait on them. Nothing is folded: the year
+        figures are built from the year-to-date already published, read
+        afresh after the reads, so a meter event handled meanwhile is not
+        overwritten.
+        """
+        if not self.meter_history_pending:
+            return
+        self.meter_history_pending = False
+        meter = self._meter_entity_id
+        if meter is None:
+            return
+        await self._read_meter_history(meter)
+        if self.data is None or not self._owns_the_entry():
+            return
+        self.data = replace(
+            self.data,
+            year_figures=self._year_figures(
+                self.data.tariff, self.data.ytd_consumption_m3, self.data.current_year_cost_eur
+            ),
+        )
+        self.async_update_listeners()
+
     def _year_figures(
         self, tariff: WaterTariff, ytd_m3: float | None, ytd_cost: float | None
     ) -> YearFigures:
@@ -1688,6 +1740,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         Returns ``(ytd_m3, ytd_cost_eur)``; both ``None`` when no meter is
         configured or nothing is known about this year yet.
         """
+        deferred = self._meter_history_deferred
+        self._meter_history_deferred = False
         meter = await self.async_resolve_meter_entity()
         if meter != self._meter_entity_id:
             # Auto-discovery can start resolving a different Energy-dashboard
@@ -1699,21 +1753,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._metered = None
             return None, None
         # Before anything reads the meter or folds the cycle, not after:
-        # this awaits a recorder query, and an await between the fold and
+        # these await recorder queries, and an await between the fold and
         # the return is exactly the window a live meter event uses to
         # publish a higher figure that the stale locals here would then
         # overwrite with a lower one. Everything below re-reads its state.
-        # Advisory, so a failure logs and is dropped rather than taking the
-        # tick down and blanking every sensor on the entry.
-        try:
-            await self._sync_projection_issue(meter)
-        except Exception:
-            _LOGGER.exception("could not check the projection against a metered year")
-        # Before the fold for the same reason.
-        try:
-            await self._read_metered_days(meter)
-        except Exception:
-            _LOGGER.exception("could not read the last year of %s", meter)
+        if deferred:
+            self.meter_history_pending = True
+        else:
+            await self._read_meter_history(meter)
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         recorder_m3: float | None = None
