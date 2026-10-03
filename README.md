@@ -47,7 +47,8 @@ publication and how to parse it.
 
 > Targets Home Assistant **2026.2.3 or newer** -- the version the test
 > matrix installs, so the floor is one CI proves rather than one nobody
-> has run.
+> has run. CI runs the suite on a recent release beside it, since that is
+> what most installs run.
 
 ## Highlights
 

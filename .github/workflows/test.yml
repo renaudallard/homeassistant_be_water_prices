@@ -18,8 +18,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.13 is what Home Assistant ships, so it is the version that
-        # decides whether a release works. 3.14 is here because that is
+        # 3.13 is the oldest Python the floor release of Home Assistant
+        # accepts, so it decides whether a release works there (current
+        # releases need 3.14, see the job below). 3.14 is here because that is
         # what a current Debian / Raspberry Pi OS gives a local checkout,
         # and without it a 3.14-only failure shows up as a green local run
         # and a red CI one (or worse, the reverse).
@@ -41,5 +42,34 @@ jobs:
         run: |
           mypy --strict custom_components/be_water_prices
           mypy --strict scripts
+      - name: Tests
+        run: pytest tests/ -q
+
+  # The job above runs the Home Assistant floor hacs.json declares, which
+  # is what an upgrade must not break, while users run the current
+  # release, and a change there only showed when someone reported it. This
+  # runs the suite and the type check against a recent one too. Pinned
+  # as a matching pair, since the harness pins one exact Home Assistant
+  # and an unpinned install drifted once already; move both together.
+  # freezegun is left to the harness, which pins its own.
+  test-current-ha:
+    runs-on: ubuntu-latest
+    env:
+      HA_VERSION: "2026.9.4"
+      HARNESS_VERSION: "0.13.367"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          # What this Home Assistant requires.
+          python-version: "3.14"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "homeassistant==$HA_VERSION" \
+            "pytest-homeassistant-custom-component==$HARNESS_VERSION" \
+            beautifulsoup4==4.15.0 pdfplumber==0.11.9 pytest-timeout==2.4.0 mypy==2.3.1
+      - name: Type check
+        run: mypy --strict custom_components/be_water_prices
       - name: Tests
         run: pytest tests/ -q
