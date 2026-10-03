@@ -1408,7 +1408,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             if held is not None and (held.meter != meter or today - held.read_on > _METERED_HOLD):
                 self._metered = None
             return
-        admitted, _refused = _admitted_changes(rows, meter, start, end)
+        # Quietly: this reads the same thirteen months every day, so a bucket
+        # refused here would be warned about daily until it left the window.
+        # The year-to-date and full-year readers say so when they meet one.
+        admitted, _refused = _admitted_changes(rows, meter, start, end, level=logging.DEBUG)
         days = {
             dt_util.as_local(datetime.fromtimestamp(bucket, UTC)).date(): m3
             for bucket, m3 in admitted
@@ -2273,7 +2276,7 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
     guard in this module was re-deriving one call later.
     """
     rows = await _recorder_daily_rows(hass, entity_id, start, end)
-    admitted, refused = _admitted_changes(rows, entity_id, start, end)
+    admitted, refused = _admitted_changes(rows, entity_id, start, end, level=logging.WARNING)
     if not admitted and refused > _REFUSALS_BEFORE_UNREADABLE:
         # Every bucket the year had was refused, and there were enough of
         # them to mean something. A handful is not enough: on 1 and 2
@@ -2290,12 +2293,13 @@ async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end
 
 
 def _admitted_changes(
-    rows: list[Any], entity_id: str, start: date, end: date
+    rows: list[Any], entity_id: str, start: date, end: date, *, level: int
 ) -> tuple[list[tuple[float | None, float]], int]:
     """The daily changes in ``rows`` over ``[start, end]`` that read as water.
 
     Returns each admitted change with the start of the bucket it was
-    booked in, and how many buckets a guard refused.
+    booked in, and how many buckets a guard refused. A bucket refused for
+    claiming more than its days could hold is logged at ``level``.
     """
     # The first-bucket trim below is not a refusal: it is a boundary
     # artefact, not evidence about the year. A year every guard rejects
@@ -2376,7 +2380,7 @@ def _admitted_changes(
                 _LOGGER.debug("%s: dropping a register drop and its follow-up bucket", entity_id)
                 refused += 1
                 continue
-            if _exceeds_a_day(netted, entity_id, "netted", gap_days):
+            if _exceeds_a_day(netted, entity_id, "netted", gap_days, level=level):
                 refused += 1
                 continue
             admitted.append((bucket, netted))
@@ -2396,14 +2400,16 @@ def _admitted_changes(
             )
             refused += 1
             continue
-        if _exceeds_a_day(float(delta), entity_id, "single", gap_days):
+        if _exceeds_a_day(float(delta), entity_id, "single", gap_days, level=level):
             refused += 1
             continue
         admitted.append((bucket, float(delta)))
     return admitted, refused
 
 
-def _exceeds_a_day(change: float, entity_id: str, kind: str, gap_days: float = 0.0) -> bool:
+def _exceeds_a_day(
+    change: float, entity_id: str, kind: str, gap_days: float = 0.0, *, level: int
+) -> bool:
     """Whether a bucket claims more water than the days behind it can hold.
 
     The live path holds a single report that climbs more than
@@ -2438,7 +2444,8 @@ def _exceeds_a_day(change: float, entity_id: str, kind: str, gap_days: float = 0
     allowance = _IMPLAUSIBLE_JUMP_M3 + max(0.0, gap_days) * _AWAY_M3_PER_DAY
     if change <= allowance:
         return False
-    _LOGGER.warning(
+    _LOGGER.log(
+        level,
         "%s: ignoring a %s change of %.1f m3 over %.0f day(s); no household uses "
         "that much, so it reads as a re-based or reset register rather than water",
         entity_id,
@@ -2549,7 +2556,7 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
             # The same reset arithmetic as above; a year that carries the
             # whole register as one day's water is not a year to offer.
             return None
-        if _exceeds_a_day(float(delta), entity_id, "full-year", gap_days):
+        if _exceeds_a_day(float(delta), entity_id, "full-year", gap_days, level=logging.WARNING):
             # _change_exceeds_the_register is a shape test and by
             # construction only catches a same-day reset: a counter
             # re-based onto the real meter reading leaves a bucket whose

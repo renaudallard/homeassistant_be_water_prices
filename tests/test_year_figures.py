@@ -34,6 +34,7 @@ to it.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -52,6 +53,7 @@ from custom_components.be_water_prices.const import (
 from custom_components.be_water_prices.coordinator import (
     RecorderUnavailable,
     _metered_m3,
+    _recorder_ytd_m3,
     _rest_of_year_m3,
     _rolling_year_m3,
 )
@@ -388,3 +390,33 @@ async def test_a_tick_that_returns_after_midnight_projects_the_year_it_folded(
     assert coordinator.data.year_figures.projected_end_cost_eur == compute_annual_cost(
         _tariff(), 90.0, 1
     )
+
+
+@pytest.mark.asyncio
+async def test_a_refused_day_is_not_warned_about_on_every_read(
+    hass: HomeAssistant, freezer: Any, caplog: Any
+) -> None:
+    """The year figures read the same thirteen months daily, so one bad
+    bucket in them warned once a day until it left the window. The
+    year-to-date reader still warns about it."""
+    freezer.move_to(_NOW)
+    days = _span(_TODAY - timedelta(days=396), _TODAY - timedelta(days=1))
+    days[date(2026, 2, 10)] = 500.0
+    rows = AsyncMock(return_value=_buckets(days))
+    entry = await _setup_entry(hass, rows)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    caplog.clear()
+    caplog.set_level(logging.DEBUG)
+    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_ROWS, new=rows):
+        freezer.tick(timedelta(days=1))
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    refused = [r for r in caplog.records if "ignoring a single change of 500.0" in r.getMessage()]
+    assert rows.await_count == 2
+    assert refused
+    assert all(r.levelno == logging.DEBUG for r in refused)
+    caplog.clear()
+    with patch(_ROWS, new=rows):
+        await _recorder_ytd_m3(hass, "sensor.water_meter", date(2026, 1, 1), _TODAY)
+    refused = [r for r in caplog.records if "ignoring a single change of 500.0" in r.getMessage()]
+    assert [r.levelno for r in refused] == [logging.WARNING]
