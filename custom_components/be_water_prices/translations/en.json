@@ -61,9 +61,12 @@
       },
       "reconfigure_commune": {
         "title": "Pick your commune",
-        "description": "Pick the commune this address belongs to. Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) charge slightly different rates per commune; leave blank to use the operator's default and revisit the choice later via the entry's options.",
+        "description": "Pick the commune this address belongs to. Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) charge slightly different rates per commune; leave blank to use the operator's default, except as noted below, and revisit the choice later via the entry's options.",
         "data": {
           "commune": "Commune"
+        },
+        "data_description": {
+          "commune": "Where the operator bills your postcode on a commune of its own, that commune is pre-selected, and clearing it does not stick: it comes back on the next reload. Pick another commune to be priced on another card."
         }
       },
       "options": {

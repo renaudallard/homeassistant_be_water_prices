@@ -61,9 +61,12 @@
       },
       "reconfigure_commune": {
         "title": "Gemeinde wählen",
-        "description": "Wählen Sie die Gemeinde dieser Adresse. Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) berechnen leicht unterschiedliche Tarife je Gemeinde; leer lassen, um den Standardtarif des Versorgers zu verwenden und später über die Optionen des Eintrags zu wählen.",
+        "description": "Wählen Sie die Gemeinde dieser Adresse. Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) berechnen leicht unterschiedliche Tarife je Gemeinde; leer lassen, um den Standardtarif des Versorgers zu verwenden, außer wie unten angegeben, und später über die Optionen des Eintrags zu wählen.",
         "data": {
           "commune": "Gemeinde"
+        },
+        "data_description": {
+          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden."
         }
       },
       "options": {

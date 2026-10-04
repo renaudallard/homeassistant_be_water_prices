@@ -61,9 +61,12 @@
       },
       "reconfigure_commune": {
         "title": "Choisissez votre commune",
-        "description": "Sélectionnez la commune de cette adresse. Les compagnies à tarif par commune (De Watergroep / Farys / Pidpa / Water-link) appliquent des tarifs légèrement différents selon la commune ; laissez vide pour utiliser le tarif par défaut de la compagnie et choisir plus tard via les options de l'entrée.",
+        "description": "Sélectionnez la commune de cette adresse. Les compagnies à tarif par commune (De Watergroep / Farys / Pidpa / Water-link) appliquent des tarifs légèrement différents selon la commune ; laissez vide pour utiliser le tarif par défaut de la compagnie, sauf exception ci-dessous, et choisir plus tard via les options de l'entrée.",
         "data": {
           "commune": "Commune"
+        },
+        "data_description": {
+          "commune": "Là où le distributeur facture votre code postal sur une commune précise, celle-ci est présélectionnée, et la vider ne tient pas : elle revient au prochain rechargement. Choisissez une autre commune pour être tarifé sur une autre carte."
         }
       },
       "options": {

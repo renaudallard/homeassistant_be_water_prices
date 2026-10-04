@@ -61,9 +61,12 @@
       },
       "reconfigure_commune": {
         "title": "Kies je gemeente",
-        "description": "Kies de gemeente waar dit adres ligt. Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) rekenen lichtjes verschillende tarieven per gemeente; laat leeg om de standaard van de maatschappij te gebruiken en kies later via de opties van de invoer.",
+        "description": "Kies de gemeente waar dit adres ligt. Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) rekenen lichtjes verschillende tarieven per gemeente; laat leeg om de standaard van de maatschappij te gebruiken, behalve zoals hieronder vermeld, en kies later via de opties van de invoer.",
         "data": {
           "commune": "Gemeente"
+        },
+        "data_description": {
+          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend."
         }
       },
       "options": {

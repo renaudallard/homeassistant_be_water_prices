@@ -896,6 +896,103 @@ async def test_reconfigure_commune_drops_stale_saved_when_no_longer_in_list(
     assert CONF_COMMUNE_LABEL not in entry.options
 
 
+def _suggested_commune(result: data_entry_flow.FlowResult) -> object:
+    """The commune the form pre-fills, or None when it pre-fills nothing."""
+    keys = [key for key in result["data_schema"].schema if key == CONF_COMMUNE]
+    assert keys
+    return (keys[0].description or {}).get("suggested_value")
+
+
+_PIDPA_COMMUNES = (
+    CommuneOption(id="geel", label="Geel"),
+    CommuneOption(id="nijlen", label="Nijlen"),
+)
+
+
+async def _reconfigure_pidpa_to(
+    hass: HomeAssistant, saved_postcode: str, postcode: str
+) -> data_entry_flow.FlowResult:
+    """Reconfigure a Pidpa entry saved on Geel to ``postcode``; the commune step."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_COMMUNE: "geel",
+            CONF_COMMUNE_LABEL: "Geel",
+            CONF_POSTCODE: saved_postcode,
+        },
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=_PIDPA_COMMUNES,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: postcode}
+        )
+    assert result["step_id"] == "reconfigure_commune"
+    return result
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_move_pre_fills_the_commune_the_new_postcode_is_billed_on(
+    hass: HomeAssistant,
+) -> None:
+    """A move from Geel to Nijlen pre-filled Geel, and submitting it kept
+    Pidpa's Geel card for good, since setup only fills in an absent commune."""
+    result = await _reconfigure_pidpa_to(hass, "2440", "2560")
+    assert _suggested_commune(result) == "nijlen"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_same_postcode_keeps_the_saved_commune(hass: HomeAssistant) -> None:
+    """A commune the household picked for this very postcode is still theirs."""
+    result = await _reconfigure_pidpa_to(hass, "2560", "2560")
+    assert _suggested_commune(result) == "geel"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_into_water_link_pre_fills_the_ring_commune(
+    hass: HomeAssistant,
+) -> None:
+    """A move into Water-link at 2070 has no saved commune to offer, and
+    the card bills 2070 in the ring group rather than at Antwerpen."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "1000"},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    communes = (
+        CommuneOption(id="Antwerpen", label="Antwerpen"),
+        CommuneOption(id="Beveren-Kruibeke-Zwijndrecht", label="Beveren-Kruibeke-Zwijndrecht"),
+    )
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=communes,
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "2070"}
+        )
+    assert result["step_id"] == "reconfigure_commune"
+    assert _suggested_commune(result) == "Beveren-Kruibeke-Zwijndrecht"
+
+
 @pytest.mark.asyncio
 async def test_phantom_sweep_runs_on_v2_entries_too(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
