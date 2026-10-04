@@ -311,31 +311,82 @@ def test_an_unshowable_leg_has_its_own_failure_type() -> None:
         )
 
 
+def _halle_2025() -> str:
+    """Halle's card with its 2025 tab active, as last year's answer."""
+    halle = fixture_html("dewatergroep_halle_2026.html")
+    page = halle.replace('2025/hh-tarieven" class=""', '2025/hh-tarieven" class="active"')
+    page = page.replace('2026/hh-tarieven" class="active"', '2026/hh-tarieven" class=""')
+    assert page.count('class="active"') == halle.count('class="active"')
+    assert '2025/hh-tarieven" class="active"' in page, "the 2025 tab is not active"
+    return page
+
+
 @pytest.mark.asyncio
-async def test_a_commune_that_cannot_show_a_leg_is_served_the_default_card() -> None:
+async def test_a_commune_that_cannot_show_a_leg_is_served_the_default_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """3660 Opglabbeek could not finish setup at all, for months.
 
     The page has printed the sentence since before the refusal shipped, so
     that household had no entry and no way of knowing that leaving the
     commune blank is what works. The default is a real, current card and
     for Opglabbeek it is the figure the bill was calculated at.
+
+    Last year's card for the same commune printing every amount does not
+    change that: it would stand only until 31 March and then be served
+    stale for the rest of the year.
     """
-    from unittest.mock import AsyncMock, patch
+    from datetime import date
 
     from custom_components.be_water_prices.providers import de_watergroep as dwg
+    from custom_components.be_water_prices.providers._pdf import memoise_text_fetches
 
-    default = dwg.parse_commune_tariff(
-        fixture_html("dewatergroep_halle_2026.html"), year=2026, commune_label="Halle"
-    )
-    cards = AsyncMock(side_effect=[dwg.UnshowableLeg("cannot be shown"), default])
-    with patch.object(dwg, "_newest_commune_card", new=cards):
-        tariff = await dwg.fetch_for_commune(object(), "{SOME-OTHER-GUID}")
+    monkeypatch.setattr(dwg, "belgian_today", lambda: date(2026, 6, 1))
+    halle = fixture_html("dewatergroep_halle_2026.html")
+    commune = "{SOME-OTHER-GUID}"
+    url = dwg.COMMUNE_DETAIL_URL_FMT.format
+    store = {
+        f"{url(year=2026)}#dwg_l={commune}": fixture_html("dewatergroep_opglabbeek_2026.html"),
+        f"{url(year=2025)}#dwg_l={commune}": _halle_2025(),
+        f"{url(year=2026)}#dwg_l={dwg._DEFAULT_COMMUNE_GUID}": halle,
+    }
+    # Every answer comes from the memo, so the session is never used.
+    with memoise_text_fetches(store):
+        tariff = await dwg.fetch_for_commune(None, commune)  # type: ignore[arg-type]
 
-    assert tariff is default
-    assert cards.await_count == 2
-    # The second call asks for the default commune, by its own label.
-    assert cards.await_args.args[1] == dwg._DEFAULT_COMMUNE_GUID
-    assert cards.await_args.args[2] == dwg._DEFAULT_COMMUNE_LABEL
+    assert tariff.publication_label == f"De Watergroep tarieven 2026 ({dwg._DEFAULT_COMMUNE_LABEL})"
+    assert tariff.valid_from == date(2026, 1, 1)
+    assert tariff.valid_until == date(2026, 12, 31)
+
+
+@pytest.mark.asyncio
+async def test_the_default_card_still_falls_back_to_last_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default commune has no default of its own to be swapped for.
+
+    When its current card will not show a leg, last year's card stands in
+    until 31 March, as it does for every utility, rather than leaving the
+    entries without a commune with nothing.
+    """
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import de_watergroep as dwg
+    from custom_components.be_water_prices.providers._pdf import memoise_text_fetches
+
+    monkeypatch.setattr(dwg, "belgian_today", lambda: date(2026, 2, 1))
+    url = dwg.COMMUNE_DETAIL_URL_FMT.format
+    store = {
+        f"{url(year=2026)}#dwg_l={dwg._DEFAULT_COMMUNE_GUID}": fixture_html(
+            "dewatergroep_opglabbeek_2026.html"
+        ),
+        f"{url(year=2025)}#dwg_l={dwg._DEFAULT_COMMUNE_GUID}": _halle_2025(),
+    }
+    with memoise_text_fetches(store):
+        tariff = await dwg.fetch(None)  # type: ignore[arg-type]
+
+    assert tariff.publication_label == f"De Watergroep tarieven 2025 ({dwg._DEFAULT_COMMUNE_LABEL})"
+    assert tariff.valid_until == date(2026, 3, 31)
 
 
 @pytest.mark.asyncio

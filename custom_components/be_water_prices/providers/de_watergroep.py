@@ -354,6 +354,13 @@ async def _newest_commune_card(
     except TransientFetchError:
         raise
     except ExtractorError as err:
+        # A commune's current card that will not show a leg goes to
+        # fetch_for_commune, which serves the current default card. Its own
+        # last year's card would stand only until 31 March and then sit
+        # there stale, a retry fetching the same thing. The default commune
+        # has nothing else to fall back to, so it keeps last year's card.
+        if isinstance(err, UnshowableLeg) and commune != _DEFAULT_COMMUNE_GUID:
+            raise
         _LOGGER.info("De Watergroep %d card unavailable (%s); trying %d", target, err, target - 1)
         return await _commune_card(session, commune, label, target, year=target - 1)
 
