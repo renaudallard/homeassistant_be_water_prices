@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from custom_components.be_water_prices.providers._html import extract_amounts
 
 
@@ -61,3 +63,15 @@ def test_extract_amounts_keeps_a_discount_negative() -> None:
     """ "-€ 4,00" and "€ -6,00" are discounts; a dash between blanks is punctuation."""
     assert extract_amounts("Korting -€ 4,00 en € -6,00 en -7,25 €") == [-4.0, -6.0, -7.25]
     assert extract_amounts("Tarief 2025 - € 10,00") == [10.0]
+
+
+@pytest.mark.timeout(5)
+def test_extract_amounts_stays_linear_on_a_long_space_grouped_run() -> None:
+    """A long run of space-grouped digits with no euro sign must not hold the parser.
+
+    Each separator used to start a match that backtracked through every
+    group after it, so 24 KB took about 20 s and the cost grew faster
+    than the length.
+    """
+    assert extract_amounts("1" + " 234" * 50_000) == []
+    assert extract_amounts("€ 1\u202f234 567,89 et 2,10 €") == [1234567.89, 2.10]

@@ -84,8 +84,12 @@ async def fetch_and_parse[T](
 # purpose: SWDE prints dot decimals with three digits ("€ 2.748"), and no
 # rule can tell that from a grouped thousand. The digit guards on both
 # sides keep "Tarif 2025 100,00 €" from reading as 25100.
+# Both forms are bounded: unbounded repetition let every separator in
+# a long digit run start a new match that backtracked through the rest
+# of the run, which held the GIL for minutes on a hostile page. No
+# tariff needs more than four thousands groups or fifteen digits.
 _NUMBER = (
-    r"(?<![0-9])((?:[0-9]{1,3}(?:[     ][0-9]{3})+|[0-9]+)"
+    r"(?<![0-9])((?:[0-9]{1,3}(?:[     ][0-9]{3}){1,4}|[0-9]{1,15})"
     r"(?:[.,][0-9]+)?)(?![0-9])"
 )
 # A minus glued to the euro sign ("-€ 4,00") or to the number ("€ -6,00",
