@@ -53,13 +53,14 @@ Farys / Pidpa / Water-link), a third step (``reconfigure_commune``)
 shows the commune dropdown so the user can pick their commune in the
 same flow rather than needing a follow-up OptionsFlow. The dropdown
 pre-fills with the saved commune when the resolved utility matches
-the entry's current utility. Every path runs through
-``_async_finish_reconfigure``, which rewrites the entry in place;
-commune-tied options are dropped on a utility change because operator
-A's commune IDs mean nothing to operator B, and on a postcode change
-unless a commune is picked, since the saved one belongs to the old
-address. Annual consumption / persons / social tariff / meter carry
-over.
+the entry's current utility and the postcode is unchanged; after a
+move it pre-fills only the commune the new postcode is billed on.
+Every path runs through ``_async_finish_reconfigure``, which
+rewrites the entry in place; commune-tied options are dropped on a
+utility change because operator A's commune IDs mean nothing to
+operator B, and on a postcode change unless a commune is picked,
+since the saved one belongs to the old address. Annual consumption /
+persons / social tariff / meter carry over.
 """
 
 from __future__ import annotations
@@ -489,8 +490,9 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         Per-commune resolutions chain into ``reconfigure_commune`` so
         the user can confirm or re-pick the commune in the same flow
         (the commune dropdown is pre-filled with the current commune
-        when the resolved utility matches the saved one). Split
-        postcodes chain into ``reconfigure_choose`` instead.
+        when the resolved utility matches the saved one and the
+        postcode is unchanged). Split postcodes chain into
+        ``reconfigure_choose`` instead.
         """
         if user_input is not None:
             postcode = user_input[CONF_POSTCODE].strip()
@@ -544,10 +546,13 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         """Commune picker shown after the manual or postcode pick.
 
         Pre-fills the dropdown with the saved commune when the resolved
-        utility matches the entry's current utility, so the user can
-        submit as-is to keep their commune. A postcode the operator bills
-        on a commune of its own pre-fills that commune instead when the
-        postcode has changed, or when nothing is saved to pre-fill.
+        utility matches the entry's current utility and the postcode is
+        unchanged, so the user can submit as-is to keep their commune.
+        When the postcode has changed, or nothing is saved to pre-fill,
+        it pre-fills the commune the operator bills the postcode on, if
+        it bills it on one of its own, and nothing otherwise. An entry
+        that never saved a postcode keeps its saved commune unless the
+        postcode is billed on one of its own.
 
         Skips itself when the commune list cannot be fetched (transient
         network / parser failure). The saved commune is then kept only
@@ -596,15 +601,21 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             saved if entry.data.get(CONF_UTILITY) == self._utility and saved in live_ids else None
         )
         # The commune the operator bills the postcode on, as the config and
-        # options flows suggest it. It wins over the saved commune when the
-        # postcode has changed: that commune belongs to the old address, and
-        # once submitted setup never revisits it. Moving from Geel to Nijlen
-        # kept Pidpa's Geel card, 27.06 EUR a year too much.
+        # options flows suggest it. When the postcode has changed it is the
+        # only thing offered: the saved commune belongs to the old address,
+        # and once submitted setup never revisits it. Moving from Geel to
+        # Nijlen kept Pidpa's Geel card, 27.06 EUR a year too much, and
+        # moving from Nijlen to Geel kept Nijlen's, 27.06 EUR too little.
+        # An entry that never saved a postcode (created before 0.6.0) counts
+        # as moved for the billed commune, but keeps its saved one otherwise:
+        # nothing says the household picked it for another address.
         saved_postcode = entry.options.get(CONF_POSTCODE) or entry.data.get(CONF_POSTCODE)
         billed = _commune_for_postcode(self._utility, self._postcode or saved_postcode)
         moved = self._postcode is not None and self._postcode != saved_postcode
         if billed in live_ids and (moved or suggested is None):
             suggested = billed
+        elif moved and saved_postcode is not None:
+            suggested = None
         if saved is not None and saved not in live_ids:
             # The form will load with no selection; explicitly tell
             # _async_finish_reconfigure to drop the stale commune even

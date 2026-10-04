@@ -347,14 +347,17 @@ menu and pick **Reconfigure**. You get a menu with two options:
 
 If either path lands on a per-commune operator (De Watergroep / Farys
 / Pidpa / Water-link), a commune dropdown follows so you can pick the
-exact commune in the same flow. When the postcode resolves to the
-same operator you already have, the dropdown is pre-filled with your
-current commune so you can submit as-is to just refresh. A new
-postcode that the operator bills on a commune of its own (the ones
-listed under step 3 of Configuration) pre-fills that commune instead,
-since the saved one belongs to the old address; so does a move into
-such a postcode from another operator, where nothing is saved to
-pre-fill.
+exact commune in the same flow. When the postcode is unchanged and
+resolves to the same operator you already have, the dropdown is
+pre-filled with your current commune so you can submit as-is to just
+refresh. A new postcode does not carry the saved commune over, since
+it belongs to the old address: the dropdown is pre-filled only with
+the commune the operator bills the new postcode on, where it bills it
+on one of its own (the ones listed under step 3 of Configuration), and
+is left empty otherwise. The same goes for a move from another
+operator, where nothing is saved. An entry created before 0.6.0 never
+saved a postcode; its current commune is still pre-filled unless the
+operator bills the postcode on a commune of its own.
 
 Either path reloads the integration in place. Annual consumption and the
 water-meter sensor carry over. Registered residents and the social

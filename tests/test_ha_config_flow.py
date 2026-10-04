@@ -467,6 +467,7 @@ async def test_reconfigure_flow_keeps_commune_when_utility_unchanged(
             CONF_SOCIAL_TARIFF: False,
             CONF_COMMUNE: "25071",
             CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+            CONF_POSTCODE: "9000",
         },
         unique_id=f"{DOMAIN}_farys",
     )
@@ -494,6 +495,7 @@ async def test_reconfigure_flow_keeps_commune_when_utility_unchanged(
 
         # The form is pre-filled with the saved commune, so submitting it
         # as-is sends that value back and it is preserved.
+        assert _suggested_commune(result) == "25071"
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_COMMUNE: "25071"}
         )
@@ -524,6 +526,7 @@ async def test_reconfigure_flow_clearing_the_commune_drops_it(
             CONF_CONSUMPTION_M3_PER_YEAR: 90,
             CONF_COMMUNE: "25071",
             CONF_COMMUNE_LABEL: "9000 - Gent (Centrum)",
+            CONF_POSTCODE: "9000",
         },
         unique_id=f"{DOMAIN}_farys",
     )
@@ -909,29 +912,42 @@ _PIDPA_COMMUNES = (
     CommuneOption(id="nijlen", label="Nijlen"),
 )
 
+_WATER_LINK_COMMUNES = (
+    CommuneOption(id="Antwerpen", label="Antwerpen"),
+    CommuneOption(id="Beveren-Kruibeke-Zwijndrecht", label="Beveren-Kruibeke-Zwijndrecht"),
+)
 
-async def _reconfigure_pidpa_to(
-    hass: HomeAssistant, saved_postcode: str, postcode: str
+
+async def _reconfigure_to(
+    hass: HomeAssistant,
+    saved_postcode: str | None,
+    postcode: str,
+    *,
+    utility: str = "pidpa",
+    communes: tuple[CommuneOption, ...] = _PIDPA_COMMUNES,
+    saved_commune: str = "geel",
 ) -> data_entry_flow.FlowResult:
-    """Reconfigure a Pidpa entry saved on Geel to ``postcode``; the commune step."""
+    """Reconfigure an entry saved on ``saved_commune`` (Pidpa's Geel unless
+    told otherwise) to ``postcode``; the commune step."""
+    label = next(c.label for c in communes if c.id == saved_commune)
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Pidpa",
-        data={CONF_UTILITY: "pidpa"},
+        title=utility,
+        data={CONF_UTILITY: utility},
         options={
             CONF_CONSUMPTION_M3_PER_YEAR: 80,
             CONF_PERSONS: 2,
             CONF_SOCIAL_TARIFF: False,
-            CONF_COMMUNE: "geel",
-            CONF_COMMUNE_LABEL: "Geel",
-            CONF_POSTCODE: saved_postcode,
+            CONF_COMMUNE: saved_commune,
+            CONF_COMMUNE_LABEL: label,
+            **({CONF_POSTCODE: saved_postcode} if saved_postcode else {}),
         },
-        unique_id=f"{DOMAIN}_pidpa",
+        unique_id=f"{DOMAIN}_{utility}",
     )
     entry.add_to_hass(hass)
     with patch(
         "custom_components.be_water_prices.config_flow._async_communes",
-        return_value=_PIDPA_COMMUNES,
+        return_value=communes,
     ):
         result = await entry.start_reconfigure_flow(hass)
         result = await hass.config_entries.flow.async_configure(
@@ -950,15 +966,53 @@ async def test_reconfigure_move_pre_fills_the_commune_the_new_postcode_is_billed
 ) -> None:
     """A move from Geel to Nijlen pre-filled Geel, and submitting it kept
     Pidpa's Geel card for good, since setup only fills in an absent commune."""
-    result = await _reconfigure_pidpa_to(hass, "2440", "2560")
+    result = await _reconfigure_to(hass, "2440", "2560")
     assert _suggested_commune(result) == "nijlen"
 
 
 @pytest.mark.asyncio
 async def test_reconfigure_same_postcode_keeps_the_saved_commune(hass: HomeAssistant) -> None:
     """A commune the household picked for this very postcode is still theirs."""
-    result = await _reconfigure_pidpa_to(hass, "2560", "2560")
+    result = await _reconfigure_to(hass, "2560", "2560")
     assert _suggested_commune(result) == "geel"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_entry_without_a_saved_postcode_keeps_its_commune(
+    hass: HomeAssistant,
+) -> None:
+    """An entry created before 0.6.0 never saved a postcode, so its first
+    one is no move: the commune the household picked is still offered."""
+    result = await _reconfigure_to(hass, None, "2440")
+    assert _suggested_commune(result) == "geel"
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_move_out_of_a_billed_postcode_pre_fills_nothing(
+    hass: HomeAssistant,
+) -> None:
+    """A move from Nijlen to Geel pre-filled Nijlen, and submitting it kept
+    Nijlen's card, 27.06 EUR a year too little: the saved commune belongs to
+    the old address, and Geel is billed on the operator default."""
+    result = await _reconfigure_to(hass, "2560", "2440", saved_commune="nijlen")
+    assert _suggested_commune(result) is None
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_water_link_move_out_of_the_ring_pre_fills_nothing(
+    hass: HomeAssistant,
+) -> None:
+    """A move from 2070 to 2000 pre-filled the ring row, about 66 EUR a year
+    too much at 80 m3, while Antwerpen is the operator default."""
+    result = await _reconfigure_to(
+        hass,
+        "2070",
+        "2000",
+        utility="water_link",
+        communes=_WATER_LINK_COMMUNES,
+        saved_commune="Beveren-Kruibeke-Zwijndrecht",
+    )
+    assert _suggested_commune(result) is None
 
 
 @pytest.mark.asyncio
@@ -1025,13 +1079,9 @@ async def test_reconfigure_into_water_link_pre_fills_the_ring_commune(
         unique_id=f"{DOMAIN}_vivaqua",
     )
     entry.add_to_hass(hass)
-    communes = (
-        CommuneOption(id="Antwerpen", label="Antwerpen"),
-        CommuneOption(id="Beveren-Kruibeke-Zwijndrecht", label="Beveren-Kruibeke-Zwijndrecht"),
-    )
     with patch(
         "custom_components.be_water_prices.config_flow._async_communes",
-        return_value=communes,
+        return_value=_WATER_LINK_COMMUNES,
     ):
         result = await entry.start_reconfigure_flow(hass)
         result = await hass.config_entries.flow.async_configure(
