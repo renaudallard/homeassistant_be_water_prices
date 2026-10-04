@@ -74,6 +74,7 @@ from .const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
+    CONF_POSTCODE_RESOLVED,
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
@@ -1611,10 +1612,18 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         postcode = self.entry.options.get(CONF_POSTCODE) or self.entry.data.get(CONF_POSTCODE)
         utility = self.entry.data.get(CONF_UTILITY, "")
         candidates = resolve_candidates(str(postcode)) if postcode else ()
-        if not candidates or utility in candidates or not self._owns_the_entry():
+        overridden = tuple(self.entry.options.get(CONF_POSTCODE_RESOLVED) or ())
+        if (
+            not candidates
+            or utility in candidates
+            or candidates == overridden
+            or not self._owns_the_entry()
+        ):
             # No postcode, an unresolvable one, or one that still answers
             # with the operator in use. A postcode split between operators
-            # counts as answering: the household picked one of them.
+            # counts as answering: the household picked one of them. So
+            # does an answer the household already overrode by picking the
+            # operator by hand; a later change to it is still news.
             ir.async_delete_issue(self.hass, DOMAIN, self.operator_issue_id)
             return
         ir.async_create_issue(

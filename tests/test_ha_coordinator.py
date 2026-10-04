@@ -54,6 +54,7 @@ from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
+    CONF_POSTCODE_RESOLVED,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -3772,6 +3773,57 @@ async def test_a_postcode_that_still_resolves_here_is_left_alone(
             assert issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id) is None, (
                 postcode
             )
+
+
+@pytest.mark.asyncio
+async def test_an_operator_picked_by_hand_is_left_alone_until_the_resolver_changes(
+    hass: HomeAssistant, issue_registry: Any
+) -> None:
+    """A household that overrode the resolver is not told to switch back.
+
+    The reconfigure flow records what the postcode resolved to when the
+    operator was picked by hand against it. While the resolver still
+    says that, the pick stands; once it says something else, that is a
+    correction the household has not seen yet.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    from custom_components.be_water_prices.providers import get as real_get
+
+    fake = WaterExtractor(id="water_link", label="Water-link", region="flanders", fetch=_fetch)
+
+    def _get(utility_id: str) -> WaterExtractor:
+        return fake if utility_id == "water_link" else real_get(utility_id)
+
+    # 2440 resolves to Pidpa alone. The second entry recorded an answer
+    # the resolver no longer gives.
+    for recorded, raised in ((["pidpa"], False), (["farys"], True)):
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title="Water-link",
+            data={CONF_UTILITY: "water_link"},
+            options={
+                CONF_CONSUMPTION_M3_PER_YEAR: 80,
+                CONF_POSTCODE: "2440",
+                CONF_POSTCODE_RESOLVED: recorded,
+            },
+            unique_id=f"{DOMAIN}_water_link_{recorded[0]}",
+        )
+        entry.add_to_hass(hass)
+        with patch("custom_components.be_water_prices.coordinator.get", new=_get):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            coordinator = hass.data[DOMAIN][entry.entry_id]
+            issue = issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id)
+            assert (issue is not None) is raised, recorded
+            if raised:
+                assert issue.translation_placeholders == {
+                    "utility": "Water-link",
+                    "resolved": "Pidpa",
+                }
 
 
 async def _down(_session: Any) -> WaterTariff:

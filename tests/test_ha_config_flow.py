@@ -48,6 +48,7 @@ from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
+    CONF_POSTCODE_RESOLVED,
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     DOMAIN,
@@ -1359,6 +1360,99 @@ async def test_reconfigure_flow_manual_picker_skips_commune_step_when_list_unava
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "water_link"
     assert CONF_COMMUNE not in entry.options
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_manual_override_records_what_the_postcode_resolved_to(
+    hass: HomeAssistant,
+) -> None:
+    """Picking the operator by hand against the postcode is remembered.
+
+    The postcode stays, so the coordinator would re-resolve it on every
+    refresh and raise operator_moved against the household's own choice.
+    The resolver's answer at that moment is recorded instead, an options
+    save keeps it, and going back through the postcode path drops it.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        # 2440 is Geel, which the resolver gives to Pidpa alone.
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "2440"},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=(),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_manual"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "water_link"}
+        )
+        assert result["reason"] == "reconfigure_successful"
+        assert entry.data[CONF_UTILITY] == "water_link"
+        assert entry.options[CONF_POSTCODE] == "2440"
+        assert entry.options[CONF_POSTCODE_RESOLVED] == ["pidpa"]
+
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_CONSUMPTION_M3_PER_YEAR: 120}
+        )
+        assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
+        assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 120
+        assert entry.options[CONF_POSTCODE_RESOLVED] == ["pidpa"]
+
+        # 2100 is Deurne, Water-link's: the resolver agrees again.
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "2100"}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.options[CONF_POSTCODE] == "2100"
+    assert CONF_POSTCODE_RESOLVED not in entry.options
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_manual_pick_the_resolver_agrees_with_drops_the_override(
+    hass: HomeAssistant,
+) -> None:
+    """A hand pick back onto the resolved operator is no override at all."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water-link",
+        data={CONF_UTILITY: "water_link"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_POSTCODE: "2440",
+            CONF_POSTCODE_RESOLVED: ["pidpa"],
+        },
+        unique_id=f"{DOMAIN}_water_link",
+    )
+    entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=(),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_manual"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "pidpa"}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "pidpa"
+    assert entry.options[CONF_POSTCODE] == "2440"
+    assert CONF_POSTCODE_RESOLVED not in entry.options
 
 
 @pytest.mark.asyncio

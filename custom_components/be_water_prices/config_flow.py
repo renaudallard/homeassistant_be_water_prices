@@ -99,6 +99,7 @@ from .const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
     CONF_PERSONS,
     CONF_POSTCODE,
+    CONF_POSTCODE_RESOLVED,
     CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
@@ -733,6 +734,18 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             new_options.pop(CONF_COMMUNE_LABEL, None)
         if self._postcode is not None:
             new_options[CONF_POSTCODE] = self._postcode
+            new_options.pop(CONF_POSTCODE_RESOLVED, None)
+        else:
+            # Picked by hand, so the saved postcode stays. When it resolves
+            # elsewhere the household is overriding the resolver on purpose:
+            # record what it answered, so the postcode check speaks only once
+            # that answer changes rather than on every refresh from now on.
+            saved = new_options.get(CONF_POSTCODE) or entry.data.get(CONF_POSTCODE)
+            candidates = _resolve_candidates(str(saved)) if saved else ()
+            if candidates and new_utility not in candidates:
+                new_options[CONF_POSTCODE_RESOLVED] = list(candidates)
+            else:
+                new_options.pop(CONF_POSTCODE_RESOLVED, None)
 
         if new_utility == old_utility and new_options == dict(entry.options):
             # No-op rewrite (postcode resolved to the same utility we
@@ -832,12 +845,13 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
                     final[CONF_COMMUNE] = existing[CONF_COMMUNE]
                 if existing.get(CONF_COMMUNE_LABEL):
                     final[CONF_COMMUNE_LABEL] = existing[CONF_COMMUNE_LABEL]
-            # CONF_POSTCODE is not surfaced in the options schema, so it
-            # cannot ride in via user_input. Reattach the stored value;
-            # otherwise every options save would wipe the postcode that
-            # the initial and reconfigure flows persist.
-            if CONF_POSTCODE not in final and self.config_entry.options.get(CONF_POSTCODE):
-                final[CONF_POSTCODE] = self.config_entry.options[CONF_POSTCODE]
+            # CONF_POSTCODE and CONF_POSTCODE_RESOLVED are not surfaced in
+            # the options schema, so they cannot ride in via user_input.
+            # Reattach the stored values; otherwise every options save
+            # would wipe what the initial and reconfigure flows persist.
+            for key in (CONF_POSTCODE, CONF_POSTCODE_RESOLVED):
+                if key not in final and self.config_entry.options.get(key):
+                    final[key] = self.config_entry.options[key]
             saved = self.config_entry.options.get(CONF_COMMUNE)
             if communes and saved is not None and saved not in {c.id for c in communes}:
                 # The saved commune could not be offered, so this save

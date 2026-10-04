@@ -235,3 +235,33 @@ async def test_the_backfill_gate_does_not_carry_the_commune_out(hass) -> None:  
     assert "nijlen" not in json.dumps(dump).lower()
     # The rest of the gate is still there to read.
     assert dump["entry"]["data"][DATA_BACKFILL_YEAR].startswith("2026:pidpa:2026:")
+
+
+async def test_the_recorded_resolver_answer_is_redacted(hass) -> None:  # type: ignore[no-untyped-def]
+    """The operators a postcode resolved to can name the postcode.
+
+    ('de_watergroep', 'farys') comes back for 1770 alone, so dumping the
+    recorded answer of a hand-picked operator gave the postcode away.
+    """
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.be_water_prices.const import (
+        CONF_POSTCODE_RESOLVED,
+        CONF_UTILITY,
+        DOMAIN,
+    )
+    from custom_components.be_water_prices.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_POSTCODE: "1770", CONF_POSTCODE_RESOLVED: ["de_watergroep", "farys"]},
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+    dump = await async_get_config_entry_diagnostics(hass, entry)
+    assert dump["entry"]["options"][CONF_POSTCODE] == "**REDACTED**"
+    assert dump["entry"]["options"][CONF_POSTCODE_RESOLVED] == "**REDACTED**"

@@ -108,6 +108,10 @@ FLANDERS_KORTING_TOTAL_PER_PERSON = (
 # Config / option keys.
 CONF_UTILITY = "utility"
 CONF_POSTCODE = "postcode"
+# What the resolver answered for that postcode when the operator was
+# picked by hand against it. The postcode check stays quiet while the
+# resolver still gives that answer, and speaks once it changes.
+CONF_POSTCODE_RESOLVED = "postcode_resolved"
 CONF_CONSUMPTION_M3_PER_YEAR = "consumption_m3_per_year"
 CONF_PERSONS = "gedomicilieerd_persons"
 CONF_SOCIAL_TARIFF = "social_tariff"

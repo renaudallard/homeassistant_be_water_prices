@@ -39,6 +39,7 @@ from .const import (
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
     CONF_POSTCODE,
+    CONF_POSTCODE_RESOLVED,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
@@ -46,8 +47,16 @@ from .coordinator import WaterCoordinator
 
 # Fields that uniquely or near-uniquely identify the household; the
 # diagnostics file ends up attached to GitHub issues so anything that
-# could narrow down to a specific address has to be redacted.
-_REDACT_KEYS = {CONF_POSTCODE, CONF_COMMUNE, CONF_COMMUNE_LABEL, CONF_WATER_METER_SENSOR}
+# could narrow down to a specific address has to be redacted. The
+# resolver's recorded answer goes too: it is a function of the postcode,
+# and some answers belong to a single postcode.
+_REDACT_KEYS = {
+    CONF_POSTCODE,
+    CONF_POSTCODE_RESOLVED,
+    CONF_COMMUNE,
+    CONF_COMMUNE_LABEL,
+    CONF_WATER_METER_SENSOR,
+}
 
 
 async def async_get_config_entry_diagnostics(

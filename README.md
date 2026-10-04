@@ -63,7 +63,7 @@ publication and how to parse it.
 - **Rolling year and year-end projection** — what your meter recorded over the last 365 days and what a year like that costs at today's tariff, and where this year's consumption and bill will stand on 31 December, the rest of the year taken from your meter's same days last year.
 - **Translated UI** — English, Dutch, French and German.
 - **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own, and a year holding a bucket that claims more than the days behind it could hold is not offered at all: that is a re-based or reset counter rather than water, and it would otherwise be proposed as your yearly consumption. The days behind it count because a meter that was away comes back with the whole absence in one bucket, and a year that really did have an outage is still a year worth offering.
-- **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive.
+- **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card the project's daily archive captured (see *The card archive* below) instead of retrying setup until the utility is back, and an outage that drags on past the staleness window picks up whatever the archive has captured since; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
@@ -340,7 +340,10 @@ menu and pick **Reconfigure**. You get a menu with two options:
 - **Pick the utility directly** jumps straight to the operator
   dropdown, bypassing the resolver -- the right choice when your
   postcode resolves to the wrong operator (e.g. a Pidpa ring commune
-  actually served by Water-link).
+  actually served by Water-link). The postcode is kept along with what
+  it resolved to, so your choice raises no "postcode now points to a
+  different operator" Repair unless a later release changes that answer.
+  Going back through **Update postcode** drops the override.
 
 If either path lands on a per-commune operator (De Watergroep / Farys
 / Pidpa / Water-link), a commune dropdown follows so you can pick the
@@ -685,8 +688,9 @@ and clears nothing, and says so in the log at info level.
 menu **→ Download diagnostics** dumps the active config, the last
 parsed `WaterTariff` (every component plus validity window), the
 fetch metadata, the projected and running costs, and the rolling and
-projected year. The postcode, the
-commune and the water-meter entity id are redacted, and the commune is
+projected year. The postcode, the operators it resolved to when an
+operator was picked by hand, the commune and the water-meter entity id
+are redacted, and the commune is
 scrubbed out of every other value too: the publication label, the source
 URL, the error text and the price-history gate, which names the commune
 it was drawn for. The file can go on an issue as it is. An entry that has not
