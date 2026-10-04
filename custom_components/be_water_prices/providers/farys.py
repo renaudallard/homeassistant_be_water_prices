@@ -163,6 +163,9 @@ _TUSSENKOMST_COMFORT_RE = re.compile(
 )
 
 
+_PERIOD_RE = re.compile(r"(?:[A-Za-z]{3,4}\.?\s*)?(20\d\d)")
+
+
 def _active_period_year(soup: BeautifulSoup) -> int | None:
     """The tariff year Farys marks as selected, if the switcher is present.
 
@@ -170,14 +173,16 @@ def _active_period_year(soup: BeautifulSoup) -> int | None:
     one it is showing with ``<li class="active">``. Reading it means a
     page that starts serving next year's card early is dated by the page
     rather than by our clock -- which is also what lets the stale-snapshot
-    check notice a page still stuck on last year.
+    check notice a page still stuck on last year. Most cards label the
+    period with the bare year, the Zaventem ones with "Jan. 2026".
     """
     active = soup.select_one("ul.js-period-rates li.active button[value]")
     if active is None:
         return None
     value = str(active.get("value", "")).strip()
-    if value.isdigit() and len(value) == 4:
-        return int(value)
+    match = _PERIOD_RE.fullmatch(value)
+    if match is not None:
+        return int(match.group(1))
     # The switcher is there and says something else: the clock takes
     # over, and a page that changed shape should not do so in silence,
     # since the clock cannot tell a card stuck on last year from a

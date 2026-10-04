@@ -33,6 +33,7 @@ first day of the year for however long the utility took to publish.
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 import pytest
@@ -100,6 +101,24 @@ def test_farys_page_still_on_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
     t = farys.parse_tariff(fixture_html("farys_gent_2026.json"))
     assert t.valid_from == date(2026, 1, 1)
     assert t.valid_until == date(2027, 3, 31)
+
+
+def test_farys_zaventem_page_still_on_last_year(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The Zaventem cards label their period "Jan. 2026", not "2026".
+
+    Read as no year, the card was dated by the clock, so last year's
+    rates came out as this year's card and never went stale.
+    """
+    _fake_today(farys, monkeypatch, date(2027, 1, 5))
+    raw = fixture_html("farys_zaventem_2026.json")
+    assert "value=\\u0022Jan. 2026\\u0022" in raw
+    with caplog.at_level(logging.WARNING):
+        t = farys.parse_tariff(raw)
+    assert t.valid_from == date(2026, 1, 1)
+    assert t.valid_until == date(2027, 3, 31)
+    assert "not a year" not in caplog.text
 
 
 def test_the_card_year_follows_the_belgian_calendar(freezer) -> None:  # type: ignore[no-untyped-def]
