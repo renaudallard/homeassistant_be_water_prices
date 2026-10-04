@@ -398,7 +398,7 @@ def test_aiec_dates_its_card_from_the_operator_s_picture() -> None:
     assert card.valid_from == date(2026, 1, 1)  # build_tariff stamps 1 January
     page = fixture_html("aiec_operator_2026.html")
     assert aiec.published_card_date(page) == date(2026, 4, 1)
-    assert aiec.date_against_operator(card, page).valid_from == date(2026, 4, 1)
+    assert aiec.date_against_operator(card, date(2026, 4, 1)).valid_from == date(2026, 4, 1)
 
 
 def test_aiec_still_serves_a_card_once_the_aggregator_catches_up() -> None:
@@ -409,7 +409,7 @@ def test_aiec_still_serves_a_card_once_the_aggregator_catches_up() -> None:
         fixture_html("aiec_callmepower_2026.html").replace("2,46", "3,05"), year=2026
     )
     assert caught_up.cvd_eur_per_m3 == 3.05
-    dated = aiec.date_against_operator(caught_up, fixture_html("aiec_operator_2026.html"))
+    dated = aiec.date_against_operator(caught_up, date(2026, 4, 1))
     assert dated.cvd_eur_per_m3 == 3.05
     assert dated.valid_from == date(2026, 4, 1)
 
@@ -420,7 +420,7 @@ def test_aiec_leaves_a_card_alone_when_the_page_dates_none() -> None:
 
     card = parse_aiec(fixture_html("aiec_callmepower_2026.html"), year=2026)
     assert aiec.published_card_date("<html><img src='logo.png'></html>") is None
-    assert aiec.date_against_operator(card, "<html></html>").valid_from == date(2026, 1, 1)
+    assert aiec.date_against_operator(card, None).valid_from == date(2026, 1, 1)
 
 
 def test_aiec_falls_back_when_the_operator_page_has_moved() -> None:
@@ -534,7 +534,9 @@ def test_aiec_serves_the_rate_its_own_card_prints() -> None:
     """The aggregator sat on 2,460 for five months after AIEC moved."""
     from custom_components.be_water_prices.providers import aiec
 
-    card = aiec.card_from_operator_page(fixture_html("aiec_operator_2026.html"))
+    card = aiec.card_from_operator_page(
+        aiec.published_card_date(fixture_html("aiec_operator_2026.html"))
+    )
     assert card is not None
     assert card.cvd_eur_per_m3 == 3.050
     assert card.valid_from == date(2026, 4, 1)
@@ -548,7 +550,9 @@ def test_the_aiec_card_reproduces_the_table_printed_beside_it() -> None:
     from custom_components.be_water_prices.pricing import compute_annual_cost
     from custom_components.be_water_prices.providers import aiec
 
-    card = aiec.card_from_operator_page(fixture_html("aiec_operator_2026.html"))
+    card = aiec.card_from_operator_page(
+        aiec.published_card_date(fixture_html("aiec_operator_2026.html"))
+    )
     assert card is not None
     for consumption, printed in (
         (35, 233),
@@ -572,7 +576,55 @@ def test_a_card_nobody_has_read_falls_back_instead_of_guessing() -> None:
     assert page.count("Tarif-2026-04-1") == 1
     later = page.replace("Tarif-2026-04-1", "Tarif-2026-10-1")
     assert aiec.published_card_date(later) == date(2026, 10, 1)
-    assert aiec.card_from_operator_page(later) is None
+    assert aiec.card_from_operator_page(date(2026, 10, 1)) is None
+
+
+def test_aiec_reads_its_operator_page_over_tls() -> None:
+    """Over plain HTTP anyone on the path could strip the picture and swap the rate."""
+    from custom_components.be_water_prices.providers import aiec
+
+    assert aiec.OPERATOR_URL.startswith("https://")
+
+
+def test_a_hostile_aiec_page_is_read_in_linear_time() -> None:
+    """Every date with no picture after it used to scan to the end and back.
+
+    56 KB of bare dates took seconds and the cost grew with the square of
+    the size; bounded, it is a few milliseconds.
+    """
+    import time
+
+    from custom_components.be_water_prices.providers import aiec
+
+    body = "Tarif-2026-1-1" * 4000
+    started = time.perf_counter()
+    assert aiec.published_card_date(body) is None
+    assert time.perf_counter() - started < 1.0
+
+
+def test_aiec_parses_its_operator_page_off_the_event_loop() -> None:
+    """A synchronous parse inside the coroutine stalled the whole of Home Assistant."""
+    import threading
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.be_water_prices.providers import aiec
+
+    threads: list[threading.Thread] = []
+    real = aiec.published_card_date
+
+    def recording(html: str) -> date | None:
+        threads.append(threading.current_thread())
+        return real(html)
+
+    page = fixture_html("aiec_operator_2026.html")
+    with (
+        patch.object(aiec, "published_card_date", new=recording),
+        patch.object(aiec, "fetch_html", new=AsyncMock(return_value=page)),
+    ):
+        got = asyncio.run(aiec.fetch(session=None))  # type: ignore[arg-type]
+    assert got.cvd_eur_per_m3 == 3.050
+    assert len(threads) == 1
+    assert threads[0] is not threading.main_thread()
 
 
 @pytest.mark.parametrize(

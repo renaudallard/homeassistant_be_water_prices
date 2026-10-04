@@ -149,7 +149,7 @@ def _aiec_card(text: str) -> WaterTariff:
     date the picture's name carries. A page showing a card that is not in
     that table is exactly what this check exists to report.
     """
-    card = aiec.card_from_operator_page(text)
+    card = aiec.card_from_operator_page(aiec.published_card_date(text))
     if card is None:
         raise ExtractorError("AIEC is showing a card whose rate has not been transcribed")
     return card

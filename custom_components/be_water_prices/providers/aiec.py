@@ -56,11 +56,12 @@ months after AIEC moved to 3,050, which under-billed an 80 m3 household
 by 53.16 EUR a year with nothing anywhere to show it.
 
 Sources: https://callmepower.be/fr/eau/distributeurs/aiec
-         http://www.eauxducondroz.be/Prix.htm
+         https://www.eauxducondroz.be/Prix.htm
 """
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 import re
@@ -94,9 +95,12 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
 
 # The operator's own page, and the card picture it embeds. The trailing
 # hash is the CMS dedupe suffix, as on the Water-link and Aquaduin links.
-OPERATOR_URL = "http://www.eauxducondroz.be/Prix.htm"
+# The gap before the extension is bounded: unbounded, every date with no
+# picture after it scanned to the end of the page and back, which made a
+# hostile page cost the square of its length.
+OPERATOR_URL = "https://www.eauxducondroz.be/Prix.htm"
 _CARD_IMAGE_RE = re.compile(
-    r"Tarif-(20\d\d)-(\d{1,2})-(\d{1,2})[^\"'>]*\.jpe?g",
+    r"Tarif-(20\d\d)-(\d{1,2})-(\d{1,2})[^\"'>\s]{0,200}\.jpe?g",
     re.IGNORECASE,
 )
 
@@ -114,13 +118,13 @@ _TRANSCRIBED_CVD: dict[date, float] = {
 }
 
 
-def card_from_operator_page(html: str) -> WaterTariff | None:
+def card_from_operator_page(published: date | None) -> WaterTariff | None:
     """The card AIEC's page is showing, when its rate has been transcribed.
 
+    ``published`` is what :func:`published_card_date` read off the page.
     ``None`` when the page shows a card that is not in the table above,
     which is the caller's cue to fall back to the aggregator.
     """
-    published = published_card_date(html)
     if published is None:
         return None
     cvd = _TRANSCRIBED_CVD.get(published)
@@ -152,7 +156,7 @@ def published_card_date(html: str) -> date | None:
     return max(dates) if dates else None
 
 
-def date_against_operator(tariff: WaterTariff, html: str) -> WaterTariff:
+def date_against_operator(tariff: WaterTariff, published: date | None) -> WaterTariff:
     """Date the aggregator card from the operator's own card picture.
 
     The aggregator prints no effective date, so :func:`build_tariff` stamps
@@ -170,7 +174,6 @@ def date_against_operator(tariff: WaterTariff, html: str) -> WaterTariff:
     ``valid_from`` says which card it is on, and hands the staleness
     machinery something real to work with.
     """
-    published = published_card_date(html)
     if published is None or published <= tariff.valid_from:
         return tariff
     if published.year != tariff.valid_from.year:
@@ -203,10 +206,11 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
         # standing in undated is better than nothing at all.
         _LOGGER.warning("could not read %s: %s; serving %s", OPERATOR_URL, err, SOURCE_URL)
         return await _fetch_aggregator(session)
-    transcribed = card_from_operator_page(html)
+    # The page is parsed off the event loop, as every other extractor's is.
+    published = await asyncio.to_thread(published_card_date, html)
+    transcribed = card_from_operator_page(published)
     if transcribed is not None:
         return transcribed
-    published = published_card_date(html)
     if published is not None:
         _LOGGER.warning(
             "AIEC published a card effective %s whose rate this release does not carry; "
@@ -216,7 +220,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             SOURCE_URL,
         )
     tariff = await _fetch_aggregator(session)
-    return date_against_operator(tariff, html)
+    return date_against_operator(tariff, published)
 
 
 _fetch_aggregator = build_extractor(
