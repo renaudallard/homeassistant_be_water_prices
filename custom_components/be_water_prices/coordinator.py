@@ -1541,7 +1541,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
              already; auto-discovering it from that config means the
              YTD sensors light up without having to re-pick the same
              entity in our OptionsFlow.
-          3. ``None`` -- YTD entities stay unavailable.
+          3. ``None`` -- YTD entities stay unknown.
         """
         explicit = self.entry.options.get(CONF_WATER_METER_SENSOR)
         if explicit:

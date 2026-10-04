@@ -325,7 +325,7 @@ def _is_applicable(desc: WaterSensorDescription, *, region: str) -> bool:
 
     The meter-driven sensors (the YTD pair and the rolling and projected
     year) are always created: even without a configured water meter the
-    entities show as ``unavailable`` until the user wires one up via the
+    entities show as ``unknown`` until the user wires one up via the
     OptionsFlow OR via the Energy dashboard. Adding the meter via the
     OptionsFlow triggers a reload; adding it via the Energy dashboard now
     also surfaces values on the next coordinator tick without requiring an
