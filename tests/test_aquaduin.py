@@ -58,6 +58,16 @@ def test_raises_when_pdf_text_is_garbage() -> None:
         parse_tariff("nothing here", year=2026)
 
 
+@pytest.mark.timeout(5)
+def test_the_comfort_anchor_stays_linear_on_a_run_of_whitespace() -> None:
+    """A label followed by spaces and no ">" used to backtrack over every split of the run."""
+    from custom_components.be_water_prices.providers.aquaduin import _COMFORT_RE
+
+    line = "Comforttarief > Basisverbruik (pro rata verrekend) 11,9816 euro/m³ 12\n"
+    m = _COMFORT_RE.search("Comforttarief" + " " * 50_000 + "X\n" + line)
+    assert m is not None and m.group(1) == "11,9816"
+
+
 def test_find_pdf_href_extracts_versioned_link() -> None:
     from custom_components.be_water_prices.providers.aquaduin import _find_pdf_href
 

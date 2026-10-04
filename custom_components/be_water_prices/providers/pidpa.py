@@ -181,9 +181,10 @@ _HEADER_RE = re.compile(
 # tolerate spaces around the punctuation.
 # The year between the label and the colon is optional on the page and
 # is kept: a line for another year must not win over this year's, and
-# the last line no longer wins by default.
+# the last line no longer wins by default. The space after the year
+# belongs to the year, for the reason inasep._CVD_RE gives.
 _SAN_RE = re.compile(
-    r"\(\s*(afvoer|zuivering)\s*\)\s*(\d{4})?\s*:\s*([\d.,]+)\s*€/m³",
+    r"\(\s*(afvoer|zuivering)\s*\)\s*(?:(\d{4})\s*)?:\s*([\d.,]+)\s*€/m³",
     re.IGNORECASE,
 )
 

@@ -69,6 +69,17 @@ def test_the_cvd_regex_stays_linear_on_a_run_of_whitespace() -> None:
     assert t.valid_from == date(2026, 1, 1)
 
 
+@pytest.mark.timeout(5)
+def test_the_cva_check_stays_linear_on_a_run_of_whitespace() -> None:
+    """A label followed by spaces and no "=" used to backtrack over every split of the run."""
+    page = fixture_html("inasep_2026.html")
+    assert page.count("Assainissement (CVA)\n") == 1
+    padded = page.replace("Assainissement (CVA)\n", "Assainissement (CVA)" + " " * 50_000 + "X\n")
+    t = parse_tariff(padded, year=2026)
+    assert t.cvd_eur_per_m3 == 3.6734
+    assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
+
+
 def test_dates_the_cvd_from_the_day_the_page_says_it_applies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -275,6 +275,16 @@ def test_a_sanering_line_for_another_year_does_not_win() -> None:
     assert _sanering_for_year(frozen + text, 2026)["afvoer"] == 1.0
 
 
+@pytest.mark.timeout(5)
+def test_the_sanering_line_stays_linear_on_a_run_of_whitespace() -> None:
+    """A label followed by spaces and no colon used to backtrack over every split of the run."""
+    from custom_components.be_water_prices.providers.pidpa import _sanering_for_year
+
+    line = "Tarief gemeentelijke sanering (afvoer ) 2024: 1,6533 €/m³ basistarief\n"
+    padded = "(afvoer)" + " " * 50_000 + "X\n" + line
+    assert _sanering_for_year(padded, 2026) == {"afvoer": 1.6533}
+
+
 def test_a_tab_past_the_year_asked_for_is_not_a_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     """With no 2026 tab, a 2027 tab was served as 2026's card."""
     from datetime import date

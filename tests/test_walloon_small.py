@@ -463,6 +463,18 @@ def test_a_labelled_anchor_that_matches_twice_takes_the_current_value() -> None:
     assert parse_cvd(page) == 3.05
 
 
+@pytest.mark.timeout(5)
+def test_the_labelled_cvd_anchor_stays_linear_on_a_run_of_whitespace() -> None:
+    """A label followed by spaces and no colon used to backtrack over every split of the run."""
+    page = fixture_html("aiec_callmepower_2026.html")
+    anchor = "Distribution (<strong>CVD</strong>), calcul"
+    assert page.count(anchor) == 1
+    padded = page.replace(
+        anchor, "Distribution (<strong>CVD</strong>)" + " " * 50_000 + "X, calcul"
+    )
+    assert parse_aiec(padded, year=2026).cvd_eur_per_m3 == 2.46
+
+
 def test_an_out_of_window_anchor_still_falls_through_to_the_scan() -> None:
     """The plausibility gate has to survive the change of rule."""
     from custom_components.be_water_prices.providers._walloon_simple import parse_cvd

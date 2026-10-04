@@ -94,9 +94,11 @@ _ACTUAL_CVD_RE = re.compile(
 # "Coût vérité distribution (CVD) : N €", where the value FOLLOWS the
 # "distribution (CVD)" label; the reversed card text cannot match it.
 # IEG and AIEM sit on operator sites without this phrasing, so they fall
-# through to the anchors below unchanged.
+# through to the anchors below unchanged. The whitespace after the
+# optional colon belongs to the colon, for the reason inasep._CVD_RE
+# gives: two free runs around it make a failed match quadratic.
 _LABELED_DIST_CVD_RE = re.compile(
-    r"distribution\s*\(\s*CVD\s*\)\s*:?\s*(\d+,\d{1,5})\s*€",
+    r"distribution\s*\(\s*CVD\s*\)\s*(?::\s*)?(\d+,\d{1,5})\s*€",
     re.IGNORECASE,
 )
 # Plausibility window for residential Walloon CVDs. As of 2026 the
@@ -179,12 +181,14 @@ def warn_constant_drift(
 # Where the prose pages print the two SPGE components. Each pattern binds
 # the amount to its own label, so Callmepower's summary cards, which put
 # the value before the label and the CVD card right next to the CVA one,
-# cannot answer for each other. Every gap is bounded.
+# cannot answer for each other. Every gap is bounded, and the whitespace
+# after an optional separator belongs to the separator, as in
+# _LABELED_DIST_CVD_RE.
 _CVA_RES = (
     # AIEM: "Valeur actuelle du CVA : 2,748€"
     re.compile(r"actuelle\s+du\s+CVA[^\d€]{0,40}(\d+,\d{1,5})\s*€", re.IGNORECASE),
     # Callmepower prose and INASEP: "assainissement (CVA) : 2,748 €", "(CVA) = 2,748 €"
-    re.compile(r"assainissement\s*\(\s*CVA\s*\)\s*[:=]?\s*(\d+,\d{1,5})\s*€", re.IGNORECASE),
+    re.compile(r"assainissement\s*\(\s*CVA\s*\)\s*(?:[:=]\s*)?(\d+,\d{1,5})\s*€", re.IGNORECASE),
     # IEG: "CVA : Coût Vérité d'Assainissement : 2,7480€"
     re.compile(
         r"CVA\s*:\s*Co[ûu]t\s+V[ée]rit[ée]\s+d.Assainissement\s*:\s*(\d+,\d{1,5})\s*€",

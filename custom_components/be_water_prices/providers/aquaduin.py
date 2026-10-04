@@ -99,9 +99,10 @@ _BASIS_RE = re.compile(
 # comforttarief row ("Comforttarief > Basisverbruik (pro rata
 # verrekend) N,NNNN euro/m³") so a future explainer paragraph above
 # the row cannot supply the first match. Tolerant of the ">" being
-# dropped or spaced differently.
+# dropped or spaced differently; the space after it belongs to it, for
+# the reason inasep._CVD_RE gives.
 _COMFORT_RE = re.compile(
-    r"comforttarief\s*>?\s*basisverbruik.*?([\d]+,\d{3,5})\s*euro/m³",
+    r"comforttarief\s*(?:>\s*)?basisverbruik.*?([\d]+,\d{3,5})\s*euro/m³",
     re.IGNORECASE | re.DOTALL,
 )
 
