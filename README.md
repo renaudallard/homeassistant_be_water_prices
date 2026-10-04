@@ -725,6 +725,18 @@ when reporting an issue.
   is already gone when the new page is late, the fetch fails and the
   cached card keeps serving with the stale-snapshot Repair up until the
   new card is published.
+- **An encrypted tariff PDF is refused.** Before a card reaches the PDF
+  reader, every stream in it is inflated with a bounded decompressor, and
+  a card whose streams would grow past 64 MiB, that chains filters, names
+  a filter other than Flate or JPEG, or writes its filter as anything but
+  a plain name (by reference, for instance) is refused, so a compromised
+  operator site cannot exhaust Home Assistant's memory with a small file.
+  An encrypted card cannot be checked that way,
+  since its streams are deciphered only inside the reader, so it is
+  refused too, even one that opens with an empty password and only
+  restricts printing or copying. No card published today is encrypted; if
+  one becomes so, the fetch fails with "PDF is encrypted" and the last
+  good snapshot keeps serving behind the stale-snapshot Repair.
 - **Pidpa's default commune page has nothing under it either.** The
   May-2024 Tariefplan PDF used to stand in when the page could not be
   read; it is a projection whose drinkwater column was never indexed

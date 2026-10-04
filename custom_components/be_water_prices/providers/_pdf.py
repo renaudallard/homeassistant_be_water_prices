@@ -200,9 +200,40 @@ MAX_INFLATED_BYTES = 64 * 1024 * 1024
 _STREAM_RE = re.compile(rb"(?<!end)stream")
 _EOL_RE = re.compile(rb"\r\n|\r|\n")
 _OBJ_HEADER_RE = re.compile(rb"(?<![0-9])[0-9]+[ \t\r\n]+[0-9]+[ \t\r\n]+\Z")
-_FILTER_RE = re.compile(rb"/Filter\s*(\[[^\]]*\]|/[A-Za-z0-9]+|[0-9]+\s+[0-9]+\s+R)")
+
+
+# pdfminer drops a "#" in a name that no hex digit follows.
+_LONE_HASH = rb"(?:#(?![0-9A-Fa-f]))*+"
+
+
+def _name(word: bytes) -> bytes:
+    """A pattern for ``word`` inside a PDF name, each byte either as itself
+    or as the "#xx" escape pdfminer reads back to it, with any lone "#"
+    around them that pdfminer drops."""
+    escapes = (b"(?:%s|#(?i:%02x))" % (re.escape(bytes([c])), c) for c in word)
+    return _LONE_HASH + _LONE_HASH.join(escapes) + _LONE_HASH
+
+
+# A name ends at whitespace or a delimiter, so /FontFile and /First are not /F.
+_NAME_END = rb"(?![^\s/\[\]()<>{}%])"
+# pdfminer takes the abbreviated /F for /Filter.
+_FILTER_KEY_RE = re.compile(
+    b"/" + _name(b"F") + b"(?:" + _name(b"ilter") + b")?" + _NAME_END + rb"\s*"
+)
+# pdfminer's R makes a reference of the two tokens before it, whatever
+# they are, so a value is taken as read only when what follows cannot be
+# the second of them: the end of the dictionary, or a name that neither
+# R nor a comment comes after.
+_KEPT = rb"(?=\s*(?:>>|/[^\s/\[\]()<>{}%]*+\s*+(?!%|R(?![^\s#/\[\]()<>{}%]))))"
+# The only values let through: Flate or JPEG spelled plainly, and an
+# integer alone, which is an annotation's flags rather than a filter.
 _PLAIN_FILTERS = frozenset({b"/FlateDecode", b"/DCTDecode"})
-_HEAD_BYTES = 4096
+_PLAIN_FILTER_RE = re.compile(
+    b"(?:" + b"|".join(map(re.escape, sorted(_PLAIN_FILTERS))) + b")" + _NAME_END + _KEPT
+)
+_FLAGS_RE = re.compile(rb"[0-9]++" + _KEPT)
+_FILTER_NAME_RE = re.compile(rb"/[^\s/\[\]()<>{}%]*")
+_ENCRYPT_RE = re.compile(b"/" + _name(b"Encrypt") + _NAME_END)
 _INFLATE_CHUNK = 65536
 
 
@@ -262,9 +293,11 @@ def guard_pdf_streams(payload: bytes) -> None:
     count stops, never the "endstream" keyword: stored deflate blocks
     carry any bytes verbatim, so a stream can spell "endstream" long
     before it is done. A filter chain, a filter held in another object,
-    or a filter other than Flate and JPEG, is refused as well: a doubly
-    deflated or ASCII85-wrapped stream is invisible to this pass, and no
-    tariff card has used one.
+    a filter other than Flate and JPEG, or one written as anything but a
+    plain name, is refused as well: a doubly deflated or ASCII85-wrapped
+    stream is invisible to this pass, and no tariff card has used one. So is an encrypted document, since pdfminer
+    opens one with the empty password and deciphers each stream before
+    inflating it, out of this pass's sight.
 
     The pass is linear in the file: a keyword inside a stream's data is
     tried as a stream start and stops at the first byte that is not
@@ -272,6 +305,8 @@ def guard_pdf_streams(payload: bytes) -> None:
     not exceed the file by more than a chunk, which is what any set of
     streams that do not overlap consumes.
     """
+    if _ENCRYPT_RE.search(payload):
+        raise ExtractorError("PDF is encrypted; refusing to read it")
     view = memoryview(payload)
     inflated = consumed = previous_end = 0
     eol: re.Match[bytes] | None = None
@@ -285,23 +320,32 @@ def guard_pdf_streams(payload: bytes) -> None:
             if eol is None:
                 break
         # The stream's dictionary sits between its "N G obj" and "stream",
-        # after the previous keyword since streams do not nest.
-        head_start = max(previous_end, match.start() - _HEAD_BYTES)
+        # after the previous keyword since streams do not nest. It is looked
+        # for all the way back to that keyword, however long the dictionary:
+        # a fixed window used to cut a long one short and miss its filter.
+        head = payload[_object_start(payload, previous_end, match.start()) : match.start()]
         previous_end = match.end()
-        head = payload[_object_start(payload, head_start, match.start()) : match.start()]
-        filters = _FILTER_RE.findall(head)
-        if filters:
-            spec = filters[-1]
-            if spec.startswith(b"["):
+        filters = [
+            key.end()
+            for key in _FILTER_KEY_RE.finditer(head)
+            if not _FLAGS_RE.match(head, key.end())
+        ]
+        if len(filters) > 1:
+            # pdfminer reads /F before /Filter, so the one checked here
+            # need not be the one it applies.
+            raise ExtractorError("PDF stream names more than one filter; refusing to read it")
+        if filters and not _PLAIN_FILTER_RE.match(head, filters[0]):
+            if head.startswith(b"[", filters[0]):
                 raise ExtractorError("PDF stream uses a filter chain, which cannot be bounded")
-            if spec.endswith(b"R"):
+            name = _FILTER_NAME_RE.match(head, filters[0])
+            if name is not None and name[0] not in _PLAIN_FILTERS:
                 raise ExtractorError(
-                    "PDF stream names its filter by reference; refusing to read it"
+                    f"PDF stream uses the {name[0].decode('ascii', 'replace')} filter"
                 )
-            if spec not in _PLAIN_FILTERS:
-                raise ExtractorError(
-                    f"PDF stream uses the {spec.decode('ascii', 'replace')} filter"
-                )
+            raise ExtractorError(
+                "PDF stream names its filter by reference or in a form that cannot be "
+                "checked; refusing to read it"
+            )
         produced, used = _inflated_size(view[eol.end() :], MAX_INFLATED_BYTES - inflated)
         inflated += produced
         consumed += used

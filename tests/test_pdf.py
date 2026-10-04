@@ -329,9 +329,17 @@ def _stored_block(raw: bytes) -> bytes:
     return b"\x00" + size.to_bytes(2, "little") + (0xFFFF ^ size).to_bytes(2, "little") + raw
 
 
-def _pdf_with_xref(dictionary: bytes, body: bytes, keyword: bytes) -> bytes:
+def _pdf_with_xref(
+    dictionary: bytes,
+    body: bytes,
+    keyword: bytes,
+    trailer: bytes = b"",
+    extra: tuple[bytes, ...] = (),
+) -> bytes:
     """The same one-stream document with a cross-reference table, so pdfminer
-    reads /Length like it does on a real card rather than scanning."""
+    reads /Length like it does on a real card rather than scanning. The
+    ``trailer`` bytes go into the trailer dictionary and the ``extra``
+    objects are numbered from 6."""
     objs = [
         b"<</Type/Catalog/Pages 2 0 R>>",
         b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
@@ -339,6 +347,7 @@ def _pdf_with_xref(dictionary: bytes, body: bytes, keyword: bytes) -> bytes:
         b"/Resources<</Font<</F1 5 0 R>>>>>>",
         dictionary + keyword + body + b"\nendstream",
         b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+        *extra,
     ]
     out = bytearray(b"%PDF-1.4\n")
     offsets = []
@@ -349,7 +358,11 @@ def _pdf_with_xref(dictionary: bytes, body: bytes, keyword: bytes) -> bytes:
     out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
     for offset in offsets:
         out += b"%010d 00000 n \n" % offset
-    out += b"trailer<</Root 1 0 R/Size %d>>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    out += b"trailer<</Root 1 0 R/Size %d%s>>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objs) + 1,
+        trailer,
+        xref,
+    )
     return bytes(out)
 
 
@@ -409,6 +422,142 @@ def test_an_endstream_inside_the_data_does_not_end_the_count(monkeypatch: Any) -
 def test_a_filter_held_in_another_object_is_refused() -> None:
     payload = _pdf_with_stream(b"<</Length 5/Filter 9 0 R>>", b"hello")
     with pytest.raises(ExtractorError, match="by reference"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def _pdfminer_stream(payload: bytes) -> Any:
+    """The content stream of a ``_pdf_with_xref`` document, as pdfminer reads it."""
+    import io
+
+    from pdfminer.pdfdocument import PDFDocument
+    from pdfminer.pdfparser import PDFParser
+
+    return PDFDocument(PDFParser(io.BytesIO(payload))).getobj(4)
+
+
+def _filters_pdfminer_applies(payload: bytes) -> list[str]:
+    return [f.name for f, _params in _pdfminer_stream(payload).get_filters()]
+
+
+@pytest.mark.parametrize(
+    "key", [b"/F", b"/F#69lter", b"/#46", b"/Fil#74er", b"/Fi#lter", b"/F#", b"/F# ", b"/##46"]
+)
+def test_every_spelling_of_the_filter_key_is_checked(key: bytes) -> None:
+    """pdfminer takes /F for /Filter, reads "#xx" in a name as the byte it
+    encodes and drops a "#" with no hex digit after it; the guard once knew
+    only the long spelling."""
+    payload = _pdf_with_xref(b"<</Length 11%s/ASCIIHexDecode>>" % key, b"48656c6c6f>", b"stream\n")
+    assert _filters_pdfminer_applies(payload) == ["ASCIIHexDecode"]
+    with pytest.raises(ExtractorError, match="ASCIIHexDecode"):
+        _pdf.guard_pdf_streams(payload)
+
+
+@pytest.mark.parametrize(
+    "key", [b"/FontFile 7 0 R", b"/First 12", b"/F 4", b"/F1 5 0 R", b"/F1%c\n5 0 R"]
+)
+def test_names_that_only_start_like_the_filter_key_are_not_it(key: bytes) -> None:
+    """A font file, an object stream's offset, an annotation's flags and a
+    font named /F1 all begin with /F; none of them names a filter."""
+    payload = _pdf_with_stream(b"<</Length 5%s/Filter/FlateDecode>>" % key, b"hello")
+    _pdf.guard_pdf_streams(payload)
+
+
+@pytest.mark.parametrize("value", [b"%c\n/ASCIIHexDecode", b" 9 %c\n0 R", b" 9 0 %c\nR"])
+def test_a_comment_between_the_filter_key_and_its_value_is_refused(value: bytes) -> None:
+    """pdfminer skips the comment and applies the filter behind it."""
+    payload = _pdf_with_xref(b"<</Length 11/Filter%s>>" % value, b"48656c6c6f>", b"stream\n")
+    if value.startswith(b"%"):
+        assert _filters_pdfminer_applies(payload) == ["ASCIIHexDecode"]
+    with pytest.raises(ExtractorError, match="cannot be checked"):
+        _pdf.guard_pdf_streams(payload)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        (b"/F/#41SCIIHexDecode", "#41SCIIHexDecode filter"),
+        (b"/Filter/#41SCIIHexDecode", "#41SCIIHexDecode filter"),
+        (b"/Filter/FlateDecode 0 R/ASCIIHexDecode", "by reference"),
+        (b"/F 6.0 0 R", "by reference"),
+        (b"/F +6 0 R", "by reference"),
+        (b"/F 6 -0 R", "by reference"),
+        (b"/F 6 0.0 R", "by reference"),
+        (b"/F 6 null R", "by reference"),
+        (b"/F 6 /x R", "by reference"),
+        (b"/F 6 /x %c\nR", "by reference"),
+    ],
+)
+def test_a_filter_value_in_any_other_form_is_refused(value: bytes, message: str) -> None:
+    """pdfminer reads an escaped filter name, and its R takes any two tokens
+    before it as a reference, so the guard lets through only a plain name
+    or an annotation's flags with nothing behind them that R could take."""
+    payload = _pdf_with_xref(
+        b"<</Length 11%s>>" % value, b"48656c6c6f>", b"stream\n", extra=(b"[/ASCIIHexDecode]",)
+    )
+    assert _filters_pdfminer_applies(payload) == ["ASCIIHexDecode"]
+    with pytest.raises(ExtractorError, match=message):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_a_dictionary_with_both_filter_keys_is_refused() -> None:
+    """pdfminer applies /F when both are there, whichever comes first."""
+    payload = _pdf_with_xref(
+        b"<</Length 11/Filter/FlateDecode/F/ASCIIHexDecode>>", b"48656c6c6f>", b"stream\n"
+    )
+    assert _filters_pdfminer_applies(payload) == ["ASCIIHexDecode"]
+    with pytest.raises(ExtractorError, match="more than one filter"):
+        _pdf.guard_pdf_streams(payload)
+
+
+def test_a_filter_far_ahead_of_the_stream_keyword_is_still_read() -> None:
+    """A dictionary longer than a few kilobytes once hid its own filter."""
+    import zlib
+
+    body = zlib.compress(zlib.compress(b"BT (hello) Tj ET", 9), 9)
+    pad = b"A" * 8192
+    payload = _pdf_with_stream(
+        b"<</Filter[/FlateDecode/FlateDecode]/Length %d/Pad(%s)>>" % (len(body), pad), body
+    )
+    with pytest.raises(ExtractorError, match="filter chain"):
+        _pdf.guard_pdf_streams(payload)
+
+
+@pytest.mark.parametrize("name", [b"/Encrypt", b"/Encr#ypt"])
+def test_an_encrypted_document_is_refused(name: bytes, monkeypatch: Any) -> None:
+    """pdfminer opens a file with an empty user password unasked, deciphers
+    its streams and inflates them, while the bytes on disk are noise to the
+    guard. The file is encrypted here by hand (revision 2, RC4) so pdfminer
+    is shown inflating the whole stream."""
+    import hashlib
+    import zlib
+
+    from pdfminer.arcfour import Arcfour
+
+    pad = bytes.fromhex("28bf4e5e4e758a4164004e56fffa01082e2e00b6d0683e802f0ca9fe6453697a")
+    owner, docid, perms = b"\x01" * 32, b"\x02" * 16, -4
+    key = hashlib.md5(pad + owner + perms.to_bytes(4, "little", signed=True) + docid).digest()[:5]
+    user = Arcfour(key).encrypt(pad)
+    object_key = hashlib.md5(key + (4).to_bytes(3, "little") + b"\0\0").digest()[:10]
+
+    monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
+    content = b" " * (2 << 20)
+    body = Arcfour(object_key).encrypt(zlib.compress(content, 9))
+    payload = _pdf_with_xref(
+        b"<</Length %d/Filter/FlateDecode>>" % len(body),
+        body,
+        b"stream\n",
+        b"/ID[<%s><%s>]%s<</Filter/Standard/V 1/R 2/O<%s>/U<%s>/P %d>>"
+        % (
+            docid.hex().encode(),
+            docid.hex().encode(),
+            name,
+            owner.hex().encode(),
+            user.hex().encode(),
+            perms,
+        ),
+    )
+    assert len(_pdfminer_stream(payload).get_data()) == len(content)
+    with pytest.raises(ExtractorError, match="encrypted"):
         _pdf.guard_pdf_streams(payload)
 
 
