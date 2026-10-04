@@ -4,9 +4,10 @@ backfill_prices:
     Import flat-line hourly long-term-statistics rows for this
     integration's price sensors so the History and Energy dashboards
     show a tariff line going back further than the install date. The
-    run is automatic once per calendar year on integration setup; this
-    service lets you re-trigger it on demand or extend it to an earlier
-    start date.
+    run is automatic on the entry's first setup, and again whenever the
+    calendar year, the operator, the year of the card the rates came off
+    or the commune changes; this service lets you re-trigger it on demand
+    or extend it to an earlier start date.
   fields:
     entry_id:
       name: Config entry
