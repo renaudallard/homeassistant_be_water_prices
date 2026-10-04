@@ -364,7 +364,11 @@ options step stops offering them, and are asked for on a move into
 Flanders from Brussels or Wallonia, since the Flemish tariff prices on
 them. The saved commune is cleared when the
 utility changes (the new operator uses different commune IDs, so a stale
-value would silently fail at fetch time).
+value would silently fail at fetch time). It is also cleared on a new
+postcode when the operator's commune list cannot be loaded and the
+dropdown is skipped: the next load then picks up the commune the
+operator bills the new postcode on, or the operator's default applies,
+and you can pick your commune later from the entry's options.
 
 Switching operators can also strand price history: a Flemish comfort
 rate has no counterpart in Wallonia, so its statistics would sit there

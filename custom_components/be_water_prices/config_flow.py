@@ -56,8 +56,10 @@ pre-fills with the saved commune when the resolved utility matches
 the entry's current utility. Every path runs through
 ``_async_finish_reconfigure``, which rewrites the entry in place;
 commune-tied options are dropped on a utility change because operator
-A's commune IDs mean nothing to operator B. Annual consumption /
-persons / social tariff / meter carry over.
+A's commune IDs mean nothing to operator B, and on a postcode change
+unless a commune is picked, since the saved one belongs to the old
+address. Annual consumption / persons / social tariff / meter carry
+over.
 """
 
 from __future__ import annotations
@@ -548,9 +550,11 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         postcode has changed, or when nothing is saved to pre-fill.
 
         Skips itself when the commune list cannot be fetched (transient
-        network / parser failure); the entry then loads on the
-        operator-wide default and the user can pick a commune later via
-        OptionsFlow.
+        network / parser failure). The saved commune is then kept only
+        when neither the utility nor the postcode changed; otherwise it
+        is dropped, setup fills in the commune the operator bills the new
+        postcode on, or the operator-wide default applies, and the user
+        can pick a commune later via OptionsFlow.
         """
         if self._utility is None:
             return self.async_abort(reason="invalid_flow_state")
@@ -669,7 +673,9 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         commune-tied options: ``CONF_COMMUNE`` and ``CONF_COMMUNE_LABEL``
         carry an opaque, operator-specific identifier (DWG GUID, Farys
         numeric, Pidpa slug, Water-link name) that means nothing to a
-        different operator. The other options (consumption, persons,
+        different operator. They are dropped as well when the postcode
+        changed, since a commune saved for the old address no longer
+        applies. The other options (consumption, persons,
         social tariff, meter) carry over. If the user picked a commune
         in the manual flow (``async_step_reconfigure_commune``), layer
         it on top.
@@ -697,7 +703,15 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return await self.async_step_reconfigure_household()
 
         new_options = dict(entry.options)
-        if new_utility != old_utility or self._drop_stale_reconfigure_commune:
+        # A commune picked on the commune step is layered back on further
+        # down. Without one, a commune saved for the old postcode belongs
+        # to the old address, and setup never revisits a saved commune:
+        # moving from Geel to Nijlen while Pidpa's list could not be
+        # fetched kept the Geel card for good. Dropped, setup adopts the
+        # commune the new postcode is billed on, or the default applies.
+        saved_postcode = entry.options.get(CONF_POSTCODE) or entry.data.get(CONF_POSTCODE)
+        moved = self._postcode is not None and self._postcode != saved_postcode
+        if new_utility != old_utility or self._drop_stale_reconfigure_commune or moved:
             new_options.pop(CONF_COMMUNE, None)
             new_options.pop(CONF_COMMUNE_LABEL, None)
         if (

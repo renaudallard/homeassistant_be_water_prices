@@ -962,6 +962,56 @@ async def test_reconfigure_same_postcode_keeps_the_saved_commune(hass: HomeAssis
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("saved_postcode", "expected_commune"),
+    [("2440", "nijlen"), ("2560", "geel")],
+)
+async def test_reconfigure_move_with_the_list_down_drops_the_old_commune(
+    hass: HomeAssistant, saved_postcode: str, expected_commune: str
+) -> None:
+    """With Pidpa's list unreachable the commune step skips itself, and a
+    move from Geel to Nijlen kept the Geel card for good, 27.06 EUR a year
+    too much. Dropped, setup adopts Nijlen. Without a move, the commune
+    the household picked stays."""
+    from custom_components.be_water_prices import _adopt_commune_for_postcode
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_COMMUNE: "geel",
+            CONF_COMMUNE_LABEL: "Geel",
+            CONF_POSTCODE: saved_postcode,
+        },
+        unique_id=f"{DOMAIN}_pidpa",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    with (
+        patch(
+            "custom_components.be_water_prices.config_flow._async_communes",
+            return_value=(),
+        ),
+        patch.object(hass.config_entries, "async_reload", return_value=True),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "2560"}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.options[CONF_POSTCODE] == "2560"
+    _adopt_commune_for_postcode(hass, entry)
+    assert entry.options[CONF_COMMUNE] == expected_commune
+    # The label names the dropped commune, so it goes with it.
+    assert (CONF_COMMUNE_LABEL in entry.options) == (expected_commune == "geel")
+
+
+@pytest.mark.asyncio
 async def test_reconfigure_into_water_link_pre_fills_the_ring_commune(
     hass: HomeAssistant,
 ) -> None:
