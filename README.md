@@ -170,8 +170,9 @@ install.
 The all-in basis rate sensor reports the first-block tariff per m³
 (basis or linear plus sanering, VAT-incl) so a dashboard can surface
 what a cubic metre costs at a glance. It is the published rate: the
-social tariff and the vastrecht korting only enter the two cost
-sensors.
+social tariff and the vastrecht korting only enter the four cost
+sensors (`projected_annual_cost`, `current_year_cost`,
+`rolling_year_cost` and `projected_year_end_cost`).
 
 ## Sensors
 
@@ -208,8 +209,8 @@ with it, again without a restart.
 | `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
 | `all_in_basis_rate` | The first-block tariff per m³, VAT-incl: `(basis + sanering) × (1 + VAT)`, before any social-tariff reduction. For Wallonia this is the **above-30 m³** headline; the first 30 m³ pays only `0.5·CVD + FSE` (use the projected-cost sensor for the actual bill). |
 
-Between 1 January and the day your operator publishes the new card, both
-cost sensors run at **last year's rates**, and `snapshot_stale` stays
+Between 1 January and the day your operator publishes the new card, all
+four cost sensors run at **last year's rates**, and `snapshot_stale` stays
 `false` because the card is deliberately held valid until 31 March (see
 the grace window above). The `valid_from` attribute is what tells you
 which year is on screen. Once the new card lands the whole year to date
@@ -225,7 +226,7 @@ high-water mark and the rolling and year-end figures stay on the card in
 force until 1 January, across a restart too, and the new card prices the
 new year from its first day.
 
-All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting or the social tariff, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe.
+All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting or the social tariff, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe; `rolling_year_cost` and `projected_year_end_cost` are priced for your household the same way.
 
 | Entity id suffix (English install) | Description |
 | --- | --- |
