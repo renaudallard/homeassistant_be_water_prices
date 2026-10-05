@@ -76,3 +76,26 @@ def test_meter_repair_names_the_option_label(lang: str) -> None:
     field = m.group(1)
     for flow in (data["config"]["step"]["options"], data["options"]["step"]["init"]):
         assert flow["data"]["water_meter_sensor"].startswith(field)
+
+
+# How each language says that the saved commune goes with a new postcode.
+_POSTCODE_CLEARS_COMMUNE = {
+    "en": "postcode differs from the saved one",
+    "fr": "code postal diffère de celui enregistré",
+    "nl": "postcode verschilt van de opgeslagen",
+    "de": "Postleitzahl von der gespeicherten abweicht",
+}
+
+
+@pytest.mark.parametrize("lang", LANGUAGES)
+@pytest.mark.parametrize("step", ["reconfigure_postcode", "reconfigure_choose"])
+def test_reconfigure_says_a_new_postcode_clears_the_commune(lang: str, step: str) -> None:
+    """Both steps after a postcode say a move drops the saved commune.
+
+    The finish step drops it on a postcode other than the saved one
+    unless a commune is picked, even under the same operator. Text that
+    tied the drop to an operator change alone told a household moving
+    within Pidpa that its commune would carry over.
+    """
+    text = _load(lang)["config"]["step"][step]["description"]
+    assert _POSTCODE_CLEARS_COMMUNE[lang] in text

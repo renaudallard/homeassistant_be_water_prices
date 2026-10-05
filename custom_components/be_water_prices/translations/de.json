@@ -32,7 +32,7 @@
       },
       "reconfigure_postcode": {
         "title": "Postleitzahl aktualisieren",
-        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs).",
+        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs) oder die Postleitzahl von der gespeicherten abweicht, es sei denn, Sie wählen im nächsten Schritt eine Gemeinde (rechnet der Versorger die neue Postleitzahl über eine eigene Gemeinde ab, ist diese dort vorausgewählt).",
         "data": {
           "postcode": "Postleitzahl"
         }
@@ -46,7 +46,7 @@
       },
       "reconfigure_choose": {
         "title": "Wasserversorger wählen",
-        "description": "Ihre Postleitzahl wird von mehreren Versorgern bedient -- jeder beliefert andere Straßen. Wählen Sie den Versorger, der Sie abrechnet. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen.",
+        "description": "Ihre Postleitzahl wird von mehreren Versorgern bedient -- jeder beliefert andere Straßen. Wählen Sie den Versorger, der Sie abrechnet. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen oder die Postleitzahl von der gespeicherten abweicht, es sei denn, Sie wählen im nächsten Schritt eine Gemeinde.",
         "data": {
           "utility": "Versorger"
         }

@@ -32,7 +32,7 @@
       },
       "reconfigure_postcode": {
         "title": "Postcode bijwerken",
-        "description": "Voer de nieuwe postcode in voor deze invoer. We koppelen opnieuw aan een maatschappij en herladen de integratie. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als de gekoppelde maatschappij verandert (de nieuwe maatschappij gebruikt andere gemeente-IDs).",
+        "description": "Voer de nieuwe postcode in voor deze invoer. We koppelen opnieuw aan een maatschappij en herladen de integratie. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als de gekoppelde maatschappij verandert (de nieuwe maatschappij gebruikt andere gemeente-IDs) of de postcode verschilt van de opgeslagen, tenzij je bij de volgende stap een gemeente kiest (factureert de maatschappij de nieuwe postcode op een eigen gemeente, dan is die daar vooraf gekozen).",
         "data": {
           "postcode": "Postcode"
         }
@@ -46,7 +46,7 @@
       },
       "reconfigure_choose": {
         "title": "Kies je watermaatschappij",
-        "description": "Je postcode wordt door meerdere maatschappijen bediend -- elk verzorgt andere straten in je buurt. Kies wie jou factureert. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest.",
+        "description": "Je postcode wordt door meerdere maatschappijen bediend -- elk verzorgt andere straten in je buurt. Kies wie jou factureert. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest of de postcode verschilt van de opgeslagen, tenzij je bij de volgende stap een gemeente kiest.",
         "data": {
           "utility": "Maatschappij"
         }

@@ -32,7 +32,7 @@
       },
       "reconfigure_postcode": {
         "title": "Update your postcode",
-        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs).",
+        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs) or the postcode differs from the saved one, unless you pick a commune on the next step (where the operator bills the new postcode on a commune of its own, that commune is pre-selected).",
         "data": {
           "postcode": "Postcode"
         }
@@ -46,7 +46,7 @@
       },
       "reconfigure_choose": {
         "title": "Pick your water utility",
-        "description": "Your postcode is shared by more than one utility -- they each serve different streets in your area. Pick the one that bills you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if you pick a different operator.",
+        "description": "Your postcode is shared by more than one utility -- they each serve different streets in your area. Pick the one that bills you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if you pick a different operator or the postcode differs from the saved one, unless you pick a commune on the next step.",
         "data": {
           "utility": "Utility"
         }
