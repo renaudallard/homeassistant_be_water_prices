@@ -836,7 +836,10 @@ Two cron workflows guard against silent regressions:
   HTTP 5xx / 429) are reported as a `TRANSIENT` row and retried but
   never open an issue — only a real regression (parse / shape error,
   HTTP 3xx / 4xx) does, so a brief outage at a utility is not mistaken for a
-  broken extractor.
+  broken extractor. A card or commune list that takes longer than
+  `FETCH_BUDGET_S` in `const.py` (180 s, parse included), the time the
+  integration itself waits before serving its held card, is a `FAIL` row
+  and not a `TRANSIENT` one, since that is exactly the failure users see.
 - [`.github/workflows/fixture_drift.yml`](./.github/workflows/fixture_drift.yml)
   runs weekly, parses each utility's live publication and diffs
   the result against the parser's output on the committed test
@@ -848,6 +851,8 @@ Two cron workflows guard against silent regressions:
   rate drift* that the live check misses. A run where a utility was
   unreachable on a blip exits 2 rather than 0, so it neither opens an
   issue nor comments "drift cleared" on an open one it did not recheck.
+  A live fetch past the same 180 s budget is an error, as in the live
+  check.
 
 Both scripts skip Water-link in CI: its CDN HTTP-403s GitHub
 Actions IP ranges. Reachable from residential IPs; rerun either

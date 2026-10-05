@@ -14,6 +14,12 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # A run takes minutes. Each fetch is held to the integration's budget,
+    # but the parse thread it gives up on still has to end before the
+    # script can, so a render that never returns would hold the job until
+    # GitHub's six-hour cap. This leaves room for five attempts and their
+    # backoff.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

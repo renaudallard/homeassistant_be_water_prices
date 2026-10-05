@@ -57,6 +57,14 @@ REGIONS: tuple[str, ...] = (REGION_FLANDERS, REGION_WALLONIA, REGION_BRUSSELS)
 # Daily refresh; tariffs change once a year so anything tighter is wasted work.
 UPDATE_INTERVAL_HOURS = 24
 
+# How long one tariff fetch may take, parse included. The per-request
+# timeouts bound the network, not the parse: a page-long content stream
+# kept pdfplumber busy for ten minutes past the inflate guard, and the
+# refresh it wedged never re-armed the daily tick. The live check and the
+# drift check hold their fetches to the same figure, so a card that times
+# out for users fails there too instead of being graded fine.
+FETCH_BUDGET_S = 180
+
 # The project's own daily capture of every utility's card, one JSON per
 # utility, commune and month on the archive branch (scripts/archive_cards.py
 # writes it). Read when a refresh fails with nothing to serve, a restart

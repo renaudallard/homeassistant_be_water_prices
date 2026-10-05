@@ -75,6 +75,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # rendered again here; the fixture side renders as always.
 from card_texts import StoredTexts  # noqa: E402
 
+from custom_components.be_water_prices.const import FETCH_BUDGET_S  # noqa: E402
 from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterTariff,
     agso_knokke,
@@ -381,8 +382,10 @@ async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> Drift
     if chk.label in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
         return DriftResult(chk, [], error=None, skipped=CI_BLOCKED[chk.label])
 
+    budget = asyncio.timeout(FETCH_BUDGET_S)
     try:
-        live_t = await chk.fetch_live(session)
+        async with budget:
+            live_t = await chk.fetch_live(session)
     except TransientFetchError as err:
         # A transient upstream blip (5xx / 429 / timeout) is not drift and
         # must not flip the exit code, or the weekly workflow would open a
@@ -394,6 +397,12 @@ async def _check_one(session: aiohttp.ClientSession, chk: FixtureCheck) -> Drift
     except ExtractorError as err:
         return DriftResult(chk, [], error=f"live fetch failed: {err}")
     except Exception:
+        # Out of time is an error, as in the live check: the integration
+        # gives up on the same budget.
+        if budget.expired():
+            return DriftResult(
+                chk, [], error=f"live fetch did not finish within {FETCH_BUDGET_S} s"
+            )
         return DriftResult(chk, [], error=f"live fetch crashed:\n{traceback.format_exc()}")
     return DriftResult(chk, _diff(fixture_t, live_t), error=None)
 

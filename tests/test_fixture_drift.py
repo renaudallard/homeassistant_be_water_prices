@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 import aiohttp
@@ -81,6 +82,26 @@ async def test_hard_live_fetch_is_errored() -> None:
     )
     result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
     assert result.error is not None
+    assert result.skipped is None
+
+
+async def test_live_fetch_past_the_budget_is_errored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The integration gives up on the same budget, so this is not drift
+    to skip on a blip but a card users cannot load."""
+
+    async def _slow(_session: aiohttp.ClientSession) -> WaterTariff:
+        await asyncio.sleep(2)
+        return _dummy_tariff(b"")
+
+    chk = FixtureCheck(
+        label="TEST",
+        fixture="vivaqua_linear_2026.html",
+        parse_fixture=_dummy_tariff,
+        fetch_live=_slow,
+    )
+    monkeypatch.setattr("scripts.fixture_drift.FETCH_BUDGET_S", 0.05)
+    result = await _check_one(session=None, chk=chk)  # type: ignore[arg-type]
+    assert result.error == "live fetch did not finish within 0.05 s"
     assert result.skipped is None
 
 

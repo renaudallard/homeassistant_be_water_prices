@@ -44,7 +44,8 @@ but only open an issue for a real one):
 
     0 = all reachable extractors green
     1 = at least one extractor really failed (parse error, sanity check
-        missed, HTTP 4xx); worth retrying and opening an issue
+        missed, HTTP 4xx, or a fetch past the integration's own time
+        budget); worth retrying and opening an issue
     2 = at least one extractor hit a transient infrastructure failure
         (timeout, connection reset, HTTP 5xx / 429); worth retrying but
         not worth an issue. A brief upstream hiccup is not a regression
@@ -78,6 +79,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # rendered again here.
 from card_texts import StoredTexts  # noqa: E402
 
+from custom_components.be_water_prices.const import FETCH_BUDGET_S  # noqa: E402
 from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterExtractor,
     WaterTariff,
@@ -198,8 +200,10 @@ async def _check[T](
     region = extractor.region
     if extractor.id in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
         return CheckResult(check_id, label, region, "SKIP", CI_BLOCKED[extractor.id])
+    budget = asyncio.timeout(FETCH_BUDGET_S)
     try:
-        value = await call(session)
+        async with budget:
+            value = await call(session)
     except TransientFetchError as err:
         # Upstream hiccup (timeout / connection reset / HTTP 5xx): not a
         # regression, so it must not open an issue. Checked before the
@@ -208,7 +212,16 @@ async def _check[T](
     except ExtractorError as err:
         return CheckResult(check_id, label, region, "FAIL", str(err))
     except Exception:  # top-level: report anything unexpected as a failure row
-        return CheckResult(check_id, label, region, "FAIL", traceback.format_exc())
+        # Out of time is a failure, not a hiccup: a refresh gives up on the
+        # same budget and users stay on their held card, and a commune list
+        # that slow leaves the config flow waiting as long. The parse
+        # thread runs on to its end; only the job's own timeout bounds one
+        # that never returns.
+        if budget.expired():
+            detail = f"did not finish within {FETCH_BUDGET_S} s"
+        else:
+            detail = traceback.format_exc()
+        return CheckResult(check_id, label, region, "FAIL", detail)
     status, detail = judge(value)
     return CheckResult(check_id, label, region, status, detail)
 

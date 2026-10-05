@@ -32,6 +32,7 @@ a false GitHub issue; only a genuine parse / shape / 4xx failure is FAIL.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import date
 from pathlib import Path
@@ -137,6 +138,42 @@ async def test_check_one_unexpected_exception_is_fail() -> None:
 
     result = await _check_one(None, _fake_extractor(fetch))  # type: ignore[arg-type]
     assert result.status == "FAIL"
+
+
+async def test_check_one_past_the_budget_is_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A card that parses slower than the integration waits is broken for
+    users, who get the time-out and keep their held card, so it is a
+    failure and not a hiccup to retry quietly."""
+    from custom_components.be_water_prices.providers import WaterTariff
+
+    async def fetch(_session: object) -> WaterTariff:
+        await asyncio.sleep(2)
+        return WaterTariff(
+            utility="x",
+            region="flanders",
+            valid_from=date(date.today().year, 1, 1),
+            valid_until=date(date.today().year, 12, 31),
+            publication_label="x",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=100.0,
+            basis_eur_per_m3=2.0,
+        )
+
+    monkeypatch.setattr("scripts.live_check.FETCH_BUDGET_S", 0.05)
+    result = await _check_one(None, _fake_extractor(fetch))  # type: ignore[arg-type]
+    assert result.status == "FAIL"
+    assert result.detail == "did not finish within 0.05 s"
+
+
+async def test_check_one_timeout_of_its_own_keeps_its_traceback() -> None:
+    """A bare TimeoutError from the extractor is not the budget running out."""
+
+    async def fetch(_session: object) -> None:
+        raise TimeoutError
+
+    result = await _check_one(None, _fake_extractor(fetch))  # type: ignore[arg-type]
+    assert result.status == "FAIL"
+    assert "Traceback" in result.detail
 
 
 # --- exit-code bitmask -------------------------------------------------------

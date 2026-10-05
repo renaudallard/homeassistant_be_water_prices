@@ -62,7 +62,7 @@ async def test_a_fetch_past_the_budget_fails_the_refresh_with_a_reason(
     fake = WaterExtractor(id="aquaduin", label="Aquaduin", region="flanders", fetch=_fetch)
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch("custom_components.be_water_prices.coordinator._FETCH_BUDGET_S", 0.05),
+        patch("custom_components.be_water_prices.coordinator.FETCH_BUDGET_S", 0.05),
     ):
         assert not await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()

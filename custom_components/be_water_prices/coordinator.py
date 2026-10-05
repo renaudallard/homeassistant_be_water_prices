@@ -82,6 +82,7 @@ from .const import (
     DEFAULT_CONSUMPTION_M3,
     DEFAULT_PERSONS,
     DOMAIN,
+    FETCH_BUDGET_S,
     INTEGRATION_VERSION,
     MAX_CONSUMPTION_M3,
     MIN_CONSUMPTION_M3,
@@ -99,12 +100,6 @@ if TYPE_CHECKING:
     import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
-
-# How long one tariff fetch may take, parse included. The per-request
-# timeouts bound the network, not the parse: a page-long content stream
-# kept pdfplumber busy for ten minutes past the inflate guard, and the
-# refresh it wedged never re-armed the daily tick.
-_FETCH_BUDGET_S = 180
 
 # How many months back a failed refresh looks for a stored card, newest
 # first and stopping at the first one it finds. The daily run files a row
@@ -1011,7 +1006,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _async_update_data(self) -> CoordinatorData:
         session = async_get_clientsession(self.hass)
         commune = self.entry.options.get(CONF_COMMUNE)
-        budget = asyncio.timeout(_FETCH_BUDGET_S)
+        budget = asyncio.timeout(FETCH_BUDGET_S)
         failure: Exception | None = None
         try:
             async with budget:
@@ -1139,7 +1134,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if out_of_time:
             # A bare TimeoutError, whose str() is empty. The parse thread
             # it gave up on runs to completion on its own.
-            failure = ExtractorError(f"fetch did not finish within {_FETCH_BUDGET_S} s")
+            failure = ExtractorError(f"fetch did not finish within {FETCH_BUDGET_S} s")
         # The message quotes the URL it failed on, and a per-commune URL
         # carries the town name. The sensor attribute, diagnostics and the
         # Repair card all scrub that; the log was the one surface left
