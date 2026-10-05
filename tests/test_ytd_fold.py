@@ -1155,6 +1155,26 @@ def test_a_refuted_spike_does_not_raise_the_high_water_mark() -> None:
     assert normal.high_m3 == 106.0
 
 
+def test_an_admitted_dip_does_not_lower_the_high_water_mark() -> None:
+    """Of the readings a round admits, only one above the mark raises it.
+
+    A glitch a little under the meter is admitted and republishes the
+    year's figure. Had it set the high-water mark, the next tick carrying the
+    recorder would find the meter at that mark and rebuild the frame
+    under the dip, over-reporting every reading until a later tick with
+    a recorder answer took it back down.
+    """
+    dip = _round(_anchored(20.0, 980.0), reading=995.0, high_m3=1000.0)
+    assert dip.m3 == 20.0
+    assert dip.hold_m3 is None
+    assert dip.hold_run == 0
+    assert dip.high_m3 == 1000.0
+
+    tick = _round(dip.cycle, reading=996.0, recorder_m3=20.0, high_m3=dip.high_m3)
+    assert tick.cycle.offset_m3 == 980.0
+    assert _round(tick.cycle, reading=1001.0, high_m3=tick.high_m3).m3 == 21.0
+
+
 def test_a_floor_measured_for_other_options_does_not_clamp() -> None:
     """The social tariff granted in July published 437.56 where 87.51 was owed."""
     cycle = _anchored(60.0, 1000.0, cost=_bill(60.0))
