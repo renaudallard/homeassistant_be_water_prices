@@ -130,7 +130,7 @@ async def test_next_years_card_in_december_leaves_the_closing_year_alone(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=0.0),
+            new=AsyncMock(return_value=(0.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -205,7 +205,7 @@ async def test_a_fresh_install_in_december_prices_on_the_card_it_has(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=0.0),
+            new=AsyncMock(return_value=(0.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)

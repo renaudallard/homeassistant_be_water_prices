@@ -89,6 +89,6 @@ async def test_the_day_a_meter_reads_0_keeps_its_water(
         do_adhoc_statistics(hass, start=moment.astimezone(dt_util.UTC))
         await async_wait_recording_done(hass)
 
-    total = await _recorder_ytd_m3(hass, _METER, date(2026, 3, 1), date(2026, 3, 3))
+    total, _ = await _recorder_ytd_m3(hass, _METER, date(2026, 3, 1), date(2026, 3, 3))
 
     assert total == pytest.approx(1.0)  # 1000.0 -> 1001.0, every drop of it

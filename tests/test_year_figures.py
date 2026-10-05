@@ -242,7 +242,7 @@ def _card_and_recorder(
     )
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(_YTD, new=ytd or AsyncMock(return_value=20.0)),
+        patch(_YTD, new=ytd or AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=full_year or AsyncMock(return_value=None)),
         patch(_ROWS, new=rows),
     ):
@@ -348,7 +348,7 @@ async def test_the_meter_is_read_once_a_day(hass: HomeAssistant, freezer: Any) -
     rows = AsyncMock(return_value=_a_year_of_water())
     entry = await _setup_entry(hass, rows)
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_ROWS, new=rows):
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=rows):
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert rows.await_count == 1
@@ -367,7 +367,7 @@ async def test_an_unreadable_recorder_keeps_the_last_read(
     coordinator = hass.data[DOMAIN][entry.entry_id]
     freezer.tick(timedelta(days=1))
     with (
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_ROWS, new=AsyncMock(side_effect=RecorderUnavailable("locked"))),
     ):
         await coordinator.async_refresh()
@@ -384,7 +384,7 @@ async def test_a_read_kept_too_long_is_dropped(hass: HomeAssistant, freezer: Any
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
     coordinator = hass.data[DOMAIN][entry.entry_id]
     broken = AsyncMock(side_effect=RecorderUnavailable("locked"))
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_ROWS, new=broken):
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=broken):
         freezer.tick(timedelta(days=7))
         await coordinator.async_refresh()
         await hass.async_block_till_done()
@@ -421,7 +421,10 @@ async def test_a_draw_during_the_read_is_not_overwritten(hass: HomeAssistant, fr
         return _a_year_of_water()
 
     freezer.tick(timedelta(days=1))
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_ROWS, new=_draw_while_reading):
+    with (
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
+        patch(_ROWS, new=_draw_while_reading),
+    ):
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert coordinator.data.ytd_consumption_m3 == 50.0
@@ -478,9 +481,9 @@ async def test_a_tick_that_returns_after_midnight_projects_the_year_it_folded(
     freezer.move_to("2026-12-31 22:59:50+00:00")  # 23:59:50 in Brussels
     rows = AsyncMock(return_value=_buckets(_span(date(2025, 11, 1), date(2026, 12, 30))))
 
-    async def _past_midnight(*_args: Any) -> float:
+    async def _past_midnight(*_args: Any) -> tuple[float, float]:
         freezer.tick(timedelta(seconds=20))
-        return 90.0
+        return 90.0, 0.0
 
     entry = await _setup_entry(hass, rows, AsyncMock(side_effect=_past_midnight))
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -507,7 +510,7 @@ async def test_a_refused_day_is_not_warned_about_on_every_read(
     coordinator = hass.data[DOMAIN][entry.entry_id]
     caplog.clear()
     caplog.set_level(logging.DEBUG)
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_ROWS, new=rows):
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=rows):
         freezer.tick(timedelta(days=1))
         await coordinator.async_refresh()
         await hass.async_block_till_done()
@@ -535,7 +538,7 @@ async def test_a_read_of_another_meter_is_not_kept(hass: HomeAssistant, freezer:
         patch.object(
             coordinator, "async_resolve_meter_entity", AsyncMock(return_value="sensor.other_meter")
         ),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_ROWS, new=AsyncMock(side_effect=RecorderUnavailable("locked"))),
     ):
         await coordinator.async_refresh()

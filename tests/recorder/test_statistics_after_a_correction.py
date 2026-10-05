@@ -187,6 +187,7 @@ async def test_picking_a_renamed_meter_again_keeps_the_year_in_its_cycle(
             meter=meter,
             reading=reading,
             recorder_m3=recorder_m3,
+            recorder_taken_back=0.0,
             recorder_has_statistic=recorder_m3 is not None,
             recorder_ok=None if recorder_m3 is None else True,
             elapsed_s=3600.0,

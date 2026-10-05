@@ -72,6 +72,7 @@ def _round(
     *,
     reading: float | None = None,
     recorder_m3: float | None = None,
+    recorder_taken_back: float = 0.0,
     recorder_has_statistic: bool = True,
     recorder_ok: bool | None = True,
     hold_m3: float | None = None,
@@ -93,6 +94,7 @@ def _round(
         meter=meter,
         reading=reading,
         recorder_m3=recorder_m3,
+        recorder_taken_back=recorder_taken_back,
         recorder_has_statistic=recorder_has_statistic,
         recorder_ok=recorder_ok,
         hold_m3=hold_m3,
@@ -1669,6 +1671,35 @@ def test_a_recorder_below_its_own_previous_answer_is_a_database_that_lost_some()
 
     assert out.m3 == 130.0
     assert out.cycle.recorder_hwm == 120.0  # and the high-water mark stands
+
+
+def test_an_answer_lower_only_by_a_spike_taken_back_is_believed() -> None:
+    """The earlier answer was read before the correction's day was compiled.
+
+    It held a spike the reader has since taken back out of its day, so the
+    answer below it is the corrected year rather than a lost day. Summed
+    back, the same water can come out a binary residue short, as it does
+    here, and that is no lost day either.
+    """
+    before, spike, corrected = 4000.0, 3.1, 4000.3
+    earlier = 0.2 + spike
+    capped = corrected - before
+    taken = spike - capped
+    later = 0.2 + capped
+    assert later + taken < earlier
+    misread = _anchored(earlier, before - 0.2, recorder_hwm=earlier)
+    out = _round(misread, reading=corrected, recorder_m3=later, recorder_taken_back=taken)
+
+    assert out.m3 == pytest.approx(0.5)
+    assert out.cycle.recorder_hwm == earlier
+
+
+def test_a_take_back_does_not_excuse_a_database_that_lost_more() -> None:
+    purged = _anchored(130.0, 1000.0, recorder_hwm=120.0)
+    out = _round(purged, reading=1041.0, recorder_m3=41.0, recorder_taken_back=5.0)
+
+    assert out.m3 == 130.0
+    assert out.cycle.recorder_hwm == 120.0
 
 
 def test_a_meter_with_no_statistic_still_starts_an_empty_year() -> None:

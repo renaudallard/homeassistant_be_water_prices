@@ -122,7 +122,7 @@ async def _setup_entry(
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch_tariff)
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=full_year if full_year is not None else AsyncMock(return_value=None)),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -479,7 +479,7 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
     # per (meter, year, configured figure) and setup already spent it.
     coordinator._projection_checked = None
     with (
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=_draw_while_querying),
     ):
         await coordinator.async_refresh()
@@ -530,7 +530,7 @@ async def test_fix_flow_writes_the_measured_year_into_the_options(
         # to stay patched across that or the reload fetches vivaqua.be for
         # real and the assertion below passes or fails on the network.
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=AsyncMock(return_value=131.0)),
     ):
         flow = await async_create_fix_flow(hass, coordinator.projection_issue_id, issue.data)
@@ -600,7 +600,7 @@ async def test_opening_the_card_shows_a_form_before_doing_anything(
 
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=AsyncMock(return_value=131.0)),
     ):
         result = await hass.data["repairs"]["flow_manager"].async_init(

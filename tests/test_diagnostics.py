@@ -144,7 +144,7 @@ async def test_dump_carries_no_postcode_commune_or_meter(hass) -> None:  # type:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)

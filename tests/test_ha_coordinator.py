@@ -315,7 +315,7 @@ async def test_one_absurd_reading_does_not_pin_the_year(hass: HomeAssistant) -> 
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -375,7 +375,7 @@ async def test_recorder_fallback_does_not_publish_below_the_live_mark(
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -392,7 +392,7 @@ async def test_recorder_fallback_does_not_publish_below_the_live_mark(
         # The meter drops out and the recorder's daily total trails it.
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
-        recorder.return_value = 49.7
+        recorder.return_value = (49.7, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 50.0
@@ -429,7 +429,7 @@ async def test_removing_the_entry_deletes_its_ytd_store(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         await hass.config.async_set_time_zone("Europe/Brussels")
@@ -512,7 +512,7 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -578,7 +578,7 @@ async def test_meter_events_do_not_starve_the_daily_refresh(hass: HomeAssistant)
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -639,7 +639,7 @@ async def test_live_tracking_follows_a_changed_auto_discovered_meter(
         ),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -697,7 +697,7 @@ async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -743,7 +743,7 @@ async def test_live_ytd_reanchors_on_year_rollover(hass: HomeAssistant) -> None:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -795,7 +795,7 @@ async def test_live_ytd_recovers_after_meter_unavailable_at_tick(hass: HomeAssis
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -849,7 +849,7 @@ async def test_live_ytd_recovery_resets_when_meter_down_across_year_boundary(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -898,7 +898,7 @@ async def test_live_ytd_republishes_when_only_cost_changes(hass: HomeAssistant) 
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -946,7 +946,7 @@ async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -966,7 +966,7 @@ async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
         # true 50 because its daily statistics lag), then set up again.
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
-        recorder.return_value = 45.0
+        recorder.return_value = (45.0, 0.0)
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
@@ -1007,7 +1007,7 @@ async def test_live_ytd_ignores_meter_glitch_down(hass: HomeAssistant) -> None:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1084,7 +1084,7 @@ async def test_live_ytd_cost_held_when_tariff_drops(hass: HomeAssistant) -> None
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1130,7 +1130,7 @@ async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1178,7 +1178,7 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -1198,7 +1198,7 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
-        recorder.return_value = 2.0
+        recorder.return_value = (2.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -1237,7 +1237,7 @@ async def test_meter_recovery_keeps_the_new_year_recorder_figure(hass: HomeAssis
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -1250,7 +1250,7 @@ async def test_meter_recovery_keeps_the_new_year_recorder_figure(hass: HomeAssis
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
-        recorder.return_value = 5.0
+        recorder.return_value = (5.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 5.0
@@ -1294,7 +1294,7 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -1312,7 +1312,7 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
         # statistics are compiled every five minutes. Left frozen at 20 it
         # would now be contradicting the year rather than trailing it, and
         # what this test is about is the glitch, not that disagreement.
-        recorder.return_value = 50.0
+        recorder.return_value = (50.0, 0.0)
 
         # Restart, then the meter momentarily reports 120 at setup time -- a
         # glitch below the climbed mark but above the Jan 1 baseline (80).
@@ -1353,7 +1353,7 @@ async def _setup_metered_entry(hass: HomeAssistant) -> Any:
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1513,7 +1513,7 @@ async def test_recorder_ytd_query_shape_and_summing(hass: HomeAssistant) -> None
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
         stats.return_value = {"sensor.wm": [{"change": 10.0}, {"change": 5.5}, {"change": None}]}
-        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+        total, _ = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
     assert total == 15.5
     _hass, _start, _end, ids, period, units, types = stats.call_args.args
@@ -1589,7 +1589,7 @@ async def test_recorder_ytd_drops_a_first_bucket_with_no_baseline(hass: HomeAssi
                 {"change": 8.16, "sum": 160.32},
             ]
         }
-        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+        total, _ = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
     assert total == pytest.approx(20.16)
 
@@ -1626,7 +1626,7 @@ async def test_recorder_ytd_keeps_a_first_bucket_that_has_a_baseline(
                 {"change": 12.0, "sum": 152.16},
             ]
         }
-        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+        total, _ = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
     assert total == pytest.approx(12.4)
 
@@ -1663,9 +1663,8 @@ async def test_recorder_ytd_floors_a_meter_swap(hass: HomeAssistant) -> None:
         ),
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
-        assert (
-            await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30)) == 10.0
-        )
+        total, _ = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+    assert total == 10.0
 
 
 @pytest.mark.asyncio
@@ -1702,7 +1701,7 @@ async def test_recorder_ytd_reads_no_statistics_as_zero(hass: HomeAssistant) -> 
             patch("homeassistant.components.recorder.get_instance", return_value=instance),
         ):
             got = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
-        assert got == 0.0
+        assert got == (0.0, 0.0)
 
 
 @pytest.mark.asyncio
@@ -1883,7 +1882,7 @@ async def test_explicit_meter_option_wins_over_discovery(hass: HomeAssistant) ->
         ),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         await hass.config.async_set_time_zone("Europe/Brussels")
@@ -1923,7 +1922,7 @@ async def test_unusable_meter_readings_leave_the_total_alone(hass: HomeAssistant
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -1975,14 +1974,16 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
     async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
         return discovered, 1 if discovered else 0
 
-    async def _recorder(_hass: HomeAssistant, meter: str, _s: date, _e: date) -> float:
+    async def _recorder(
+        _hass: HomeAssistant, meter: str, _s: date, _e: date
+    ) -> tuple[float, float]:
         if meter == "sensor.meter_b":
             # The new meter reports while its recorder query is in flight,
             # and the loop gets a turn to deliver that event before the
             # tick resumes, which is what opens the window.
             hass.states.async_set("sensor.meter_b", "5000")
             await asyncio.sleep(0)
-        return ytd_for[meter]
+        return ytd_for[meter], 0.0
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2049,12 +2050,14 @@ async def test_a_reading_that_lands_during_the_recorder_query_is_used(
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
 
-    async def _recorder(_hass: HomeAssistant, _meter: str, _s: date, _e: date) -> float:
+    async def _recorder(
+        _hass: HomeAssistant, _meter: str, _s: date, _e: date
+    ) -> tuple[float, float]:
         # The meter comes back while the query is in flight, and the loop
         # gets a turn to deliver that event before the tick resumes.
         hass.states.async_set("sensor.water_meter", "100")
         await asyncio.sleep(0)
-        return 20.0
+        return 20.0, 0.0
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2113,7 +2116,7 @@ async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssist
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -2127,7 +2130,7 @@ async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssist
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
-        recorder.return_value = 0.0
+        recorder.return_value = (0.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 0.0
@@ -2172,7 +2175,7 @@ async def test_transient_recorder_gap_does_not_reset_the_year(hass: HomeAssistan
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=12.0)
+    recorder = AsyncMock(return_value=(12.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -2235,7 +2238,7 @@ async def test_a_recorder_gap_across_a_restart_keeps_the_year(hass: HomeAssistan
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=12.0)
+    recorder = AsyncMock(return_value=(12.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -2327,7 +2330,7 @@ async def test_tick_defers_the_anchor_when_the_recorder_query_fails(
 
         # The next healthy tick anchors properly and keeps the 40.
         recorder.side_effect = None
-        recorder.return_value = 40.0
+        recorder.return_value = (40.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator._ytd.offset_m3 == 4480.0
@@ -2364,7 +2367,7 @@ async def test_an_old_recorder_failure_does_not_block_the_new_year(
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -2495,7 +2498,7 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=78.0)
+    recorder = AsyncMock(return_value=(78.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
@@ -2517,7 +2520,7 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
 
         # Roll over: the figure now belongs to last year.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
-        recorder.return_value = 0.4
+        recorder.return_value = (0.4, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -2561,7 +2564,7 @@ async def test_resuming_live_tracking_keeps_the_cost_floor(hass: HomeAssistant) 
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -2611,7 +2614,7 @@ async def test_recorder_hiccup_does_not_blank_a_known_figure(hass: HomeAssistant
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=20.0)
+    recorder = AsyncMock(return_value=(20.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -2681,7 +2684,7 @@ async def test_cost_floor_from_an_older_store_still_drops_at_rollover(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=2.0),
+            new=AsyncMock(return_value=(2.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -2721,7 +2724,7 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=0.0)
+    recorder = AsyncMock(return_value=(0.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
@@ -2740,7 +2743,7 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         # Meter drops out and the recorder now answers, above the mark.
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
-        recorder.return_value = 30.0
+        recorder.return_value = (30.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
@@ -2762,7 +2765,7 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         # the next tick ask the recorder again, and a reading and a figure
         # read together are the one pair that can put it back: 107 - 30.
         recorder.side_effect = None
-        recorder.return_value = 30.0
+        recorder.return_value = (30.0, 0.0)
         hass.states.async_set("sensor.water_meter", "107")
         await hass.async_block_till_done()
         await coordinator.async_refresh()
@@ -2827,7 +2830,7 @@ async def test_undatable_cost_floor_from_an_older_store_is_dropped(
         ),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=2.0),
+            new=AsyncMock(return_value=(2.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -2868,7 +2871,7 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=70.0)
+    recorder = AsyncMock(return_value=(70.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
@@ -2956,7 +2959,7 @@ async def test_first_anchor_of_a_running_year_still_anchors_after_a_migration(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=30.0),
+            new=AsyncMock(return_value=(30.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3000,7 +3003,7 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
     )
     entry.add_to_hass(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
-    recorder = AsyncMock(return_value=45.0)
+    recorder = AsyncMock(return_value=(45.0, 0.0))
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
@@ -3016,20 +3019,20 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
         assert coordinator.data.ytd_consumption_m3 == 45.0
 
         # The recorder total steps backwards inside the same year.
-        recorder.return_value = 40.0
+        recorder.return_value = (40.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 45.0
 
         # A genuine climb still gets through.
-        recorder.return_value = 51.0
+        recorder.return_value = (51.0, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 51.0
 
         # And the new year is free to start near zero.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
-        recorder.return_value = 0.4
+        recorder.return_value = (0.4, 0.0)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 0.4
@@ -3067,7 +3070,7 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3128,7 +3131,7 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3188,7 +3191,7 @@ async def test_meter_draw_does_not_churn_the_rate_sensors(hass: HomeAssistant) -
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3257,7 +3260,7 @@ async def test_unreadable_cycle_store_does_not_block_setup(hass: HomeAssistant) 
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
         patch(
             "custom_components.be_water_prices.coordinator._YtdStore.async_load",
@@ -3448,7 +3451,7 @@ async def test_a_litre_meter_spelt_the_way_home_assistant_knows_is_read(
         ),
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
-        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
+        total, _ = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
     assert total == pytest.approx(0.3)
 
 
@@ -3480,7 +3483,7 @@ async def test_several_energy_water_sources_raise_a_repair(hass: HomeAssistant) 
         ),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3518,7 +3521,7 @@ async def test_one_energy_water_source_raises_nothing(hass: HomeAssistant) -> No
         ),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3601,13 +3604,14 @@ async def test_the_tick_after_a_swap_asks_the_recorder(hass: HomeAssistant) -> N
         now_year=dt_util.now().year,
         reading=0.0,
         recorder_m3=None,
+        recorder_taken_back=0.0,
         recorder_has_statistic=False,
     )
     assert coordinator._ytd_arbitrate is True
 
     # ...and the next tick spends it on a recorder query.
     hass.states.async_set("sensor.water_meter", "1234.6")
-    recorder = AsyncMock(return_value=40.1)
+    recorder = AsyncMock(return_value=(40.1, 0.0))
     with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
         await coordinator._compute_ytd(_fresh_tariff())
     recorder.assert_awaited()
@@ -3653,12 +3657,13 @@ async def test_a_replaced_meter_is_tracked_live_after_the_recorder_tick(
         now_year=year,
         reading=1.2,
         recorder_m3=None,
+        recorder_taken_back=0.0,
         recorder_has_statistic=False,
     )
     assert swap == 0.0
 
     hass.states.async_set("sensor.water_meter", "1.2")
-    recorder = AsyncMock(return_value=60.3)
+    recorder = AsyncMock(return_value=(60.3, 0.0))
     with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
         tick, _ = await coordinator._compute_ytd(_fresh_tariff())
     assert tick == 60.3
@@ -3669,6 +3674,7 @@ async def test_a_replaced_meter_is_tracked_live_after_the_recorder_tick(
         now_year=year,
         reading=5.0,
         recorder_m3=None,
+        recorder_taken_back=0.0,
         recorder_has_statistic=False,
     )
     assert live == pytest.approx(64.1)
@@ -3712,7 +3718,7 @@ async def test_a_swap_moves_the_sensors_reset_to_its_start(hass: HomeAssistant) 
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            AsyncMock(return_value=60.0),
+            AsyncMock(return_value=(60.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3819,7 +3825,7 @@ async def test_a_unit_the_recorder_needs_no_help_with_is_read(
         ),
         patch("homeassistant.components.recorder.get_instance", return_value=instance),
     ):
-        total = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
+        total, _ = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 3, 1))
     assert total == pytest.approx(0.3)
 
 
@@ -3871,7 +3877,7 @@ async def test_first_anchor_keeps_a_floor_it_can_account_for(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=30.0),
+            new=AsyncMock(return_value=(30.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -3929,7 +3935,7 @@ async def test_a_floor_measured_by_an_earlier_release_is_rebuilt_once(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=30.0),
+            new=AsyncMock(return_value=(30.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)

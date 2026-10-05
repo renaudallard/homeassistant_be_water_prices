@@ -142,7 +142,7 @@ async def test_a_late_refresh_does_not_write_the_store_of_a_removed_entry(
     store_key = f"{DOMAIN}.{entry.entry_id}.ytd"
     with (
         patch(_GET, return_value=_extractor(_fetch)),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -191,7 +191,7 @@ async def test_a_late_refresh_does_not_raise_the_projection_card_after_unload(
     entry = _metered_entry(hass)
     with (
         patch(_GET, return_value=_extractor(_fetch)),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=_full_year),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -222,7 +222,7 @@ async def test_a_setup_that_fails_after_the_first_refresh_takes_its_cards_down(
     entry = _metered_entry(hass)
     with (
         patch(_GET, return_value=_extractor(_stale)),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=AsyncMock(return_value=131.0)),
         patch.object(
             hass.config_entries, "async_forward_entry_setups", side_effect=RuntimeError("boom")
@@ -365,7 +365,7 @@ async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
     store_key = f"{DOMAIN}.{entry.entry_id}.ytd"
     with (
         patch(_GET, return_value=_extractor(_fetch)),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -428,7 +428,7 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
     entry = _metered_entry(hass)
     with (
         patch(_GET, return_value=_extractor(_fetch)),
-        patch(_YTD, new=AsyncMock(return_value=20.0)),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()

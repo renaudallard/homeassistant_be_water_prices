@@ -71,7 +71,7 @@ async def test_a_frame_that_reproduces_the_figure_to_the_femtolitre_is_not_stale
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
-        patch(_YTD, new=AsyncMock(return_value=0.1)) as recorder,
+        patch(_YTD, new=AsyncMock(return_value=(0.1, 0.0))) as recorder,
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()

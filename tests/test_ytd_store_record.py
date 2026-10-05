@@ -91,7 +91,7 @@ async def test_a_malformed_record_starts_a_fresh_cycle(
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)

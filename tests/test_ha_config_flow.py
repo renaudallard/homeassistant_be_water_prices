@@ -1738,7 +1738,7 @@ async def test_failed_first_refresh_leaves_no_meter_listener(hass: HomeAssistant
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
             "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
-            new=AsyncMock(return_value=20.0),
+            new=AsyncMock(return_value=(20.0, 0.0)),
         ),
         # The refresh succeeds and subscribes; platform setup then fails.
         patch.object(

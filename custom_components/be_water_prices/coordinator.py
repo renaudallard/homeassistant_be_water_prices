@@ -375,10 +375,11 @@ class _YtdCycle:
     # the options that price them. A floor only holds while these hold. An
     # older record has no basis and simply rebuilds its floor once.
     basis: str | None = None
-    # The highest figure the recorder has reported for this cycle. It only
-    # ever climbs while its history is intact, since consumption
-    # accumulates, so an answer below it is a database that has lost some
-    # and must not be believed against the year.
+    # The highest figure the recorder has reported for this cycle, counting
+    # what the reader took back out of misread days. It only ever climbs
+    # while its history is intact, since consumption accumulates, so an
+    # answer below it is a database that has lost some and must not be
+    # believed against the year.
     recorder_hwm: float | None = None
     # When a reading was last folded into this cycle, as epoch seconds.
     # Persisted, because the gap that matters most is the one across a
@@ -442,6 +443,7 @@ def _fold(
     meter: str,
     reading: float | None,
     recorder_m3: float | None,
+    recorder_taken_back: float,
     recorder_has_statistic: bool,
     recorder_ok: bool | None,
     hold_m3: float | None,
@@ -464,7 +466,9 @@ def _fold(
     does; nothing else distinguishes them.
 
     ``recorder_m3`` is this year's consumption as the recorder reports it,
-    or ``None`` when it was not asked or could not answer. ``recorder_ok``
+    or ``None`` when it was not asked or could not answer, and
+    ``recorder_taken_back`` is how much the reader took back out of days it
+    found to be misreads to arrive at it. ``recorder_ok``
     tells those apart for the one decision that needs it: ``False`` when
     the query failed, ``True`` when it succeeded, ``None`` when nothing has
     asked yet. ``recorder_has_statistic`` is ``False`` when the recorder
@@ -722,7 +726,7 @@ def _fold(
     if (
         recorder_has_statistic
         and recorder_m3 is not None
-        and (recorder_hwm is None or recorder_m3 >= recorder_hwm)
+        and (recorder_hwm is None or recorder_m3 + recorder_taken_back >= recorder_hwm - 1e-6)
     ):
         # A recorder answer only climbs while its history is intact, since
         # consumption accumulates. One at or above every previous answer is
@@ -734,12 +738,22 @@ def _fold(
         # database that has lost some, and it is ignored rather than
         # believed against the year.
         #
+        # The answer compared is the one before the reader took a misread
+        # back out of the day it landed in. A spike corrected after
+        # midnight is still in the answer read before the correction's
+        # hour is compiled, which is the very tick the correction queries
+        # on, and the corrected answer below it would otherwise read as a
+        # lost day and keep the spike until the year caught up with it.
+        # Added back, the same water can sum to a binary residue below the
+        # answer it was in, which is no lost day either.
+        #
         # None of this holds for a meter the recorder has no statistic
         # for. Its zero repeats on every query, so a second one passed for
         # a history that had stayed whole, and a meter renamed after New
         # Year, or one with no state class whose reading stepped back a
         # little, had its year taken down to nothing and saved that way.
-        recorder_hwm = recorder_m3
+        whole = recorder_m3 + recorder_taken_back
+        recorder_hwm = whole if recorder_hwm is None else max(recorder_hwm, whole)
         if (
             candidate is not None
             and candidate - recorder_m3 > _RECORDER_LAG_M3
@@ -1557,7 +1571,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # Quietly: this reads the same thirteen months every day, so a bucket
         # refused here would be warned about daily until it left the window.
         # The year-to-date and full-year readers say so when they meet one.
-        admitted, _refused = _admitted_changes(rows or [], meter, start, end, level=logging.DEBUG)
+        admitted, _refused, _taken_back = _admitted_changes(
+            rows or [], meter, start, end, level=logging.DEBUG
+        )
         days = {
             dt_util.as_local(datetime.fromtimestamp(bucket, UTC)).date(): m3
             for bucket, m3 in admitted
@@ -1883,6 +1899,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year: int,
         reading: float | None,
         recorder_m3: float | None,
+        recorder_taken_back: float,
         recorder_has_statistic: bool,
     ) -> tuple[float | None, float | None]:
         """Fold a round of evidence into the cycle and return what to publish.
@@ -1910,6 +1927,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             meter=meter,
             reading=reading,
             recorder_m3=recorder_m3,
+            recorder_taken_back=recorder_taken_back,
             recorder_has_statistic=recorder_has_statistic,
             recorder_ok=self._recorder_ok,
             hold_m3=self._ytd_hold_m3,
@@ -1987,6 +2005,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         recorder_m3: float | None = None
+        recorder_taken_back = 0.0
         recorder_has_statistic = False
         # The frame produces less than the year has already published, so it
         # has fallen behind what is known. Only a reading and a recorder
@@ -2025,7 +2044,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # zero, or one Home Assistant keeps no statistics for could
                 # never anchor; the fold is told the zero came from nowhere.
                 recorder_has_statistic = answer is not None
-                recorder_m3 = 0.0 if answer is None else answer
+                recorder_m3, recorder_taken_back = (0.0, 0.0) if answer is None else answer
             except RecorderUnavailable as err:
                 _LOGGER.debug("recorder unreadable for %s: %s", meter, err)
                 self._recorder_ok = False
@@ -2049,6 +2068,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             now_year=now_year,
             reading=live,
             recorder_m3=recorder_m3,
+            recorder_taken_back=recorder_taken_back,
             recorder_has_statistic=recorder_has_statistic,
         )
         if self._cycle_dirty and self._owns_the_entry():
@@ -2066,6 +2086,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     now_year=now_year,
                     reading=None,
                     recorder_m3=None,
+                    recorder_taken_back=0.0,
                     recorder_has_statistic=False,
                 )
         return ytd_m3, ytd_cost
@@ -2153,6 +2174,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             now_year=dt_util.now().year,
             reading=live,
             recorder_m3=None,
+            recorder_taken_back=0.0,
             recorder_has_statistic=False,
         )
         if ytd_m3 is None:
@@ -2602,13 +2624,19 @@ async def _recorder_daily_rows(
 
 async def _recorder_ytd_m3(
     hass: HomeAssistant, entity_id: str, start: date, end: date
-) -> float | None:
+) -> tuple[float, float] | None:
     """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
 
     Returns the period's consumption, ``0.0`` when the meter's statistic
     holds none, and ``None`` when there is no statistic to read at all.
     Raises :class:`RecorderUnavailable` only when a recorder that is
     running could not answer the query.
+
+    The consumption comes paired with how much of it was taken back out of
+    days a later register showed to be misreads. Such a take-back lowers an
+    answer below one read before the correction's day was compiled, so the
+    caller adds it back to tell a corrected answer from a database that
+    lost some of the year.
 
     Those are different answers and the caller has to tell them apart: a
     year with no statistics may be anchored at zero, a query that failed may
@@ -2621,7 +2649,9 @@ async def _recorder_ytd_m3(
     rows = await _recorder_daily_rows(hass, entity_id, start, end)
     if rows is None:
         return None
-    admitted, refused = _admitted_changes(rows, entity_id, start, end, level=logging.WARNING)
+    admitted, refused, taken_back = _admitted_changes(
+        rows, entity_id, start, end, level=logging.WARNING
+    )
     if not admitted and refused > _REFUSALS_BEFORE_UNREADABLE:
         # Every bucket the year had was refused, and there were enough of
         # them to mean something. A handful is not enough: on 1 and 2
@@ -2634,17 +2664,19 @@ async def _recorder_ytd_m3(
         )
     # No admitted change is negative any more, but the floor stays: it
     # costs nothing and the sensor must never read negative.
-    return max(0.0, sum(m3 for _bucket, m3 in admitted))
+    return max(0.0, sum(m3 for _bucket, m3 in admitted)), taken_back
 
 
 def _admitted_changes(
     rows: list[Any], entity_id: str, start: date, end: date, *, level: int
-) -> tuple[list[tuple[float | None, float]], int]:
+) -> tuple[list[tuple[float | None, float]], int, float]:
     """The daily changes in ``rows`` over ``[start, end]`` that read as water.
 
     Returns each admitted change with the start of the bucket it was
-    booked in, and how many buckets a guard refused. A bucket refused for
-    claiming more than its days could hold is logged at ``level``.
+    booked in, how many buckets a guard refused, and how much was taken
+    back out of buckets a later register showed to be misreads. A bucket
+    refused for claiming more than its days could hold is logged at
+    ``level``.
     """
     # The first-bucket trim below is not a refusal: it is a boundary
     # artefact, not evidence about the year. A year every guard rejects
@@ -2657,6 +2689,7 @@ def _admitted_changes(
     # until January.
     admitted: list[tuple[float | None, float]] = []
     refused = 0
+    taken_back = 0.0
     # The register at the end of the bucket before, which the bucket
     # after a dip climbs from. Unknown before the first row: the window
     # holds nothing earlier.
@@ -2730,8 +2763,11 @@ def _admitted_changes(
             # back the last admitted bucket has already been settled
             # against it, and holding it as well would cost the next day.
             refused += 1
-            if not _took_back_a_spike(admitted, around, register):
+            taken = _took_back_a_spike(admitted, around, register)
+            if taken is None:
                 pending_drop += float(delta)
+            else:
+                taken_back += taken
             continue
         if pending_drop < 0.0:
             netted = float(delta) + pending_drop
@@ -2766,7 +2802,9 @@ def _admitted_changes(
             # the day is refused. So is one whose register shows the last
             # admitted bucket was a spike, which is taken back out of that
             # bucket instead.
-            if _took_back_a_spike(admitted, around, register):
+            taken = _took_back_a_spike(admitted, around, register)
+            if taken is not None:
+                taken_back += taken
                 refused += 1
                 continue
             if register is not None and before is not None and 0.0 < before <= register:
@@ -2790,15 +2828,18 @@ def _admitted_changes(
             continue
         admitted.append((bucket, float(delta)))
         around = None if before is None or register is None else (before, register)
-    return admitted, refused
+    return admitted, refused, taken_back
 
 
 def _took_back_a_spike(
     admitted: list[tuple[float | None, float]],
     around: tuple[float, float] | None,
     register: float | None,
-) -> bool:
+) -> float | None:
     """Cap the last admitted bucket when ``register`` shows it was a misread.
+
+    Returns how much the cap took out of it, or ``None`` when the register
+    says nothing about that bucket.
 
     ``around`` holds the registers at the end of the bucket before that
     one and at its own end. A meter that misreads high before midnight and
@@ -2813,13 +2854,14 @@ def _took_back_a_spike(
     and says nothing about the day before it.
     """
     if around is None or register is None:
-        return False
+        return None
     before, high = around
     if not before <= register < high:
-        return False
+        return None
     bucket, m3 = admitted[-1]
-    admitted[-1] = (bucket, min(m3, register - before))
-    return True
+    capped = min(m3, register - before)
+    admitted[-1] = (bucket, capped)
+    return m3 - capped
 
 
 def _exceeds_a_day(

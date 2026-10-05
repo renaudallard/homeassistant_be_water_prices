@@ -93,7 +93,7 @@ async def test_a_day_whose_change_is_the_whole_register_is_not_water() -> None:
         _row(date(2026, 3, 3), change=0.2, state=4000.9, total=4101.4),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
     assert total == pytest.approx(0.9)  # 4000.0 -> 4000.9
 
 
@@ -110,7 +110,7 @@ async def test_a_register_that_comes_back_lower_is_still_refused() -> None:
         _row(date(2026, 3, 3), change=0.2, state=12.2, total=112.7),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
     assert total == pytest.approx(0.5)
 
 
@@ -126,7 +126,7 @@ async def test_a_climb_no_day_could_hold_is_still_refused() -> None:
         _row(date(2026, 3, 3), change=0.2, state=8050.2, total=8150.7),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
     assert total == pytest.approx(0.5)
 
 
@@ -150,7 +150,7 @@ async def test_the_day_a_meter_returns_carries_the_whole_absence() -> None:
         _row(date(2026, 4, 21), change=1.0, state=1110.0, total=1010.0),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 4, 21))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 4, 21))  # type: ignore[arg-type]
     assert total == 110.0
 
 
@@ -166,7 +166,7 @@ async def test_the_room_a_gap_buys_is_a_household_and_not_a_register() -> None:
         _row(date(2026, 12, 30), change=4050.0, state=5051.0, total=4951.0),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rebased)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 12, 30))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 12, 30))  # type: ignore[arg-type]
     assert total == 1.0
 
     # And a day that stands on its own still gets one day's room.
@@ -175,7 +175,7 @@ async def test_the_room_a_gap_buys_is_a_household_and_not_a_register() -> None:
         _row(date(2026, 1, 2), change=150.0, state=1151.0, total=1051.0),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=same_day)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 2))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 2))  # type: ignore[arg-type]
     assert total == 1.0
 
 
@@ -197,7 +197,7 @@ async def test_a_meter_that_reported_every_day_has_no_gap_to_spend() -> None:
         day += timedelta(days=1)
     rows.append(_row(day, change=250.0, state=register + 250.0, total=running + 250.0))
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), day)  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), day)  # type: ignore[arg-type]
     assert total == 181 * 0.25
 
 
@@ -207,7 +207,7 @@ async def test_ordinary_days_are_summed_in_full() -> None:
         _row(date(2026, 3, 2), change=0.4, state=4000.7, total=100.7),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
     assert round(total, 3) == 0.7
 
 
@@ -267,7 +267,7 @@ async def test_a_dip_that_recovers_across_midnight_nets_to_the_water_used() -> N
         _row(date(2026, 3, 3), change=4050.2, state=4050.2, total=100.5),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
     assert round(total, 3) == 0.5
 
 
@@ -287,8 +287,27 @@ async def test_a_spike_taken_back_across_quiet_days_keeps_the_water_around_it() 
         _row(date(2026, 3, 7), change=0.2, state=4001.2, total=101.2),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 7))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 7))  # type: ignore[arg-type]
     assert round(total, 3) == 1.2  # 4000.0 -> 4001.2
+
+
+async def test_the_reader_says_how_much_it_took_back() -> None:
+    """Added back, the answer is the one read before the correction's day.
+
+    That earlier answer held the spike, and the caller has to tell the
+    corrected one below it from a database that lost some of the year.
+    """
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=5.4, state=4005.7, total=105.7),
+        _row(date(2026, 3, 3), change=-5.0, state=4000.7, total=100.7),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows[:2])):
+        earlier = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        later = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+    assert earlier == (pytest.approx(5.7), 0.0)
+    assert later == (pytest.approx(0.7), pytest.approx(5.0))
 
 
 async def test_a_refused_bucket_does_not_hide_the_spike_before_it() -> None:
@@ -301,7 +320,7 @@ async def test_a_refused_bucket_does_not_hide_the_spike_before_it() -> None:
         _row(date(2026, 3, 5), change=0.2, state=4000.9, total=100.9),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 5))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 5))  # type: ignore[arg-type]
     assert round(total, 3) == 0.9  # 4000.0 -> 4000.9
 
 
@@ -320,7 +339,7 @@ async def test_a_fall_after_a_netted_day_is_not_read_against_the_dip() -> None:
         _row(date(2026, 3, 6), change=0.7, state=4001.1, total=101.1),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 6))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 6))  # type: ignore[arg-type]
     assert round(total, 3) == 1.1  # 4000.0 -> 4001.1
 
 
@@ -332,7 +351,7 @@ async def test_a_genuine_swap_is_dropped_whole() -> None:
         _row(date(2026, 3, 4), change=0.5, state=1.2, total=-3898.8),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 4))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 4))  # type: ignore[arg-type]
     # The drop swallows the day after it; the water from then on counts.
     assert round(total, 3) == 0.8
 
@@ -346,7 +365,7 @@ async def test_a_negative_day_does_not_walk_a_reset_into_the_year() -> None:
         _row(date(2026, 3, 4), change=0.2, state=4050.6, total=4050.6),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=glitched)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 3, 1), date(2026, 3, 4))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 3, 1), date(2026, 3, 4))  # type: ignore[arg-type]
     assert total < 5.0
     assert round(total, 3) == 0.5
 
@@ -359,7 +378,7 @@ async def test_a_re_based_counter_does_not_bill_its_whole_register() -> None:
         _row(date(2026, 2, 16), change=0.3, state=1235.1, total=1235.1),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 2, 16))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 2, 16))  # type: ignore[arg-type]
     assert round(total, 3) == 0.6
 
 
@@ -370,7 +389,7 @@ async def test_a_heavy_but_believable_day_is_still_counted() -> None:
         _row(date(2026, 6, 2), change=60.0, state=360.3, total=360.3),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 6, 2))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 6, 2))  # type: ignore[arg-type]
     assert round(total, 3) == 60.3
 
 
@@ -382,7 +401,7 @@ async def test_a_bucket_dated_after_the_window_is_not_billed_into_it() -> None:
         _row(date(2026, 3, 3), change=0.5, state=101.2, total=101.2),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        asked = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
+        asked, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 2))  # type: ignore[arg-type]
     assert round(asked, 3) == 0.7
 
 
@@ -405,7 +424,7 @@ async def test_a_year_whose_every_bucket_is_refused_is_unreadable_not_empty() ->
 async def test_a_year_with_no_buckets_at_all_is_still_zero() -> None:
     """An empty year may be anchored at zero; only a refused one may not."""
     with patch(_ROWS, new=AsyncMock(return_value=[])):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
     assert total == 0.0
 
 
@@ -415,7 +434,7 @@ async def test_one_admitted_bucket_is_enough_to_call_the_year_readable() -> None
         _row(date(2026, 1, 2), change=0.4, state=10.4, total=10.4),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
     assert round(total, 3) == 0.4
 
 
@@ -436,7 +455,7 @@ async def test_a_meter_whose_history_starts_inside_the_window_loses_its_first_da
         _row(date(2026, 1, 7), change=0.5, state=1.2, total=1.2),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
     # 0.3 of genuinely consumed water is missing, and stays missing.
     assert round(total, 3) == 0.9
 
@@ -450,7 +469,7 @@ async def test_a_meter_installed_today_still_anchors_its_year() -> None:
     """
     rows = [_row(date(2026, 1, 5), change=0.3, state=0.3, total=0.3)]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 7))  # type: ignore[arg-type]
     assert total == 0.0
 
 
@@ -461,7 +480,7 @@ async def test_the_first_days_of_a_year_are_empty_not_unreadable() -> None:
         _row(date(2026, 1, 2), change=-0.1, state=4.9, total=4.9),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
-        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 2))  # type: ignore[arg-type]
+        total, _ = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 1, 2))  # type: ignore[arg-type]
     assert total == 0.0
 
 

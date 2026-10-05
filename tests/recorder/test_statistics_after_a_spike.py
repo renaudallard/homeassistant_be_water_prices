@@ -50,8 +50,10 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 
 from custom_components.be_water_prices.coordinator import (
     _admitted_changes,
+    _fold,
     _recorder_daily_rows,
     _recorder_ytd_m3,
+    _YtdCycle,
 )
 
 _METER = "sensor.water_meter"
@@ -103,10 +105,84 @@ async def test_a_spike_corrected_after_midnight_is_not_water(
         ],
     )
 
-    total = await _recorder_ytd_m3(hass, _METER, date(2026, 3, 1), date(2026, 3, 4))
+    total, _ = await _recorder_ytd_m3(hass, _METER, date(2026, 3, 1), date(2026, 3, 4))
 
     # 500.0 -> 501.2, and the day after the correction keeps its 0.2.
     assert total == pytest.approx(1.2)
+
+
+@pytest.mark.asyncio
+async def test_the_year_comes_down_once_the_correction_day_is_compiled(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any
+) -> None:
+    """The tick the correction brings reads the recorder before its hour is in.
+
+    The correction leaves the frame behind the year, so that tick asks the
+    recorder, and Home Assistant has compiled the spike's day but not yet
+    the hour holding the correction. Its answer still carries the spike,
+    and the corrected answer an hour later used to read as a database
+    that had lost some of the year, so the spike stood until the
+    household had used as much again.
+    """
+    plan = [
+        (datetime(2026, 2, 27, 23, 55), 499.8),
+        (datetime(2026, 2, 28, 23, 55), 500.0),
+        (datetime(2026, 3, 1, 23, 55), 500.3),
+        (datetime(2026, 3, 2, 23, 55), 505.7),
+    ]
+    await _record(hass, freezer, "total_increasing", plan)
+    tz = dt_util.get_default_time_zone()
+
+    async def _tick(cycle: _YtdCycle, at: datetime, reading: float, ask: bool) -> Any:
+        recorder_m3, taken_back = None, 0.0
+        if ask:
+            answer = await _recorder_ytd_m3(hass, _METER, date(2026, 3, 1), at.date())
+            assert answer is not None
+            recorder_m3, taken_back = answer
+        return _fold(
+            cycle,
+            now_year=2026,
+            meter=_METER,
+            reading=reading,
+            recorder_m3=recorder_m3,
+            recorder_taken_back=taken_back,
+            recorder_has_statistic=ask,
+            recorder_ok=True if ask else None,
+            hold_m3=None,
+            hold_run=0,
+            hold_span_s=0.0,
+            run_m3=None,
+            elapsed_s=300.0,
+            now_ts=at.replace(tzinfo=tz).timestamp(),
+            high_m3=None,
+            after_swap=False,
+            basis="stand-in",
+            cost_of=lambda m3: m3,
+        )
+
+    # Framed on 500.0, with the recorder heard from on 2 March.
+    cycle = _YtdCycle(
+        meter=_METER,
+        year=2026,
+        m3=0.6,
+        cost=0.6,
+        offset_m3=500.0,
+        basis="stand-in",
+        recorder_hwm=0.3,
+        seen_at=datetime(2026, 3, 2, 23, 0, tzinfo=tz).timestamp(),
+    )
+    # The 5 m3 misread is small enough to be admitted on sight.
+    out = await _tick(cycle, datetime(2026, 3, 2, 23, 56), 505.7, ask=False)
+    assert out.m3 == pytest.approx(5.7)
+    out = await _tick(out.cycle, datetime(2026, 3, 3, 0, 5), 500.7, ask=True)
+    assert out.m3 == pytest.approx(5.7)
+    assert out.cycle.recorder_hwm == pytest.approx(5.7)  # the answer held the spike
+
+    await _record(hass, freezer, "total_increasing", [(datetime(2026, 3, 3, 0, 55), 500.7)])
+    out = await _tick(out.cycle, datetime(2026, 3, 3, 1, 5), 500.7, ask=True)
+
+    assert out.m3 == pytest.approx(0.7)
+    assert out.cycle.m3 == pytest.approx(0.7)
 
 
 @pytest.mark.parametrize("state_class", ["total", "total_increasing"])
@@ -137,7 +213,7 @@ async def test_a_meter_that_reads_0_at_midnight_keeps_the_day_before(
     )
 
     rows = await _recorder_daily_rows(hass, _METER, date(2026, 2, 28), date(2026, 3, 3))
-    admitted, _refused = _admitted_changes(
+    admitted, _refused, _ = _admitted_changes(
         rows, _METER, date(2026, 2, 28), date(2026, 3, 3), level=logging.DEBUG
     )
     days = {dt_util.as_local(dt_util.utc_from_timestamp(b)).date(): m3 for b, m3 in admitted if b}
