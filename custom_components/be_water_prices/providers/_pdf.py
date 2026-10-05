@@ -377,11 +377,15 @@ def guard_pdf_streams(payload: bytes) -> None:
 # follow pdfminer's parser everywhere and a bomb it misses would otherwise
 # be inflated in Home Assistant's own memory. RLIMIT_DATA, not RLIMIT_AS,
 # is the limit: Linux counts the heap and anonymous mappings against it
-# since 4.7, and it is near what the reader really uses. Measured on the
-# three cards on file and on a 2 MB card with eight pages of tables, the
-# smallest limit each one still reads under was 28, 28, 50 and 54 MiB
-# (RLIMIT_AS: 60, 60, 84 and 86 MiB), so the ceiling leaves several times
-# the largest. The time limit leaves a minute of the fetch budget for the
+# since 4.7, and it is near what the reader really uses. That holds only
+# for the allocator the child starts with: Home Assistant OS and Container
+# export PYTHONMALLOC=mimalloc, which reserves a 1 GiB arena at start that
+# Linux counts against the limit before the reader has read a byte, so the
+# child is pinned to the C library's malloc whatever this process runs
+# under. Measured that way on the three cards on file and on a 2 MB card
+# with eight pages of tables, the smallest limit each one still reads
+# under was 28, 28, 52 and 56 MiB, so the ceiling leaves several times the
+# largest. The time limit leaves a minute of the fetch budget for the
 # downloads ahead of the parse; the Pidpa card, the slowest on file,
 # reads in 14 s on a Raspberry Pi 4.
 PDF_READER_MEMORY_BYTES = 256 * 1024 * 1024
@@ -452,7 +456,7 @@ def extract_pdf_text_layout(payload: bytes) -> str:
             input=payload,
             capture_output=True,
             timeout=PDF_READER_TIMEOUT_S,
-            env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+            env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path), "PYTHONMALLOC": "malloc"},
             check=False,
         )
     except subprocess.TimeoutExpired as err:

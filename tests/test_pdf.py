@@ -654,13 +654,18 @@ def _bombs() -> list[tuple[bytes, bytes, tuple[bytes, ...]]]:
     ]
 
 
-def test_a_bomb_the_stream_guard_misses_dies_in_the_reader_child() -> None:
+@pytest.mark.parametrize("allocator", [None, "mimalloc"])
+def test_a_bomb_the_stream_guard_misses_dies_in_the_reader_child(
+    monkeypatch: Any, allocator: str | None
+) -> None:
     """No pattern follows pdfminer's parser everywhere, so the guard passes
     these, and each one used to be inflated in Home Assistant's own memory.
     The reader's child runs out of its ceiling instead, and this process
-    never grows."""
+    never grows, whichever allocator Home Assistant runs under."""
     import resource
 
+    if allocator:
+        monkeypatch.setenv("PYTHONMALLOC", allocator)
     for dictionary, body, extra in _bombs():
         payload = _pdf_with_xref(dictionary % len(body), body, b"stream\n", extra=extra)
         _pdf.guard_pdf_streams(payload)
@@ -736,6 +741,16 @@ def test_the_reader_child_finds_pdfplumber_where_this_process_did(monkeypatch: A
 
     monkeypatch.delenv("PYTHONPATH", raising=False)
     monkeypatch.setattr(subprocess, "run", run_without_site)
+    assert "Overzicht tarieven" in _pdf.extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
+
+
+def test_the_reader_child_reads_a_card_under_home_assistants_allocator(monkeypatch: Any) -> None:
+    """Home Assistant OS and Container export PYTHONMALLOC=mimalloc, whose
+    arena alone is past the reader's memory ceiling, so a child that kept
+    it could not even import pdfplumber."""
+    from tests import fixture_bytes
+
+    monkeypatch.setenv("PYTHONMALLOC", "mimalloc")
     assert "Overzicht tarieven" in _pdf.extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
 
 
