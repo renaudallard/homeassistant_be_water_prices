@@ -1562,7 +1562,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         happen to be stored in. A log line was the only signal, and a bill
         computed from a hot-water sub-meter is not a log-level problem.
         """
-        if count > 1 and self._owns_the_entry():
+        if not self._owns_the_entry():
+            # The card is keyed on the entry, so after a reload a retired
+            # coordinator would take down the one its successor raised.
+            return
+        if count > 1:
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,
@@ -1603,16 +1607,15 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         knows all of that and this does not need to learn it twice. What
         was missing was the signal, not the machinery.
         """
+        if not self._owns_the_entry():
+            # Same card id as the successor's after a reload: deleting it
+            # here would hide a notice the live coordinator just raised.
+            return
         postcode = self.entry.options.get(CONF_POSTCODE) or self.entry.data.get(CONF_POSTCODE)
         utility = self.entry.data.get(CONF_UTILITY, "")
         candidates = resolve_candidates(str(postcode)) if postcode else ()
         overridden = tuple(self.entry.options.get(CONF_POSTCODE_RESOLVED) or ())
-        if (
-            not candidates
-            or utility in candidates
-            or candidates == overridden
-            or not self._owns_the_entry()
-        ):
+        if not candidates or utility in candidates or candidates == overridden:
             # No postcode, an unresolvable one, or one that still answers
             # with the operator in use. A postcode split between operators
             # counts as answering: the household picked one of them. So

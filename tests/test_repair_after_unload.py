@@ -44,6 +44,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
+    CONF_POSTCODE,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -266,6 +267,71 @@ async def test_the_coordinator_a_reload_replaced_no_longer_raises_cards(
 
         previous._sync_repair_issue(replace(previous.data, snapshot_stale=True))
     assert ir.async_get(hass).async_get_issue(DOMAIN, previous.stale_issue_id) is None
+
+
+async def test_the_coordinator_a_reload_replaced_leaves_the_new_cards_up(
+    hass: HomeAssistant,
+) -> None:
+    """The operator and meter cards share their id with the successor's.
+
+    A late refresh on the retired coordinator took both down right after
+    the new one had raised them.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    async def _discover(_hass: HomeAssistant) -> tuple[str | None, int]:
+        return "sensor.hot_water", 2
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        # 2100 is Deurne, which resolves to Water-link.
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "2100"},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    from custom_components.be_water_prices.providers import get as real_get
+
+    fake = WaterExtractor(id="pidpa", label="Pidpa", region="flanders", fetch=_fetch)
+
+    def _get(utility_id: str) -> WaterExtractor:
+        return fake if utility_id == "pidpa" else real_get(utility_id)
+
+    with (
+        patch(_GET, new=_get),
+        patch(
+            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            new=_discover,
+        ),
+        patch(_YTD, new=AsyncMock(return_value=None)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        previous = hass.data[DOMAIN][entry.entry_id]
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert hass.data[DOMAIN][entry.entry_id] is not previous
+
+        registry = ir.async_get(hass)
+        assert registry.async_get_issue(DOMAIN, previous.operator_issue_id) is not None
+        assert registry.async_get_issue(DOMAIN, previous.several_meters_issue_id) is not None
+
+        previous._sync_operator_issue()
+        await previous.async_resolve_meter_entity()
+        assert registry.async_get_issue(DOMAIN, previous.operator_issue_id) is not None
+        assert registry.async_get_issue(DOMAIN, previous.several_meters_issue_id) is not None
+
+        # Nor may it raise them on its own.
+        registry.async_delete(DOMAIN, previous.operator_issue_id)
+        registry.async_delete(DOMAIN, previous.several_meters_issue_id)
+        previous._sync_operator_issue()
+        await previous.async_resolve_meter_entity()
+        assert registry.async_get_issue(DOMAIN, previous.operator_issue_id) is None
+        assert registry.async_get_issue(DOMAIN, previous.several_meters_issue_id) is None
 
 
 async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
