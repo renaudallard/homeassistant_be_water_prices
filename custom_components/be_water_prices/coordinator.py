@@ -687,9 +687,9 @@ def _fold(
             # year 1254 EUR over with the recorder saying otherwise in the
             # same round.
             _LOGGER.warning(
-                "%s: a reading implying %.1f m3 for the year against the recorder's %.1f; "
-                "taking the recorder, which has the year's own statistics behind it",
-                meter,
+                "a reading of the water meter implying %.1f m3 for the year against the "
+                "recorder's %.1f; taking the recorder, which has the year's own statistics "
+                "behind it",
                 candidate,
                 recorder_m3,
             )
@@ -707,9 +707,8 @@ def _fold(
             # to show its history is whole, and a database that lost the
             # year before anyone asked would read exactly like this.
             _LOGGER.warning(
-                "%s: the year stood at %.1f m3 against the recorder's %.1f; taking the "
-                "recorder, which has the year's own statistics behind it",
-                meter,
+                "the water meter's year stood at %.1f m3 against the recorder's %.1f; "
+                "taking the recorder, which has the year's own statistics behind it",
                 mark,
                 recorder_m3,
             )
@@ -1458,7 +1457,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         try:
             await self._read_metered_days(meter)
         except Exception:
-            _LOGGER.exception("could not read the last year of %s", meter)
+            _LOGGER.exception("could not read the last year of the water meter")
 
     async def async_read_meter_history(self) -> None:
         """Make the reads setup's own refresh left out, and publish the
@@ -2559,14 +2558,17 @@ def _exceeds_a_day(
     allowance = _IMPLAUSIBLE_JUMP_M3 + max(0.0, gap_days) * _AWAY_M3_PER_DAY
     if change <= allowance:
         return False
+    # The id only at DEBUG: diagnostics redact the meter, and the recorder
+    # readers warn here at a level that reaches the default log users
+    # attach to issues.
     _LOGGER.log(
         level,
-        "%s: ignoring a %s change of %.1f m3 over %.0f day(s); no household uses "
+        "ignoring a %s change of %.1f m3 over %.0f day(s) on %s; no household uses "
         "that much, so it reads as a re-based or reset register rather than water",
-        entity_id,
         kind,
         change,
         gap_days + 1.0,
+        entity_id if level <= logging.DEBUG else "the water meter",
     )
     return True
 
