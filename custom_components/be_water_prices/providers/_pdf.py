@@ -473,7 +473,7 @@ def guard_pdf_streams(payload: bytes) -> None:
 # under was 28, 28, 52 and 56 MiB, so the ceiling leaves several times the
 # largest. The time limit leaves a minute of the fetch budget for the
 # downloads ahead of the parse; the Pidpa card, the slowest on file,
-# reads in 14 s on a Raspberry Pi 4.
+# reads in 17 s on a Raspberry Pi 4 under that malloc.
 PDF_READER_MEMORY_BYTES = 256 * 1024 * 1024
 PDF_READER_TIMEOUT_S = FETCH_BUDGET_S - 60
 
