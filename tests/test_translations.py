@@ -139,3 +139,17 @@ def test_card_archive_option_names_every_case_it_is_asked(lang: str) -> None:
     data = _load(lang)
     for flow in (data["config"]["step"]["options"], data["options"]["step"]["init"]):
         assert _ARCHIVE_ASKED_FOR[lang] in flow["data"]["card_archive"]
+
+
+@pytest.mark.parametrize("lang", ["fr", "nl", "de"])
+def test_options_description_names_the_projected_cost_sensor(lang: str) -> None:
+    """The consumption field points at the sensor by its displayed name.
+
+    The sensor takes its name from this file, so a description that
+    calls it something else sends the user looking for an entity that
+    does not exist. English describes the sensor rather than naming it.
+    """
+    data = _load(lang)
+    name = data["entity"]["sensor"]["projected_annual_cost"]["name"]
+    text = data["config"]["step"]["options"]["description"]
+    assert name.casefold() in text.casefold()
