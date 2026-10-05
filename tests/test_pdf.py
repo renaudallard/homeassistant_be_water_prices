@@ -509,6 +509,87 @@ def test_a_dictionary_with_both_filter_keys_is_refused() -> None:
         _pdf.guard_pdf_streams(payload)
 
 
+@pytest.mark.parametrize("own_filter", [b"/Filter/FlateDecode", b""])
+def test_filter_keys_inside_nested_dictionaries_are_not_the_stream_s(own_filter: bytes) -> None:
+    """A form whose resources name a font /F, as Quadient Inspire writes
+    them, was refused as naming a second filter or one by reference;
+    pdfminer reads the filter from the stream's own dictionary only, and
+    an /F inside an array is a value, not a key."""
+    import zlib
+
+    content = b"BT /F 12 Tf 10 100 Td (Basistarief 2,1234 euro/m3) Tj ET"
+    body = zlib.compress(content) if own_filter else content
+    payload = _pdf_with_xref(
+        b"<</Length %d/Type/XObject/Subtype/Form/BBox[0 0 200 200]"
+        b"/Resources<</Font<</F 5 0 R>>>>/X<</Filter/ASCIIHexDecode/S(>>)/H<41>>"
+        b"/A[/F/ASCIIHexDecode]%s>>" % (len(body), own_filter),
+        body,
+        b"stream\n",
+    )
+    assert _filters_pdfminer_applies(payload) == (["FlateDecode"] if own_filter else [])
+    assert _pdfminer_stream(payload).get_data() == content
+    _pdf.guard_pdf_streams(payload)
+
+
+@pytest.mark.parametrize(
+    "before",
+    [
+        b"/R<</X 1>>",
+        b"/R<</H<41>>",
+        b"/S(<<<<)",
+        b"/S(a(b)c<<<<)",
+        b"/S(\\)<<<<)",
+        b"/H<41>",
+        b"%<<<<\n",
+    ],
+)
+def test_a_top_level_filter_behind_brackets_pdfminer_does_not_nest_is_refused(
+    before: bytes,
+) -> None:
+    """Brackets inside a string or comment, and the ones a hex string's end
+    leaves to be read afresh, must not make the stream's own /F look nested."""
+    payload = _pdf_with_xref(
+        b"<</Length 11%s/F/ASCIIHexDecode>>" % before, b"48656c6c6f>", b"stream\n"
+    )
+    assert _filters_pdfminer_applies(payload) == ["ASCIIHexDecode"]
+    with pytest.raises(ExtractorError, match="ASCIIHexDecode"):
+        _pdf.guard_pdf_streams(payload)
+
+
+@pytest.mark.parametrize(
+    ("dictionary", "chain"),
+    [
+        (b"<<<</Length %d/F/ASCIIHexDecode>>", False),
+        (b"<</K<</Length %d/F/ASCIIHexDecode>>", False),
+        (b"<<<</Length %d/Filter[/FlateDecode/FlateDecode]>>", True),
+        (b"<</S(stream\n<<<<)/F/ASCIIHexDecode/Length %d>>", False),
+        (b"<</S(stream\n<<<<)/F/ASCIIHexDecode/Length %d>>>>", False),
+        (b"<</Length %d%%stream<<<<\n/F/ASCIIHexDecode>>", False),
+        (b"<</K[<<]/F/ASCIIHexDecode/Length %d>>>>", False),
+        (b"<</K[<</Length %d/F/ASCIIHexDecode>>>>", False),
+        (b"<</K{<<}/F/ASCIIHexDecode/Length %d>>>>", False),
+        (b"<</K[<<]/Filter[/FlateDecode/FlateDecode]/Length %d>>>>", True),
+    ],
+)
+def test_a_filter_in_a_head_that_does_not_close_cleanly_is_refused(
+    dictionary: bytes, chain: bool
+) -> None:
+    """pdfminer takes the dictionary that closed last before "stream", a
+    nested one while the outer is still open, and a "stream" word in a
+    string or comment starts a head inside it; neither may hide the filter
+    pdfminer applies. Nor may a closing bracket that pdfminer skips because
+    an array or procedure is open, such as the "]" after "[<<" or a ">>"
+    inside an array."""
+    import zlib
+
+    body = zlib.compress(zlib.compress(b" " * 1000)) if chain else b"48656c6c6f>"
+    payload = _pdf_with_xref(dictionary % len(body), body, b"stream\n")
+    expected = ["FlateDecode", "FlateDecode"] if chain else ["ASCIIHexDecode"]
+    assert _filters_pdfminer_applies(payload) == expected
+    with pytest.raises(ExtractorError, match="filter chain" if chain else "ASCIIHexDecode"):
+        _pdf.guard_pdf_streams(payload)
+
+
 def test_a_filter_far_ahead_of_the_stream_keyword_is_still_read() -> None:
     """A dictionary longer than a few kilobytes once hid its own filter."""
     import zlib

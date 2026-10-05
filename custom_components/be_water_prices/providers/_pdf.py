@@ -218,7 +218,8 @@ def _name(word: bytes) -> bytes:
 
 # A name ends at whitespace or a delimiter, so /FontFile and /First are not /F.
 _NAME_END = rb"(?![^\s/\[\]()<>{}%])"
-# pdfminer takes the abbreviated /F for /Filter.
+# pdfminer takes the abbreviated /F for /Filter, from the stream's own
+# dictionary only, which :func:`_outer_spans` picks out.
 _FILTER_KEY_RE = re.compile(
     b"/" + _name(b"F") + b"(?:" + _name(b"ilter") + b")?" + _NAME_END + rb"\s*"
 )
@@ -241,6 +242,71 @@ _FLAGS_RE = re.compile(rb"[0-9]++" + _KEPT)
 _FILTER_NAME_RE = re.compile(rb"/[^\s/\[\]()<>{}%]*")
 _ENCRYPT_RE = re.compile(b"/" + _name(b"Encrypt") + _NAME_END)
 _INFLATE_CHUNK = 65536
+# The bytes that change how pdfminer reads what follows them in a
+# dictionary: the brackets of dictionaries, arrays and procedures and the
+# start of a literal string, a hex string or a comment. Inside a literal
+# string only its parentheses count, and a backslash takes the byte after it
+# out of the count. A hex string ends at the first byte that is neither a
+# hex digit nor whitespace, which pdfminer then reads afresh, so "<41>>"
+# closes a dictionary.
+_DICT_SYNTAX_RE = re.compile(rb"<<|>>|[\[\]{}(<%]")
+_CLOSER = {b"<<": b">>", b"[": b"]", b"{": b"}"}
+_STRING_SYNTAX_RE = re.compile(rb"\\.|[()]", re.DOTALL)
+_HEX_STRING_END_RE = re.compile(rb"[^\s0-9A-Fa-f]")
+_COMMENT_END_RE = re.compile(rb"[\r\n]")
+
+
+def _string_end(head: bytes, position: int) -> int:
+    """Where the literal string opened just before ``position`` ends, else the end of ``head``."""
+    depth = 1
+    for syntax in _STRING_SYNTAX_RE.finditer(head, position):
+        if syntax[0] == b"(":
+            depth += 1
+        elif syntax[0] == b")":
+            depth -= 1
+            if not depth:
+                return syntax.end()
+    return len(head)
+
+
+def _outer_spans(head: bytes) -> list[tuple[int, int]]:
+    """The stretches of ``head`` that hold the stream dictionary's own keys.
+
+    pdfminer reads /F and /Filter from the stream's dictionary alone, so a
+    font named /F in a form's /Resources is no filter. Nested dictionaries,
+    arrays, procedures, strings and comments are left out, and the bytes
+    outside any of them are kept. pdfminer skips a closing bracket that is
+    not the one the innermost open dictionary, array or procedure waits
+    for, so ">>" inside an array closes nothing, and the walk skips it the
+    same way. Its reading holds only once everything the head opens is
+    closed: pdfminer takes the object that closed last before "stream",
+    which is a nested one while the outer is still open, so a head left
+    open is read whole.
+    """
+    spans = []
+    # The closing bracket each open dictionary, array or procedure waits for.
+    waiting: list[bytes] = []
+    start = position = 0
+    while (syntax := _DICT_SYNTAX_RE.search(head, position)) is not None:
+        if not waiting or waiting == [b">>"]:
+            spans.append((start, syntax.start()))
+        position = syntax.end()
+        token = syntax[0]
+        if token in _CLOSER:
+            waiting.append(_CLOSER[token])
+        elif token == b"(":
+            position = _string_end(head, position)
+        elif token in (b"<", b"%"):
+            end_re = _HEX_STRING_END_RE if token == b"<" else _COMMENT_END_RE
+            end = end_re.search(head, position)
+            position = len(head) if end is None else end.start()
+        elif waiting and waiting[-1] == token:
+            waiting.pop()
+        start = position
+    if waiting:
+        return [(0, len(head))]
+    spans.append((start, len(head)))
+    return spans
 
 
 def _inflated_size(data: memoryview, budget: int) -> tuple[int, int]:
@@ -275,15 +341,15 @@ def _inflated_size(data: memoryview, budget: int) -> tuple[int, int]:
     return produced, consumed
 
 
-def _object_start(payload: bytes, low: int, high: int) -> int:
-    """Where the last "N G obj" header between ``low`` and ``high`` starts, else ``low``."""
+def _object_start(payload: bytes, low: int, high: int) -> int | None:
+    """Where the last "N G obj" header between ``low`` and ``high`` starts, if any."""
     position = payload.rfind(b"obj", low, high)
     while position >= 0:
         header = _OBJ_HEADER_RE.search(payload, max(low, position - 40), position)
         if header is not None:
             return header.start()
         position = payload.rfind(b"obj", low, position)
-    return low
+    return None
 
 
 def guard_pdf_streams(payload: bytes) -> None:
@@ -309,7 +375,8 @@ def guard_pdf_streams(payload: bytes) -> None:
     shapes it can see and no more. A run of R tokens can take the filter
     it checked off pdfminer's stack and leave another in its place, and an
     "N G obj" spelled inside a stream's dictionary moves where the pass
-    thinks that dictionary starts, past its filter. What it misses is
+    thinks that dictionary starts: a filter ahead of it is left out, and
+    one after it can look nested. What it misses is
     bounded by the memory ceiling the reader runs under, in
     :func:`extract_pdf_text_layout`; this pass turns the shapes it sees
     into a clear message and keeps the child from being started for them.
@@ -338,11 +405,17 @@ def guard_pdf_streams(payload: bytes) -> None:
         # after the previous keyword since streams do not nest. It is looked
         # for all the way back to that keyword, however long the dictionary:
         # a fixed window used to cut a long one short and miss its filter.
-        head = payload[_object_start(payload, previous_end, match.start()) : match.start()]
+        start = _object_start(payload, previous_end, match.start())
+        head = payload[previous_end if start is None else start : match.start()]
         previous_end = match.end()
+        # Without an "N G obj" ahead of it the head can begin inside one of
+        # pdfminer's strings or comments, where its brackets mean nothing,
+        # so all of it is read.
+        spans = [(0, len(head))] if start is None else _outer_spans(head)
         filters = [
             key.end()
-            for key in _FILTER_KEY_RE.finditer(head)
+            for low, high in spans
+            for key in _FILTER_KEY_RE.finditer(head, low, high)
             if not _FLAGS_RE.match(head, key.end())
         ]
         if len(filters) > 1:
