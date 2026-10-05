@@ -2476,6 +2476,10 @@ def _admitted_changes(
     register: float | None = None
     # A register drop waiting for the bucket after it, see below.
     pending_drop = 0.0
+    # The registers either side of the last admitted bucket, so a fall
+    # that comes after it can show it was a misread. Kept across refused
+    # buckets and gaps, which do not move the bucket it belongs to.
+    around: tuple[float, float] | None = None
     # Asking for a day period makes Home Assistant re-align the end of the
     # window to the following local midnight, and the end handed over is
     # already midnight, so the query comes back one day longer than it was
@@ -2535,9 +2539,12 @@ def _admitted_changes(
             # that follows it instead: a dip that recovers the next day (a
             # `total` meter rebooting across midnight) nets to the water
             # actually used, while a genuine swap or a lost run-up leaves
-            # the pair negative and is dropped whole.
-            pending_drop += float(delta)
+            # the pair negative and is dropped whole. A fall that takes
+            # back the last admitted bucket has already been settled
+            # against it, and holding it as well would cost the next day.
             refused += 1
+            if not _took_back_a_spike(admitted, around, register):
+                pending_drop += float(delta)
             continue
         if pending_drop < 0.0:
             netted = float(delta) + pending_drop
@@ -2550,6 +2557,9 @@ def _admitted_changes(
                 refused += 1
                 continue
             admitted.append((bucket, netted))
+            # Its water is measured across the drop, not from the
+            # register before it, so there is no spike to read off it.
+            around = None
             continue
         if _change_exceeds_the_register(row):
             # A register cannot consume more than it reads. Home Assistant
@@ -2566,13 +2576,19 @@ def _admitted_changes(
             # history looks like to the fold. A previous register of 0 is
             # the dip itself rather than a reading to climb from, and one
             # above this bucket's is a different register, so either way
-            # the day is refused.
+            # the day is refused. So is one whose register shows the last
+            # admitted bucket was a spike, which is taken back out of that
+            # bucket instead.
+            if _took_back_a_spike(admitted, around, register):
+                refused += 1
+                continue
             if register is not None and before is not None and 0.0 < before <= register:
                 climb = register - before
                 if _exceeds_a_day(climb, entity_id, "recovered", gap_days, level=level):
                     refused += 1
                     continue
                 admitted.append((bucket, climb))
+                around = (before, register)
                 continue
             _LOGGER.debug(
                 "%s: dropping a bucket whose change %s exceeds the register %s",
@@ -2586,7 +2602,37 @@ def _admitted_changes(
             refused += 1
             continue
         admitted.append((bucket, float(delta)))
+        around = None if before is None or register is None else (before, register)
     return admitted, refused
+
+
+def _took_back_a_spike(
+    admitted: list[tuple[float | None, float]],
+    around: tuple[float, float] | None,
+    register: float | None,
+) -> bool:
+    """Cap the last admitted bucket when ``register`` shows it was a misread.
+
+    ``around`` holds the registers at the end of the bucket before that
+    one and at its own end. A meter that misreads high before midnight and
+    is corrected after it leaves the spike in an admitted bucket and the
+    correction in the next one, either as a negative change or, past a
+    tenth of the register, as a reset that is refused. Netting only went
+    forward, so the spike stayed in the year and in the rolling year.
+
+    A register that comes back between the two shows the high one was the
+    outlier, and the bucket keeps only the climb to where it came back.
+    One that comes back below where it stood before is a dip or a swap,
+    and says nothing about the day before it.
+    """
+    if around is None or register is None:
+        return False
+    before, high = around
+    if not before <= register < high:
+        return False
+    bucket, m3 = admitted[-1]
+    admitted[-1] = (bucket, min(m3, register - before))
+    return True
 
 
 def _exceeds_a_day(

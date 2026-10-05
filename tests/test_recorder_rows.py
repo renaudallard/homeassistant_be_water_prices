@@ -224,6 +224,59 @@ async def test_a_dip_that_recovers_across_midnight_nets_to_the_water_used() -> N
     assert round(total, 3) == 0.5
 
 
+async def test_a_spike_taken_back_across_quiet_days_keeps_the_water_around_it() -> None:
+    """A spike is read against the buckets either side of it, wherever they fall.
+
+    Days without a bucket on either side do not move the registers it is
+    measured by, and their water stays in the bucket that holds it.
+    """
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=0.2, state=4000.5, total=100.5),
+        # Quiet on 3 March, then 0.2 of real water and a 5.2 misread.
+        _row(date(2026, 3, 4), change=5.4, state=4005.9, total=105.9),
+        # Quiet on 5 March, corrected on 6 March with 0.3 more drawn.
+        _row(date(2026, 3, 6), change=-4.9, state=4001.0, total=101.0),
+        _row(date(2026, 3, 7), change=0.2, state=4001.2, total=101.2),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 7))  # type: ignore[arg-type]
+    assert round(total, 3) == 1.2  # 4000.0 -> 4001.2
+
+
+async def test_a_refused_bucket_does_not_hide_the_spike_before_it() -> None:
+    """The spike is the last admitted bucket, not the last bucket."""
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=5.4, state=4005.7, total=105.7),
+        _row(date(2026, 3, 3), change=150.0, state=4155.7, total=255.7),
+        _row(date(2026, 3, 4), change=-155.0, state=4000.7, total=100.7),
+        _row(date(2026, 3, 5), change=0.2, state=4000.9, total=100.9),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 5))  # type: ignore[arg-type]
+    assert round(total, 3) == 0.9  # 4000.0 -> 4000.9
+
+
+async def test_a_fall_after_a_netted_day_is_not_read_against_the_dip() -> None:
+    """A netted day's water is measured across the drop before it.
+
+    The registers either side of the day before the drop say nothing
+    about it, so a fall after it is held for the day after as usual.
+    """
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=0.2, state=4000.5, total=100.5),
+        _row(date(2026, 3, 3), change=-4000.5, state=0.0, total=-3900.0),
+        _row(date(2026, 3, 4), change=4000.9, state=4000.9, total=100.9),
+        _row(date(2026, 3, 5), change=-0.5, state=4000.4, total=100.4),
+        _row(date(2026, 3, 6), change=0.7, state=4001.1, total=101.1),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 6))  # type: ignore[arg-type]
+    assert round(total, 3) == 1.1  # 4000.0 -> 4001.1
+
+
 async def test_a_genuine_swap_is_dropped_whole() -> None:
     rows = [
         _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
