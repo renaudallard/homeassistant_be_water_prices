@@ -551,12 +551,13 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         When the postcode has changed, or nothing is saved to pre-fill,
         it pre-fills the commune the operator bills the postcode on, if
         it bills it on one of its own, and nothing otherwise. An entry
-        that never saved a postcode keeps its saved commune unless the
-        postcode is billed on one of its own.
+        that never saved a postcode keeps its saved commune: its first
+        postcode is not a change.
 
         Skips itself when the commune list cannot be fetched (transient
         network / parser failure). The saved commune is then kept only
-        when neither the utility nor the postcode changed; otherwise it
+        when neither the utility nor the postcode changed, the first
+        postcode again not counting as a change; otherwise it
         is dropped, setup fills in the commune the operator bills the new
         postcode on, or the operator-wide default applies, and the user
         can pick a commune later via OptionsFlow.
@@ -606,15 +607,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # and once submitted setup never revisits it. Moving from Geel to
         # Nijlen kept Pidpa's Geel card, 27.06 EUR a year too much, and
         # moving from Nijlen to Geel kept Nijlen's, 27.06 EUR too little.
-        # An entry that never saved a postcode (created before 0.6.0) counts
-        # as moved for the billed commune, but keeps its saved one otherwise:
-        # nothing says the household picked it for another address.
         saved_postcode = entry.options.get(CONF_POSTCODE) or entry.data.get(CONF_POSTCODE)
         billed = _commune_for_postcode(self._utility, self._postcode or saved_postcode)
-        moved = self._postcode is not None and self._postcode != saved_postcode
+        moved = self._moved_from(saved_postcode)
         if billed in live_ids and (moved or suggested is None):
             suggested = billed
-        elif moved and saved_postcode is not None:
+        elif moved:
             suggested = None
         if saved is not None and saved not in live_ids:
             # The form will load with no selection; explicitly tell
@@ -666,6 +664,17 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         )
         return self.async_show_form(step_id="reconfigure_household", data_schema=schema)
 
+    def _moved_from(self, saved_postcode: str | None) -> bool:
+        """Whether this reconfigure gives a postcode other than the saved one.
+
+        An entry that never saved a postcode (created before 0.6.0) is not
+        moving when it gives its first one: nothing says the household
+        picked its commune for another address. Both the commune step and
+        the finish read this, so a commune the step offers back is not
+        dropped when the commune list cannot be fetched.
+        """
+        return bool(saved_postcode) and self._postcode not in (None, saved_postcode)
+
     def _entry_under_reconfigure(self) -> ConfigEntry | None:
         """The entry this flow reconfigures, or None once it has been removed.
 
@@ -686,10 +695,10 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         numeric, Pidpa slug, Water-link name) that means nothing to a
         different operator. They are dropped as well when the postcode
         changed, since a commune saved for the old address no longer
-        applies. The other options (consumption, persons,
-        social tariff, meter) carry over. If the user picked a commune
-        in the manual flow (``async_step_reconfigure_commune``), layer
-        it on top.
+        applies; an entry's first postcode is not a change. The other
+        options (consumption, persons, social tariff, meter) carry over.
+        If the user picked a commune in the manual flow
+        (``async_step_reconfigure_commune``), layer it on top.
         """
         if self._utility is None:
             return self.async_abort(reason="invalid_flow_state")
@@ -721,7 +730,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         # fetched kept the Geel card for good. Dropped, setup adopts the
         # commune the new postcode is billed on, or the default applies.
         saved_postcode = entry.options.get(CONF_POSTCODE) or entry.data.get(CONF_POSTCODE)
-        moved = self._postcode is not None and self._postcode != saved_postcode
+        moved = self._moved_from(saved_postcode)
         if new_utility != old_utility or self._drop_stale_reconfigure_commune or moved:
             new_options.pop(CONF_COMMUNE, None)
             new_options.pop(CONF_COMMUNE_LABEL, None)

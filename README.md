@@ -372,8 +372,9 @@ the commune the operator bills the new postcode on, where it bills it
 on one of its own (the ones listed under step 3 of Configuration), and
 is left empty otherwise. The same goes for a move from another
 operator, where nothing is saved. An entry created before 0.6.0 never
-saved a postcode; its current commune is still pre-filled unless the
-operator bills the postcode on a commune of its own.
+saved a postcode, and its first one does not count as a new postcode:
+its current commune is still pre-filled, and kept when the dropdown is
+skipped.
 
 Either path reloads the integration in place. Annual consumption and the
 water-meter sensor carry over. Registered residents and the social
