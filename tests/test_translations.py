@@ -114,3 +114,28 @@ def test_operator_repair_names_the_manual_pick(lang: str) -> None:
     card = data["issues"]["operator_moved"]["description"]
     label = data["config"]["step"]["reconfigure"]["menu_options"]["reconfigure_manual"]
     assert f"> {label} " in card
+
+
+# How each language lists the cached cards that send a failed refresh to
+# the archive.
+_ARCHIVE_ASKED_FOR = {
+    "en": "missing, stale or last year's",
+    "fr": "manque, est périmée ou est celle de l'an dernier",
+    "nl": "ontbreekt, verouderd is of die van vorig jaar is",
+    "de": "fehlt, veraltet ist oder die des Vorjahres ist",
+}
+
+
+@pytest.mark.parametrize("lang", LANGUAGES)
+def test_card_archive_option_names_every_case_it_is_asked(lang: str) -> None:
+    """The archive box says when a request naming the commune goes out.
+
+    A failed refresh asks the archive with nothing held, with a stale
+    card, and with last year's card even while it is not stale yet,
+    which is every failure from January to March. Text that spoke only
+    of a missing recent card hid that last case from the user deciding
+    whether to allow the request.
+    """
+    data = _load(lang)
+    for flow in (data["config"]["step"]["options"], data["options"]["step"]["init"]):
+        assert _ARCHIVE_ASKED_FOR[lang] in flow["data"]["card_archive"]
