@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -41,9 +42,23 @@ from custom_components.be_water_prices.providers.base import WaterTariff
 from custom_components.be_water_prices.sensor import (
     SENSORS,
     WaterSensor,
-    _jan_1_local,
     _source_url_without_commune,
 )
+
+_BRUSSELS = dt_util.get_time_zone("Europe/Brussels")
+# Written out rather than asked of the code under test: a reset that moved
+# on the 1st of every month would otherwise agree with itself.
+_JAN_1 = datetime(2026, 1, 1, tzinfo=_BRUSSELS)
+
+
+@pytest.fixture
+def _mid_july_in_brussels(freezer: Any) -> Iterator[None]:
+    """Pin the clock and the zone the year-to-date sensors reset in."""
+    zone = dt_util.get_default_time_zone()
+    dt_util.set_default_time_zone(_BRUSSELS)
+    freezer.move_to(datetime(2026, 7, 15, 12, tzinfo=_BRUSSELS))
+    yield
+    dt_util.set_default_time_zone(zone)
 
 
 class _StubEntry:
@@ -78,6 +93,7 @@ def _publish(sensor: WaterSensor, m3: float | None, started: datetime | None = N
         sensor._handle_coordinator_update()
 
 
+@pytest.mark.usefixtures("_mid_july_in_brussels")
 def test_a_correction_in_the_same_year_keeps_the_reset() -> None:
     """A lower figure that still covers the year is not a new cycle.
 
@@ -89,20 +105,19 @@ def test_a_correction_in_the_same_year_keeps_the_reset() -> None:
     """
     for key in ("ytd_consumption", "current_year_cost"):
         sensor = _sensor(key)
-        jan1 = _jan_1_local()
         for value in (437.56, 87.51, 88.0):
             _publish(sensor, value)
-            assert sensor.last_reset == jan1
+            assert sensor.last_reset == _JAN_1
 
 
+@pytest.mark.usefixtures("_mid_july_in_brussels")
 def test_a_restarted_year_moves_the_reset_to_its_start() -> None:
     """A confirmed swap or a different meter restarts the figure, and the
     reset follows the start the coordinator publishes for it."""
     sensor = _sensor("ytd_consumption")
-    jan1 = _jan_1_local()
     _publish(sensor, 50.0)
-    assert sensor.last_reset == jan1
-    swap = jan1 + timedelta(days=200)
+    assert sensor.last_reset == _JAN_1
+    swap = datetime(2026, 7, 10, 8, tzinfo=_BRUSSELS)
     _publish(sensor, 0.0, started=swap)
     assert sensor.last_reset == swap
     # A tick with no figure in between leaves the start where it was.
@@ -111,6 +126,7 @@ def test_a_restarted_year_moves_the_reset_to_its_start() -> None:
     assert sensor.last_reset == swap
 
 
+@pytest.mark.usefixtures("_mid_july_in_brussels")
 def test_the_reset_never_moves_back() -> None:
     """Home Assistant opens a new cycle when last_reset moves back too.
 
@@ -118,19 +134,20 @@ def test_the_reset_never_moves_back() -> None:
     back to 1 January, which would count the year once more.
     """
     sensor = _sensor("ytd_consumption")
-    swap = _jan_1_local() + timedelta(days=200)
+    swap = datetime(2026, 7, 10, 8, tzinfo=_BRUSSELS)
     _publish(sensor, 0.0, started=swap)
     _publish(sensor, 1.0)
     assert sensor.last_reset == swap
 
 
+@pytest.mark.usefixtures("_mid_july_in_brussels")
 def test_last_years_start_gives_way_to_the_new_year() -> None:
     sensor = _sensor("ytd_consumption")
-    jan1 = _jan_1_local()
-    _publish(sensor, 0.0, started=jan1 - timedelta(days=30))
-    assert sensor.last_reset == jan1
+    _publish(sensor, 0.0, started=datetime(2025, 12, 2, tzinfo=_BRUSSELS))
+    assert sensor.last_reset == _JAN_1
 
 
+@pytest.mark.usefixtures("_mid_july_in_brussels")
 async def test_a_restored_reset_is_kept_as_a_floor() -> None:
     """The reset this entity last went out under survives a restart.
 
@@ -160,9 +177,10 @@ async def test_a_restored_reset_is_kept_as_a_floor() -> None:
     assert sensor.last_reset == earlier
 
 
+@pytest.mark.usefixtures("_mid_july_in_brussels")
 def test_the_reset_is_handed_out_for_storage() -> None:
     sensor = _sensor("ytd_consumption")
-    swap = _jan_1_local() + timedelta(days=200)
+    swap = datetime(2026, 7, 10, 8, tzinfo=_BRUSSELS)
     _publish(sensor, 10.0, started=swap)
     stored = sensor.extra_restore_state_data
     assert stored is not None

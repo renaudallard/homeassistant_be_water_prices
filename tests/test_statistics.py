@@ -532,6 +532,33 @@ async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: Home
     backfill.assert_not_awaited()
 
 
+async def test_the_price_line_starts_on_1_january(hass: HomeAssistant, freezer: Any) -> None:
+    """The auto-once run and the service without a start date both write
+    the year from 1 January 00:00 local.
+
+    The date is written out rather than asked of the code under test: a
+    start that moved to the 1st of the month would agree with itself.
+    """
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from custom_components.be_water_prices.statistics import async_maybe_backfill_once
+
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    freezer.move_to("2026-07-15 10:00:00+00:00")
+    jan_1 = datetime(2026, 1, 1, tzinfo=dt_util.get_time_zone("Europe/Brussels"))
+    entry = _entry(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = SimpleNamespace(data=None)
+    async_register_services(hass)
+    with patch(
+        "custom_components.be_water_prices.statistics.async_backfill_prices",
+        new=AsyncMock(return_value=0),
+    ) as backfill:
+        await async_maybe_backfill_once(hass, entry)
+        await hass.services.async_call(DOMAIN, SERVICE_BACKFILL_PRICES, {}, blocking=True)
+    assert [call.kwargs["start"] for call in backfill.await_args_list] == [jan_1, jan_1]
+
+
 async def test_picking_a_commune_rewrites_the_price_line(hass: HomeAssistant) -> None:
     """Several of the sensors this writes are made of the commune.
 
