@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
@@ -93,6 +95,23 @@ def test_in_january_the_newest_started_year_is_served(monkeypatch: pytest.Monkey
     t = parse_tariff(fixture_html("agso_knokke_2026.html"))
     assert t.basis_eur_per_m3 == 2.3295
     assert t.valid_from.year == 2026
+
+
+@pytest.mark.parametrize("today", [date(2027, 1, 10), date(2027, 5, 1)])
+def test_a_reworded_current_heading_is_not_dated_by_the_clock(
+    monkeypatch: pytest.MonkeyPatch, today: date
+) -> None:
+    """In January the undated 2026 table was stamped 2027 and never went stale."""
+    from custom_components.be_water_prices.providers import agso_knokke
+
+    page = fixture_html("agso_knokke_2026.html")
+    marker = "OVERZICHT TARIEVEN&nbsp; PER 1/1/2026"
+    assert page.count(marker) == 1
+    monkeypatch.setattr(agso_knokke, "belgian_today", lambda: today)
+    t = parse_tariff(page.replace(marker, "TARIEVEN VANAF 1 JANUARI 2026"))
+    assert t.basis_eur_per_m3 == 2.3295
+    assert t.valid_from == date(2026, 1, 1)
+    assert t.valid_until == date(2027, 3, 31)
 
 
 def test_without_headings_the_dearest_table_is_served_as_this_years() -> None:

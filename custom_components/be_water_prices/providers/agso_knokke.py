@@ -204,7 +204,20 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         # because the stamp always looked current. If the table the price
         # picked does carry a heading, that is the year it is, whatever
         # its neighbours are missing.
-        chosen_year = _year_for_table(chosen) or target
+        own_year = _year_for_table(chosen)
+        known = [y for y, _ in dated if y is not None]
+        if own_year is not None:
+            chosen_year = own_year
+        elif known:
+            # An undated table is at most the year after the newest dated
+            # one beside it. The clock's year stamped last year's card as
+            # the new one every January the operator was late, so it was
+            # never carried and never turned stale.
+            chosen_year = min(max(known) + 1, target)
+        else:
+            # Nothing on the page carries a year to place it against, so
+            # the clock's year is the only reading left.
+            chosen_year = target
         if chosen_year > target and year is None:
             raise ExtractorError(
                 f"AGSO Knokke's dearest table is dated {chosen_year}, ahead of {target}, "
