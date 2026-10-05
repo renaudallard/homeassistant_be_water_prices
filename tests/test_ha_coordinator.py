@@ -3681,6 +3681,93 @@ async def test_a_replaced_meter_is_tracked_live_after_the_recorder_tick(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("startup_state", ["unavailable", "1.2"])
+async def test_a_replaced_meter_is_tracked_live_across_a_restart(
+    hass: HomeAssistant, hass_storage: dict[str, Any], startup_state: str
+) -> None:
+    """A restart between a swap and its first tick must not lose the swap.
+
+    Both the request for that tick and what the swap means for the frame
+    used to be held in memory only. With the meter in sight at startup
+    nothing asked the recorder and the year stayed on the new register.
+    With it out of sight the recorder was asked, but the frame was never
+    put under its figure and the year moved only once a day after that.
+    """
+    from custom_components.be_water_prices import coordinator as co
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=AsyncMock())
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        before = co.WaterCoordinator(hass, entry)
+
+    year = dt_util.now().year
+    before._ytd = co._YtdCycle(
+        meter="sensor.water_meter", year=year, m3=60.0, offset_m3=940.0, recorder_hwm=59.5
+    )
+    before._ytd_hold_run = 2
+    before._ytd_hold_span_s = 700.0
+    before._ytd_run_m3 = 1.1
+    before._ytd_high_m3 = 1000.0
+    swap, _ = before._fold_cycle(
+        _fresh_tariff(),
+        meter="sensor.water_meter",
+        now_year=year,
+        reading=1.2,
+        recorder_m3=None,
+        recorder_taken_back=0.0,
+        recorder_has_statistic=False,
+    )
+    assert swap == 0.0
+    await before._store.async_save(before._cycle_state())
+
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        after = co.WaterCoordinator(hass, entry)
+    await after.async_load_ytd_state()
+    assert after._ytd == before._ytd
+
+    hass.states.async_set("sensor.water_meter", startup_state)
+    recorder = AsyncMock(return_value=(60.3, 0.0))
+    with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
+        startup, _ = await after._compute_ytd(_fresh_tariff())
+    recorder.assert_awaited()
+    assert startup == 60.3
+
+    def _live(reading: float) -> float | None:
+        m3, _ = after._fold_cycle(
+            _fresh_tariff(),
+            meter="sensor.water_meter",
+            now_year=year,
+            reading=reading,
+            recorder_m3=None,
+            recorder_taken_back=0.0,
+            recorder_has_statistic=False,
+        )
+        return m3
+
+    # The restart cost the highest reading the meter had shown, and nothing
+    # rebuilds the frame without one, so the startup tick cannot.
+    assert _live(1.5) == 60.3
+
+    hass.states.async_set("sensor.water_meter", "2.0")
+    recorder = AsyncMock(return_value=(60.8, 0.0))
+    with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
+        tick, _ = await after._compute_ytd(_fresh_tariff())
+    assert tick == 60.8
+
+    assert _live(5.0) == pytest.approx(63.8)
+
+
+@pytest.mark.asyncio
 async def test_a_swap_moves_the_sensors_reset_to_its_start(hass: HomeAssistant) -> None:
     """A confirmed swap restarts the year, and the YTD sensors' reset with it.
 

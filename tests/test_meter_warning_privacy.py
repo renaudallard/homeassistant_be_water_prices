@@ -101,7 +101,6 @@ def _fold_round(cycle: _YtdCycle, reading: float | None) -> None:
         elapsed_s=0.0,
         now_ts=0.0,
         high_m3=None,
-        after_swap=False,
         basis="b",
         cost_of=lambda m3: m3,
     )

@@ -192,7 +192,6 @@ async def test_picking_a_renamed_meter_again_keeps_the_year_in_its_cycle(
             recorder_ok=None if recorder_m3 is None else True,
             elapsed_s=3600.0,
             now_ts=(moment + timedelta(hours=hour)).timestamp(),
-            after_swap=False,
             basis="stand-in",
             cost_of=lambda m3: m3,
             **hold,

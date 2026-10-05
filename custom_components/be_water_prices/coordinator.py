@@ -453,7 +453,6 @@ def _fold(
     elapsed_s: float,
     now_ts: float,
     high_m3: float | None,
-    after_swap: bool,
     basis: str,
     cost_of: Callable[[float], float | None],
 ) -> _YtdFold:
@@ -480,10 +479,7 @@ def _fold(
     reading on its strength. ``hold_m3`` is a reading held pending
     confirmation by the next one, ``hold_run`` counts consecutive readings
     below the frame and ``run_m3`` is the value that run is sitting at; all
-    three are transient and none is persisted. ``after_swap`` says this
-    meter's year restarted on a replaced register, so the recorder's total
-    for it still holds the old meter's water and stands above anything the
-    new register can show.
+    three are transient and none is persisted.
 
     Every figure a round produces is a candidate, and the published one is
     the highest of the candidates and the mark already standing. That
@@ -515,6 +511,16 @@ def _fold(
     offset = cycle.offset_m3 if current else None
     recorder_hwm = cycle.recorder_hwm if current else None
     started_at = cycle.started_at if current else None
+    # Whether this meter's year restarted after 1 January. After a swap the
+    # recorder's total for the meter still holds the old register's water
+    # and stands above anything the new one can show, which the frame
+    # rebuild below has to allow for. Read from the record rather than held
+    # by the caller, since a restart between the swap and the tick that
+    # brings the year back would otherwise lose it. A meter the recorder
+    # holds no statistics for is stamped the same way when its year starts
+    # empty, but its frame starts at its own register and the recorder has
+    # no old water to put above it.
+    after_swap = started_at is not None
     if cycle.year is None and not recorder_has_statistic:
         # A record with no year, a first setup or a repoint, only gets one
         # from a recorder answer, so this is the round that says when its
@@ -1071,17 +1077,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ytd_high_m3: float | None = None
         # Set when a round has treated the meter as replaced, cleared by
         # the next tick that asks the recorder about it. In memory only, so
-        # a restart in between loses the arbitration: the record a swap
-        # persists is a complete, self-consistent frame, so every clause of
-        # the gate reads False and nothing asks again. That is the same
-        # place v0.7.8 was in permanently, and closing it needs the intent
+        # a restart in between loses the arbitration: the record such a
+        # round persists is a complete, self-consistent frame, so every
+        # clause of the gate reads False and nothing asks again. A swap is
+        # the exception, since its record still shows it, and loading the
+        # record sets the flag again for one (see async_load_ytd_state).
+        # Any other round that wants the recorder still needs the intent
         # persisted rather than held.
         self._ytd_arbitrate: bool = False
-        # The meter and year a round last treated the meter as replaced in.
-        # For the rest of that year the recorder's total for the meter
-        # includes the old register's water, which the fold has to know to
-        # put the new register under it. In memory only, like the flag above.
-        self._ytd_swapped_on: tuple[str, int] | None = None
         # Whether the last recorder query succeeded, None before anything has
         # asked. Transient by design: it says what the database did a moment
         # ago, which is exactly as long as the answer is worth trusting.
@@ -1815,6 +1818,16 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return
         self._ytd = cycle
         self._ytd_card = _card_from_record(data.get("card"))
+        # A swap stamps the start of the year and clears what the recorder
+        # had reported for it, and only a recorder answer reports again, so
+        # a record in that shape is one whose swap no tick has dated yet.
+        # The flag asking for that tick is gone with the process, and with
+        # the meter in sight nothing else would ask: the year would stay on
+        # the new register instead of coming back to the recorder's figure.
+        # A meter the recorder holds no statistics for keeps the same shape
+        # all year and is asked once per restart, and its zero answer never
+        # lowers the year.
+        self._ytd_arbitrate = cycle.started_at is not None and cycle.recorder_hwm is None
 
     async def async_load_metered_days(self) -> None:
         """Restore the last read of the meter's days before the first refresh.
@@ -1940,7 +1953,6 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # across a restart, which no monotonic clock survives.
             now_ts=dt_util.utcnow().timestamp(),
             high_m3=self._ytd_high_m3,
-            after_swap=self._ytd_swapped_on == (meter, now_year),
             basis=_cost_basis(
                 utility=tariff.utility,
                 commune=self.entry.options.get(CONF_COMMUNE),
@@ -1966,8 +1978,6 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # and a meter that was merely offline bills its whole
             # lifetime into this year.
             self._ytd_arbitrate = True
-        if out.swapped:
-            self._ytd_swapped_on = (meter, now_year)
         return out.m3, out.cost
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:

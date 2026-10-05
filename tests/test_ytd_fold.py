@@ -82,7 +82,6 @@ def _round(
     elapsed_s: float = 86400.0,
     now_ts: float = _NOW_TS,
     high_m3: float | None = None,
-    after_swap: bool = False,
     now_year: int = _YEAR,
     meter: str = _METER,
     basis: str = _BASIS,
@@ -104,7 +103,6 @@ def _round(
         elapsed_s=elapsed_s,
         now_ts=now_ts,
         high_m3=high_m3,
-        after_swap=after_swap,
         basis=basis,
         cost_of=cost_of,
     )
@@ -465,11 +463,11 @@ def test_the_tick_after_a_swap_puts_the_new_register_under_the_recorder() -> Non
     assert swap.swapped is True
     assert swap.m3 == 0.0
 
-    tick = _round(swap.cycle, reading=1.2, recorder_m3=60.3, high_m3=swap.high_m3, after_swap=True)
+    tick = _round(swap.cycle, reading=1.2, recorder_m3=60.3, high_m3=swap.high_m3)
     assert tick.m3 == 60.3
     assert tick.cycle.offset_m3 == pytest.approx(1.2 - 60.3)
 
-    live = _round(tick.cycle, reading=5.0, high_m3=tick.high_m3, after_swap=True)
+    live = _round(tick.cycle, reading=5.0, high_m3=tick.high_m3)
     assert live.m3 == pytest.approx(64.1)
 
 
@@ -479,8 +477,8 @@ def test_a_dip_on_the_tick_after_a_swap_leaves_the_frame_alone() -> None:
     A reading under one the new register has already shown is a dip, and
     rebuilding on it would count the water between the two again.
     """
-    cycle = _anchored(3.8, 1.2)
-    out = _round(cycle, reading=3.0, recorder_m3=60.3, high_m3=5.0, after_swap=True)
+    cycle = _anchored(3.8, 1.2, started_at=_NOW_TS - _DAY_S)
+    out = _round(cycle, reading=3.0, recorder_m3=60.3, high_m3=5.0)
 
     assert out.m3 == 60.3
     assert out.cycle.offset_m3 == 1.2
@@ -1613,31 +1611,23 @@ def test_a_dropout_tick_after_a_swap_does_not_rebuild_the_frame() -> None:
     )
     assert swap.swapped is True
 
-    tick = _round(swap.cycle, reading=1.2, recorder_m3=131.0, high_m3=swap.high_m3, after_swap=True)
+    tick = _round(swap.cycle, reading=1.2, recorder_m3=131.0, high_m3=swap.high_m3)
     assert tick.cycle.offset_m3 == pytest.approx(1.2 - 131.0)
 
     out = tick
     for reading in (10.0, 28.0, 10.2):
-        out = _round(
-            out.cycle, reading=reading, elapsed_s=300.0, high_m3=out.high_m3, after_swap=True
-        )
+        out = _round(out.cycle, reading=reading, elapsed_s=300.0, high_m3=out.high_m3)
     assert out.m3 == pytest.approx(157.8)  # the spike, small enough to be admitted
 
-    dropout = _round(
-        out.cycle, reading=0.0, recorder_m3=141.0, high_m3=out.high_m3, after_swap=True
-    )
+    dropout = _round(out.cycle, reading=0.0, recorder_m3=141.0, high_m3=out.high_m3)
     assert dropout.cycle.offset_m3 == pytest.approx(1.2 - 131.0)
     assert dropout.cycle.recorder_hwm == 141.0
 
-    back = _round(
-        dropout.cycle, reading=10.5, elapsed_s=300.0, high_m3=dropout.high_m3, after_swap=True
-    )
+    back = _round(dropout.cycle, reading=10.5, elapsed_s=300.0, high_m3=dropout.high_m3)
     assert back.cycle.offset_m3 == pytest.approx(1.2 - 131.0)
 
     # The next tick with the meter in sight takes the spike back.
-    later = _round(
-        back.cycle, reading=11.0, recorder_m3=142.0, high_m3=back.high_m3, after_swap=True
-    )
+    later = _round(back.cycle, reading=11.0, recorder_m3=142.0, high_m3=back.high_m3)
     assert later.m3 == 142.0
     assert later.cycle.offset_m3 == pytest.approx(11.0 - 142.0)
 

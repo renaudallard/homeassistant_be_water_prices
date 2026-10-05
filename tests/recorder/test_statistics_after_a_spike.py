@@ -155,7 +155,6 @@ async def test_the_year_comes_down_once_the_correction_day_is_compiled(
             elapsed_s=300.0,
             now_ts=at.replace(tzinfo=tz).timestamp(),
             high_m3=None,
-            after_swap=False,
             basis="stand-in",
             cost_of=lambda m3: m3,
         )
