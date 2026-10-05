@@ -71,12 +71,12 @@
       },
       "options": {
         "title": "Consommation annuelle",
-        "description": "Votre consommation annuelle d'eau en mètres cubes. Pour les distributeurs flamands, indiquez aussi le nombre de personnes domiciliées (détermine le volume du tarif de base) et l'option pour le tarif social VMM. Optionnel : pointez un capteur compteur d'eau (cumulatif m³, device_class=water) pour que le capteur de coût annuel lise la consommation depuis le 1er janvier depuis l'historique Home Assistant.",
+        "description": "Votre consommation annuelle d'eau en mètres cubes. Utilisée par le capteur de coût annuel projeté ; 80 m³/an par défaut. Pour les distributeurs flamands, indiquez aussi le nombre de personnes domiciliées (détermine le volume du tarif de base) et l'option pour le tarif social VMM. Optionnel : pointez un capteur compteur d'eau (cumulatif m³, device_class=water) pour que le capteur de coût annuel lise la consommation depuis le 1er janvier depuis l'historique Home Assistant.",
         "data": {
           "consumption_m3_per_year": "Consommation (m³ / an)",
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
           "social_tariff": "Tarif social (Flandre, réduction 80%)",
-          "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
+          "water_meter_sensor": "Capteur de compteur d'eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
           "card_archive": "Lire l'archive des cartes du projet quand le distributeur est injoignable et qu'aucune carte récente n'est en cache (la requête nomme votre distributeur et votre commune)",
           "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Pidpa / Water-link)"
         },
@@ -101,7 +101,7 @@
           "consumption_m3_per_year": "Consommation (m³ / an)",
           "gedomicilieerd_persons": "Personnes domiciliées (Flandre uniquement)",
           "social_tariff": "Tarif social (Flandre, réduction 80%)",
-          "water_meter_sensor": "Capteur compteur d eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
+          "water_meter_sensor": "Capteur de compteur d'eau (optionnel ; auto-détecté depuis le tableau de bord Énergie si vide)",
           "card_archive": "Lire l'archive des cartes du projet quand le distributeur est injoignable et qu'aucune carte récente n'est en cache (la requête nomme votre distributeur et votre commune)",
           "commune": "Commune (uniquement pour les distributeurs par commune : De Watergroep / Farys / Pidpa / Water-link)"
         },
