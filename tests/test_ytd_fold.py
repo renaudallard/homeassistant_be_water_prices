@@ -114,11 +114,13 @@ def _anchored(
     cost: float | None = None,
     recorder_hwm: float | None = None,
     away_s: float = 0.0,
+    started_at: float | None = None,
 ) -> _YtdCycle:
     """A cycle tracking the live meter: a figure and the frame behind it.
 
     ``away_s`` is how long ago the meter was last seen, which is what the
-    step bound is scaled by.
+    step bound is scaled by. ``started_at`` is when a restart of the year
+    began the figure, None for 1 January.
     """
     return _YtdCycle(
         meter=_METER,
@@ -129,6 +131,7 @@ def _anchored(
         basis=_BASIS,
         recorder_hwm=recorder_hwm,
         seen_at=_NOW_TS - away_s,
+        started_at=started_at,
     )
 
 
@@ -435,7 +438,9 @@ def test_a_sustained_run_below_the_frame_is_a_meter_swap() -> None:
     # The cost floor restarts with the cycle, or the new meter's first
     # month would be billed at the old meter's peak.
     assert out.cost == _bill(0.0)
-    assert out.cycle == _anchored(0.0, 12.0, cost=_bill(0.0))
+    # Stamped with the moment of the swap, which is where the YTD sensors
+    # move their last reset to.
+    assert out.cycle == _anchored(0.0, 12.0, cost=_bill(0.0), started_at=_NOW_TS)
     assert out.hold_run == 0
 
 
@@ -766,7 +771,7 @@ def test_a_sustained_run_below_a_served_figure_is_a_meter_swap() -> None:
         published.append(out.m3)
 
     assert published == [70.0, 70.0, 0.0, 1.0]
-    assert cycle == _anchored(1.0, 7.0, cost=_bill(1.0))
+    assert cycle == _anchored(1.0, 7.0, cost=_bill(1.0), started_at=_NOW_TS)
 
 
 def test_a_reading_back_above_a_served_figure_clears_the_run() -> None:
@@ -815,7 +820,47 @@ def test_a_repointed_meter_does_not_inherit_the_old_frame() -> None:
     out = _round(_anchored(20.0, 80.0, cost=500.0), meter=_OTHER, reading=5000.0)
 
     assert out.m3 is None
-    assert out.cycle == _YtdCycle(meter=_OTHER)
+    # The year restarts on the new meter, from now.
+    assert out.cycle == _YtdCycle(meter=_OTHER, started_at=_NOW_TS)
+
+
+def test_a_repointed_year_keeps_its_start_once_it_has_a_figure() -> None:
+    """The record a repoint leaves has no year, and the round that gives
+    it one must not take the start back to 1 January."""
+    repointed = _round(_anchored(20.0, 80.0), meter=_OTHER, reading=5000.0)
+    later = _round(
+        repointed.cycle, meter=_OTHER, reading=5000.0, recorder_m3=40.0, now_ts=_NOW_TS + 60.0
+    )
+
+    assert later.m3 == 40.0
+    assert later.cycle.started_at == _NOW_TS
+
+
+def test_only_a_restart_moves_the_start_of_the_year() -> None:
+    """A correction lowers a figure that still covers the year since
+    1 January, so it must leave the start alone: the sensors would move
+    their last reset with it, and Home Assistant would add the whole
+    corrected year on top of the old one."""
+    # The recorder takes back an admitted spike.
+    spiked = _anchored(130.0, 1000.0, cost=_bill(130.0), recorder_hwm=40.0)
+    assert _round(spiked, reading=1041.0, recorder_m3=41.0).cycle.started_at is None
+    # A frame built too high is rebuilt under the meter.
+    high = _anchored(5.0, 1500.0)
+    assert _round(high, reading=1400.0, hold_run=2, run_m3=1400.0).cycle.started_at is None
+    # The household changes, and the bill is rebuilt lower.
+    floored = _anchored(20.0, 80.0, cost=500.0)
+    assert _round(floored, reading=100.0, basis="social").cycle.started_at is None
+    # And a swap's start stands for the rest of its year.
+    swapped = _anchored(3.0, 12.0, started_at=_NOW_TS - _DAY_S)
+    assert _round(swapped, reading=16.0).cycle.started_at == _NOW_TS - _DAY_S
+
+
+def test_a_new_year_forgets_last_years_start() -> None:
+    last_year = _YtdCycle(meter=_METER, year=_YEAR - 1, m3=40.0, offset_m3=10.0, started_at=1.0)
+
+    out = _round(last_year, reading=4105.0)
+
+    assert out.cycle.started_at is None
 
 
 def test_a_repointed_meter_anchors_on_its_own_recorder_figure() -> None:
@@ -951,7 +996,7 @@ def test_migrating_a_record_that_is_already_current_changes_nothing() -> None:
 
     # Every key the record has grown since, or the rollback loses it and
     # the year comes back without what the recorder had reported for it.
-    full = {**current, "basis": "b", "recorder_hwm": 49.5, "seen_at": 1.0}
+    full = {**current, "basis": "b", "recorder_hwm": 49.5, "seen_at": 1.0, "started_at": 2.0}
 
     assert _migrate_cycle_to_v2(full) == full
 

@@ -23,13 +23,14 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""WaterSensor last_reset handling for TOTAL sensors that can decrease."""
+"""WaterSensor last_reset handling for the TOTAL year-to-date sensors."""
 
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, PropertyMock, patch
+from unittest.mock import AsyncMock, patch
 
 from homeassistant.util import dt as dt_util
 
@@ -65,54 +66,81 @@ def _sensor_with(key: str, coordinator: _StubCoordinator) -> WaterSensor:
     return WaterSensor(coordinator, desc)  # type: ignore[arg-type]
 
 
-def test_last_reset_advances_on_mid_cycle_drop() -> None:
+def _publish(sensor: WaterSensor, m3: float | None, started: datetime | None = None) -> None:
+    """Hand the sensor a coordinator round, as the coordinator does."""
+    sensor.coordinator.data = SimpleNamespace(  # type: ignore[assignment]
+        ytd_consumption_m3=m3, current_year_cost_eur=m3, ytd_started_at=started
+    )
+    with patch.object(WaterSensor, "async_write_ha_state"):
+        sensor._handle_coordinator_update()
+
+
+def test_a_correction_in_the_same_year_keeps_the_reset() -> None:
+    """A lower figure that still covers the year is not a new cycle.
+
+    A recorder taking back a spike, or the social tariff rebuilding the
+    bill, lowers the figure for the year since 1 January. Moving the
+    reset there made Home Assistant add the whole corrected year on top
+    of the old one: 437.56 + 87.51 in the long-term sum for a bill of
+    87.51.
+    """
+    for key in ("ytd_consumption", "current_year_cost"):
+        sensor = _sensor(key)
+        jan1 = _jan_1_local()
+        for value in (437.56, 87.51, 88.0):
+            _publish(sensor, value)
+            assert sensor.last_reset == jan1
+
+
+def test_a_restarted_year_moves_the_reset_to_its_start() -> None:
+    """A confirmed swap or a different meter restarts the figure, and the
+    reset follows the start the coordinator publishes for it."""
     sensor = _sensor("ytd_consumption")
     jan1 = _jan_1_local()
-    # A normal climb keeps last_reset at the calendar-year start.
-    sensor._note_value(10.0)
-    sensor._note_value(20.0)
+    _publish(sensor, 50.0)
     assert sensor.last_reset == jan1
-    # A meter swap floors YTD to 0 mid-year: last_reset moves past Jan 1 so
-    # HA opens a fresh statistics cycle instead of recording a negative delta.
-    sensor._note_value(0.0)
-    reset = sensor.last_reset
-    assert reset is not None and reset > jan1
-    # A subsequent climb keeps the new reset point (no further advance).
-    sensor._note_value(3.0)
-    assert sensor.last_reset == reset
+    swap = jan1 + timedelta(days=200)
+    _publish(sensor, 0.0, started=swap)
+    assert sensor.last_reset == swap
+    # A tick with no figure in between leaves the start where it was.
+    _publish(sensor, None, started=swap)
+    _publish(sensor, 3.0, started=swap)
+    assert sensor.last_reset == swap
 
 
-def test_a_drop_across_an_unknown_state_still_resets() -> None:
-    """An unknown state in between must not erase the comparison point.
+def test_the_reset_never_moves_back() -> None:
+    """Home Assistant opens a new cycle when last_reset moves back too.
 
-    The recorder skips a state that is not a number and measures the next
-    one against the last number it compiled. A tick with no meter at all
-    followed by a different meter's lower year used to go out under the
-    calendar-year reset, booked as a negative delta.
+    A start the coordinator could not restore must not take the reset
+    back to 1 January, which would count the year once more.
     """
     sensor = _sensor("ytd_consumption")
+    swap = _jan_1_local() + timedelta(days=200)
+    _publish(sensor, 0.0, started=swap)
+    _publish(sensor, 1.0)
+    assert sensor.last_reset == swap
+
+
+def test_last_years_start_gives_way_to_the_new_year() -> None:
+    sensor = _sensor("ytd_consumption")
     jan1 = _jan_1_local()
-    sensor._note_value(50.0)
-    sensor._note_value(None)
-    assert sensor._last_native == 50.0
-    sensor._note_value(0.5)
-    reset = sensor.last_reset
-    assert reset is not None and reset > jan1
+    _publish(sensor, 0.0, started=jan1 - timedelta(days=30))
+    assert sensor.last_reset == jan1
 
 
-async def test_the_drop_guard_survives_a_restart() -> None:
-    """A restart must not forget a drop, nor the value it was measured against.
+async def test_a_restored_reset_is_kept_as_a_floor() -> None:
+    """The reset this entity last went out under survives a restart.
 
-    Held only in memory, the guard came back empty: the recorded reset
-    point was lost, so the recorder saw the next figure as a negative
-    delta on a cycle that had already been closed, and the last value was
-    lost too, so a drop happening across the restart went unnoticed.
+    That includes one an earlier release moved on any fall: dropping it
+    on the upgrade would take last_reset back to 1 January, and the
+    statistics would count the year a second time.
     """
     sensor = _sensor("ytd_consumption")
     earlier = dt_util.now() - timedelta(days=3)
 
     class _Stored:
         def as_dict(self) -> dict[str, Any]:
+            # last_native is what an earlier release stored next to it.
             return {"reset_at": earlier.isoformat(), "last_native": 42.0}
 
     with (
@@ -121,102 +149,27 @@ async def test_the_drop_guard_survives_a_restart() -> None:
             "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
             AsyncMock(),
         ),
-        # The value the platform is about to write as the first state.
-        patch.object(WaterSensor, "native_value", new_callable=PropertyMock, return_value=1.0),
-    ):
-        await sensor.async_added_to_hass()
-
-    # The platform's first write follows straight away with no coordinator
-    # update in between, so the drop over the restart has to be recorded
-    # here rather than on the next update, or the reset moves twice.
-    assert sensor._reset_at is not None and sensor._reset_at > earlier
-    assert sensor._last_native == 1.0
-
-
-async def test_a_fresh_entity_judges_its_first_write_too() -> None:
-    """With nothing to restore, the first value went unrecorded.
-
-    A drop right after it, a meter swap on the entity's first day, was
-    then measured against nothing and published under the calendar-year
-    reset as a negative delta.
-    """
-    sensor = _sensor("ytd_consumption")
-    jan1 = _jan_1_local()
-    with (
-        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=None)),
-        patch(
-            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
-            AsyncMock(),
-        ),
-        patch.object(WaterSensor, "native_value", new_callable=PropertyMock, return_value=30.0),
-    ):
-        await sensor.async_added_to_hass()
-
-    assert sensor._last_native == 30.0
-    sensor._note_value(0.0)
-    reset = sensor.last_reset
-    assert reset is not None and reset > jan1
-
-
-async def test_a_restart_without_a_drop_keeps_the_recorded_reset() -> None:
-    sensor = _sensor("ytd_consumption")
-    earlier = dt_util.now() - timedelta(days=3)
-
-    class _Stored:
-        def as_dict(self) -> dict[str, Any]:
-            return {"reset_at": earlier.isoformat(), "last_native": 42.0}
-
-    with (
-        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=_Stored())),
-        patch(
-            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
-            AsyncMock(),
-        ),
-        patch.object(WaterSensor, "native_value", new_callable=PropertyMock, return_value=50.0),
     ):
         await sensor.async_added_to_hass()
 
     assert sensor._reset_at == earlier
-    assert sensor._last_native == 50.0
+    _publish(sensor, 1.0)
+    assert sensor.last_reset == earlier
 
 
-async def test_a_restart_with_no_value_yet_keeps_the_restored_comparison_point() -> None:
+def test_the_reset_is_handed_out_for_storage() -> None:
     sensor = _sensor("ytd_consumption")
-    earlier = dt_util.now() - timedelta(days=3)
-
-    class _Stored:
-        def as_dict(self) -> dict[str, Any]:
-            return {"reset_at": earlier.isoformat(), "last_native": 42.0}
-
-    with (
-        patch.object(WaterSensor, "async_get_last_extra_data", AsyncMock(return_value=_Stored())),
-        patch(
-            "homeassistant.helpers.update_coordinator.CoordinatorEntity.async_added_to_hass",
-            AsyncMock(),
-        ),
-    ):
-        await sensor.async_added_to_hass()
-
-    # Nothing to compare yet (no coordinator data): the restored value must
-    # survive so the first real figure is still measured against it.
-    assert sensor._reset_at == earlier
-    assert sensor._last_native == 42.0
-
-
-def test_the_guard_is_handed_out_for_storage() -> None:
-    sensor = _sensor("ytd_consumption")
-    sensor._note_value(10.0)
+    swap = _jan_1_local() + timedelta(days=200)
+    _publish(sensor, 10.0, started=swap)
     stored = sensor.extra_restore_state_data
     assert stored is not None
-    assert stored.as_dict()["last_native"] == 10.0
-    # A sensor with no drop guard has nothing to store.
+    assert stored.as_dict() == {"reset_at": swap.isoformat()}
+    # A sensor with no reset has nothing to store.
     assert _sensor("basis_rate").extra_restore_state_data is None
 
 
 def test_last_reset_none_for_non_total_sensor() -> None:
     sensor = _sensor("basis_rate")
-    sensor._note_value(5.0)
-    sensor._note_value(1.0)  # a drop, but no last_reset_fn -> untracked
     assert sensor.last_reset is None
 
 

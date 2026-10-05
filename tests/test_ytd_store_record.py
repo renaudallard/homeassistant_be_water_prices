@@ -119,6 +119,7 @@ def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
     assert old is not None
     assert old.recorder_hwm is None
     assert old.seen_at is None
+    assert old.started_at is None
 
 
 def test_the_new_keys_round_trip_through_the_record() -> None:
@@ -132,11 +133,13 @@ def test_the_new_keys_round_trip_through_the_record() -> None:
             "offset_m3": 1000.0,
             "recorder_hwm": 39.5,
             "seen_at": 1_760_000_000.0,
+            "started_at": 1_759_000_000.0,
         }
     )
     assert cycle is not None
     assert cycle.recorder_hwm == 39.5
     assert cycle.seen_at == 1_760_000_000.0
+    assert cycle.started_at == 1_759_000_000.0
 
 
 def test_when_the_meter_was_last_seen_survives_a_restart() -> None:

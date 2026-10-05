@@ -267,7 +267,7 @@ def _migrate_cycle_to_v2(old: dict[str, Any]) -> dict[str, Any]:
         kept: dict[str, Any] = {
             key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")
         }
-        for key in ("basis", "recorder_hwm", "seen_at"):
+        for key in ("basis", "recorder_hwm", "seen_at", "started_at"):
             # Carried when it is there, and not invented when it is not.
             # Rebuilding the dict without a key dropped it on every
             # rollback-and-upgrade: the floor lost its own provenance, and
@@ -394,6 +394,20 @@ class _YtdCycle:
     # the next real change instead, so what is persisted may trail the
     # figure in hand by however long the year sat still.
     seen_at: float | None = field(default=None, compare=False)
+    # When this cycle's figure started counting, as epoch seconds: the
+    # moment a confirmed swap or a different meter restarted the year.
+    # None is 1 January of ``year``. Persisted, because Home Assistant's
+    # statistics open a new cycle whenever a total's last_reset moves,
+    # backwards included, and a start forgotten over a restart would fall
+    # back to 1 January and count the year a second time.
+    started_at: float | None = None
+
+    @property
+    def started(self) -> datetime | None:
+        """``started_at`` as the moment the YTD sensors report as their reset."""
+        if self.started_at is None:
+            return None
+        return datetime.fromtimestamp(self.started_at, UTC)
 
 
 @dataclass(frozen=True)
@@ -474,8 +488,10 @@ def _fold(
         # Repointed at a different meter: its cumulative reading has nothing
         # to do with the old one's, so the record goes rather than being
         # reinterpreted. The year's figure restarts, which is the user's
-        # only escape from a meter that was wrong all along.
-        cycle = _YtdCycle(meter=meter)
+        # only escape from a meter that was wrong all along. A record that
+        # never had a meter is a first setup rather than a repoint, and its
+        # year is counted from 1 January like any other.
+        cycle = _YtdCycle(meter=meter, started_at=None if cycle.meter is None else now_ts)
         hold_m3 = None
         hold_run = 0
         hold_span_s = 0.0
@@ -493,6 +509,8 @@ def _fold(
     floor = cycle.cost if current and cycle.basis == basis else None
     offset = cycle.offset_m3 if current else None
     recorder_hwm = cycle.recorder_hwm if current else None
+    # A repointed record has no year yet and keeps the moment it restarted.
+    started_at = cycle.started_at if current or cycle.year is None else None
     if not current:
         hold_m3 = None
         hold_run = 0
@@ -603,6 +621,7 @@ def _fold(
                 # or the old mark resurrects itself through the comparison and
                 # the swap never takes effect.
                 swapped = True
+                started_at = now_ts
                 offset = reading
                 mark = 0.0
                 floor = None
@@ -862,6 +881,7 @@ def _fold(
             basis=basis,
             recorder_hwm=recorder_hwm,
             seen_at=seen_at,
+            started_at=started_at,
         ),
         published,
         cost,
@@ -934,6 +954,9 @@ class CoordinatorData:
     projected_annual_cost_eur: float | None = None
     current_year_cost_eur: float | None = None
     ytd_consumption_m3: float | None = None
+    # When the year-to-date figures above started counting, or None for
+    # 1 January: what the YTD sensors report as their last reset.
+    ytd_started_at: datetime | None = None
     year_figures: YearFigures = field(default_factory=YearFigures)
 
 
@@ -1115,6 +1138,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             projected_annual_cost_eur=self._project_cost(tariff),
             current_year_cost_eur=ytd_cost,
             ytd_consumption_m3=ytd_m3,
+            ytd_started_at=self._ytd.started,
             year_figures=self._year_figures(tariff, ytd_m3, ytd_cost),
         )
         self._last_good = data
@@ -1265,6 +1289,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             projected_annual_cost_eur=self._project_cost(tariff),
             current_year_cost_eur=ytd_cost,
             ytd_consumption_m3=ytd_m3,
+            ytd_started_at=self._ytd.started,
             year_figures=self._year_figures(tariff, ytd_m3, ytd_cost),
         )
         if card is not None:
@@ -1788,6 +1813,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "basis": self._ytd.basis,
             "recorder_hwm": self._ytd.recorder_hwm,
             "seen_at": self._ytd.seen_at,
+            "started_at": self._ytd.started_at,
         }
 
     def _fold_cycle(
@@ -2101,6 +2127,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self.data,
             ytd_consumption_m3=ytd_m3,
             current_year_cost_eur=ytd_cost,
+            ytd_started_at=self._ytd.started,
             year_figures=self._year_figures(self.data.tariff, ytd_m3, ytd_cost),
         )
         self.async_update_listeners()
@@ -2187,7 +2214,10 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         return None
     if year is not None and (isinstance(year, bool) or not isinstance(year, int)):
         return None
-    figures = {key: data.get(key) for key in ("m3", "cost", "offset_m3", "recorder_hwm", "seen_at")}
+    figures = {
+        key: data.get(key)
+        for key in ("m3", "cost", "offset_m3", "recorder_hwm", "seen_at", "started_at")
+    }
     if any(value is not None and _figure(value) is None for value in figures.values()):
         return None
     return _YtdCycle(
@@ -2204,6 +2234,7 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         # allowance back from the first reading rather than being handed
         # one on the strength of an unknown.
         seen_at=_figure(figures["seen_at"]),
+        started_at=_figure(figures["started_at"]),
     )
 
 

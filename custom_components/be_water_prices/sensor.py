@@ -372,23 +372,18 @@ def async_remove_inapplicable_entities(hass: HomeAssistant, entry: ConfigEntry) 
 
 @dataclass
 class _ResetGuardState(ExtraStoredData):
-    """The drop-guard's memory, kept across restarts.
+    """The last reset a figure went out under, kept across restarts.
 
-    Both halves matter. Without ``last_native`` the first value after a
-    restart has nothing to be compared against, so a drop that happens
-    over the restart goes unnoticed. Without ``reset_at`` the guard
-    forgets a drop it already recorded and hands the recorder a negative
-    delta for a cycle it had already closed.
+    Home Assistant's statistics open a new cycle whenever last_reset
+    moves, and moving it back counts as well. Kept as a floor, it stops
+    the reset going back over a restart: a cycle start the coordinator
+    could not restore, or one an earlier release recorded on its own.
     """
 
     reset_at: datetime | None
-    last_native: float | None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
-            "reset_at": self.reset_at.isoformat() if self.reset_at is not None else None,
-            "last_native": self.last_native,
-        }
+        return {"reset_at": self.reset_at.isoformat() if self.reset_at is not None else None}
 
 
 class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEntity):
@@ -404,19 +399,15 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
         self._attr_device_info = utility_device_info(coordinator)
-        # Timestamp of the last mid-cycle decrease for a TOTAL sensor, and
-        # the value it was measured against. See _handle_coordinator_update.
-        # Both are restored in async_added_to_hass so a restart neither
-        # forgets a drop already recorded nor misses one that happens while
-        # the entity is down.
+        # The last reset a figure of a TOTAL sensor went out under, restored
+        # in async_added_to_hass. See last_reset.
         self._reset_at: datetime | None = None
-        self._last_native: float | None = None
 
     @property
     def extra_restore_state_data(self) -> _ResetGuardState | None:
         if self.entity_description.last_reset_fn is None:
             return None
-        return _ResetGuardState(self._reset_at, self._last_native)
+        return _ResetGuardState(self._reset_at)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -424,47 +415,16 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
             return
         stored = await self.async_get_last_extra_data()
         if stored is not None:
-            data = stored.as_dict()
-            raw = data.get("reset_at")
+            raw = stored.as_dict().get("reset_at")
             if isinstance(raw, str):
                 self._reset_at = dt_util.parse_datetime(raw)
-            last = data.get("last_native")
-            if isinstance(last, (int, float)) and not isinstance(last, bool):
-                self._last_native = float(last)
-        # The platform writes the first state straight after this returns,
-        # without a coordinator update, so the guard has to judge that
-        # value here, restore data or not. Left to the next update, a drop
-        # over the restart went out under last year's last_reset and the
-        # reset then moved a second time inside the same cycle, which the
-        # statistics engine counts as another whole year; and with nothing
-        # restored the first value went unrecorded, so a drop right after
-        # it was not a drop at all.
-        value = self.native_value
-        if value is not None:
-            self._note_value(value)
-
-    def _note_value(self, value: float | None) -> None:
-        # A TOTAL sensor (current_year_cost / ytd_consumption) can legitimately
-        # decrease mid-cycle without crossing Jan 1: a meter swap floors YTD to
-        # ~0, or a tariff refresh lowers the running cost. HA only treats a drop
-        # as a reset for TOTAL_INCREASING; for plain TOTAL it records the drop as
-        # a negative long-term-statistics delta unless last_reset advances. Move
-        # last_reset to now on a decrease so HA opens a fresh cycle instead.
-        #
-        # An unknown state is not a value and does not replace the last one.
-        # The recorder skips it and measures the next number against the last
-        # number it compiled, so a drop across it is still a drop: forgetting
-        # the reference there let a meter change that went through a tick
-        # with no meter at all book the whole difference as a negative delta.
-        if self.entity_description.last_reset_fn is None or value is None:
-            return
-        if self._last_native is not None and value < self._last_native:
-            self._reset_at = dt_util.now()
-        self._last_native = value
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        self._note_value(self.native_value)
+        # An unknown state is skipped by the recorder, so only a figure
+        # fixes the reset it went out under.
+        if self.native_value is not None:
+            self._reset_at = self.last_reset
         super()._handle_coordinator_update()
 
     @property
@@ -478,13 +438,26 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
         fn = self.entity_description.last_reset_fn
         if fn is None:
             return None
-        # The later of the calendar-year start and the last mid-cycle drop.
-        # On the Jan 1 rollover fn() returns the new year start, which
-        # supersedes a stale prior-year drop timestamp.
-        base = fn()
-        if self._reset_at is not None and self._reset_at > base:
-            return self._reset_at
-        return base
+        # Only a year that really restarts moves the reset: 1 January, or the
+        # moment the coordinator restarted the figure on a confirmed meter
+        # swap or a different meter. Any other fall in the same year is a
+        # correction of a figure that still covers the year since 1 January,
+        # a recorder taking back a spike or a household change lowering the
+        # bill. Home Assistant books that as a negative change in the same
+        # cycle, so the long-term sum nets to the true figure; opening a new
+        # cycle instead added the whole corrected year on top of the old one.
+        #
+        # The reset last reported counts too, as a floor: moving last_reset
+        # back opens a new cycle as well. It and the coordinator's start both
+        # date from an earlier year once 1 January passes, so the new year
+        # supersedes them.
+        resets = [fn()]
+        data = self.coordinator.data
+        if data is not None and data.ytd_started_at is not None:
+            resets.append(data.ytd_started_at)
+        if self._reset_at is not None:
+            resets.append(self._reset_at)
+        return max(resets)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

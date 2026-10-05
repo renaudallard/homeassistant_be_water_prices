@@ -320,8 +320,8 @@ async def test_recorder_fallback_does_not_publish_below_the_live_mark(
 
     The recorder's daily total trails the live meter, so serving it raw
     after a dropout drops the m3 figure. That sensor is a TOTAL with a
-    Jan 1 last_reset, and the statistics engine reads a same-cycle
-    decrease as a reset, re-adding the whole figure to the long-term sum.
+    Jan 1 last_reset, and the statistics engine books a same-cycle
+    decrease as water given back, which a dip never was.
     """
     await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
@@ -1955,11 +1955,15 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
         await hass.async_block_till_done()
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert coordinator.data.ytd_consumption_m3 == 20.0
+        # The first meter ever is not a repoint: its year runs from 1 January.
+        assert coordinator.data.ytd_started_at is None
 
         discovered = "sensor.meter_b"
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 40.0
+        # A different meter restarts the year, from now.
+        assert coordinator.data.ytd_started_at is not None
 
         # The frame comes from meter_b's own figure: the 5000 it reported
         # during the query against the 40 that query answered. Built out of
@@ -3617,6 +3621,89 @@ async def test_a_replaced_meter_is_tracked_live_after_the_recorder_tick(
         recorder_has_statistic=False,
     )
     assert live == pytest.approx(64.1)
+
+
+@pytest.mark.asyncio
+async def test_a_swap_moves_the_sensors_reset_to_its_start(hass: HomeAssistant) -> None:
+    """A confirmed swap restarts the year, and the YTD sensors' reset with it.
+
+    The start goes out with the figures, which is where the sensors read
+    it, including from the live path that usually finds the swap. It is
+    persisted with the cycle too, so a restart does not take the reset
+    back to 1 January, which Home Assistant would count as another year.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.be_water_prices.coordinator import _cycle_from_record
+
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.states.async_set("sensor.water_meter", "1000.0")
+    failing = False
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        if failing:
+            raise ExtractorError("HTTP 503 from upstream")
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            AsyncMock(return_value=60.0),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = hass.data[DOMAIN][entry.entry_id]
+        entity_id = er.async_get(hass).async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_ytd_consumption"
+        )
+        assert entity_id is not None
+        jan1 = dt_util.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        def _last_reset() -> Any:
+            state = hass.states.get(entity_id)
+            assert state is not None
+            return dt_util.parse_datetime(state.attributes["last_reset"])
+
+        assert coordinator.data.ytd_consumption_m3 == 60.0
+        assert coordinator.data.ytd_started_at is None
+        assert _last_reset() == jan1
+
+        # Two low readings already seen far enough apart; this one confirms.
+        coordinator._ytd_hold_run = 2
+        coordinator._ytd_hold_span_s = 700.0
+        coordinator._ytd_run_m3 = 1.1
+        hass.states.async_set("sensor.water_meter", "1.2")
+        await hass.async_block_till_done()
+
+        assert coordinator.data.ytd_consumption_m3 == 0.0
+        started = coordinator.data.ytd_started_at
+        assert started is not None and started > jan1
+        assert _last_reset() == started
+        restored = _cycle_from_record(coordinator._cycle_state())
+        assert restored is not None and restored.started == started
+
+        # A round served from the held snapshot carries the start as well,
+        # so a tariff outage does not take the reset back to 1 January.
+        failing = True
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.last_error
+        assert coordinator.data.ytd_started_at == started
+        assert _last_reset() == started
 
 
 def test_both_halves_of_the_meter_path_accept_the_same_units() -> None:
