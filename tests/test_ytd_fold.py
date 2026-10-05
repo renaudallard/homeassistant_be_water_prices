@@ -1529,6 +1529,29 @@ def test_a_recorder_that_has_spoken_before_brings_the_year_back_down() -> None:
     assert out.cycle.recorder_hwm == 41.0
 
 
+def test_bringing_the_year_down_rebuilds_the_frame_under_the_recorder() -> None:
+    """Live tracking carries on from the corrected figure.
+
+    The test above folds a reading the frame already places at the
+    recorder's figure, so it cannot tell a rebuilt frame from the old one.
+    Here the frame still implies 130 m3 when the recorder says 41: left
+    alone, every live reading after the correction would land 89 m3 over
+    the year and be held or sent to arbitration, and the year would sit
+    at 41 until some later tick happened to rebuild the frame.
+    """
+    spiked = _anchored(130.0, 1000.0, cost=_bill(130.0), recorder_hwm=40.0)
+    out = _round(spiked, reading=1130.0, recorder_m3=41.0)
+
+    assert out.m3 == 41.0
+    assert out.cycle.offset_m3 == 1089.0  # 1130 - 41
+    assert out.high_m3 == 1130.0
+
+    later = _round(out.cycle, reading=1131.0, high_m3=out.high_m3)
+    assert later.m3 == 42.0
+    assert later.cost == _bill(42.0)
+    assert not later.arbitrate
+
+
 def test_a_dropout_tick_does_not_bring_the_year_down() -> None:
     """The frame is never rebuilt on a glitch value.
 
