@@ -440,12 +440,14 @@ class WaterSensor(CoordinatorEntity[WaterCoordinator], SensorEntity, RestoreEnti
             return None
         # Only a year that really restarts moves the reset: 1 January, or the
         # moment the coordinator restarted the figure on a confirmed meter
-        # swap or a different meter. Any other fall in the same year is a
-        # correction of a figure that still covers the year since 1 January,
-        # a recorder taking back a spike or a household change lowering the
-        # bill. Home Assistant books that as a negative change in the same
-        # cycle, so the long-term sum nets to the true figure; opening a new
-        # cycle instead added the whole corrected year on top of the old one.
+        # swap or a meter the recorder holds no statistics for. Any other
+        # fall in the same year is a correction of a figure that still covers
+        # the year since 1 January, a recorder taking back a spike or a
+        # household change lowering the bill, and so is whatever a switch to
+        # a meter the recorder does hold statistics for brings, up or down.
+        # Home Assistant books that as a change in the same cycle, so the
+        # long-term sum nets to the true figure; opening a new cycle instead
+        # added the whole corrected year on top of the old one.
         #
         # The reset last reported counts too, as a floor: moving last_reset
         # back opens a new cycle as well. It and the coordinator's start both

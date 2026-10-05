@@ -396,7 +396,8 @@ class _YtdCycle:
     # figure in hand by however long the year sat still.
     seen_at: float | None = field(default=None, compare=False)
     # When this cycle's figure started counting, as epoch seconds: the
-    # moment a confirmed swap or a different meter restarted the year.
+    # moment a confirmed swap, or a meter the recorder holds no statistics
+    # for, restarted the year.
     # None is 1 January of ``year``. Persisted, because Home Assistant's
     # statistics open a new cycle whenever a total's last_reset moves,
     # backwards included, and a start forgotten over a restart would fall
@@ -488,11 +489,10 @@ def _fold(
     if cycle.meter != meter:
         # Repointed at a different meter: its cumulative reading has nothing
         # to do with the old one's, so the record goes rather than being
-        # reinterpreted. The year's figure restarts, which is the user's
-        # only escape from a meter that was wrong all along. A record that
-        # never had a meter is a first setup rather than a repoint, and its
-        # year is counted from 1 January like any other.
-        cycle = _YtdCycle(meter=meter, started_at=None if cycle.meter is None else now_ts)
+        # reinterpreted. The year's figure is then rebuilt from the new
+        # meter alone, which is the user's only escape from a meter that
+        # was wrong all along.
+        cycle = _YtdCycle(meter=meter)
         hold_m3 = None
         hold_run = 0
         hold_span_s = 0.0
@@ -510,8 +510,19 @@ def _fold(
     floor = cycle.cost if current and cycle.basis == basis else None
     offset = cycle.offset_m3 if current else None
     recorder_hwm = cycle.recorder_hwm if current else None
-    # A repointed record has no year yet and keeps the moment it restarted.
-    started_at = cycle.started_at if current or cycle.year is None else None
+    started_at = cycle.started_at if current else None
+    if cycle.year is None and not recorder_has_statistic:
+        # A record with no year, a first setup or a repoint, only gets one
+        # from a recorder answer, so this is the round that says when its
+        # figure started. One the recorder holds statistics for carries on
+        # from 1 January: a rename moves them to the new id, and the year
+        # it reports is the same water, so a new cycle in Home Assistant's
+        # statistics would count it twice. One it holds none for starts
+        # empty here, and the water the year had summed before it has to
+        # stay in the sum rather than come back out as a negative change.
+        # A round that publishes nothing leaves the record as it found it,
+        # so the live path, which never asks the recorder, decides nothing.
+        started_at = now_ts
     if not current:
         hold_m3 = None
         hold_run = 0

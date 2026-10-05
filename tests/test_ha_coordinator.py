@@ -2005,15 +2005,16 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
         await hass.async_block_till_done()
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert coordinator.data.ytd_consumption_m3 == 20.0
-        # The first meter ever is not a repoint: its year runs from 1 January.
+        # The recorder holds meter_a's year, so it runs from 1 January.
         assert coordinator.data.ytd_started_at is None
 
         discovered = "sensor.meter_b"
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 40.0
-        # A different meter restarts the year, from now.
-        assert coordinator.data.ytd_started_at is not None
+        # And it holds meter_b's as well, so the switch keeps that start
+        # rather than opening a new cycle on the year it already counted.
+        assert coordinator.data.ytd_started_at is None
 
         # The frame comes from meter_b's own figure: the 5000 it reported
         # during the query against the 40 that query answered. Built out of

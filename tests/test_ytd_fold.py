@@ -820,20 +820,41 @@ def test_a_repointed_meter_does_not_inherit_the_old_frame() -> None:
     out = _round(_anchored(20.0, 80.0, cost=500.0), meter=_OTHER, reading=5000.0)
 
     assert out.m3 is None
-    # The year restarts on the new meter, from now.
-    assert out.cycle == _YtdCycle(meter=_OTHER, started_at=_NOW_TS)
+    # Nor does the live path decide when its year starts: it never asks
+    # the recorder whether the new meter has one.
+    assert out.cycle == _YtdCycle(meter=_OTHER)
 
 
-def test_a_repointed_year_keeps_its_start_once_it_has_a_figure() -> None:
+def test_a_repointed_year_starts_where_the_recorder_says() -> None:
     """The record a repoint leaves has no year, and the round that gives
-    it one must not take the start back to 1 January."""
-    repointed = _round(_anchored(20.0, 80.0), meter=_OTHER, reading=5000.0)
-    later = _round(
-        repointed.cycle, meter=_OTHER, reading=5000.0, recorder_m3=40.0, now_ts=_NOW_TS + 60.0
+    it one says when its figure started.
+
+    Picking a renamed meter again finds its statistics under the new id,
+    so the recorder reports the same year since 1 January and the start
+    stays there. Moving it to the repoint would have Home Assistant open
+    a new cycle and add the whole year to the sum a second time.
+    """
+    repointed = _round(_anchored(39.9, 1000.0), meter=_OTHER, reading=1040.2)
+    renamed = _round(
+        repointed.cycle, meter=_OTHER, reading=1040.2, recorder_m3=40.2, now_ts=_NOW_TS + 60.0
     )
 
-    assert later.m3 == 40.0
-    assert later.cycle.started_at == _NOW_TS
+    assert renamed.m3 == 40.2
+    assert renamed.cycle.started_at is None
+
+    # A meter the recorder holds no statistics for starts its year empty,
+    # from the round that found out.
+    unknown = _round(
+        repointed.cycle,
+        meter=_OTHER,
+        reading=1040.2,
+        recorder_m3=0.0,
+        recorder_has_statistic=False,
+        now_ts=_NOW_TS + 60.0,
+    )
+
+    assert unknown.m3 == 0.0
+    assert unknown.cycle.started_at == _NOW_TS + 60.0
 
 
 def test_only_a_restart_moves_the_start_of_the_year() -> None:

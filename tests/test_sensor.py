@@ -112,8 +112,9 @@ def test_a_correction_in_the_same_year_keeps_the_reset() -> None:
 
 @pytest.mark.usefixtures("_mid_july_in_brussels")
 def test_a_restarted_year_moves_the_reset_to_its_start() -> None:
-    """A confirmed swap or a different meter restarts the figure, and the
-    reset follows the start the coordinator publishes for it."""
+    """A confirmed swap, or a meter the recorder holds no statistics for,
+    restarts the figure, and the reset follows the start the coordinator
+    publishes for it."""
     sensor = _sensor("ytd_consumption")
     _publish(sensor, 50.0)
     assert sensor.last_reset == _JAN_1

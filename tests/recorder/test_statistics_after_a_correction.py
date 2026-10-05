@@ -51,6 +51,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 )
 
 from custom_components.be_water_prices.const import CONF_UTILITY
+from custom_components.be_water_prices.coordinator import _fold, _YtdCycle
 from custom_components.be_water_prices.sensor import SENSORS, WaterSensor
 
 _ENTITY = "sensor.vivaqua_current_year_cost"
@@ -82,12 +83,15 @@ async def _compile(
     sensor = _sensor()
     moment = datetime(2026, 10, 4, 7, 55, tzinfo=dt_util.get_default_time_zone())
     for value, started in rounds:
+        # Before the sensor sees the figure, which is when it fixes its
+        # reset: on the real clock 1 January of a later year would outrank
+        # every start these rounds publish, and no reset could ever move.
+        freezer.move_to(moment)
         sensor.coordinator.data = SimpleNamespace(
             current_year_cost_eur=value, ytd_started_at=started
         )
         with patch.object(WaterSensor, "async_write_ha_state"):
             sensor._handle_coordinator_update()
-        freezer.move_to(moment)
         reset = sensor.last_reset
         assert reset is not None
         hass.states.async_set(_ENTITY, str(value), {**_ATTRS, "last_reset": reset.isoformat()})
@@ -142,3 +146,67 @@ async def test_a_restarted_year_still_opens_a_new_cycle(
     total = await _compile(hass, freezer, [(0.0, None), (40.0, None), (0.0, swap), (2.0, swap)])
 
     assert total == pytest.approx(42.0)
+
+
+@pytest.mark.asyncio
+async def test_picking_a_renamed_meter_again_keeps_the_year_in_its_cycle(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any
+) -> None:
+    """The README says to pick the meter again after a rename.
+
+    Home Assistant moves the statistics to the new id, so the recorder
+    reports the same year since 1 January for it. A repoint that moved the
+    reset had the compiler add that year to the sum a second time. Here the
+    fold decides the figures and the start, at a stand-in price of 1 EUR a
+    cubic metre so the sum reads in water.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    assert await async_setup_component(hass, "sensor", {})
+    await hass.async_block_till_done()
+    moment = datetime(2026, 10, 4, 7, 55, tzinfo=dt_util.get_default_time_zone())
+    evidence: list[tuple[str, float, float | None]] = [
+        ("sensor.water_meter", 1000.0, 0.0),
+        ("sensor.water_meter", 1020.0, None),
+        ("sensor.water_meter", 1040.0, None),
+        ("sensor.renamed_meter", 1040.2, 40.2),
+        ("sensor.renamed_meter", 1040.3, None),
+    ]
+    cycle = _YtdCycle()
+    hold: dict[str, Any] = {
+        "hold_m3": None,
+        "hold_run": 0,
+        "hold_span_s": 0.0,
+        "run_m3": None,
+        "high_m3": None,
+    }
+    rounds: list[tuple[float, datetime | None]] = []
+    for hour, (meter, reading, recorder_m3) in enumerate(evidence):
+        out = _fold(
+            cycle,
+            now_year=2026,
+            meter=meter,
+            reading=reading,
+            recorder_m3=recorder_m3,
+            recorder_has_statistic=recorder_m3 is not None,
+            recorder_ok=None if recorder_m3 is None else True,
+            elapsed_s=3600.0,
+            now_ts=(moment + timedelta(hours=hour)).timestamp(),
+            after_swap=False,
+            basis="stand-in",
+            cost_of=lambda m3: m3,
+            **hold,
+        )
+        assert out.cost is not None
+        cycle = out.cycle
+        hold = {
+            "hold_m3": out.hold_m3,
+            "hold_run": out.hold_run,
+            "hold_span_s": out.hold_span_s,
+            "run_m3": out.run_m3,
+            "high_m3": out.high_m3,
+        }
+        rounds.append((out.cost, cycle.started))
+
+    total = await _compile(hass, freezer, rounds)
+
+    assert total == pytest.approx(40.3)
