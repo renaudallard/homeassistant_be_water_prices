@@ -48,6 +48,34 @@ def _row(day: date, *, change: float, state: float, total: float) -> dict[str, A
     }
 
 
+def _year_rows(
+    year: int,
+    m3: float,
+    *,
+    away: tuple[date, date] | None = None,
+    odd: dict[date, float] | None = None,
+    reset: date | None = None,
+) -> list[dict[str, Any]]:
+    """A bucket on each day of ``year`` drawing ``m3``, register and sum climbing.
+
+    A bucket on 20 December of the year before proves the meter predates
+    the year. No day inside ``away`` has a bucket, a day in ``odd`` draws
+    its own volume, and on ``reset`` the register restarts at that day's
+    change, the shape the recorder's reset arithmetic leaves behind.
+    """
+    register, running = 900.0, 800.0
+    rows = [_row(date(year - 1, 12, 20), change=1.0, state=register, total=running)]
+    day = date(year, 1, 1)
+    while day.year == year:
+        if away is None or not away[0] <= day <= away[1]:
+            change = (odd or {}).get(day, m3)
+            register = change if day == reset else register + change
+            running += change
+            rows.append(_row(day, change=change, state=register, total=running))
+        day += timedelta(days=1)
+    return rows
+
+
 async def test_a_day_whose_change_is_the_whole_register_is_not_water() -> None:
     """A meter that dipped to 0 and came back shows its register as one day's change.
 
@@ -162,11 +190,13 @@ async def test_ordinary_days_are_summed_in_full() -> None:
 
 
 async def test_a_metered_year_carrying_the_register_as_one_day_is_not_offered() -> None:
-    rows = [
-        _row(date(2025, 12, 15), change=0.3, state=3000.0, total=50.0),
-        _row(date(2026, 6, 1), change=3100.0, state=3100.0, total=3150.0),
-        _row(date(2026, 12, 15), change=0.2, state=3100.2, total=3150.2),
-    ]
+    """A same-day reset books the whole recovered register as the day's water.
+
+    An 80 m3 register is a day a household could draw, so the daily bound
+    lets it through and only the register's shape refuses the year.
+    """
+    reset = date(2026, 6, 1)
+    rows = _year_rows(2026, 0.25, odd={reset: 80.0}, reset=reset)
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await co._recorder_full_year_m3(None, "sensor.m", 2026) is None  # type: ignore[arg-type]
 
@@ -179,31 +209,26 @@ async def test_a_year_the_meter_was_away_for_is_still_offered() -> None:
     whatever consumption it typed at setup: at the 80 m3 default against a
     real 364, the projected cost understates by 4012 EUR on a Farys card.
     """
-    rows = [_row(date(2025, 12, 20), change=1.0, state=900.0, total=800.0)]
-    register, running = 901.0, 801.0
-    day = date(2026, 1, 1)
-    while day <= date(2026, 12, 31):
-        if date(2026, 1, 5) <= day < date(2026, 4, 20):
-            day += timedelta(days=1)  # away, so no bucket of its own
-            continue
-        change = 105.0 if day == date(2026, 4, 20) else 1.0
-        register += change
-        running += change
-        rows.append(_row(day, change=change, state=register, total=running))
-        day += timedelta(days=1)
-
+    rows = _year_rows(
+        2026,
+        1.0,
+        away=(date(2026, 1, 5), date(2026, 4, 19)),
+        odd={date(2026, 4, 20): 105.0},
+    )
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         total = await co._recorder_full_year_m3(None, "sensor.m", 2026)  # type: ignore[arg-type]
     assert total == 364.0
 
 
 async def test_a_register_carrying_its_own_total_is_refused_however_long_the_gap() -> None:
-    """The room a gap buys is a household's, so the teeth are still there."""
-    rows = [
-        _row(date(2025, 12, 20), change=1.0, state=900.0, total=800.0),
-        _row(date(2026, 6, 1), change=3100.0, state=5000.0, total=3900.0),
-        _row(date(2026, 12, 15), change=0.2, state=5000.2, total=3900.2),
-    ]
+    """The room a gap buys is a household's, so the teeth are still there.
+
+    The meter is away from March to May and the rest of the year covers
+    two days in three, so only the daily bound can refuse the 3100 m3 the
+    re-based register brings back with it.
+    """
+    away = (date(2026, 3, 1), date(2026, 5, 31))
+    rows = _year_rows(2026, 0.25, away=away, odd={date(2026, 6, 1): 3100.0})
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await co._recorder_full_year_m3(None, "sensor.m", 2026) is None  # type: ignore[arg-type]
 

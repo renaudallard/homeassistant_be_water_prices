@@ -246,9 +246,13 @@ async def test_a_meter_off_for_half_the_year_is_not_a_full_year(hass: HomeAssist
 
 @pytest.mark.asyncio
 async def test_meter_installed_mid_year_is_not_a_full_year(hass: HomeAssistant) -> None:
-    """A June-to-December figure is indistinguishable from a frugal year."""
+    """A March-to-December figure is indistinguishable from a frugal year.
+
+    A bucket every day from 10 March covers two days in three, so only
+    the missing history before the year tells it apart.
+    """
     await hass.config.async_set_time_zone("Europe/Brussels")
-    rows = _buckets([(date(2025, 6, 1), 20.0), (date(2025, 12, 20), 5.0)])
+    rows = _buckets(_daily(date(2025, 3, 10), date(2025, 12, 31), 0.25))
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
 
@@ -257,8 +261,13 @@ async def test_meter_installed_mid_year_is_not_a_full_year(hass: HomeAssistant) 
 async def test_meter_that_stopped_before_december_is_not_a_full_year(
     hass: HomeAssistant,
 ) -> None:
+    """A meter that went quiet on 30 September did not see the year out.
+
+    A bucket every day until then covers two days in three, so only the
+    missing December tells it apart from a whole year.
+    """
     await hass.config.async_set_time_zone("Europe/Brussels")
-    rows = _buckets([(date(2024, 12, 15), 3.0), (date(2025, 6, 1), 20.0)])
+    rows = _buckets([(date(2024, 12, 15), 3.0), *_daily(date(2025, 1, 1), date(2025, 9, 30), 0.25)])
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
 
@@ -267,11 +276,12 @@ async def test_meter_that_stopped_before_december_is_not_a_full_year(
 async def test_meter_swapped_mid_year_is_refused(hass: HomeAssistant) -> None:
     """A register that went backwards makes the deltas around it meaningless."""
     await hass.config.async_set_time_zone("Europe/Brussels")
+    swap = date(2025, 3, 1)
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),
-            (date(2025, 3, 1), -40.0),
-            (date(2025, 12, 20), 5.0),
+            *_daily(date(2025, 1, 1), date(2025, 12, 31), 0.25, (swap, swap)),
+            (swap, -40.0),
         ]
     )
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
