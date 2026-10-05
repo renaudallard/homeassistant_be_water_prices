@@ -1236,8 +1236,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         refresh is the entry's "not ready" reason.
         """
         if out_of_time:
-            # A bare TimeoutError, whose str() is empty. The parse thread
-            # it gave up on runs to completion on its own.
+            # A bare TimeoutError, whose str() is empty. A PDF parse it gave
+            # up on keeps its thread until the reader's own time limit kills
+            # the child, at most that long after the parse began.
             failure = ExtractorError(f"fetch did not finish within {FETCH_BUDGET_S} s")
         # The message quotes the URL it failed on, and a per-commune URL
         # carries the town name. The sensor attribute, diagnostics and the

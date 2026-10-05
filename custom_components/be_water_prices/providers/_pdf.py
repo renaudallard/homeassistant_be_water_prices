@@ -36,18 +36,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import os
 import re
+import subprocess
+import sys
 import unicodedata
 import zlib
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from io import BytesIO
 from urllib.parse import urlparse
 
 import aiohttp
 
-from ..const import INTEGRATION_VERSION
+from ..const import FETCH_BUDGET_S, INTEGRATION_VERSION
 from .base import ExtractorError, TransientFetchError
 
 _LOGGER = logging.getLogger(__name__)
@@ -221,9 +223,13 @@ _FILTER_KEY_RE = re.compile(
     b"/" + _name(b"F") + b"(?:" + _name(b"ilter") + b")?" + _NAME_END + rb"\s*"
 )
 # pdfminer's R makes a reference of the two tokens before it, whatever
-# they are, so a value is taken as read only when what follows cannot be
+# they are, so a value is taken as read only when the next token cannot be
 # the second of them: the end of the dictionary, or a name that neither
-# R nor a comment comes after.
+# R nor a comment comes after. That is one token of lookahead and no more.
+# An R that finds no integer drops both tokens it took, so a run of them
+# further on can still reach back and take the value, and no pattern here
+# follows that; the PDF reader's memory ceiling bounds what such a stream
+# inflates to.
 _KEPT = rb"(?=\s*(?:>>|/[^\s/\[\]()<>{}%]*+\s*+(?!%|R(?![^\s#/\[\]()<>{}%]))))"
 # The only values let through: Flate or JPEG spelled plainly, and an
 # integer alone, which is an annotation's flags rather than a filter.
@@ -299,6 +305,15 @@ def guard_pdf_streams(payload: bytes) -> None:
     opens one with the empty password and deciphers each stream before
     inflating it, out of this pass's sight.
 
+    This is a text pass over bytes that pdfminer parses, so it refuses the
+    shapes it can see and no more. A run of R tokens can take the filter
+    it checked off pdfminer's stack and leave another in its place, and an
+    "N G obj" spelled inside a stream's dictionary moves where the pass
+    thinks that dictionary starts, past its filter. What it misses is
+    bounded by the memory ceiling the reader runs under, in
+    :func:`extract_pdf_text_layout`; this pass turns the shapes it sees
+    into a clear message and keeps the child from being started for them.
+
     The pass is linear in the file: a keyword inside a stream's data is
     tried as a stream start and stops at the first byte that is not
     deflate, and the bytes fed to the decompressor over the whole pass may
@@ -357,17 +372,102 @@ def guard_pdf_streams(payload: bytes) -> None:
             raise ExtractorError("PDF streams overlap; refusing to read it")
 
 
+# What the PDF reader may allocate, and how long it may take. pdfplumber
+# runs in a child process held to these, since the stream guard cannot
+# follow pdfminer's parser everywhere and a bomb it misses would otherwise
+# be inflated in Home Assistant's own memory. RLIMIT_DATA, not RLIMIT_AS,
+# is the limit: Linux counts the heap and anonymous mappings against it
+# since 4.7, and it is near what the reader really uses. Measured on the
+# three cards on file and on a 2 MB card with eight pages of tables, the
+# smallest limit each one still reads under was 28, 28, 50 and 54 MiB
+# (RLIMIT_AS: 60, 60, 84 and 86 MiB), so the ceiling leaves several times
+# the largest. The time limit leaves a minute of the fetch budget for the
+# downloads ahead of the parse; the Pidpa card, the slowest on file,
+# reads in 14 s on a Raspberry Pi 4.
+PDF_READER_MEMORY_BYTES = 256 * 1024 * 1024
+PDF_READER_TIMEOUT_S = FETCH_BUDGET_S - 60
+
+# The child reads the PDF on stdin and writes its text on stdout. On a
+# failure it writes one line to stderr, the exception type and the first
+# line of its message, never the traceback, which can quote the page.
+# Nothing else may reach that pipe: pdfminer logs a warning for each
+# operator it cannot use, quoting the operand, and with no handler set they
+# go to stderr, which this process reads whole and the memory ceiling does
+# not bound, so a few kilobytes of bad operators shared by many pages would
+# grow Home Assistant by hundreds of megabytes. The child keeps a private
+# copy of the descriptor for its one line and points its own stderr at the
+# null device.
+# Without the resource module it runs uncapped rather than not at all, and
+# under a hard limit already below the ceiling it keeps that.
+_READER = """\
+import os
+import sys
+
+report = os.fdopen(os.dup(2), "w")
+null = os.open(os.devnull, os.O_WRONLY)
+os.dup2(null, 2)
+os.close(null)
+try:
+    import resource
+
+    resource.setrlimit(resource.RLIMIT_DATA, (int(sys.argv[1]),) * 2)
+except (ImportError, OSError, ValueError):
+    pass
+try:
+    import io
+
+    import pdfplumber
+
+    with pdfplumber.open(io.BytesIO(sys.stdin.buffer.read())) as pdf:
+        text = "\\n".join((page.dedupe_chars().extract_text() or "") for page in pdf.pages)
+except BaseException as err:
+    lines = str(err).splitlines()
+    name = type(err).__name__
+    report.write((f"{name}: {lines[0]}" if lines else name)[:200] + "\\n")
+    report.flush()
+    sys.exit(1)
+sys.stdout.buffer.write(text.encode("utf-8", "surrogatepass"))
+"""
+
+
 def extract_pdf_text_layout(payload: bytes) -> str:
-    """Extract PDF text via pdfplumber, preserving table layout."""
+    """Extract PDF text via pdfplumber, preserving table layout.
+
+    The reader runs in a child process under :data:`PDF_READER_MEMORY_BYTES`
+    and :data:`PDF_READER_TIMEOUT_S`, so a stream the guard let through
+    that inflates without end costs the child, not Home Assistant, and a
+    card that keeps the reader busy is killed rather than holding a thread
+    for as long as it likes. The time limit is per parse and shorter than
+    the fetch budget, but an extractor that falls back to last year's card
+    after a timeout starts a second parse, which can still be running when
+    the budget gives up on the fetch. The child imports pdfplumber
+    from wherever this process found it, Home Assistant's deps directory
+    included, through PYTHONPATH.
+    """
     payload = _strip_bom(payload)
     guard_pdf_streams(payload)
     try:
-        import pdfplumber
-
-        with pdfplumber.open(BytesIO(payload)) as pdf:
-            text = "\n".join((page.dedupe_chars().extract_text() or "") for page in pdf.pages)
-    except Exception as err:
-        raise ExtractorError(f"PDF layout parse error: {error_text(err)}") from err
+        child = subprocess.run(
+            [sys.executable, "-c", _READER, str(PDF_READER_MEMORY_BYTES)],
+            input=payload,
+            capture_output=True,
+            timeout=PDF_READER_TIMEOUT_S,
+            env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+            check=False,
+        )
+    except subprocess.TimeoutExpired as err:
+        raise ExtractorError(
+            f"the PDF took longer than {PDF_READER_TIMEOUT_S} s to read; gave up on it"
+        ) from err
+    except (OSError, ValueError) as err:
+        raise ExtractorError(f"could not start the PDF reader: {error_text(err)}") from err
+    if child.returncode < 0:
+        raise ExtractorError(f"the PDF reader was killed by signal {-child.returncode}")
+    if child.returncode:
+        lines = child.stderr.decode("utf-8", "replace").strip().splitlines()
+        reason = lines[-1] if lines else f"exit status {child.returncode}"
+        raise ExtractorError(f"PDF layout parse error: {reason}")
+    text = child.stdout.decode("utf-8", "surrogatepass")
     if not text.strip():
         # A PDF with no text layer, or none we can reach. Returning ""
         # sends the parser off to fail on a missing row, which points

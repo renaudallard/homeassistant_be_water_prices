@@ -803,9 +803,15 @@ when reporting an issue.
   reader, every stream in it is inflated with a bounded decompressor, and
   a card whose streams would grow past 64 MiB, that chains filters, names
   a filter other than Flate or JPEG, or writes its filter as anything but
-  a plain name (by reference, for instance) is refused, so a compromised
-  operator site cannot exhaust Home Assistant's memory with a small file.
-  An encrypted card cannot be checked that way,
+  a plain name (by reference, for instance) is refused. That pass reads
+  the file as text and refuses the shapes it can see; it cannot follow
+  the PDF reader's own parser everywhere. What bounds the rest is that
+  the reader runs in a child process held to 256 MiB of memory and
+  120 s, so a small file from a compromised operator site that inflates
+  without end, or keeps the reader busy, fails the fetch instead of
+  exhausting Home Assistant's memory, and no parse holds its thread
+  longer than that.
+  An encrypted card cannot be checked by the text pass,
   since its streams are deciphered only inside the reader, so it is
   refused too, even one that opens with an empty password and only
   restricts printing or copying. No card published today is encrypted; if

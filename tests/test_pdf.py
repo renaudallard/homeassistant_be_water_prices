@@ -615,6 +615,166 @@ def test_the_real_cards_pass_the_stream_guard() -> None:
         _pdf.guard_pdf_streams(fixture_bytes(name))
 
 
+def _deflated_spaces(mib: int) -> bytes:
+    """A zlib stream of ``mib`` MiB of spaces, built without holding them.
+
+    After a full flush the compressor starts afresh, so every further
+    megabyte compresses to the same bytes and is repeated rather than
+    compressed again; the checksum is worked out on the side.
+    """
+    import zlib
+
+    chunk = b" " * (1 << 20)
+    compressor = zlib.compressobj(9)
+    first = compressor.compress(chunk) + compressor.flush(zlib.Z_FULL_FLUSH)
+    again = compressor.compress(chunk) + compressor.flush(zlib.Z_FULL_FLUSH)
+    tail = compressor.flush()[:-4]
+    check = 1
+    for _ in range(mib):
+        check = zlib.adler32(chunk, check)
+    return first + again * (mib - 1) + tail + check.to_bytes(4, "big")
+
+
+def _bombs() -> list[tuple[bytes, bytes, tuple[bytes, ...]]]:
+    """Streams the text pass lets through that inflate to twice the reader's
+    memory ceiling: a run of R taking the checked filter off pdfminer's
+    stack, the same run turning an annotation's flags into a reference, an
+    "N G obj" in a string moving the dictionary's start past its filter,
+    and a hex wrapping that hides the deflate header from the pass."""
+    import zlib
+
+    inner = _deflated_spaces(2 * _pdf.PDF_READER_MEMORY_BYTES >> 20)
+    twice = zlib.compress(inner, 9)
+    hexed = inner.hex().encode() + b">"
+    return [
+        (b"<</Length %d/Filter/FlateDecode/X/Y/Z R R[/FlateDecode/FlateDecode]>>", twice, ()),
+        (b"<</Length %d/F 6/X/Y/Z R R>>", twice, (b"[/FlateDecode/FlateDecode]",)),
+        (b"<</Filter[/FlateDecode/FlateDecode]/Length %d/X(9 0 obj)>>", twice, ()),
+        (b"<</Length %d/F/FlateDecode/X/Y/Z R R[/ASCIIHexDecode/FlateDecode]>>", hexed, ()),
+    ]
+
+
+def test_a_bomb_the_stream_guard_misses_dies_in_the_reader_child() -> None:
+    """No pattern follows pdfminer's parser everywhere, so the guard passes
+    these, and each one used to be inflated in Home Assistant's own memory.
+    The reader's child runs out of its ceiling instead, and this process
+    never grows."""
+    import resource
+
+    for dictionary, body, extra in _bombs():
+        payload = _pdf_with_xref(dictionary % len(body), body, b"stream\n", extra=extra)
+        _pdf.guard_pdf_streams(payload)
+        before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        with pytest.raises(ExtractorError, match="PDF layout parse error") as err:
+            _pdf.extract_pdf_text_layout(payload)
+        grown = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - before
+        assert "allocate" in str(err.value) or "MemoryError" in str(err.value)
+        # ru_maxrss counts KiB on Linux.
+        assert grown < 8 * 1024
+
+
+def test_the_reader_childs_warnings_never_reach_this_process(monkeypatch: Any) -> None:
+    """pdfminer logs a warning quoting the operand for each operator it
+    cannot use, and with no handler those went to the child's stderr, which
+    this process read whole: two megabytes from this one small page, and
+    pages can share the stream. Only the child's one failure line may come
+    back."""
+    import subprocess
+    import zlib
+
+    content = zlib.compress((b"(" + b"A" * 10000 + b") w\n") * 200, 9)
+    payload = _pdf_with_xref(
+        b"<</Length %d/Filter/FlateDecode>>" % len(content), content, b"stream\n"
+    )
+    _pdf.guard_pdf_streams(payload)
+    received: list[int] = []
+    run = subprocess.run
+
+    def recording_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        child = run(*args, **kwargs)
+        received.append(len(child.stderr))
+        return child
+
+    monkeypatch.setattr(subprocess, "run", recording_run)
+    with pytest.raises(ExtractorError, match="no extractable text layer"):
+        _pdf.extract_pdf_text_layout(payload)
+    assert received == [0]
+
+
+# Each card is read twice, and the Pidpa card alone takes most of the
+# suite's 30 s per test on a Raspberry Pi.
+@pytest.mark.timeout(120)
+@pytest.mark.parametrize(
+    "name", ["aquaduin_2026.pdf", "water_link_2026.pdf", "pidpa_tariefplan_2025-2030.pdf"]
+)
+def test_the_real_cards_read_in_the_child_as_they_did_in_process(name: str) -> None:
+    import io
+
+    import pdfplumber
+
+    from tests import fixture_bytes
+
+    payload = fixture_bytes(name)
+    with pdfplumber.open(io.BytesIO(payload)) as pdf:
+        expected = "\n".join((p.dedupe_chars().extract_text() or "") for p in pdf.pages)
+    assert _pdf.extract_pdf_text_layout(payload) == expected
+
+
+def test_the_reader_child_finds_pdfplumber_where_this_process_did(monkeypatch: Any) -> None:
+    """Home Assistant installs pdfplumber in a deps directory it adds to its
+    own path, where a fresh interpreter would not look. A child started with
+    -S has no site-packages either, so it reads the card only through the
+    path handed down to it."""
+    import subprocess
+
+    from tests import fixture_bytes
+
+    run = subprocess.run
+
+    def run_without_site(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        return run([args[0], "-S", *args[1:]], **kwargs)
+
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    monkeypatch.setattr(subprocess, "run", run_without_site)
+    assert "Overzicht tarieven" in _pdf.extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
+
+
+def test_a_card_that_keeps_the_reader_busy_is_given_up_on(monkeypatch: Any) -> None:
+    """The fetch budget stopped waiting, but the parse thread ran on."""
+    from tests import fixture_bytes
+
+    monkeypatch.setattr(_pdf, "PDF_READER_TIMEOUT_S", 0.01)
+    with pytest.raises(ExtractorError, match=r"took longer than 0\.01 s"):
+        _pdf.extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
+
+
+def test_a_reader_that_cannot_start_or_dies_is_an_extractor_error(monkeypatch: Any) -> None:
+    import sys
+
+    from tests import fixture_bytes
+
+    payload = fixture_bytes("aquaduin_2026.pdf")
+    monkeypatch.setattr(_pdf, "_READER", "import os; os.abort()")
+    with pytest.raises(ExtractorError, match="killed by signal"):
+        _pdf.extract_pdf_text_layout(payload)
+    monkeypatch.setattr(_pdf, "_READER", "raise SystemExit(3)")
+    with pytest.raises(ExtractorError, match="exit status 3"):
+        _pdf.extract_pdf_text_layout(payload)
+    monkeypatch.setattr(sys, "executable", "/nonexistent/python")
+    with pytest.raises(ExtractorError, match="could not start the PDF reader"):
+        _pdf.extract_pdf_text_layout(payload)
+
+
+def test_a_reader_failure_names_the_error_and_not_the_traceback() -> None:
+    """Only the child's one line on stderr, the exception type and the
+    first line of its message, reaches last_error."""
+    with pytest.raises(ExtractorError) as err:
+        _pdf.extract_pdf_text_layout(b"%PDF-1.4 garbage")
+    assert str(err.value) == (
+        "PDF layout parse error: PdfminerException: No /Root object! - Is this really a PDF?"
+    )
+
+
 async def test_read_text_capped_survives_a_codec_without_a_replace_handler() -> None:
     """idna passes the codec lookup and then refuses errors="replace"."""
     resp = _FakeResp([b"caf\xc3\xa9 75,00 euro"], content_length=None, charset="idna")
