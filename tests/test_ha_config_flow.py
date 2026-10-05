@@ -890,6 +890,9 @@ async def test_reconfigure_commune_drops_stale_saved_when_no_longer_in_list(
             {CONF_POSTCODE: "9000"},  # resolves to Farys
         )
         assert result["step_id"] == "reconfigure_commune"
+        # Pre-filled, the stale id would be what the frontend submits,
+        # and the selector would reject it.
+        assert _suggested_commune(result) is None
         # User submits unchanged.
         result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
 
@@ -1092,6 +1095,34 @@ async def test_reconfigure_into_water_link_pre_fills_the_ring_commune(
         )
     assert result["step_id"] == "reconfigure_commune"
     assert _suggested_commune(result) == "Beveren-Kruibeke-Zwijndrecht"
+
+
+@pytest.mark.asyncio
+async def test_options_form_pre_fills_the_saved_commune_over_the_billed_one(
+    hass: HomeAssistant,
+) -> None:
+    """A 2070 household on Antwerpen opening Options must find Antwerpen,
+    not the ring row the postcode is billed on: saving the form untouched
+    would otherwise move it to another card."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water-link",
+        data={CONF_UTILITY: "water_link"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_POSTCODE: "2070",
+            CONF_COMMUNE: "Antwerpen",
+            CONF_COMMUNE_LABEL: "Antwerpen",
+        },
+        unique_id=f"{DOMAIN}_water_link",
+    )
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.be_water_prices.config_flow._async_communes",
+        return_value=_WATER_LINK_COMMUNES,
+    ):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert _suggested_commune(result) == "Antwerpen"
 
 
 @pytest.mark.asyncio
