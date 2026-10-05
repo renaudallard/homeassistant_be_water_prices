@@ -613,7 +613,14 @@ def _fold(
         hold_m3 = None
         if hold_run >= _SWAP_CONFIRM_READINGS and hold_span_s >= _SWAP_CONFIRM_SPAN_S:
             base = max(seen) if seen else None
-            if base is not None and reading >= base:
+            # A year with no frame whose figure the meter's own statistics
+            # gave, a first setup or a repoint, measures readings against
+            # that figure. Home Assistant's sum runs straight through a
+            # replacement, so a register fitted earlier in the year sits
+            # below it by everything the old one measured, and taking that
+            # for a swap restarted a year that had not restarted.
+            served_by_recorder = offset is None and recorder_hwm is not None
+            if base is not None and (reading >= base or served_by_recorder):
                 # The run is sustained, but the meter still shows more water
                 # than the year has used, so it cannot be the fresh register a
                 # replacement leaves behind. What it sits below is a frame
@@ -623,7 +630,9 @@ def _fold(
                 # already published instead of starting over. The figure the
                 # frame is rebuilt against is the one standing, so the round
                 # publishes what it already published; the recorder answer is
-                # kept, because it is still about this meter.
+                # kept, because it is still about this meter. A year served
+                # from the recorder gets the same frame under a register
+                # replaced earlier in the year, below zero if need be.
                 offset = reading - base
                 # Ask the recorder on the next tick, as the swap below
                 # does. A frame rebuilt this way reproduces the figure

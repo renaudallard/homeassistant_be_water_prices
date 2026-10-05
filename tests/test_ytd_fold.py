@@ -884,6 +884,37 @@ def test_a_new_year_forgets_last_years_start() -> None:
     assert out.cycle.started_at is None
 
 
+def test_a_register_replaced_earlier_in_the_year_is_framed_not_swapped() -> None:
+    """Picking a renamed meter again, or setting up over one replaced in
+    March, finds the recorder's year above anything the new register can
+    show, since Home Assistant's sum runs through the replacement. A run
+    of readings below it used to confirm a swap, publish 0 and restart the
+    year, which Home Assistant's statistics then counted a second time."""
+    tick = _round(_anchored(119.9, -100.0), meter=_OTHER, reading=20.0, recorder_m3=120.0)
+    assert tick.m3 == 120.0
+    out = tick
+    for step in range(1, 4):
+        out = _round(
+            out.cycle,
+            meter=_OTHER,
+            reading=20.0 + step / 100,
+            hold_run=out.hold_run,
+            hold_span_s=out.hold_span_s,
+            run_m3=out.run_m3,
+            elapsed_s=300.0,
+            high_m3=out.high_m3,
+        )
+        assert not out.swapped
+        assert out.cycle.started_at is None
+    # The tick's reading opened the run, so the third reading framed the
+    # register under the year and the fourth carries it on.
+    assert out.cycle.offset_m3 == pytest.approx(20.02 - 120.0)
+    assert out.m3 == pytest.approx(120.01)
+
+    climbing = _round(out.cycle, meter=_OTHER, reading=20.5, high_m3=out.high_m3)
+    assert climbing.m3 == pytest.approx(20.5 - (20.02 - 120.0))
+
+
 def test_a_repointed_meter_anchors_on_its_own_recorder_figure() -> None:
     out = _round(_anchored(20.0, 80.0), meter=_OTHER, reading=5000.0, recorder_m3=40.0)
 
