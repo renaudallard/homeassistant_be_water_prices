@@ -254,6 +254,13 @@ _CLOSER = {b"<<": b">>", b"[": b"]", b"{": b"}"}
 _STRING_SYNTAX_RE = re.compile(rb"\\.|[()]", re.DOTALL)
 _HEX_STRING_END_RE = re.compile(rb"[^\s0-9A-Fa-f]")
 _COMMENT_END_RE = re.compile(rb"[\r\n]")
+# How many brackets, strings and comments the walk below follows in one
+# head before reading the whole head instead. The stream dictionaries on
+# file hold at most a dozen; a head made of millions of stray brackets cost
+# a minute and two gigabytes inside Home Assistant before the reader child
+# ever started. Reading the whole head finds every key the walk would, and
+# nested ones too, so past the cap a card can only be refused more often.
+_MAX_DICT_SYNTAX = 4096
 
 
 def _string_end(head: bytes, position: int) -> int:
@@ -281,13 +288,17 @@ def _outer_spans(head: bytes) -> list[tuple[int, int]]:
     same way. Its reading holds only once everything the head opens is
     closed: pdfminer takes the object that closed last before "stream",
     which is a nested one while the outer is still open, so a head left
-    open is read whole.
+    open is read whole, and so is one with more than
+    :data:`_MAX_DICT_SYNTAX` brackets, strings and comments in it.
     """
     spans = []
     # The closing bracket each open dictionary, array or procedure waits for.
     waiting: list[bytes] = []
     start = position = 0
-    while (syntax := _DICT_SYNTAX_RE.search(head, position)) is not None:
+    for _ in range(_MAX_DICT_SYNTAX):
+        syntax = _DICT_SYNTAX_RE.search(head, position)
+        if syntax is None:
+            break
         if not waiting or waiting == [b">>"]:
             spans.append((start, syntax.start()))
         position = syntax.end()
@@ -303,6 +314,8 @@ def _outer_spans(head: bytes) -> list[tuple[int, int]]:
         elif waiting and waiting[-1] == token:
             waiting.pop()
         start = position
+    else:
+        return [(0, len(head))]
     if waiting:
         return [(0, len(head))]
     spans.append((start, len(head)))

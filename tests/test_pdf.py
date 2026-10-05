@@ -531,6 +531,30 @@ def test_filter_keys_inside_nested_dictionaries_are_not_the_stream_s(own_filter:
     _pdf.guard_pdf_streams(payload)
 
 
+def test_a_head_full_of_stray_brackets_is_read_whole_and_cheaply() -> None:
+    """Two million stray brackets cost a few hundred megabytes and several
+    seconds inside Home Assistant when the walk followed every one of them;
+    past its cap the head is read whole in one pass."""
+    import resource
+
+    payload = _pdf_with_stream(b"<<" + b"]" * (2 * 1024 * 1024) + b">>", b"x")
+    before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    _pdf.guard_pdf_streams(payload)
+    grown_kib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - before
+    assert grown_kib < 64 * 1024
+
+
+def test_a_head_past_the_walk_s_cap_counts_nested_filter_keys_too() -> None:
+    """Read whole, a head finds the nested /F the walk would have left out,
+    so the cap can only refuse a card, never let one through."""
+    nested = b"/Resources<</Font<</F 5 0 R>>>>"
+    filler = b"[]" * _pdf._MAX_DICT_SYNTAX
+    payload = _pdf_with_stream(b"<<%s/Filter/FlateDecode%s>>" % (nested, filler), b"x")
+    with pytest.raises(ExtractorError, match="more than one filter"):
+        _pdf.guard_pdf_streams(payload)
+    _pdf.guard_pdf_streams(_pdf_with_stream(b"<<%s/Filter/FlateDecode>>" % nested, b"x"))
+
+
 @pytest.mark.parametrize(
     "before",
     [
