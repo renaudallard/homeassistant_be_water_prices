@@ -45,7 +45,10 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
+    CONF_COMMUNE,
     CONF_CONSUMPTION_M3_PER_YEAR,
+    CONF_PERSONS,
+    CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -543,6 +546,37 @@ async def test_fix_flow_writes_the_measured_year_into_the_options(
         await hass.async_block_till_done()
 
     assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 131
+
+
+@pytest.mark.asyncio
+async def test_fix_flow_keeps_the_other_options(hass: HomeAssistant) -> None:
+    """Writing the measured year must not drop the rest of the household.
+
+    Losing persons, the social tariff, the commune or the meter would bill
+    the entry as one resident on the operator default from then on.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    others = {
+        CONF_PERSONS: 3,
+        CONF_SOCIAL_TARIFF: True,
+        CONF_COMMUNE: "gent",
+        CONF_WATER_METER_SENSOR: "sensor.water_meter",
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, **others},
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+    flow = ProjectionOutdatedRepairFlow(entry_id=entry.entry_id, consumption_m3=131)
+    flow.hass = hass
+    flow.handler = DOMAIN
+    flow.issue_id = f"projection_outdated_{entry.entry_id}"
+    result = await flow.async_step_confirm({})
+    assert result["type"] == "create_entry"
+    assert dict(entry.options) == {CONF_CONSUMPTION_M3_PER_YEAR: 131, **others}
 
 
 @pytest.mark.asyncio

@@ -252,6 +252,40 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
 
 
 @pytest.mark.asyncio
+async def test_opening_the_stale_card_does_not_refresh(hass: HomeAssistant) -> None:
+    """Going through the real manager must show the form, not retry at once.
+
+    The manager hands the flow the issue id as init data, so a first step
+    that read any dict as a submission would run the refresh as soon as
+    the card is opened and abort without ever showing the form.
+    """
+    from homeassistant.setup import async_setup_component
+
+    assert await async_setup_component(hass, "repairs", {})
+    yesterday = belgian_today() - timedelta(days=1)
+    fetches = 0
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        nonlocal fetches
+        fetches += 1
+        return _this_years_card(yesterday)
+
+    entry = await _setup_entry(hass, _fetch)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
+    before = fetches
+
+    result = await hass.data["repairs"]["flow_manager"].async_init(
+        DOMAIN, data={"issue_id": coordinator.stale_issue_id}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "confirm"
+    assert fetches == before
+
+
+@pytest.mark.asyncio
 async def test_one_absurd_reading_does_not_pin_the_year(hass: HomeAssistant) -> None:
     """A lone garbage spike must not become the year's high-water mark.
 
@@ -1423,10 +1457,26 @@ async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None
     coordinator = hass.data[DOMAIN][entry.entry_id]
     issue_reg = ir.async_get(hass)
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
+    # The meter and postcode cards need their own setups to come up, and
+    # only their removal is under test here, so raise them by hand.
+    for issue_id, key in (
+        (coordinator.several_meters_issue_id, "several_water_meters"),
+        (coordinator.operator_issue_id, "operator_moved"),
+    ):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=key,
+        )
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
+    assert issue_reg.async_get_issue(DOMAIN, coordinator.several_meters_issue_id) is None
+    assert issue_reg.async_get_issue(DOMAIN, coordinator.operator_issue_id) is None
 
 
 @pytest.mark.asyncio
