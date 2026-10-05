@@ -50,6 +50,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
+    CONF_PERSONS,
+    CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -63,6 +65,7 @@ from custom_components.be_water_prices.coordinator import (
     _rolling_year_m3,
 )
 from custom_components.be_water_prices.pricing import compute_annual_cost, compute_ytd_cost
+from custom_components.be_water_prices.providers._flanders import build_flanders_tariff
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 
 _ROWS = "custom_components.be_water_prices.coordinator._recorder_daily_rows"
@@ -194,23 +197,28 @@ async def _setup_entry(
     rows: Any,
     ytd: AsyncMock | None = None,
     full_year: AsyncMock | None = None,
+    card: WaterTariff | None = None,
+    options: dict[str, Any] | None = None,
 ) -> MockConfigEntry:
     """Set an entry up on a meter at 100 m³ whose year so far is 20 m³,
-    or whatever ``ytd`` has the recorder say."""
+    or whatever ``ytd`` has the recorder say, on ``card`` or the Brussels
+    one, with ``options`` laid over the defaults."""
+    card = card or _tariff()
     await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="VIVAQUA",
-        data={CONF_UTILITY: "vivaqua"},
+        title=card.utility.upper(),
+        data={CONF_UTILITY: card.utility},
         options={
             CONF_CONSUMPTION_M3_PER_YEAR: 80,
             CONF_WATER_METER_SENSOR: "sensor.water_meter",
+            **(options or {}),
         },
-        unique_id=f"{DOMAIN}_vivaqua",
+        unique_id=f"{DOMAIN}_{card.utility}",
     )
     entry.add_to_hass(hass)
-    with _card_and_recorder(rows, ytd, full_year):
+    with _card_and_recorder(rows, ytd, full_year, card):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     return entry
@@ -218,14 +226,20 @@ async def _setup_entry(
 
 @contextmanager
 def _card_and_recorder(
-    rows: Any, ytd: AsyncMock | None = None, full_year: AsyncMock | None = None
+    rows: Any,
+    ytd: AsyncMock | None = None,
+    full_year: AsyncMock | None = None,
+    card: WaterTariff | None = None,
 ) -> Iterator[None]:
     """The card a setup fetches and the recorder it reads."""
+    card = card or _tariff()
 
     async def _fetch(_session: Any) -> WaterTariff:
-        return _tariff()
+        return card
 
-    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    fake = WaterExtractor(
+        id=card.utility, label=card.utility.upper(), region=card.region, fetch=_fetch
+    )
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(_YTD, new=ytd or AsyncMock(return_value=20.0)),
@@ -235,8 +249,8 @@ def _card_and_recorder(
         yield
 
 
-def _state(hass: HomeAssistant, key: str) -> float:
-    state = hass.states.get(f"sensor.vivaqua_{key}")
+def _state(hass: HomeAssistant, key: str, utility: str = "vivaqua") -> float:
+    state = hass.states.get(f"sensor.{utility}_{key}")
     assert state is not None
     return float(state.state)
 
@@ -251,6 +265,52 @@ async def test_the_four_sensors_publish_the_meters_year(hass: HomeAssistant, fre
     assert _state(hass, "projected_year_consumption") == pytest.approx(20.0 + 26.75)
     assert _state(hass, "projected_year_end_cost") == compute_annual_cost(tariff, 46.75, 1)
     assert _state(hass, "projected_year_end_cost") == 139.34
+
+
+@pytest.mark.asyncio
+async def test_a_flemish_household_is_billed_on_its_own_options(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """Brussels prices neither persons nor the social tariff, and 80 m³ is
+    the default consumption, so only a Flemish card with all three moved
+    shows that the household's options reach the bill.
+
+    The figures are worked out by hand from the VMM rules. Three residents
+    give a basis volume of 30 + 3 x 30 = 120 m³, billed at 2.00 + 0.60 +
+    1.00 = 3.60 EUR/m³, and the comfort volume above it pays double, 7.20
+    EUR/m³. The vastrecht of 100 EUR less 20 EUR per resident is 40 EUR,
+    of which the year so far carries 258/365. VAT is 6 % and the social
+    tariff takes 80 % off the total.
+    """
+    freezer.move_to(_NOW)
+    card = build_flanders_tariff(
+        utility_id="pidpa",
+        year=2026,
+        publication_label="Pidpa test",
+        source_url="https://example.invalid/",
+        basis=2.0,
+        comfort=4.0,
+        sanering_gemeentelijk=0.6,
+        sanering_bovengemeentelijk=1.0,
+    )
+    await _setup_entry(
+        hass,
+        AsyncMock(return_value=_a_year_of_water()),
+        card=card,
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 150,
+            CONF_PERSONS: 3,
+            CONF_SOCIAL_TARIFF: True,
+        },
+    )
+    # (120 x 3.60 + 30 x 7.20 + 40) x 1.06 x 0.20 = 145.856
+    assert _state(hass, "projected_annual_cost", "pidpa") == 145.86
+    # (20 x 3.60 + 40 x 258 / 365) x 1.06 x 0.20 = 21.258
+    assert _state(hass, "current_year_cost", "pidpa") == 21.26
+    # (91.25 x 3.60 + 40) x 1.06 x 0.20 = 78.122
+    assert _state(hass, "rolling_year_cost", "pidpa") == 78.12
+    # (46.75 x 3.60 + 40) x 1.06 x 0.20 = 44.1596
+    assert _state(hass, "projected_year_end_cost", "pidpa") == 44.16
 
 
 @pytest.mark.asyncio
