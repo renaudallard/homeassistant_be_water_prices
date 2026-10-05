@@ -1069,7 +1069,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # above and this return is the window a live meter event uses
             # to publish a higher figure that the locals here would then
             # overwrite with a lower one.
-            self.hass.async_create_task(self._async_rewrite_price_history())
+            #
+            # Not started eagerly: the gate and the writer read
+            # coordinator.data, which Home Assistant only replaces with
+            # what this returns once it has returned. An eager start ran
+            # them against the previous snapshot, so the tick that first
+            # fetched a new card compared the old card year, found the
+            # gate matching and left the price line alone for a day.
+            self.hass.async_create_task(self._async_rewrite_price_history(), eager_start=False)
         return data
 
     async def _async_rewrite_price_history(self) -> None:

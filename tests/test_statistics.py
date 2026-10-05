@@ -653,49 +653,66 @@ async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
 
     Publishers run late and last year's card stands until 31 March, so
     January's flat line goes in at last year's rate. An install that does
-    not restart between January and the new card landing kept it.
+    not restart between January and the new card landing kept it. Once the
+    tick did check the gate, it ran before the refresh had published its
+    result and compared the previous card's year, so the new card waited
+    another day.
     """
     from datetime import date
 
     from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+    from custom_components.be_water_prices.statistics import DATA_BACKFILL_YEAR
 
-    calls: list[str] = []
-    card_year = 2025
+    written: list[tuple[int, float | None]] = []
+    # Tied to the clock so the card never runs past its validity and
+    # marks the snapshot stale, which would hold the gate shut.
+    year = dt_util.now().year
+    card_year = year - 1
 
     async def _fetch(_session: Any) -> WaterTariff:
         return WaterTariff(
             utility="vivaqua",
             region="brussels",
             valid_from=date(card_year, 1, 1),
-            valid_until=date(2026, 12, 31),
+            valid_until=date(year, 12, 31),
             publication_label=f"VIVAQUA {card_year}",
             source_url="https://example.invalid/",
             yearly_fixed_fee=40.0,
-            linear_eur_per_m3=2.0,
+            linear_eur_per_m3=2.0 if card_year == year - 1 else 3.0,
         )
 
     entry = _entry(hass)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
 
-    async def _backfill(*_a: Any, **_k: Any) -> None:
-        calls.append("backfill")
+    async def _backfill(hass_: HomeAssistant, entry_: Any, **_k: Any) -> int:
+        tariff = hass_.data[DOMAIN][entry_.entry_id].data.tariff
+        written.append((tariff.valid_from.year, tariff.linear_eur_per_m3))
+        return 99
 
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.statistics.async_maybe_backfill_once",
+            "custom_components.be_water_prices.statistics.async_backfill_prices",
             new=_backfill,
+        ),
+        # Stamping the gate reloads the entry, and the reload's own setup
+        # would catch up on the card. Only the tick is under test here.
+        patch(
+            "custom_components.be_water_prices._async_update_listener",
+            new=AsyncMock(),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         # Setup ran it once; the first refresh inside setup must not.
-        assert calls == ["backfill"], calls
+        assert written == [(year - 1, 2.0)], written
+        assert entry.data[DATA_BACKFILL_YEAR] == f"{year}:vivaqua:{year - 1}:None"
 
         # The operator finally publishes, and the daily tick picks it up.
-        card_year = 2026
+        card_year = year
         coordinator = hass.data[DOMAIN][entry.entry_id]
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    assert calls == ["backfill", "backfill"], calls
+    assert written == [(year - 1, 2.0), (year, 3.0)], written
+    assert entry.data[DATA_BACKFILL_YEAR] == f"{year}:vivaqua:{year}:None"

@@ -652,8 +652,9 @@ saneringsbijdrage is a commune's own number, so `sewerage_rate` and
 finally publishes the new card: publishers run late, last year's card
 stands until 31 March, and without the card year in the gate January's
 line kept last year's rate for good. The
-daily tick checks the gate too, so an install that never restarts
-between January and the card landing still gets the rewrite. If the
+daily tick checks the gate too, against the card it has just fetched, so
+an install that never restarts between January and the card landing gets
+the rewrite on the tick that brings the card in. If the
 snapshot is stale it waits instead, so a year is never filled in with
 rates that had already expired. The window also stops at the tariff's own
 `valid_until`. The meter-driven sensors
