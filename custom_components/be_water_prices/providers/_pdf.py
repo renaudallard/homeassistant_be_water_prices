@@ -446,17 +446,22 @@ def extract_pdf_text_layout(payload: bytes) -> str:
     after a timeout starts a second parse, which can still be running when
     the budget gives up on the fetch. The child imports pdfplumber
     from wherever this process found it, Home Assistant's deps directory
-    included, through PYTHONPATH.
+    included, through PYTHONPATH, and never from its working directory.
     """
     payload = _strip_bom(payload)
     guard_pdf_streams(payload)
+    # Home Assistant runs from its config directory and starts with -P so
+    # that a stray module there cannot shadow an import. The child is
+    # started the same way, and an empty or "." entry in the path handed
+    # down would put that directory back, so those are left out.
+    path = os.pathsep.join(entry for entry in sys.path if entry not in ("", "."))
     try:
         child = subprocess.run(
-            [sys.executable, "-c", _READER, str(PDF_READER_MEMORY_BYTES)],
+            [sys.executable, "-P", "-c", _READER, str(PDF_READER_MEMORY_BYTES)],
             input=payload,
             capture_output=True,
             timeout=PDF_READER_TIMEOUT_S,
-            env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path), "PYTHONMALLOC": "malloc"},
+            env={**os.environ, "PYTHONPATH": path, "PYTHONMALLOC": "malloc"},
             check=False,
         )
     except subprocess.TimeoutExpired as err:

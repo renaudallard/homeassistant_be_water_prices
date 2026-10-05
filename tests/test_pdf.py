@@ -744,6 +744,24 @@ def test_the_reader_child_finds_pdfplumber_where_this_process_did(monkeypatch: A
     assert "Overzicht tarieven" in _pdf.extract_pdf_text_layout(fixture_bytes("aquaduin_2026.pdf"))
 
 
+def test_a_module_in_the_working_directory_never_shadows_the_readers_imports(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
+    """Home Assistant runs from its config directory with -P, so a stray
+    pdfplumber.py there is not imported. A child started with -c put that
+    directory first on its path, and an empty or "." entry in the path
+    handed down to it would do the same."""
+    import sys
+
+    from tests import fixture_bytes
+
+    payload = fixture_bytes("aquaduin_2026.pdf")
+    (tmp_path / "pdfplumber.py").write_text('raise RuntimeError("shadowed")\n')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "path", ["", ".", *sys.path])
+    assert "Overzicht tarieven" in _pdf.extract_pdf_text_layout(payload)
+
+
 def test_the_reader_child_reads_a_card_under_home_assistants_allocator(monkeypatch: Any) -> None:
     """Home Assistant OS and Container export PYTHONMALLOC=mimalloc, whose
     arena alone is past the reader's memory ceiling, so a child that kept
