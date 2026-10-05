@@ -789,3 +789,132 @@ async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
 
     assert written == [(year - 1, 2.0), (year, 3.0)], written
     assert entry.data[DATA_BACKFILL_YEAR] == f"{year}:vivaqua:{year}:None"
+
+
+async def _backfill_a_metered_entry(
+    hass: HomeAssistant, freezer: Any, *, clear: bool
+) -> tuple[int, list[tuple[str, Any]]]:
+    """Backfill a Brussels entry in October that has every sensor and a meter.
+
+    The card runs to 31 December, the recorder's newest run marker lags an
+    hour behind the clock, and every meter-driven figure carries a value,
+    so only the key filter keeps those sensors out. Returns the row count
+    and the recorder calls in the order they were made.
+    """
+    from datetime import UTC, date, datetime
+
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    from custom_components.be_water_prices.coordinator import CoordinatorData, YearFigures
+    from custom_components.be_water_prices.sensor import SENSORS
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    freezer.move_to("2026-10-04 20:30:00+00:00")
+    entry = _entry(hass)
+    data = CoordinatorData(
+        tariff=_fresh_tariff(valid_until=date(2026, 12, 31)),
+        fetched_at=datetime.now(UTC),
+        snapshot_age_hours=0.0,
+        snapshot_stale=False,
+        projected_annual_cost_eur=300.0,
+        current_year_cost_eur=50.0,
+        ytd_consumption_m3=20.0,
+        year_figures=YearFigures(
+            rolling_m3=80.0,
+            rolling_cost_eur=310.0,
+            projected_m3=78.0,
+            projected_end_cost_eur=305.0,
+        ),
+    )
+    # A meter-driven sensor with no value is skipped before the key filter
+    # is reached, and the test would then pass with the filter gone. Only
+    # the comfort rate, which Brussels does not have, may be empty.
+    for desc in SENSORS:
+        if desc.key != "comfort_rate":
+            assert desc.value_fn(data) is not None, desc.key
+    coordinator = MagicMock()
+    coordinator.data = data
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    ent_reg = er.async_get(hass)
+    for desc in SENSORS:
+        ent_reg.async_get_or_create(
+            "sensor", DOMAIN, f"{entry.entry_id}_{desc.key}", suggested_object_id=f"v_{desc.key}"
+        )
+
+    calls: list[tuple[str, Any]] = []
+    recorder = MagicMock()
+    recorder.async_add_executor_job = AsyncMock(
+        return_value=datetime(2026, 10, 4, 18, 55, tzinfo=UTC)
+    )
+    recorder.async_clear_statistics = lambda ids: calls.append(("clear", ids))
+    hass.data[DATA_INSTANCE] = recorder
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch(
+            "homeassistant.components.recorder.statistics.async_import_statistics",
+            side_effect=lambda _h, meta, rows: calls.append(("import", (meta, rows))),
+        ),
+    ):
+        rows = await async_backfill_prices(hass, entry, start=datetime(2026, 3, 15), clear=clear)
+    return rows, calls
+
+
+async def test_the_backfill_writes_only_the_card_s_rates_up_to_the_compiled_hour(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """A card valid to 31 December must stop at the recorder, not at the card.
+
+    Clamping to the card alone would write three months of rows into the
+    future. The year-to-date cost and consumption are TOTAL statistics made
+    of the meter's history, and flat rows written over them would invent
+    consumption, as would rows for the projections.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from custom_components.be_water_prices.sensor import EUR_PER_M3, EUR_PER_YEAR
+
+    rows, calls = await _backfill_a_metered_entry(hass, freezer, clear=False)
+
+    assert all(kind == "import" for kind, _ in calls), calls
+    imports = {meta["statistic_id"]: (meta, written) for _, (meta, written) in calls}
+    # Vivaqua has no comfort rate, so four sensors and no more.
+    assert {sid: meta["unit_of_measurement"] for sid, (meta, _) in imports.items()} == {
+        "sensor.v_yearly_fee": EUR_PER_YEAR,
+        "sensor.v_basis_rate": EUR_PER_M3,
+        "sensor.v_sanering_rate": EUR_PER_M3,
+        "sensor.v_all_in_basis": EUR_PER_M3,
+    }
+    # 15 March 00:00 in Brussels to the end of the last compiled hour,
+    # which is behind both the clock and the card's end.
+    first = datetime(2026, 3, 14, 23, tzinfo=UTC)
+    end = datetime(2026, 10, 4, 19, tzinfo=UTC)
+    hours = int((end - first) / timedelta(hours=1))
+    for _meta, written in imports.values():
+        assert written[0]["start"] == first
+        assert written[-1]["start"] + timedelta(hours=1) == end
+        assert len(written) == hours
+    assert rows == 4 * hours
+
+
+async def test_clear_wipes_each_written_sensor_before_its_rows_go_in(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """clear=True must clear what it rewrites, and nothing it does not.
+
+    The recorder only deletes a statistic whole, so a clear that reached
+    the year-to-date sensors would erase the meter's entire history.
+    """
+    _rows, calls = await _backfill_a_metered_entry(hass, freezer, clear=True)
+
+    order = [(kind, arg if kind == "clear" else [arg[0]["statistic_id"]]) for kind, arg in calls]
+    assert order == [
+        step
+        for sid in (
+            "sensor.v_yearly_fee",
+            "sensor.v_basis_rate",
+            "sensor.v_sanering_rate",
+            "sensor.v_all_in_basis",
+        )
+        for step in (("clear", [sid]), ("import", [sid]))
+    ]
