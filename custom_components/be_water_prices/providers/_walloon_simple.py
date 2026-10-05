@@ -148,13 +148,18 @@ def warn_constant_drift(
 
     Failing closed has a cost worth stating plainly: CWaPE moves the CVA
     on 1 January, every Walloon page picks the new figure up at once, and
-    all nine Walloon extractors then stop until a release carries the new
-    constant. That is the trade, and the message says what clears it. The
-    alternative is worse, because the constant is what the household is
-    actually billed on, so failing open bills everyone on last year's
-    figure with nothing to show for it.
+    eight of the nine Walloon extractors then stop until a release carries
+    the new constant. That is the trade, and the message says what clears
+    it. The alternative is worse, because the constant is what the
+    household is actually billed on, so failing open bills everyone on
+    last year's figure with nothing to show for it.
 
-    Every Walloon page prints the CVA and most print the FSE: the
+    AIEC is the one exception while its page shows a transcribed card:
+    :func:`aiec.card_from_operator_page` builds that card on the constant
+    and the picture page prints no CVA to check, so nothing here runs and
+    the card keeps serving until its 31 March grace period ends.
+
+    Every other Walloon page prints the CVA and most print the FSE: the
     table-based extractors read them off their rows, the prose-based
     ones through :func:`parse_cva` and :func:`parse_fse`. A page that
     stops printing one simply stops being checked for it.
