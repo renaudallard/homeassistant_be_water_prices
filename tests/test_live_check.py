@@ -169,7 +169,7 @@ def test_render_reports_transient_without_a_failure_banner() -> None:
     out = _render([_result("OK"), _result("TRANSIENT")])
     assert "No regressions" in out
     assert "1 transient" in out
-    assert "extractors failed" not in out
+    assert "checks failed" not in out
 
 
 def test_render_names_what_it_could_not_check() -> None:
@@ -370,3 +370,120 @@ async def test_a_pdf_the_archive_holds_is_not_rendered_again(
         in live_check._render(results, cache)
     )
     assert not live_check._render(results).endswith("rendered._")
+
+
+# --- commune lists -----------------------------------------------------------
+
+
+def _communes(count: int) -> tuple[Any, ...]:
+    from custom_components.be_water_prices.providers.base import CommuneOption
+
+    return tuple(CommuneOption(id=str(i), label=f"C{i}") for i in range(count))
+
+
+def _lister_extractor(list_communes: Any, extractor_id: str = "acme") -> Any:
+    from custom_components.be_water_prices.providers import WaterExtractor, WaterTariff
+
+    async def fetch(_session: aiohttp.ClientSession) -> WaterTariff:
+        return WaterTariff(
+            utility=extractor_id,
+            region="flanders",
+            valid_from=date(date.today().year, 1, 1),
+            valid_until=date(date.today().year, 12, 31),
+            publication_label="x",
+            source_url="https://example.invalid/",
+            yearly_fixed_fee=100.0,
+            basis_eur_per_m3=2.0,
+        )
+
+    async def fetch_for_commune(session: aiohttp.ClientSession, _commune: str) -> WaterTariff:
+        return await fetch(session)
+
+    return WaterExtractor(
+        id=extractor_id,
+        label="Acme",
+        region="flanders",
+        fetch=fetch,
+        fetch_for_commune=fetch_for_commune,
+        list_communes=list_communes,
+    )
+
+
+async def test_a_broken_commune_list_fails_the_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The config flow drops the commune field when the list fails and
+    bills the operator's default commune, so the run has to fail on it,
+    under a label of its own that the issue fingerprints separately from
+    the default card."""
+    from scripts import live_check
+
+    async def broken(_session: aiohttp.ClientSession) -> tuple[Any, ...]:
+        raise ExtractorError("could not discover any Acme communes")
+
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(live_check, "all_extractors", lambda: (_lister_extractor(broken),))
+    results, rc, _cache = await live_check._run()
+    assert [(r.extractor_id, r.status) for r in results] == [
+        ("acme", "OK"),
+        ("acme/communes", "FAIL"),
+    ]
+    assert rc & EXIT_REAL_FAIL
+    assert "**1 of 2 checks failed.**" in live_check._render(results)
+    fingerprint = [
+        line.split("|")[1].strip()
+        for line in live_check._render(results).splitlines()
+        if "| FAIL |" in line
+    ]
+    assert fingerprint == ["Acme (communes)"]
+
+
+async def test_a_commune_list_that_times_out_is_transient() -> None:
+    from scripts.live_check import _check_communes
+
+    async def slow(_session: aiohttp.ClientSession) -> tuple[Any, ...]:
+        raise TransientFetchError("HTTP 503 fetching https://x")
+
+    result = await _check_communes(None, _lister_extractor(slow))  # type: ignore[arg-type]
+    assert result.status == "TRANSIENT"
+
+
+async def test_a_short_commune_list_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dropdown the parser half matches returns a few communes, not an
+    error, and the flow would offer just those."""
+    from scripts import live_check
+
+    monkeypatch.setitem(live_check.MIN_COMMUNES, "acme", 10)
+
+    def lister(count: int) -> Any:
+        async def list_communes(_session: aiohttp.ClientSession) -> tuple[Any, ...]:
+            return _communes(count)
+
+        return list_communes
+
+    short = await live_check._check_communes(None, _lister_extractor(lister(9)))  # type: ignore[arg-type]
+    full = await live_check._check_communes(None, _lister_extractor(lister(10)))  # type: ignore[arg-type]
+    assert (short.status, full.status) == ("FAIL", "OK")
+    assert "expected at least 10" in short.detail
+
+
+async def test_a_ci_blocked_commune_list_is_skipped_without_fetching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.live_check import CI_BLOCKED, _check_communes
+
+    async def never(_session: aiohttp.ClientSession) -> tuple[Any, ...]:
+        raise AssertionError("must not list a CI-blocked utility")
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    extractor = _lister_extractor(never, next(iter(CI_BLOCKED)))
+    result = await _check_communes(None, extractor)  # type: ignore[arg-type]
+    assert result.status == "SKIP"
+
+
+def test_every_commune_lister_has_a_floor() -> None:
+    """A lister without one only has to return a single commune, and a
+    floor keyed on a typo guards nothing."""
+    from custom_components.be_water_prices.providers import all_extractors
+    from scripts.live_check import MIN_COMMUNES
+
+    listers = {e.id for e in all_extractors() if e.supports_communes}
+    assert set(MIN_COMMUNES) == listers

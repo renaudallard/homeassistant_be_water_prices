@@ -66,7 +66,7 @@ publication and how to parse it.
 - **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card the project's daily archive captured (see *The card archive* below) instead of retrying setup until the utility is back, and an outage that drags on past the staleness window picks up whatever the archive has captured since; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
-- **Daily live check** — a cron-driven workflow probes every utility and opens a GitHub issue if any extractor breaks (page restyled, wrong year, etc.).
+- **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.).
 - **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so it cannot notice a move in the decreed constants above; every Walloon parser fails outright if the CVA or FSE its page publishes leaves the constant behind, or if its page stops printing a CVA at all, which is what puts that move on the live check instead. Note what that means each 1 January: when CWaPE moves the CVA, every Walloon page picks it up at once and all nine Walloon extractors stop together, each entry holding its last good snapshot behind a stale-snapshot Repair, until a release carries the new `WALLONIA_CVA_EUR_PER_M3` / `WALLONIA_FSE_EUR_PER_M3` in `const.py`. That is deliberate: the constants are what the household is billed on, so failing open would bill everyone on last year's figure with nothing to show for it.
 
 ## Supported utilities
@@ -821,12 +821,17 @@ Two cron workflows guard against silent regressions:
 
 - [`.github/workflows/live_check.yml`](./.github/workflows/live_check.yml)
   runs daily, hits every registered extractor against its real
-  publication URL, retries up to five times with exponential
-  backoff, and opens or updates one GitHub issue, found by its
-  `live-check` label (`[live-check] water extractor broken …`), on
-  persistent parser failure. The failing utilities are the fingerprint:
-  a utility that stays broken gets one comment a week rather than one a
-  day, and a failure that changes shape is posted at once. Transient
+  publication URL, fetches the commune list of De Watergroep, Farys,
+  Pidpa and Water-link as a row of its own (an error, or fewer
+  communes than the floor in `MIN_COMMUNES`, fails it: the config flow
+  drops the commune selector when that list fails, and a new entry is
+  then billed on the operator's default commune), retries up to five
+  times with exponential backoff, and opens or updates one GitHub
+  issue, found by its `live-check` label (`[live-check] water extractor broken …`), on
+  persistent parser failure. The failing utilities are the fingerprint,
+  a commune list counting apart from its utility's card: a utility that
+  stays broken gets one comment a week rather than one a day, and a
+  failure that changes shape is posted at once. Transient
   upstream hiccups (timeout, connection reset,
   HTTP 5xx / 429) are reported as a `TRANSIENT` row and retried but
   never open an issue — only a real regression (parse / shape error,

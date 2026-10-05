@@ -29,9 +29,12 @@
 Walks every registered :class:`WaterExtractor`, hits the utility's real
 publication, parses the result, and verifies the snapshot is structurally
 sane (region matches, fee in plausible range, at least one volumetric
-component populated). Checks every extractor rather than stopping at
-the first failure, prints a markdown report to stdout and folds the
-outcomes into the exit code below.
+component populated). An extractor that lists communes has its list
+fetched too, and checked against a floor on its length, since the
+config flow quietly drops the commune selector when that list fails.
+Checks every extractor rather than stopping at the first failure,
+prints a markdown report to stdout and folds the outcomes into the exit
+code below.
 
 Run by ``.github/workflows/live_check.yml`` daily; on persistent failure
 the workflow opens or updates a GitHub issue with this report attached.
@@ -82,6 +85,7 @@ from custom_components.be_water_prices.providers import (  # noqa: E402
 )
 from custom_components.be_water_prices.providers._pdf import render_through  # noqa: E402
 from custom_components.be_water_prices.providers.base import (  # noqa: E402
+    CommuneOption,
     ExtractorError,
     TransientFetchError,
 )
@@ -96,6 +100,20 @@ MIN_FEE_EUR_YEAR = 5.0
 MAX_FEE_EUR_YEAR = 500.0
 MIN_RATE_EUR_M3 = 0.5
 MAX_RATE_EUR_M3 = 20.0
+
+# Fewest communes each lister may return before the list is called
+# broken. A restyled dropdown the parser only half matches yields a short
+# list rather than an error. Each floor sits some way under what the
+# lister returned after its phantom filter in October 2026 (De Watergroep
+# 699, Farys 266, Pidpa 63, Water-link 5), so an operator taking over or
+# handing back a commune or two does not open an issue. A lister missing
+# here only has to return something.
+MIN_COMMUNES: dict[str, int] = {
+    "de_watergroep": 600,
+    "farys": 225,
+    "pidpa": 50,
+    "water_link": 4,
+}
 
 # Utilities whose live publication is unreachable from GitHub Actions
 # runners. Water-link's CDN returns HTTP 403 to datacenter IP ranges
@@ -151,17 +169,37 @@ def _validate(tariff: WaterTariff, region: str) -> str | None:
     return None
 
 
-async def _check_fetch(
+def _judge_tariff(tariff: WaterTariff, region: str) -> tuple[str, str]:
+    complaint = _validate(tariff, region)
+    if complaint is not None:
+        return "FAIL", complaint
+    return (
+        "OK",
+        f"valid {tariff.valid_from} → {tariff.valid_until}, fee {tariff.yearly_fixed_fee:.2f} EUR/yr ex-VAT",
+    )
+
+
+def _judge_communes(communes: tuple[CommuneOption, ...], floor: int) -> tuple[str, str]:
+    if len(communes) < floor:
+        return "FAIL", f"only {len(communes)} communes listed, expected at least {floor}"
+    return "OK", f"{len(communes)} communes listed"
+
+
+async def _check[T](
     session: aiohttp.ClientSession,
+    extractor: WaterExtractor,
     *,
     check_id: str,
     label: str,
-    region: str,
-    fetch: Callable[[aiohttp.ClientSession], Awaitable[WaterTariff]],
+    call: Callable[[aiohttp.ClientSession], Awaitable[T]],
+    judge: Callable[[T], tuple[str, str]],
 ) -> CheckResult:
-    """Run one fetch and classify what it did."""
+    """Run one call against the utility and classify what it did."""
+    region = extractor.region
+    if extractor.id in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
+        return CheckResult(check_id, label, region, "SKIP", CI_BLOCKED[extractor.id])
     try:
-        tariff = await fetch(session)
+        value = await call(session)
     except TransientFetchError as err:
         # Upstream hiccup (timeout / connection reset / HTTP 5xx): not a
         # regression, so it must not open an issue. Checked before the
@@ -171,35 +209,40 @@ async def _check_fetch(
         return CheckResult(check_id, label, region, "FAIL", str(err))
     except Exception:  # top-level: report anything unexpected as a failure row
         return CheckResult(check_id, label, region, "FAIL", traceback.format_exc())
-
-    complaint = _validate(tariff, region)
-    if complaint is not None:
-        return CheckResult(check_id, label, region, "FAIL", complaint)
-    return CheckResult(
-        check_id,
-        label,
-        region,
-        "OK",
-        f"valid {tariff.valid_from} → {tariff.valid_until}, fee {tariff.yearly_fixed_fee:.2f} EUR/yr ex-VAT",
-    )
+    status, detail = judge(value)
+    return CheckResult(check_id, label, region, status, detail)
 
 
 async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
-    if extractor.id in CI_BLOCKED and os.environ.get("GITHUB_ACTIONS") == "true":
-        return CheckResult(
-            extractor.id, extractor.label, extractor.region, "SKIP", CI_BLOCKED[extractor.id]
-        )
-    return await _check_fetch(
+    return await _check(
         session,
+        extractor,
         check_id=extractor.id,
         label=extractor.label,
-        region=extractor.region,
-        fetch=extractor.fetch,
+        call=extractor.fetch,
+        judge=lambda tariff: _judge_tariff(tariff, extractor.region),
+    )
+
+
+async def _check_communes(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
+    """The commune list the config flow offers. When it fails, the flow
+    leaves the commune field out and the entry is billed on the
+    operator's default commune, with nothing to show the user."""
+    assert extractor.list_communes is not None
+    # The label is the issue's fingerprint, so a broken list must not
+    # read as the same problem as a broken default card.
+    return await _check(
+        session,
+        extractor,
+        check_id=f"{extractor.id}/communes",
+        label=f"{extractor.label} (communes)",
+        call=extractor.list_communes,
+        judge=lambda communes: _judge_communes(communes, MIN_COMMUNES.get(extractor.id, 1)),
     )
 
 
 def _exit_code(results: list[CheckResult]) -> int:
-    """Fold the per-extractor statuses into the exit bitmask.
+    """Fold the per-check statuses into the exit bitmask.
 
     SKIP rows do not flip any bit: a CI-unreachable utility is healthy
     from a residential IP, so flagging it as broken would be a false
@@ -225,7 +268,11 @@ async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, Store
         if cache is not None:
             hooks.enter_context(render_through(cache.render))
         async with aiohttp.ClientSession() as session:
-            results = [await _check_one(session, e) for e in all_extractors()]
+            results = []
+            for e in all_extractors():
+                results.append(await _check_one(session, e))
+                if e.supports_communes:
+                    results.append(await _check_communes(session, e))
     return results, _exit_code(results), cache
 
 
@@ -260,7 +307,7 @@ def _render(results: list[CheckResult], cache: StoredTexts | None = None) -> str
         # The banner names the failures; the extras give the rest of the
         # picture without burying the headline in an OK count.
         suffix = f" ({', '.join(extras)})" if extras else ""
-        lines.append(f"**{len(failed)} of {len(results)} extractors failed.**" + suffix)
+        lines.append(f"**{len(failed)} of {len(results)} checks failed.**" + suffix)
     else:
         counts = ", ".join([f"{ok} OK", *extras])
         # A transient row is not "green", and it is not "checked" either.
