@@ -37,6 +37,7 @@ import asyncio
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -380,6 +381,29 @@ async def test_a_running_bill_held_by_its_floor_carries_into_the_year_end(
     assert figures.projected_end_cost_eur == pytest.approx(
         compute_annual_cost(tariff, 46.75, 1) + 5.0
     )
+
+
+@pytest.mark.asyncio
+async def test_next_years_card_in_december_does_not_price_the_year_figures(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """The year end is this year's bill, and the card in force prices it."""
+    freezer.move_to("2026-12-15 10:00:00+00:00")
+    rows = AsyncMock(return_value=_buckets(_span(date(2025, 11, 1), date(2026, 12, 14))))
+    entry = await _setup_entry(hass, rows)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    held = coordinator.data.year_figures
+    assert held.rolling_cost_eur is not None
+    assert held.projected_end_cost_eur is not None
+    early = replace(
+        _tariff(),
+        valid_from=date(2027, 1, 1),
+        valid_until=date(2027, 12, 31),
+        yearly_fixed_fee=50.0,
+        linear_eur_per_m3=3.0,
+    )
+    ytd_cost = coordinator.data.current_year_cost_eur
+    assert coordinator._year_figures(early, 20.0, ytd_cost) == held
 
 
 @pytest.mark.asyncio

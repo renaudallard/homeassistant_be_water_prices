@@ -996,7 +996,14 @@ def test_migrating_a_record_that_is_already_current_changes_nothing() -> None:
 
     # Every key the record has grown since, or the rollback loses it and
     # the year comes back without what the recorder had reported for it.
-    full = {**current, "basis": "b", "recorder_hwm": 49.5, "seen_at": 1.0, "started_at": 2.0}
+    full = {
+        **current,
+        "basis": "b",
+        "recorder_hwm": 49.5,
+        "seen_at": 1.0,
+        "started_at": 2.0,
+        "card": {"utility": "u", "valid_from": f"{_YEAR}-01-01", "commune": None},
+    }
 
     assert _migrate_cycle_to_v2(full) == full
 

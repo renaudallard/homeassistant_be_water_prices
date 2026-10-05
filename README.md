@@ -210,6 +210,14 @@ is re-billed at it, which is correct: Belgian tariffs apply from
 1 January whatever day they are published. On the 2025 to 2026 Pidpa step, the running bill is corrected by about
 € 4 when the new card lands at the end of the grace window.
 
+The other way round, an operator can put next year's card up in December
+(Farys's page switching to its new tab, or a Walloon page headed with
+next year only). The rate sensors and `projected_annual_cost` show it at
+once, but the closing year is not billed on it: `current_year_cost`, its
+high-water mark and the rolling and year-end figures stay on the card in
+force until 1 January, across a restart too, and the new card prices the
+new year from its first day.
+
 All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting or the social tariff, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe.
 
 | Entity id suffix | Description |
@@ -506,7 +514,10 @@ you paid is worth more than a tidy chart.
   year's card. Until 31 March a late publisher's entry runs on last year's
   card, so January onwards accrues at a stand-in's rates; those are not a
   transient fetch, and if the real card comes in cheaper the floor would
-  otherwise hold you on the stand-in until the year turned.
+  otherwise hold you on the stand-in until the year turned. A card put up
+  ahead of its year, in December, does not count: the year to date stays
+  priced and floored on the card in force until 1 January, and the card
+  in force is kept with the year's figures so a restart does not lose it.
 
   What the floor still holds against is a **tariff fetch that comes back
   cheaper** — a transient bad parse, or a fallback card. A genuine
@@ -597,6 +608,9 @@ you typed:
   add on today's card: their water through whatever is left of the
   blocks, and the rest of the year's fees. A running bill held above
   today's card by its high-water mark stays in it.
+
+Today's card is the one in force today. Next year's card put up in
+December waits for 1 January here, as it does for the running bill.
 
 A window only counts if the meter covered it, by the rule the Repair
 above applies to a calendar year: a statistics bucket in the month

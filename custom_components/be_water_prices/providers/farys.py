@@ -286,7 +286,8 @@ def parse_tariff(
     clock = belgian_today().year
     if year is None and active is not None and active > clock:
         # The page dates the card, so a card served early is applied as
-        # published. Nothing downstream checks valid_from, so say so: the
+        # published. The rate sensors show it at once, while the running
+        # bill stays on the card in force until 1 January, so say so: the
         # alternative, refusing it, would blank every entity after a
         # restart in that window, since the cached snapshot is in memory.
         _LOGGER.warning(

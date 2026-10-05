@@ -99,6 +99,7 @@ from .providers.base import (
     carry_prior_year_card,
     relabel_with_human_commune,
     tariff_from_dict,
+    tariff_to_dict,
 )
 
 if TYPE_CHECKING:
@@ -267,7 +268,7 @@ def _migrate_cycle_to_v2(old: dict[str, Any]) -> dict[str, Any]:
         kept: dict[str, Any] = {
             key: old.get(key) for key in ("meter", "year", "m3", "cost", "offset_m3")
         }
-        for key in ("basis", "recorder_hwm", "seen_at", "started_at"):
+        for key in ("basis", "recorder_hwm", "seen_at", "started_at", "card"):
             # Carried when it is there, and not invented when it is not.
             # Rebuilding the dict without a key dropped it on every
             # rollback-and-upgrade: the floor lost its own provenance, and
@@ -1017,6 +1018,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # recorder's trailing daily total, which used to snap the published
         # figure downward.
         self._ytd = _YtdCycle()
+        # The card the year to date is priced on and the commune it was
+        # fetched for, persisted with the cycle. An operator can put next
+        # year's card up in December, and after a restart nothing else
+        # remembers the one still in force; see :meth:`_card_in_force`.
+        self._ytd_card: tuple[WaterTariff, str | None] | None = None
         # A reading held pending confirmation by the next one, and the run
         # length of consecutive readings below the cycle's bar. Both are
         # in-memory only: a restart simply re-runs the hold, and a real
@@ -1596,7 +1602,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _year_figures(
         self, tariff: WaterTariff, ytd_m3: float | None, ytd_cost: float | None
     ) -> YearFigures:
-        """The rolling year and the year-end projection on ``tariff``.
+        """The rolling year and the year-end projection on the card in
+        force, which is ``tariff`` unless that is dated ahead of the year.
 
         The rolling year is the 365 closed days before the last read,
         priced as a year. The projection is the year so far plus last
@@ -1614,19 +1621,22 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # midnight would otherwise add last year's whole rest to a year
         # that has closed.
         year = self._ytd.year
+        # The card the running bill is on, or the projection would add the
+        # rest of the year at rates the year to date was never billed at.
+        card = tariff if year is None else self._card_in_force(tariff, year)
         projected = end_cost = None
         if year is not None and ytd_m3 is not None:
             rest = _rest_of_year_m3(metered.days, _priced_on(year))
             if rest is not None:
                 projected = ytd_m3 + rest
                 if ytd_cost is not None:
-                    so_far = self._ytd_cost_from_m3(tariff, ytd_m3, year)
-                    whole = self._annual_cost(tariff, projected)
+                    so_far = self._ytd_cost_from_m3(card, ytd_m3, year)
+                    whole = self._annual_cost(card, projected)
                     if so_far is not None and whole is not None:
                         end_cost = round(ytd_cost + whole - so_far, 2)
         return YearFigures(
             rolling_m3=rolling,
-            rolling_cost_eur=None if rolling is None else self._annual_cost(tariff, rolling),
+            rolling_cost_eur=None if rolling is None else self._annual_cost(card, rolling),
             projected_m3=projected,
             projected_end_cost_eur=end_cost,
         )
@@ -1769,6 +1779,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             _LOGGER.warning("the persisted YTD cycle is not readable; starting a fresh one")
             return
         self._ytd = cycle
+        self._ytd_card = _card_from_record(data.get("card"))
 
     async def async_load_metered_days(self) -> None:
         """Restore the last read of the meter's days before the first refresh.
@@ -1814,7 +1825,36 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "recorder_hwm": self._ytd.recorder_hwm,
             "seen_at": self._ytd.seen_at,
             "started_at": self._ytd.started_at,
+            "card": (
+                None
+                if self._ytd_card is None
+                else {**tariff_to_dict(self._ytd_card[0]), "commune": self._ytd_card[1]}
+            ),
         }
+
+    def _card_in_force(self, tariff: WaterTariff, year: int) -> WaterTariff:
+        """The card ``year``'s running bill is priced on: ``tariff``, unless
+        it is dated after the day the round is priced on.
+
+        Farys and the Walloon pages can put next year's card up in December,
+        and Belgian tariffs apply from 1 January. Priced on it, the whole
+        closing year was billed at next year's rates, and every flip of the
+        page between the two cards dropped the cost floor, so the running
+        bill could walk down. The card in force is held instead, as long as
+        it was fetched for this operator and commune. A fresh install in
+        December holds none and prices on the card it has.
+        """
+        if tariff.valid_from <= _priced_on(year):
+            return tariff
+        if self._ytd_card is not None:
+            card, commune = self._ytd_card
+            if (
+                card.utility == tariff.utility
+                and commune == self.entry.options.get(CONF_COMMUNE)
+                and card.valid_from.year <= year
+            ):
+                return card
+        return tariff
 
     def _fold_cycle(
         self,
@@ -1840,6 +1880,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now = time.monotonic()
         elapsed_s = 0.0 if self._ytd_last_fold_at is None else now - self._ytd_last_fold_at
         self._ytd_last_fold_at = now
+        card = self._card_in_force(tariff, now_year)
+        held = (card, self.entry.options.get(CONF_COMMUNE))
+        if card.valid_from <= _priced_on(now_year) and held != self._ytd_card:
+            self._ytd_card = held
+            self._cycle_dirty = True
         out = _fold(
             self._ytd,
             now_year=now_year,
@@ -1864,9 +1909,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 commune=self.entry.options.get(CONF_COMMUNE),
                 persons=int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS)),
                 social=bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False)),
-                card_year=tariff.valid_from.year,
+                card_year=card.valid_from.year,
             ),
-            cost_of=lambda m3: self._ytd_cost_from_m3(tariff, m3, now_year),
+            cost_of=lambda m3: self._ytd_cost_from_m3(card, m3, now_year),
         )
         if out.cycle != self._ytd:
             self._cycle_dirty = True
@@ -2180,7 +2225,9 @@ def _cost_basis(
     not a transient fetch, and if the real card comes in cheaper a floor
     that cannot tell the two apart holds the household on the stand-in
     until the year turns. A card year moves once, when the publisher
-    catches up.
+    catches up. A card put up ahead of its year does not move it: the year
+    is the card in force's, so next year's card arriving in December leaves
+    the closing year's floor where it is.
     """
     return "|".join(
         str(part)
@@ -2236,6 +2283,21 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         seen_at=_figure(figures["seen_at"]),
         started_at=_figure(figures["started_at"]),
     )
+
+
+def _card_from_record(data: object) -> tuple[WaterTariff, str | None] | None:
+    """The persisted card in force and its commune, or None when the
+    record holds none it can read. A bad one costs the held card, which
+    only matters while next year's card is up early."""
+    if not isinstance(data, dict):
+        return None
+    commune = data.get("commune")
+    if commune is not None and not isinstance(commune, str):
+        return None
+    try:
+        return tariff_from_dict(data), commune
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def _metered_from_record(data: object) -> _MeteredDays | None:
