@@ -310,3 +310,38 @@ async def test_comfort_rate_is_removed_when_the_operator_loses_it(hass) -> None:
 
     assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_comfort_rate") is None
     assert ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_basis_rate") is not None
+
+
+def test_readme_lists_the_english_entity_ids() -> None:
+    """The suffixes the README documents are those of an English install.
+
+    Home Assistant names the entity id after the sensor name in its own
+    language, so a Dutch, French or German install gets other ids. The
+    tables have to say which install they describe and list exactly what
+    English produces, or users copy ids that do not exist.
+    """
+    import json
+    import re
+    from pathlib import Path
+
+    from homeassistant.util import slugify
+
+    root = Path(__file__).resolve().parent.parent
+    en = json.loads(
+        (root / "custom_components/be_water_prices/translations/en.json").read_text(
+            encoding="utf-8"
+        )
+    )["entity"]["sensor"]
+    expected = {slugify(en[d.translation_key]["name"]) for d in SENSORS}
+
+    documented: set[str] = set()
+    in_table = False
+    for line in (root / "README.md").read_text(encoding="utf-8").splitlines():
+        if line.startswith("| Entity id suffix (English install) |"):
+            in_table = True
+        elif not line.startswith("|"):
+            in_table = False
+        elif in_table and (m := re.match(r"\| `([a-z0-9_]+)` \|", line)):
+            documented.add(m.group(1))
+
+    assert documented == expected

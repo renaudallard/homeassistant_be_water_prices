@@ -177,11 +177,18 @@ sensors.
 
 All sensors share one device per config entry, named after the
 utility (`VIVAQUA`, `De Watergroep`, ...). Home Assistant builds the
-entity id from the device name plus the sensor name, so the projected
-cost lands on `sensor.vivaqua_projected_annual_cost` for a VIVAQUA
-entry and `sensor.de_watergroep_projected_annual_cost` for a De
-Watergroep one. The table below lists the suffix; rename the device
-and the prefix follows.
+entity id from the device name plus the sensor name, in the language
+Home Assistant was set to when the entity was created. On an English
+install the projected cost lands on
+`sensor.vivaqua_projected_annual_cost` for a VIVAQUA entry and
+`sensor.de_watergroep_projected_annual_cost` for a De Watergroep one.
+A Dutch, French or German install gets translated ids instead, such as
+`sensor.vivaqua_geschatte_jaarkost`, `sensor.vivaqua_cout_annuel_projete`
+or `sensor.vivaqua_geschatzte_jahreskosten` for the same sensor, and
+switching the language later does not rename entities that already
+exist. The tables below list the suffix on an English install; the real
+id of each entity is under Settings > Devices & services > Entities.
+Rename the device and the prefix follows.
 
 Up to twelve entities per entry: `comfort_rate` only appears for
 Flemish utilities; `current_year_cost`, `year_to_date_consumption` and
@@ -193,7 +200,7 @@ dashboard at a different water meter is picked up the same way: the
 following tick re-anchors on the new meter and live tracking moves
 with it, again without a restart.
 
-| Entity id suffix | Description |
+| Entity id suffix (English install) | Description |
 | --- | --- |
 | `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, **as the card prints it** — before the per-resident korting and before VAT, which is how the operators publish it too. What a Flemish household is actually charged is `max(0, fee − persons × korting)`: € 80,00 ex-VAT at the default one resident against the € 100,00 shown here, and € 0,00 from five residents up. Parsed from the publication for VIVAQUA only; Flemish entries carry the decreed uniform vastrecht (50+30+20); Walloon entries use the regulator's formula `20·CVD + 30·CVA`, where the CVD is parsed and the CVA is the flat SPGE constant. |
 | `basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
@@ -220,7 +227,7 @@ new year from its first day.
 
 All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting or the social tariff, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe.
 
-| Entity id suffix | Description |
+| Entity id suffix (English install) | Description |
 | --- | --- |
 | `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
 | `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure only goes **down for a reason**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease. The one thing that can lower it is the recorder, and only when it holds statistics for the meter, it has already reported for this year, its latest answer is at or above every earlier one, so its history is intact, and the same refresh has a meter reading inside the year's frame rather than none or a dropout value. That is what takes back a meter spike small enough to have been admitted, which used to stand until January, and one corrected only after midnight is taken back too, since the recorder's own days no longer carry it — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover or pointing the integration at a different meter. A confirmed meter swap drops it to ~0 as well, but only until the next daily tick: the recorder's statistics for the meter run through the replacement, so its answer brings back the year's water, the old meter's included, and the new meter is tracked live on top of that figure. The mark is measured for a household, so changing your commune, `gedomicilieerd_persons` or `social_tariff` rebuilds it from what you owe now rather than holding the old figure. Only the 1 January rollover, a confirmed swap and a different meter move the `last_reset` of both year-to-date sensors, so only they open a new cycle in Home Assistant's long-term statistics; any other fall is booked as a negative change in the same cycle, and the statistics sum comes down to the corrected figure instead of adding it to the old one. A swap on a meter the recorder holds statistics for still adds the year once more: the tick that brings back the year's water lands in the cycle the swap opened, so the sum counts the water up to the swap twice, and only Developer Tools > Statistics takes the extra amount back out. Returns `unknown` until a water meter is configured in the options step. The meter's unit must be one Home Assistant can convert to m³ (`m³`, `L`, `gal`, `ft³`, `CCF`, …), or one that needs no converting because it already is cubic metres: no unit at all, or the ASCII spelling `m3`. A sensor labelled with anything else is refused rather than read as cubic metres, which is what a lowercase `l` used to do at 1000× the bill. |
