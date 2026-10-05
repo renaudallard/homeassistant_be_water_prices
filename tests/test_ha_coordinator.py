@@ -69,6 +69,7 @@ from custom_components.be_water_prices.coordinator import (
     _cost_basis,
 )
 from custom_components.be_water_prices.providers.base import (
+    CommuneOption,
     ExtractorError,
     WaterExtractor,
     WaterTariff,
@@ -4160,6 +4161,81 @@ async def test_an_operator_picked_by_hand_is_left_alone_until_the_resolver_chang
                     "utility": "Water-link",
                     "resolved": "Pidpa",
                 }
+
+
+@pytest.mark.asyncio
+async def test_picking_the_same_operator_again_settles_an_older_hand_pick(
+    hass: HomeAssistant, issue_registry: Any
+) -> None:
+    """The way out the operator_moved card offers really works.
+
+    An operator picked by hand on an older release left no record of
+    what the postcode resolved to, so the card cannot tell that pick
+    from a resolver correction and raises. Picking the same operator
+    again under Pick the utility directly must record the answer, keep
+    the saved commune and clear the card, even though nothing else on
+    the entry changes.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    from custom_components.be_water_prices.providers import get as real_get
+
+    fake = WaterExtractor(id="water_link", label="Water-link", region="flanders", fetch=_fetch)
+
+    def _get(utility_id: str) -> WaterExtractor:
+        return fake if utility_id == "water_link" else real_get(utility_id)
+
+    # 2440 resolves to Pidpa alone; the household chose Water-link.
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Water-link",
+        data={CONF_UTILITY: "water_link"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_POSTCODE: "2440",
+            CONF_COMMUNE: "Edegem",
+            CONF_COMMUNE_LABEL: "Edegem",
+        },
+        unique_id=f"{DOMAIN}_water_link",
+    )
+    entry.add_to_hass(hass)
+    communes = (
+        CommuneOption(id="Antwerpen", label="Antwerpen"),
+        CommuneOption(id="Edegem", label="Edegem"),
+    )
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", new=_get),
+        patch(
+            "custom_components.be_water_prices.config_flow._async_communes",
+            return_value=communes,
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        issue_id = hass.data[DOMAIN][entry.entry_id].operator_issue_id
+        assert issue_registry.async_get_issue(DOMAIN, issue_id) is not None
+
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_manual"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_UTILITY: "water_link"}
+        )
+        assert result["step_id"] == "reconfigure_commune"
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_COMMUNE: "Edegem"}
+        )
+        await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "water_link"
+    assert entry.options[CONF_COMMUNE] == "Edegem"
+    assert entry.options[CONF_POSTCODE_RESOLVED] == ["pidpa"]
+    assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
 
 
 async def _down(_session: Any) -> WaterTariff:

@@ -174,7 +174,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility}: je postcode wijst nu naar een andere maatschappij",
-      "description": "De postcode van deze entry verwijst naar {resolved}, niet naar {utility}. De postcodetabel is gecorrigeerd nadat deze entry is aangemaakt, dus wordt nog altijd het tarief van {utility} opgehaald en je factuur daarop berekend.\n\nControleer het en pas het aan als het klopt: Instellingen > Apparaten en diensten > {utility} > de drie puntjes > Herconfigureren. Er wordt niets voor je gewijzigd, want van maatschappij veranderen wist ook de gemeente en de Vlaamse gezinsinstellingen."
+      "description": "De postcode van deze entry verwijst naar {resolved}, niet naar {utility}. Ofwel is de postcodetabel gecorrigeerd nadat deze entry is aangemaakt, ofwel is {utility} met de hand gekozen in een oudere versie, die die keuze niet onthield. In beide gevallen wordt nog altijd het tarief van {utility} opgehaald en je factuur daarop berekend.\n\nControleer het en pas het aan als het klopt: Instellingen > Apparaten en diensten > {utility} > de drie puntjes > Herconfigureren. Er wordt niets voor je gewijzigd, want van maatschappij veranderen wist ook de gemeente en de Vlaamse gezinsinstellingen.\n\nKlopt {utility}, kies dan Herconfigureren > Maatschappij rechtstreeks kiezen en kies opnieuw {utility}: dan blijft die behouden en verdwijnt deze melding."
     },
     "several_water_meters": {
       "title": "{utility}: meer dan \u00e9\u00e9n watermeter op het energiedashboard",

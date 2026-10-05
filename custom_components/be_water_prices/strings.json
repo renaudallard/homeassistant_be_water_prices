@@ -150,7 +150,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility}: your postcode now points to a different operator",
-      "description": "The postcode saved on this entry resolves to {resolved}, not {utility}. The resolver was corrected after this entry was set up, so it is still fetching {utility}'s tariff and your bill is computed from it.\n\nCheck it and switch if it is right: Settings > Devices & services > {utility} > the three dots > Reconfigure. Nothing is changed for you, because changing operator also clears the commune and the Flemish household settings."
+      "description": "The postcode saved on this entry resolves to {resolved}, not {utility}. Either the resolver was corrected after this entry was set up, or {utility} was picked by hand on an older release, which did not remember that choice. Either way it is still fetching {utility}'s tariff and your bill is computed from it.\n\nCheck it and switch if it is right: Settings > Devices & services > {utility} > the three dots > Reconfigure. Nothing is changed for you, because changing operator also clears the commune and the Flemish household settings.\n\nIf {utility} is right, choose Reconfigure > Pick the utility directly and pick {utility} again: that keeps it and stops this notice."
     },
     "several_water_meters": {
       "title": "{utility}: more than one water meter on the Energy dashboard",

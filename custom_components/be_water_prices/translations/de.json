@@ -174,7 +174,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility}: Ihre Postleitzahl verweist jetzt auf einen anderen Versorger",
-      "description": "Die in diesem Eintrag gespeicherte Postleitzahl verweist auf {resolved} und nicht auf {utility}. Die Postleitzahlentabelle wurde nach dem Anlegen dieses Eintrags korrigiert, daher wird weiterhin der Tarif von {utility} abgerufen und Ihre Rechnung daraus berechnet.\n\nPrüfen Sie es und wechseln Sie, wenn es zutrifft: Einstellungen > Geräte und Dienste > {utility} > die drei Punkte > Neu konfigurieren. Es wird nichts für Sie geändert, denn ein Wechsel des Versorgers löscht auch die Gemeinde und die flämischen Haushaltseinstellungen."
+      "description": "Die in diesem Eintrag gespeicherte Postleitzahl verweist auf {resolved} und nicht auf {utility}. Entweder wurde die Postleitzahlentabelle nach dem Anlegen dieses Eintrags korrigiert, oder {utility} wurde in einer älteren Version von Hand gewählt, die diese Wahl nicht speicherte. In beiden Fällen wird weiterhin der Tarif von {utility} abgerufen und Ihre Rechnung daraus berechnet.\n\nPrüfen Sie es und wechseln Sie, wenn es zutrifft: Einstellungen > Geräte und Dienste > {utility} > die drei Punkte > Neu konfigurieren. Es wird nichts für Sie geändert, denn ein Wechsel des Versorgers löscht auch die Gemeinde und die flämischen Haushaltseinstellungen.\n\nWenn {utility} zutrifft, wählen Sie Neu konfigurieren > Versorger direkt auswählen und wählen Sie erneut {utility}: Er bleibt erhalten und dieser Hinweis verschwindet."
     },
     "several_water_meters": {
       "title": "{utility}: mehr als ein Wasserz\u00e4hler im Energie-Dashboard",

@@ -99,3 +99,18 @@ def test_reconfigure_says_a_new_postcode_clears_the_commune(lang: str, step: str
     """
     text = _load(lang)["config"]["step"][step]["description"]
     assert _POSTCODE_CLEARS_COMMUNE[lang] in text
+
+
+@pytest.mark.parametrize("lang", LANGUAGES)
+def test_operator_repair_names_the_manual_pick(lang: str) -> None:
+    """The operator_moved card says how to keep the operator in use.
+
+    An operator picked by hand on an older release has no recorded
+    resolver answer, so the card is raised for it too, and picking the
+    same operator again on the manual step is what records the answer.
+    The card names that step by the label the reconfigure menu shows.
+    """
+    data = _load(lang)
+    card = data["issues"]["operator_moved"]["description"]
+    label = data["config"]["step"]["reconfigure"]["menu_options"]["reconfigure_manual"]
+    assert f"> {label} " in card

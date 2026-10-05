@@ -174,7 +174,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility} : votre code postal renvoie maintenant vers un autre distributeur",
-      "description": "Le code postal enregistré sur cette entrée correspond à {resolved} et non à {utility}. La table des codes postaux a été corrigée après la création de cette entrée : le tarif de {utility} est donc toujours récupéré et votre facture calculée dessus.\n\nVérifiez-le et changez si c'est correct : Paramètres > Appareils et services > {utility} > les trois points > Reconfigurer. Rien n'est modifié à votre place, car changer de distributeur efface aussi la commune et les réglages de ménage flamands."
+      "description": "Le code postal enregistré sur cette entrée correspond à {resolved} et non à {utility}. Soit la table des codes postaux a été corrigée après la création de cette entrée, soit {utility} a été choisi à la main dans une version antérieure, qui ne retenait pas ce choix. Dans les deux cas, le tarif de {utility} est toujours récupéré et votre facture calculée dessus.\n\nVérifiez-le et changez si c'est correct : Paramètres > Appareils et services > {utility} > les trois points > Reconfigurer. Rien n'est modifié à votre place, car changer de distributeur efface aussi la commune et les réglages de ménage flamands.\n\nSi {utility} est correct, choisissez Reconfigurer > Choisir la compagnie directement et choisissez à nouveau {utility} : il est conservé et cet avis disparaît."
     },
     "several_water_meters": {
       "title": "{utility} : plusieurs compteurs d'eau sur le tableau de bord \u00c9nergie",
