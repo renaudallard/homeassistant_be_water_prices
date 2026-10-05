@@ -761,6 +761,7 @@ def _fold(
         if (
             spoken_before
             and reading is not None
+            and reading > 0
             and (bar is None or reading >= bar)
             and mark is not None
             and mark - recorder_m3 > _RECORDER_LAG_M3
@@ -783,6 +784,12 @@ def _fold(
             # meter coming back would then be held and arbitrated against
             # the lowered figure. A tick with no reading has no frame to
             # rebuild and only dipped the year until the next one.
+            #
+            # The frame alone does not catch a reading of 0 once a meter
+            # swap has put it below zero, since every reading clears a
+            # negative bar. The 0 is refused on its own for that reason.
+            # The highest reading on the register would not do as a bar,
+            # because the spike this takes back is what raised it.
             _LOGGER.warning(
                 "the water meter's year stood at %.1f m3 against the recorder's %.1f; "
                 "taking the recorder, which has the year's own statistics behind it",

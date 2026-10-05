@@ -1594,6 +1594,52 @@ def test_a_dropout_tick_does_not_bring_the_year_down() -> None:
     assert back.m3 == 60.5
 
 
+def test_a_dropout_tick_after_a_swap_does_not_rebuild_the_frame() -> None:
+    """A swapped meter's frame sits below zero, and a 0 clears it.
+
+    The tick after a swap rebuilds the frame under the recorder's figure,
+    so every reading, 0 included, lands inside it. A dropout tick bringing
+    the recorder's correction of a spike then rebuilt the frame on the 0,
+    and the meter coming back was framed a whole register high.
+    """
+    swap = _round(
+        _anchored(130.0, 1000.0, cost=_bill(130.0), recorder_hwm=128.0),
+        reading=1.0,
+        hold_run=2,
+        run_m3=1.0,
+        high_m3=1130.0,
+    )
+    assert swap.swapped is True
+
+    tick = _round(swap.cycle, reading=1.2, recorder_m3=131.0, high_m3=swap.high_m3, after_swap=True)
+    assert tick.cycle.offset_m3 == pytest.approx(1.2 - 131.0)
+
+    out = tick
+    for reading in (10.0, 28.0, 10.2):
+        out = _round(
+            out.cycle, reading=reading, elapsed_s=300.0, high_m3=out.high_m3, after_swap=True
+        )
+    assert out.m3 == pytest.approx(157.8)  # the spike, small enough to be admitted
+
+    dropout = _round(
+        out.cycle, reading=0.0, recorder_m3=141.0, high_m3=out.high_m3, after_swap=True
+    )
+    assert dropout.cycle.offset_m3 == pytest.approx(1.2 - 131.0)
+    assert dropout.cycle.recorder_hwm == 141.0
+
+    back = _round(
+        dropout.cycle, reading=10.5, elapsed_s=300.0, high_m3=dropout.high_m3, after_swap=True
+    )
+    assert back.cycle.offset_m3 == pytest.approx(1.2 - 131.0)
+
+    # The next tick with the meter in sight takes the spike back.
+    later = _round(
+        back.cycle, reading=11.0, recorder_m3=142.0, high_m3=back.high_m3, after_swap=True
+    )
+    assert later.m3 == 142.0
+    assert later.cycle.offset_m3 == pytest.approx(11.0 - 142.0)
+
+
 def test_a_tick_with_no_reading_does_not_bring_the_year_down() -> None:
     """Without a reading there is no frame to rebuild, only a dip to publish."""
     year = _anchored(60.0, 1200.0, cost=_bill(60.0), recorder_hwm=55.0)
