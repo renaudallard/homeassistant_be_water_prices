@@ -895,8 +895,10 @@ read it), and a manifest of where each PDF is kept. A water tariff is
 annual, so a month whose card is the same as the previous month's points
 at the texts that month already holds rather than storing the page again.
 A day on which nothing changed writes nothing; months more than twelve
-before the running one are removed, with the texts nothing refers to any
-more.
+before the running one are removed, with the texts and the manifest
+entries nothing refers to any more. A PDF is kept under the month it was
+first seen, so an unchanged card stays as long as a remaining month
+names it.
 
 The PDFs themselves (Aquaduin's, Pidpa's and Water-link's cards) are kept
 under `--pdfs` for upload to the releases of the shared cards repository,
@@ -920,7 +922,9 @@ manual run walks them unless its `communes` input is unticked, and
 `--defaults-only` is the local equivalent), uploads the PDFs of the day
 to the releases of the shared cards
 repository [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
-(`water-<YYYY-MM>`, one per month the cards were seen in; the electricity
+(`water-<YYYY-MM>`, one per month the cards were seen in, deleted once
+it is more than twelve months old and the manifest no longer points into
+it; the electricity
 and gas integrations' live beside them as `electricity-<YYYY-MM>` and
 `gas-<YYYY-MM>`), rewrites the
 index and the per-utility sheets so each month links to a file that

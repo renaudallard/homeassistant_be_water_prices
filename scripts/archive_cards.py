@@ -172,7 +172,8 @@ Written daily by `.github/workflows/archive_cards.yml` running
 To get the original card of a utility, commune and month: open
 `coverage.md`, open the utility's sheet, find the row, click `pdf` or
 `page`; `json` is what the integration parsed out of it. Months more than
-twelve before the running one are removed.
+twelve before the running one are removed; a PDF stays as long as a
+remaining month names it.
 """
 
 
@@ -580,18 +581,18 @@ def _rows(out: Path) -> list[Path]:
 
 def _prune(out: Path, keep_months: int, today: date) -> int:
     """Remove months more than ``keep_months`` before today's, then the
-    texts no remaining row refers to; count them."""
+    texts and the manifest entries no remaining row refers to; count them."""
     cutoff = _months_before(today, keep_months)
     removed = 0
     for path in _rows(out):
         if path.stem < cutoff:
             path.unlink()
             removed += 1
-    referenced = {
-        source["text"]
-        for path in _rows(out)
-        for source in (_read_row(path) or {}).get("_sources", [])
-    }
+    sources = [
+        source for path in _rows(out) for source in (_read_row(path) or {}).get("_sources", [])
+    ]
+    referenced = {source["text"] for source in sources}
+    named = {digest_of(source["pdf"]) for source in sources if "pdf" in source}
     for path in out.glob("texts/*.txt"):
         if path.relative_to(out).as_posix() not in referenced:
             path.unlink()
@@ -603,9 +604,12 @@ def _prune(out: Path, keep_months: int, today: date) -> int:
     manifest = out / _MANIFEST
     if manifest.exists():
         kept = json.loads(manifest.read_text(encoding="utf-8"))
-        # A release path is <prefix>-<YYYY-MM>[-n]/<digest>.pdf; the workflow
-        # deletes the release itself on the same cutoff.
-        current = {d: p for d, p in kept.items() if _release_month(p) >= cutoff}
+        # A release path is <prefix>-<YYYY-MM>[-n]/<digest>.pdf. A card is
+        # filed once, under the month it was first seen, and every later
+        # month that read it names that copy, so an entry older than the
+        # cutoff stays while a remaining row names it. The workflow keeps a
+        # release while this manifest points into it.
+        current = {d: p for d, p in kept.items() if d in named or _release_month(p) >= cutoff}
         if len(current) != len(kept):
             removed += len(kept) - len(current)
             manifest.write_text(

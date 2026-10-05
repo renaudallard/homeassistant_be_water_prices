@@ -645,6 +645,37 @@ def test_prune_removes_old_rows_and_the_texts_nothing_refers_to(tmp_path: Path) 
     assert json.loads((tmp_path / "pdfs.json").read_text()) == {"kept": "water-2023-09/kept.pdf"}
 
 
+def test_prune_keeps_a_pdf_a_remaining_month_still_names(tmp_path: Path) -> None:
+    """An unchanged card is filed once, under the month it was first seen,
+    and every later month names that copy: its manifest entry stays while
+    any of those months does, even past the cutoff."""
+
+    def row(month: str, digest: str) -> None:
+        path = tmp_path / "acme" / "default" / f"{month}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        source = {"text": f"texts/{digest}.txt", "pdf": f"pdfs/{digest}.pdf"}
+        path.write_text(json.dumps({"_sources": [source]}))
+
+    for month in ("2026-09", "2026-10", "2026-11", "2026-12"):
+        row(month, "old")
+    row("2027-01", "new")
+    (tmp_path / "pdfs.json").write_text(
+        json.dumps(
+            {
+                "old": "water-2026-09/old.pdf",
+                "new": "water-2027-01/new.pdf",
+                "orphan": "water-2026-08/orphan.pdf",
+            }
+        )
+    )
+    # The 2026-09 row and the entry no row names go; the card stays.
+    assert ac._prune(tmp_path, 12, date(2027, 10, 4)) == 2
+    assert json.loads((tmp_path / "pdfs.json").read_text()) == {
+        "old": "water-2026-09/old.pdf",
+        "new": "water-2027-01/new.pdf",
+    }
+
+
 async def test_a_utility_not_answering_is_given_up_on_for_the_day(tmp_path: Path) -> None:
     """Three network failures in a row and the rest of that utility's
     communes are skipped; a parse failure does not count, and another
@@ -925,3 +956,93 @@ def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> Non
     assert log[:2] == ["Water listings of 2026-10-01", "Cards seen"]
     assert git("show", "main:electricity/row.json", cwd=origin) == "{}\n"
     assert git("show", "main:water/coverage/farys.md", cwd=origin) == "# Farys\n"
+
+
+def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> None:
+    """The store step deletes a water release more than twelve months old
+    only when no manifest entry points into it, matching the tag whole so
+    one month's overflow release is judged on its own."""
+    import os
+    import subprocess
+
+    import yaml  # type: ignore[import-untyped]
+
+    def git(*args: str, cwd: Path) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+
+    # A cards repository with a commit, so the step does not seed one.
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    git("init", "-q", "-b", "main", cwd=seed)
+    (seed / "README.md").write_text("# Price cards\n")
+    git("add", "README.md", cwd=seed)
+    git("commit", "-q", "-m", "start", cwd=seed)
+    git("clone", "-q", "--bare", str(seed), str(origin), cwd=tmp_path)
+
+    work = tmp_path / "work"
+    (work / "tmp" / "archive").mkdir(parents=True)
+    (work / "tmp" / "archive" / "pdfs.json").write_text(
+        json.dumps(
+            {
+                "a": "water-2026-09/a.pdf",
+                "b": "water-2026-08-2/b.pdf",
+                "c": "water-2026-10/c.pdf",
+            }
+        )
+    )
+
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    deleted = tmp_path / "deleted.txt"
+    tags = (
+        "water-2026-10 water-2026-09 water-2026-09-2 water-2026-08 water-2026-08-2"
+        " water-2026-07 electricity-2020-01"
+    )
+    (stubs / "gh").write_text(
+        "#!/bin/sh\n"
+        'case "$1 $2" in\n'
+        f'"release list") printf "%s\\n" {tags} ;;\n'
+        f'"release delete") echo "$3" >> {deleted} ;;\n'
+        "esac\n"
+    )
+    # Run on 2027-10-01: the cutoff is water-2026-10.
+    real_date = shutil.which("date")
+    (stubs / "date").write_text(
+        f'#!/bin/sh\ncase "$*" in *-d*) exec {real_date} "$@" ;; esac\necho 2027-10-01\n'
+    )
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/archive_cards.yml").read_text()
+    )
+    steps = workflow["jobs"]["archive"]["steps"]
+    script = next(s["run"] for s in steps if s.get("name") == "Keep the cards themselves")
+    token = "t0ken"
+    env = {
+        **os.environ,
+        "PATH": f"{stubs}:{os.environ['PATH']}",
+        "GH_TOKEN": token,
+        "CARDS_REPO": "renaudallard/be_price_cards",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
+        "GIT_CONFIG_VALUE_0": (
+            f"https://x-access-token:{token}@github.com/renaudallard/be_price_cards.git"
+        ),
+    }
+    done = subprocess.run(
+        ["bash", "-e", "-o", "pipefail", "-c", script],
+        cwd=work,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert done.returncode == 0, done.stderr
+    assert deleted.read_text().split() == ["water-2026-09-2", "water-2026-08", "water-2026-07"]
