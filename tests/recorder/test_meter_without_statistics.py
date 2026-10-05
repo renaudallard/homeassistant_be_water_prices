@@ -156,6 +156,9 @@ async def test_a_renamed_meter_keeps_its_year(hass: HomeAssistant, freezer: Any)
     _import_hours(hass, datetime(2026, 12, 1, tzinfo=tz), 24 * 30, 900.0, 7.2)
     await async_wait_recording_done(hass)
     _entry, coordinator = await _setup(hass)
+    # The setup tick framed the meter on the recorder's answer and asks it
+    # once more on the next tick, which comes before the year turns.
+    await _tick(hass, coordinator)
 
     # The live path rolls the year over, so nothing has asked the
     # recorder about the new one.

@@ -915,6 +915,30 @@ def test_a_register_replaced_earlier_in_the_year_is_framed_not_swapped() -> None
     assert climbing.m3 == pytest.approx(20.5 - (20.02 - 120.0))
 
 
+def test_a_frame_built_on_a_recorder_answer_asks_it_once_more() -> None:
+    """The answer a repoint or a first setup frames on may still hold a
+    misread whose correction is not compiled yet, and the frame reproduces
+    it from then on, so nothing would ask again and the take-back would
+    never reach the year."""
+    framed = _round(_YtdCycle(meter=_METER), reading=1000.2, recorder_m3=105.1)
+    assert framed.m3 == 105.1
+    assert framed.arbitrate
+
+    corrected = _round(
+        framed.cycle,
+        reading=1000.3,
+        recorder_m3=100.2,
+        recorder_taken_back=5.0,
+        high_m3=framed.high_m3,
+    )
+    assert corrected.m3 == pytest.approx(100.2)
+
+    # A frame built on a reading alone, a year starting empty, has no
+    # answer to doubt.
+    last_year = _YtdCycle(meter=_METER, year=_YEAR - 1, m3=100.0, offset_m3=4000.0)
+    assert not _round(last_year, reading=4105.0, recorder_ok=None).arbitrate
+
+
 def test_a_repointed_meter_anchors_on_its_own_recorder_figure() -> None:
     out = _round(_anchored(20.0, 80.0), meter=_OTHER, reading=5000.0, recorder_m3=40.0)
 

@@ -426,9 +426,16 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
         return _fresh_tariff()
 
     entry = _metered_entry(hass)
+
+    async def _recorder(*_args: Any) -> tuple[float, float]:
+        # The recorder keeps up with the meter, which sits 80 m3 above
+        # its 1 January reading: setup frames the year on this answer and
+        # asks it again on the late refresh below.
+        return float(hass.states.get("sensor.water_meter").state) - 80.0, 0.0
+
     with (
         patch(_GET, return_value=_extractor(_fetch)),
-        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
+        patch(_YTD, new=_recorder),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()

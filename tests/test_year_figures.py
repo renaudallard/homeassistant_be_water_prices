@@ -414,6 +414,11 @@ async def test_a_draw_during_the_read_is_not_overwritten(hass: HomeAssistant, fr
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    # Setup framed the meter on the recorder's answer and asks it once more
+    # on the next tick; that tick comes first, so the one below is the
+    # meter's alone.
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
 
     async def _draw_while_reading(*_args: Any) -> list[dict[str, Any]]:
         hass.states.async_set("sensor.water_meter", "130")

@@ -679,6 +679,13 @@ def _fold(
             base = max(seen)
             offset = reading - base
             candidate = base
+            # A frame built on a recorder answer reproduces that answer
+            # from then on, so the stale-frame gate never asks again. An
+            # answer read before a misread's correction was compiled still
+            # holds the misread, and with nothing asking again the reader's
+            # take-back never reached the year. One more question on the
+            # next tick settles it.
+            arbitrate = recorder_m3 is not None or recorder_hwm is not None
         elif known_meter and recorder_ok is not False:
             # Nothing to place the reading against, and no reason to believe
             # the year holds anything: it starts here. A failed query is not

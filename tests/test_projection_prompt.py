@@ -469,6 +469,12 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
     # Setup anchored the year on reading 100 against 20 m³ from the
     # recorder, so the meter contributes reading - 80 from here.
     assert coordinator.data.ytd_consumption_m3 == 20.0
+    # That frame was built on the recorder's answer, which it asks once
+    # more on the next tick; that tick comes first, so the one below is
+    # the meter's alone.
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
 
     async def _draw_while_querying(*_args: Any) -> float | None:
         hass.states.async_set("sensor.water_meter", "130")

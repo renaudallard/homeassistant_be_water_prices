@@ -85,6 +85,9 @@ async def test_a_frame_that_reproduces_the_figure_to_the_femtolitre_is_not_stale
             m3=published,
             offset_m3=reading - published,
         )
+        # A record built by hand has no question pending on it, whatever
+        # the setup tick left for the record it replaces.
+        coordinator._ytd_arbitrate = False
         assert reading - (reading - published) < published
         recorder.reset_mock()
         ytd_m3, _cost = await coordinator._compute_ytd(_fresh_tariff())
