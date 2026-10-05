@@ -27,14 +27,17 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from homeassistant.util import dt as dt_util
 
 from custom_components.be_water_prices.const import CONF_UTILITY
+from custom_components.be_water_prices.coordinator import CoordinatorData
+from custom_components.be_water_prices.providers.base import WaterTariff
 from custom_components.be_water_prices.sensor import (
     SENSORS,
     WaterSensor,
@@ -284,6 +287,91 @@ def test_last_error_is_scrubbed_of_the_commune() -> None:
     attrs = _sensor_with("basis_rate", coordinator).extra_state_attributes
     assert "geel" not in attrs["last_error"].lower()
     assert "404" in attrs["last_error"]
+
+
+def _card(region: str, **rates: float) -> WaterTariff:
+    return WaterTariff(
+        utility="x",
+        region=region,
+        valid_from=date(2026, 1, 1),
+        valid_until=date(2026, 12, 31),
+        publication_label="x",
+        source_url="https://example.invalid/",
+        **rates,
+    )
+
+
+# Expected figures are worked out by hand, not with the sensor's own
+# formula, so a slip in the formula cannot agree with itself. The same
+# values go to the price history backfill.
+@pytest.mark.parametrize(
+    ("card", "expected"),
+    [
+        pytest.param(
+            _card(
+                "flanders",
+                yearly_fixed_fee=100.0,
+                basis_eur_per_m3=2.0848,
+                comfort_eur_per_m3=4.1696,
+                sanering_gemeentelijk_eur_per_m3=1.6533,
+                sanering_bovengemeentelijk_eur_per_m3=1.1809,
+            ),
+            # sanering 1.6533 + 1.1809, all in (2.0848 + 2.8342) * 1.06
+            {
+                "yearly_fee": 100.0,
+                "basis_rate": 2.0848,
+                "comfort_rate": 4.1696,
+                "sanering_rate": 2.8342,
+                "all_in_basis": 5.2141,
+            },
+            id="flanders",
+        ),
+        pytest.param(
+            _card(
+                "brussels",
+                yearly_fixed_fee=37.735849,
+                linear_eur_per_m3=2.3585,
+                sanering_gemeentelijk_eur_per_m3=1.2264,
+            ),
+            # all in (2.3585 + 1.2264) * 1.06 = 3.799994
+            {
+                "yearly_fee": 37.74,
+                "basis_rate": 2.3585,
+                "comfort_rate": None,
+                "sanering_rate": 1.2264,
+                "all_in_basis": 3.8,
+            },
+            id="brussels",
+        ),
+        pytest.param(
+            _card(
+                "wallonia",
+                yearly_fixed_fee=147.24,
+                cvd_eur_per_m3=3.24,
+                cva_eur_per_m3=2.748,
+                fse_eur_per_m3=0.0339,
+            ),
+            # sanering is CVA + FSE, all in (3.24 + 2.7819) * 1.06 = 6.383214
+            {
+                "yearly_fee": 147.24,
+                "basis_rate": 3.24,
+                "comfort_rate": None,
+                "sanering_rate": 2.7819,
+                "all_in_basis": 6.3832,
+            },
+            id="wallonia",
+        ),
+    ],
+)
+def test_rate_sensor_values(card: WaterTariff, expected: dict[str, float | None]) -> None:
+    data = CoordinatorData(
+        tariff=card,
+        fetched_at=datetime(2026, 1, 2, tzinfo=UTC),
+        snapshot_age_hours=1.0,
+        snapshot_stale=False,
+    )
+    got = {d.key: d.value_fn(data) for d in SENSORS if d.key in expected}
+    assert got == pytest.approx(expected)
 
 
 async def test_comfort_rate_is_removed_when_the_operator_loses_it(hass) -> None:  # type: ignore[no-untyped-def]
