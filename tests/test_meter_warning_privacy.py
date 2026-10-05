@@ -91,6 +91,7 @@ def _fold_round(cycle: _YtdCycle, reading: float | None) -> None:
         meter=_METER,
         reading=reading,
         recorder_m3=10.0,
+        recorder_has_statistic=True,
         recorder_ok=True,
         hold_m3=None,
         hold_run=0,

@@ -1656,13 +1656,48 @@ async def test_recorder_ytd_reads_no_statistics_as_zero(hass: HomeAssistant) -> 
 
 
 @pytest.mark.asyncio
-async def test_recorder_ytd_reads_an_absent_recorder_as_zero(hass: HomeAssistant) -> None:
-    """A recorder that is not running is an empty year, not a failed read.
+async def test_recorder_ytd_tells_a_missing_statistic_from_an_empty_one(
+    hass: HomeAssistant,
+) -> None:
+    """No statistic under the meter's id is not a year that used no water.
+
+    A renamed or deleted meter leaves its old id with no statistic, and the
+    zero that answered for it on every query let the fold take the year
+    down to nothing.
+    """
+    from unittest.mock import MagicMock
+
+    from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+
+    instance = MagicMock()
+
+    async def _run(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    instance.async_add_executor_job = _run
+    queried = MagicMock(return_value={})
+    with (
+        patch("homeassistant.components.recorder.statistics.get_metadata", return_value={}),
+        patch(
+            "homeassistant.components.recorder.statistics.statistics_during_period",
+            new=queried,
+        ),
+        patch("homeassistant.components.recorder.get_instance", return_value=instance),
+    ):
+        got = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
+    assert got is None
+    queried.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_recorder_ytd_reads_an_absent_recorder_as_no_statistic(hass: HomeAssistant) -> None:
+    """A recorder that is not running is a missing statistic, not a failed read.
 
     An install without default_config that never enabled the recorder has
     the component importable but no instance behind it. Reporting that as
     unreadable makes the caller wait for a recovery that cannot come, and
-    both YTD sensors would sit unknown for the life of the install.
+    both YTD sensors would sit unknown for the life of the install. The
+    caller still anchors an empty year on it.
     """
     from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
 
@@ -1672,7 +1707,7 @@ async def test_recorder_ytd_reads_an_absent_recorder_as_zero(hass: HomeAssistant
     with patch("homeassistant.components.recorder.get_instance", new=_no_instance):
         got = await _recorder_ytd_m3(hass, "sensor.wm", date(2026, 1, 1), date(2026, 6, 30))
 
-    assert got == 0.0
+    assert got is None
 
 
 @pytest.mark.asyncio
@@ -3511,6 +3546,7 @@ async def test_the_tick_after_a_swap_asks_the_recorder(hass: HomeAssistant) -> N
         now_year=dt_util.now().year,
         reading=0.0,
         recorder_m3=None,
+        recorder_has_statistic=False,
     )
     assert coordinator._ytd_arbitrate is True
 

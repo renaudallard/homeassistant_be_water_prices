@@ -72,6 +72,7 @@ def _round(
     *,
     reading: float | None = None,
     recorder_m3: float | None = None,
+    recorder_has_statistic: bool = True,
     recorder_ok: bool | None = True,
     hold_m3: float | None = None,
     hold_run: int = 0,
@@ -91,6 +92,7 @@ def _round(
         meter=meter,
         reading=reading,
         recorder_m3=recorder_m3,
+        recorder_has_statistic=recorder_has_statistic,
         recorder_ok=recorder_ok,
         hold_m3=hold_m3,
         hold_run=hold_run,
@@ -1430,6 +1432,44 @@ def test_a_recorder_below_its_own_previous_answer_is_a_database_that_lost_some()
 
     assert out.m3 == 130.0
     assert out.cycle.recorder_hwm == 120.0  # and the high-water mark stands
+
+
+def test_a_meter_with_no_statistic_still_starts_an_empty_year() -> None:
+    """The zero a missing statistic answers with may anchor a fresh cycle.
+
+    A sensor with no state class, or one the recorder excludes, never has
+    statistics, and its year has to start somewhere.
+    """
+    out = _round(_YtdCycle(), reading=500.0, recorder_m3=0.0, recorder_has_statistic=False)
+
+    assert out.m3 == 0.0
+    assert out.cycle.offset_m3 == 500.0
+    assert out.cycle.recorder_hwm is None  # but it is not remembered as an answer
+
+
+def test_a_missing_statistic_does_not_bring_the_year_down() -> None:
+    """Its zero repeats on every query, so it cannot show a history is whole.
+
+    A record written before the distinction was made can already carry
+    the zero as its high-water mark, and that is no better evidence.
+    """
+    for hwm in (None, 0.0):
+        year = _anchored(20.0, 500.0, cost=_bill(20.0), recorder_hwm=hwm)
+        out = _round(year, reading=512.0, recorder_m3=0.0, recorder_has_statistic=False)
+
+        assert out.m3 == 20.0
+        assert out.cost == _bill(20.0)
+        assert out.cycle.offset_m3 == 500.0
+        assert out.cycle.recorder_hwm == hwm
+
+
+def test_a_missing_statistic_does_not_refuse_a_reading() -> None:
+    """Nor does it outvote the meter on the water the year has used."""
+    year = _anchored(20.0, 500.0, cost=_bill(20.0), recorder_hwm=0.0)
+    out = _round(year, reading=525.0, recorder_m3=0.0, recorder_has_statistic=False)
+
+    assert out.m3 == 25.0
+    assert out.cost == _bill(25.0)
 
 
 def test_a_meter_back_from_an_outage_agrees_with_the_recorder() -> None:

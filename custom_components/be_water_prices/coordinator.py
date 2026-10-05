@@ -426,6 +426,7 @@ def _fold(
     meter: str,
     reading: float | None,
     recorder_m3: float | None,
+    recorder_has_statistic: bool,
     recorder_ok: bool | None,
     hold_m3: float | None,
     hold_run: int,
@@ -449,10 +450,16 @@ def _fold(
     or ``None`` when it was not asked or could not answer. ``recorder_ok``
     tells those apart for the one decision that needs it: ``False`` when
     the query failed, ``True`` when it succeeded, ``None`` when nothing has
-    asked yet. ``hold_m3`` is a reading held pending confirmation by the
-    next one, ``hold_run`` counts consecutive readings below the frame and
-    ``run_m3`` is the value that run is sitting at; all three are transient
-    and none is persisted.
+    asked yet. ``recorder_has_statistic`` is ``False`` when the recorder
+    holds no statistic for the meter at all, which it answers with the
+    same ``0.0`` as a year that has used no water: a renamed or deleted
+    meter, or one Home Assistant never compiled statistics for. That zero
+    may still start an empty year and settle a corroborated step beyond
+    the bound, but it never lowers a year that has a figure or refuses a
+    reading on its strength. ``hold_m3`` is a reading held pending
+    confirmation by the next one, ``hold_run`` counts consecutive readings
+    below the frame and ``run_m3`` is the value that run is sitting at; all
+    three are transient and none is persisted.
 
     Every figure a round produces is a candidate, and the published one is
     the highest of the candidates and the mark already standing. That
@@ -647,6 +654,10 @@ def _fold(
                 # wrong: that is what a re-anchor onto a reading the meter
                 # never really showed leaves behind. Rebuild it against
                 # what the year knows instead of billing the difference.
+                # A meter with no statistic lands here too. Its zero proves
+                # nothing, but nothing else will ever settle the step
+                # either, and arbitrating it on every tick would leave the
+                # year stuck below a frame the meter has left behind.
                 offset = reading - max(seen)
             else:
                 # The live path never carries a recorder answer, so this
@@ -673,7 +684,11 @@ def _fold(
             hold_m3 = None
 
     spoken_before = recorder_hwm is not None
-    if recorder_m3 is not None and (recorder_hwm is None or recorder_m3 >= recorder_hwm):
+    if (
+        recorder_has_statistic
+        and recorder_m3 is not None
+        and (recorder_hwm is None or recorder_m3 >= recorder_hwm)
+    ):
         # A recorder answer only climbs while its history is intact, since
         # consumption accumulates. One at or above every previous answer is
         # therefore a database that has not lost any of the year, and it
@@ -683,6 +698,12 @@ def _fold(
         # query, and the answers keep climbing short of it. One below is a
         # database that has lost some, and it is ignored rather than
         # believed against the year.
+        #
+        # None of this holds for a meter the recorder has no statistic
+        # for. Its zero repeats on every query, so a second one passed for
+        # a history that had stayed whole, and a meter renamed after New
+        # Year, or one with no state class whose reading stepped back a
+        # little, had its year taken down to nothing and saved that way.
         recorder_hwm = recorder_m3
         if (
             candidate is not None
@@ -1466,7 +1487,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # Quietly: this reads the same thirteen months every day, so a bucket
         # refused here would be warned about daily until it left the window.
         # The year-to-date and full-year readers say so when they meet one.
-        admitted, _refused = _admitted_changes(rows, meter, start, end, level=logging.DEBUG)
+        admitted, _refused = _admitted_changes(rows or [], meter, start, end, level=logging.DEBUG)
         days = {
             dt_util.as_local(datetime.fromtimestamp(bucket, UTC)).date(): m3
             for bucket, m3 in admitted
@@ -1757,6 +1778,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year: int,
         reading: float | None,
         recorder_m3: float | None,
+        recorder_has_statistic: bool,
     ) -> tuple[float | None, float | None]:
         """Fold a round of evidence into the cycle and return what to publish.
 
@@ -1778,6 +1800,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             meter=meter,
             reading=reading,
             recorder_m3=recorder_m3,
+            recorder_has_statistic=recorder_has_statistic,
             recorder_ok=self._recorder_ok,
             hold_m3=self._ytd_hold_m3,
             hold_run=self._ytd_hold_run,
@@ -1851,6 +1874,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         now_year = dt_util.now().year
         live = _state_volume_m3(self.hass.states.get(meter))
         recorder_m3: float | None = None
+        recorder_has_statistic = False
         # The frame produces less than the year has already published, so it
         # has fallen behind what is known. Only a reading and a recorder
         # figure read together can put it back, so ask for one. The mismatch
@@ -1882,8 +1906,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)
             try:
-                recorder_m3 = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+                answer = await _recorder_ytd_m3(self.hass, meter, jan1, today)
                 self._recorder_ok = True
+                # A meter with no statistic still starts an empty year at
+                # zero, or one Home Assistant keeps no statistics for could
+                # never anchor; the fold is told the zero came from nowhere.
+                recorder_has_statistic = answer is not None
+                recorder_m3 = 0.0 if answer is None else answer
             except RecorderUnavailable as err:
                 _LOGGER.debug("recorder unreadable for %s: %s", meter, err)
                 self._recorder_ok = False
@@ -1902,7 +1931,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # the new year.
             self._recorder_ok = None
         ytd_m3, ytd_cost = self._fold_cycle(
-            tariff, meter=meter, now_year=now_year, reading=live, recorder_m3=recorder_m3
+            tariff,
+            meter=meter,
+            now_year=now_year,
+            reading=live,
+            recorder_m3=recorder_m3,
+            recorder_has_statistic=recorder_has_statistic,
         )
         if self._cycle_dirty and self._owns_the_entry():
             self._cycle_dirty = False
@@ -1914,7 +1948,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 # stands rather than the figure computed before the await,
                 # which the year has already climbed past.
                 ytd_m3, ytd_cost = self._fold_cycle(
-                    tariff, meter=meter, now_year=now_year, reading=None, recorder_m3=None
+                    tariff,
+                    meter=meter,
+                    now_year=now_year,
+                    reading=None,
+                    recorder_m3=None,
+                    recorder_has_statistic=False,
                 )
         return ytd_m3, ytd_cost
 
@@ -2001,6 +2040,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             now_year=dt_util.now().year,
             reading=live,
             recorder_m3=None,
+            recorder_has_statistic=False,
         )
         if ytd_m3 is None:
             # Nothing is known about this year yet. The fold has still kept
@@ -2280,8 +2320,11 @@ async def _discover_energy_water_meter(hass: HomeAssistant) -> tuple[str | None,
 # because the figures behind them already are cubic metres. ``None`` is a
 # sensor with no unit, which _state_volume_m3 reads as m3 on the live
 # side; ``m3`` is the ASCII spelling of the same thing.
-async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, entity_id: str) -> None:
+async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, entity_id: str) -> bool:
     """Stop before reading a statistic Home Assistant cannot put into m³.
+
+    Returns whether the recorder holds a statistic for ``entity_id`` at
+    all, which the year-to-date fold has to know: see :func:`_fold`.
 
     The query below asks the recorder for cubic metres, and the recorder
     obliges only for a unit its volume converter knows. For anything else
@@ -2307,7 +2350,7 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
     try:
         from homeassistant.components.recorder.statistics import get_metadata
     except ImportError:
-        return
+        return False
     try:
         metadata = await instance.async_add_executor_job(
             partial(get_metadata, hass, statistic_ids={entity_id})
@@ -2318,12 +2361,12 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
         raise RecorderUnavailable(f"could not read the unit of {entity_id}: {err}") from err
     entry = metadata.get(entity_id)
     if entry is None:
-        # No statistic yet. There is nothing to convert and nothing to
-        # misread; the empty answer below is the right one.
-        return
+        # No statistic under this id: none yet, or the meter was renamed
+        # or deleted. There is nothing to convert and nothing to misread.
+        return False
     unit = entry[1].get("unit_of_measurement")
     if unit in VolumeConverter.VALID_UNITS or unit in _ALREADY_CUBIC_METRES:
-        return
+        return True
     raise RecorderUnavailable(
         f"{entity_id} records statistics in {unit!r}, which Home Assistant cannot "
         f"convert to {UnitOfVolume.CUBIC_METERS} and which is not cubic metres "
@@ -2334,19 +2377,20 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
 
 async def _recorder_daily_rows(
     hass: HomeAssistant, entity_id: str, start: date, end: date
-) -> list[Any]:
+) -> list[Any] | None:
     """Return the daily statistics buckets for ``entity_id`` over ``[start, end]``.
 
     Wraps :func:`statistics_during_period` via the recorder's executor so
     the SQLite query never runs on the event loop.
 
-    Returns an empty list when there is nothing to read: an empty period, or
-    no recorder to read it from. Raises :class:`RecorderUnavailable` only
-    when a recorder that is running could not answer this query.
+    Returns an empty list for an empty period, and ``None`` when there is
+    no statistic to read at all: no recorder, or none kept for this meter.
+    Raises :class:`RecorderUnavailable` only when a recorder that is
+    running could not answer this query.
 
-    The absent-recorder cases belong with the empty period rather than with
-    the failure, because they never resolve: reporting them as unreadable
-    leaves the caller waiting for a recovery that cannot come.
+    The absent-recorder cases belong with the missing statistic rather than
+    with the failure, because they never resolve: reporting them as
+    unreadable leaves the caller waiting for a recovery that cannot come.
 
     Asks for the ``change`` field, which the recorder defines as the
     delta of the cumulative ``sum`` between the bucket's first and
@@ -2371,7 +2415,7 @@ async def _recorder_daily_rows(
         # No recorder component at all: there are no statistics to read and
         # there never will be, so the year starts here rather than being
         # treated as unreadable forever.
-        return []
+        return None
 
     try:
         instance = get_instance(hass)
@@ -2384,9 +2428,10 @@ async def _recorder_daily_rows(
         # component at all, and it has to be, or such an install could never
         # anchor a year and both YTD sensors would sit unknown forever.
         _LOGGER.debug("no recorder instance for %s: %s", entity_id, err)
-        return []
+        return None
 
-    await _refuse_an_unconvertible_unit(hass, instance, entity_id)
+    if not await _refuse_an_unconvertible_unit(hass, instance, entity_id):
+        return None
 
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
@@ -2420,20 +2465,27 @@ async def _recorder_daily_rows(
     return rows
 
 
-async def _recorder_ytd_m3(hass: HomeAssistant, entity_id: str, start: date, end: date) -> float:
+async def _recorder_ytd_m3(
+    hass: HomeAssistant, entity_id: str, start: date, end: date
+) -> float | None:
     """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
 
-    Returns the period's consumption, and ``0.0`` when there is nothing to
-    read. Raises :class:`RecorderUnavailable` only when a recorder that is
+    Returns the period's consumption, ``0.0`` when the meter's statistic
+    holds none, and ``None`` when there is no statistic to read at all.
+    Raises :class:`RecorderUnavailable` only when a recorder that is
     running could not answer the query.
 
     Those are different answers and the caller has to tell them apart: a
     year with no statistics may be anchored at zero, a query that failed may
     not, or a database hiccup would discard consumption already reported.
     Collapsing both into ``None`` is what every year-stamp and deferral
-    guard in this module was re-deriving one call later.
+    guard in this module was re-deriving one call later. A missing
+    statistic may anchor an empty year too, but a zero from it is no
+    evidence against a year that already has a figure.
     """
     rows = await _recorder_daily_rows(hass, entity_id, start, end)
+    if rows is None:
+        return None
     admitted, refused = _admitted_changes(rows, entity_id, start, end, level=logging.WARNING)
     if not admitted and refused > _REFUSALS_BEFORE_UNREADABLE:
         # Every bucket the year had was refused, and there were enough of
@@ -2461,7 +2513,7 @@ def _admitted_changes(
     """
     # The first-bucket trim below is not a refusal: it is a boundary
     # artefact, not evidence about the year. A year every guard rejects
-    # sums to the same 0.0 as a year with no statistics at all, and the
+    # sums to the same 0.0 as a year that used no water, and the
     # caller may anchor an empty year at zero but not an unreadable one: a
     # cumulative meter that republishes 0 on a nightly reconnect and is
     # still at 0 when each day closes leaves every bucket carrying the
@@ -2745,6 +2797,8 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
     this the figure it wants.
     """
     rows = await _recorder_daily_rows(hass, entity_id, date(year - 1, 12, 1), date(year, 12, 31))
+    if rows is None:
+        return None
     # Daily buckets start at local midnight, so each of these lands exactly
     # on a bucket boundary. The upper one is not defensive: asking for a
     # day period makes Home Assistant re-align the end of the window to the
