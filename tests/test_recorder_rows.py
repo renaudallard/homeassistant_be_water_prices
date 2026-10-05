@@ -179,6 +179,28 @@ async def test_the_room_a_gap_buys_is_a_household_and_not_a_register() -> None:
     assert total == 1.0
 
 
+async def test_a_meter_that_reported_every_day_has_no_gap_to_spend() -> None:
+    """The room a bucket gets is measured from the bucket before it.
+
+    Measured from 1 January instead, a meter that reported every day
+    would reach July with half a year of absence to its credit, and a
+    250 m3 re-base whose register is larger still would be billed into
+    the year and pin it until January.
+    """
+    rows = []
+    register, running = 1000.0, 900.0
+    day = date(2026, 1, 1)
+    while day < date(2026, 7, 1):
+        register += 0.25
+        running += 0.25
+        rows.append(_row(day, change=0.25, state=register, total=running))
+        day += timedelta(days=1)
+    rows.append(_row(day, change=250.0, state=register + 250.0, total=running + 250.0))
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), day)  # type: ignore[arg-type]
+    assert total == 181 * 0.25
+
+
 async def test_ordinary_days_are_summed_in_full() -> None:
     rows = [
         _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
