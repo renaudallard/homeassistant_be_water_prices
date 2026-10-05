@@ -435,6 +435,7 @@ def _fold(
     elapsed_s: float,
     now_ts: float,
     high_m3: float | None,
+    after_swap: bool,
     basis: str,
     cost_of: Callable[[float], float | None],
 ) -> _YtdFold:
@@ -459,7 +460,10 @@ def _fold(
     reading on its strength. ``hold_m3`` is a reading held pending
     confirmation by the next one, ``hold_run`` counts consecutive readings
     below the frame and ``run_m3`` is the value that run is sitting at; all
-    three are transient and none is persisted.
+    three are transient and none is persisted. ``after_swap`` says this
+    meter's year restarted on a replaced register, so the recorder's total
+    for it still holds the old meter's water and stands above anything the
+    new register can show.
 
     Every figure a round produces is a candidate, and the published one is
     the highest of the candidates and the mark already standing. That
@@ -802,7 +806,7 @@ def _fold(
         and was_high is not None
         and reading >= was_high
         and published > reading - offset
-        and reading >= published
+        and (reading >= published or after_swap)
     ):
         # A reading and a recorder figure read in the same round are the only
         # pair that dates the year's consumption to a meter position, so this
@@ -824,6 +828,17 @@ def _fold(
         # Rebuilt this way the frame produces exactly what is being published,
         # so the meter carries on from there instead of having to climb back
         # up to where the frame had got to on its own.
+        #
+        # A register holding less water than the year has used cannot have
+        # measured all of it, so the frame is normally left alone there.
+        # A replaced meter is the exception. Home Assistant's statistics run
+        # straight through the swap, so the recorder's total keeps the old
+        # meter's water and the new register stays below it all year. Left
+        # on the swap reading, the frame produced less than the recorder had
+        # published, every live reading was lost under it, and the year moved
+        # only when a daily tick asked the recorder again. The frame goes
+        # below zero here instead. Only a reading at or above the highest the
+        # meter has shown gets this far, so a dip cannot pull it down.
         offset = reading - published
 
     cost = cost_of(published)
@@ -1001,6 +1016,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # place v0.7.8 was in permanently, and closing it needs the intent
         # persisted rather than held.
         self._ytd_arbitrate: bool = False
+        # The meter and year a round last treated the meter as replaced in.
+        # For the rest of that year the recorder's total for the meter
+        # includes the old register's water, which the fold has to know to
+        # put the new register under it. In memory only, like the flag above.
+        self._ytd_swapped_on: tuple[str, int] | None = None
         # Whether the last recorder query succeeded, None before anything has
         # asked. Transient by design: it says what the database did a moment
         # ago, which is exactly as long as the answer is worth trusting.
@@ -1812,6 +1832,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # across a restart, which no monotonic clock survives.
             now_ts=dt_util.utcnow().timestamp(),
             high_m3=self._ytd_high_m3,
+            after_swap=self._ytd_swapped_on == (meter, now_year),
             basis=_cost_basis(
                 utility=tariff.utility,
                 commune=self.entry.options.get(CONF_COMMUNE),
@@ -1837,6 +1858,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # and a meter that was merely offline bills its whole
             # lifetime into this year.
             self._ytd_arbitrate = True
+        if out.swapped:
+            self._ytd_swapped_on = (meter, now_year)
         return out.m3, out.cost
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:

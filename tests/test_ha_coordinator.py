@@ -3559,6 +3559,66 @@ async def test_the_tick_after_a_swap_asks_the_recorder(hass: HomeAssistant) -> N
     assert coordinator._ytd_arbitrate is False
 
 
+@pytest.mark.asyncio
+async def test_a_replaced_meter_is_tracked_live_after_the_recorder_tick(
+    hass: HomeAssistant,
+) -> None:
+    """The recorder's year keeps the old meter's water after a swap.
+
+    The new register reads below it, so the swap has to be remembered
+    past the round that found it, or the frame stays on the swap reading
+    and live readings stop moving the year.
+    """
+    from custom_components.be_water_prices import coordinator as co
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=AsyncMock())
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        coordinator = co.WaterCoordinator(hass, entry)
+
+    year = dt_util.now().year
+    coordinator._ytd = co._YtdCycle(meter="sensor.water_meter", year=year, m3=60.0, offset_m3=940.0)
+    coordinator._ytd_hold_run = 2
+    coordinator._ytd_hold_span_s = 700.0
+    coordinator._ytd_run_m3 = 1.1
+    coordinator._ytd_high_m3 = 1000.0
+    swap, _ = coordinator._fold_cycle(
+        _fresh_tariff(),
+        meter="sensor.water_meter",
+        now_year=year,
+        reading=1.2,
+        recorder_m3=None,
+        recorder_has_statistic=False,
+    )
+    assert swap == 0.0
+
+    hass.states.async_set("sensor.water_meter", "1.2")
+    recorder = AsyncMock(return_value=60.3)
+    with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
+        tick, _ = await coordinator._compute_ytd(_fresh_tariff())
+    assert tick == 60.3
+
+    live, _ = coordinator._fold_cycle(
+        _fresh_tariff(),
+        meter="sensor.water_meter",
+        now_year=year,
+        reading=5.0,
+        recorder_m3=None,
+        recorder_has_statistic=False,
+    )
+    assert live == pytest.approx(64.1)
+
+
 def test_both_halves_of_the_meter_path_accept_the_same_units() -> None:
     """The two guards have drifted apart twice, in opposite directions.
 

@@ -81,6 +81,7 @@ def _round(
     elapsed_s: float = 86400.0,
     now_ts: float = _NOW_TS,
     high_m3: float | None = None,
+    after_swap: bool = False,
     now_year: int = _YEAR,
     meter: str = _METER,
     basis: str = _BASIS,
@@ -101,6 +102,7 @@ def _round(
         elapsed_s=elapsed_s,
         now_ts=now_ts,
         high_m3=high_m3,
+        after_swap=after_swap,
         basis=basis,
         cost_of=cost_of,
     )
@@ -442,6 +444,50 @@ def test_a_swap_ignores_a_recorder_total_spanning_the_old_meter() -> None:
 
     assert out.m3 == 0.0
     assert out.cycle.offset_m3 == 12.0
+
+
+def test_the_tick_after_a_swap_puts_the_new_register_under_the_recorder() -> None:
+    """Home Assistant's statistics run straight through a replacement.
+
+    So the tick after a swap publishes the year with the old meter's water
+    in it, and the new register reads far below that. The frame used to
+    stay on the swap reading, every live reading after it was lost under
+    the recorder's figure, and the year moved only once a day.
+    """
+    swap = _round(_anchored(60.0, 940.0), reading=1.2, hold_run=2, run_m3=1.1, high_m3=1000.0)
+    assert swap.swapped is True
+    assert swap.m3 == 0.0
+
+    tick = _round(swap.cycle, reading=1.2, recorder_m3=60.3, high_m3=swap.high_m3, after_swap=True)
+    assert tick.m3 == 60.3
+    assert tick.cycle.offset_m3 == pytest.approx(1.2 - 60.3)
+
+    live = _round(tick.cycle, reading=5.0, high_m3=tick.high_m3, after_swap=True)
+    assert live.m3 == pytest.approx(64.1)
+
+
+def test_a_dip_on_the_tick_after_a_swap_leaves_the_frame_alone() -> None:
+    """Only a meter at its highest may pull the frame below zero.
+
+    A reading under one the new register has already shown is a dip, and
+    rebuilding on it would count the water between the two again.
+    """
+    cycle = _anchored(3.8, 1.2)
+    out = _round(cycle, reading=3.0, recorder_m3=60.3, high_m3=5.0, after_swap=True)
+
+    assert out.m3 == 60.3
+    assert out.cycle.offset_m3 == 1.2
+
+
+def test_a_register_holding_less_than_the_year_keeps_its_frame() -> None:
+    """With no swap behind it, a register below the year cannot have seen
+    all of the year's water, so the recorder's figure is published but the
+    frame is not rebuilt beneath it.
+    """
+    out = _round(_anchored(5.0, 2.0), reading=6.0, recorder_m3=30.0, high_m3=6.0)
+
+    assert out.m3 == 30.0
+    assert out.cycle.offset_m3 == 2.0
 
 
 def test_a_run_below_a_frame_built_too_high_rebuilds_the_frame() -> None:
