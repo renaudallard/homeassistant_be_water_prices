@@ -1351,6 +1351,35 @@ def test_the_card_a_late_publisher_stood_in_with_does_not_hold_the_year() -> Non
     assert glitch.cost == 140.0
 
 
+@pytest.mark.parametrize(
+    ("commune", "social"), [("geel", False), (None, True)], ids=["commune", "social"]
+)
+def test_a_floor_measured_for_another_household_does_not_hold(
+    commune: str | None, social: bool
+) -> None:
+    """Resolving the commune or enabling the social tariff releases the floor.
+
+    Both lower the bill for the rest of the year, and the basis comparison
+    is the only thing that tells them from a fetch that came back cheaper:
+    an options change reloads the entry and the stored cycle comes back
+    with the basis it was measured under.
+    """
+    from custom_components.be_water_prices.coordinator import _cost_basis
+
+    old = _cost_basis(utility="pidpa", commune=None, persons=2, social=False, card_year=_YEAR)
+    new = _cost_basis(utility="pidpa", commune=commune, persons=2, social=social, card_year=_YEAR)
+    assert old != new
+
+    cycle = _YtdCycle(meter=_METER, year=_YEAR, m3=50.0, cost=250.0, offset_m3=1000.0, basis=old)
+    released = _round(cycle, reading=1050.0, basis=new, cost_of=lambda _m3: 202.5)
+    assert released.cost == 202.5
+    assert released.cycle.basis == new
+
+    # The same household seeing a cheaper figure is still held.
+    held = _round(cycle, reading=1050.0, basis=old, cost_of=lambda _m3: 202.5)
+    assert held.cost == 250.0
+
+
 def test_a_spike_under_the_old_bound_is_no_longer_taken_on_sight() -> None:
     """Only a step over 100 m3 was ever tested, and nothing below it was.
 
