@@ -153,3 +153,12 @@ def test_options_description_names_the_projected_cost_sensor(lang: str) -> None:
     name = data["entity"]["sensor"]["projected_annual_cost"]["name"]
     text = data["config"]["step"]["options"]["description"]
     assert name.casefold() in text.casefold()
+
+
+@pytest.mark.parametrize("lang", ["fr", "nl", "de"])
+def test_projection_repair_names_the_projected_cost_sensor(lang: str) -> None:
+    """The projection Repair points at the same sensor, and by the same name."""
+    data = _load(lang)
+    name = data["entity"]["sensor"]["projected_annual_cost"]["name"]
+    step = data["issues"]["projection_outdated"]["fix_flow"]["step"]["confirm"]
+    assert name.casefold() in step["description"].casefold()
