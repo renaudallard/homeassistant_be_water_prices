@@ -68,17 +68,18 @@ FETCH_BUDGET_S = 180
 # The project's own daily capture of every utility's card, one JSON per
 # utility, commune and month on the archive branch (scripts/archive_cards.py
 # writes it). Read when a refresh fails with nothing to serve, a restart
-# while the utility is down, and again once what is held has gone stale, so
-# the entry loads on the last card the archive saw instead of retrying setup
-# until the utility is back, and keeps up with the archive while it stays
-# away.
+# while the utility is down, and again once what is held has gone stale or
+# is last year's card, so the entry loads on the last card the archive saw
+# instead of retrying setup until the utility is back, and keeps up with the
+# archive while it stays away.
 CARD_ARCHIVE_URL = (
     "https://raw.githubusercontent.com/renaudallard/homeassistant_be_water_prices/archive"
 )
 
 # Treat the snapshot as stale once it has not been refreshed for this many days
-# OR the parsed valid_until is in the past. Surfaced as a sensor attribute and
-# logged; persistent failure is caught by the daily live_check workflow.
+# OR the parsed valid_until is in the past, last year's card counting as valid
+# until 31 March. Surfaced as a sensor attribute and logged; persistent
+# failure is caught by the daily live_check workflow.
 SNAPSHOT_STALE_AFTER_DAYS = 35
 
 # Wallonia uses two flat-Wallonia volumetric components on top of each

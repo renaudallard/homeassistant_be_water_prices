@@ -590,6 +590,7 @@ coordinator keeps serving the last known snapshot and surfaces
 `snapshot_age_hours`, `snapshot_stale` and `last_error` as attributes
 on every sensor. Snapshots older than
 **35 days**, or where the parsed `valid_until` has already passed,
+last year's card counting as valid until 31 March,
 flip `snapshot_stale` to `true` and raise a Repair issue under
 **Settings → Repairs**. The Repair card carries a **Retry** button
 that triggers an immediate coordinator refresh; the issue
@@ -612,6 +613,7 @@ date can be up to a month older than the archive's last sighting, and
 in an outage the utility shares with the archive the stale-snapshot
 Repair comes up early rather than late. Later failures serve that card
 as the cached snapshot; the next successful fetch replaces it. Once the snapshot has gone stale,
+or while it is still last year's card,
 a failing refresh asks the archive again and takes the card if it was
 captured later than the one being served, so an outage longer than the
 staleness window follows the archive rather than standing on the first
@@ -993,7 +995,7 @@ see them; the commune's label is inside each file.
 The integration itself reads the branch in two cases: a refresh that
 fails with nothing to serve, which is a restart or a fresh install while
 the utility's site is down, and a failing refresh whose snapshot has gone
-stale. It asks for this month's row of its utility and commune
+stale or is last year's card. It asks for this month's row of its utility and commune
 (`default` without a commune), then back a month at a time for up to a
 year, and loads on the first card it finds, dated the first day that
 month's row saw it, rather than retrying setup until the site is back or standing

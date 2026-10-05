@@ -72,6 +72,7 @@ from custom_components.be_water_prices.providers.base import (
     ExtractorError,
     WaterExtractor,
     WaterTariff,
+    belgian_today,
 )
 from custom_components.be_water_prices.repairs import async_create_fix_flow
 
@@ -88,6 +89,14 @@ def _fresh_tariff(valid_until: date | None = None) -> WaterTariff:
         linear_eur_per_m3=2.62 / 1.06,
         sanering_gemeentelijk_eur_per_m3=2.73 / 1.06,
     )
+
+
+def _this_years_card(valid_until: date | None = None) -> WaterTariff:
+    # Dated from 1 January of the Belgian year the test runs in. Last
+    # year's card stands until 31 March whatever it says, and a failing
+    # refresh asks the archive while it holds one, so a card fixed to one
+    # year would change what these tests see from that year's end on.
+    return replace(_fresh_tariff(valid_until), valid_from=date(belgian_today().year, 1, 1))
 
 
 async def _setup_entry(
@@ -143,10 +152,10 @@ async def test_successful_fetch_does_not_raise_repair_issue(hass: HomeAssistant)
 
 @pytest.mark.asyncio
 async def test_expired_valid_until_raises_repair_issue(hass: HomeAssistant) -> None:
-    yesterday = date.today() - timedelta(days=1)
+    yesterday = belgian_today() - timedelta(days=1)
 
     async def _fetch(_session: Any) -> WaterTariff:
-        return _fresh_tariff(valid_until=yesterday)
+        return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -162,8 +171,8 @@ async def test_expired_valid_until_raises_repair_issue(hass: HomeAssistant) -> N
 
 @pytest.mark.asyncio
 async def test_repair_issue_clears_when_next_fetch_is_fresh(hass: HomeAssistant) -> None:
-    yesterday = date.today() - timedelta(days=1)
-    fetch_results = [_fresh_tariff(valid_until=yesterday), _fresh_tariff()]
+    yesterday = belgian_today() - timedelta(days=1)
+    fetch_results = [_this_years_card(yesterday), _fresh_tariff()]
 
     async def _fetch(_session: Any) -> WaterTariff:
         return fetch_results.pop(0)
@@ -208,8 +217,8 @@ async def test_extractor_error_serves_cached_snapshot(hass: HomeAssistant) -> No
 
 @pytest.mark.asyncio
 async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant) -> None:
-    yesterday = date.today() - timedelta(days=1)
-    fetch_results = [_fresh_tariff(valid_until=yesterday), _fresh_tariff()]
+    yesterday = belgian_today() - timedelta(days=1)
+    fetch_results = [_this_years_card(yesterday), _fresh_tariff()]
 
     async def _fetch(_session: Any) -> WaterTariff:
         return fetch_results.pop(0)
@@ -409,11 +418,11 @@ async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssist
     still-stale snapshot would silently lose its card until the next daily
     tick recreated it, a day later.
     """
-    yesterday = date.today() - timedelta(days=1)
+    yesterday = belgian_today() - timedelta(days=1)
 
     async def _fetch(_session: Any) -> WaterTariff:
         # Every fetch stays stale, so the retry cannot clear the issue.
-        return _fresh_tariff(valid_until=yesterday)
+        return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -1405,10 +1414,10 @@ async def test_live_ytd_burst_of_subbaseline_readings_does_not_reanchor(
 
 @pytest.mark.asyncio
 async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
-    yesterday = date.today() - timedelta(days=1)
+    yesterday = belgian_today() - timedelta(days=1)
 
     async def _fetch(_session: Any) -> WaterTariff:
-        return _fresh_tariff(valid_until=yesterday)
+        return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -3892,11 +3901,11 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
     from custom_components.be_water_prices.providers.base import tariff_to_dict
 
     asked: list[tuple[str, str, date]] = []
-    # Recent enough that the adopted card is not stale, so the refresh
-    # below has no reason to ask the archive a second time.
+    # Recent enough that the adopted card is not stale, and this year's,
+    # so the refresh below has no reason to ask the archive a second time.
     seen_on = dt_util.now().date() - timedelta(days=5)
     row = {
-        **tariff_to_dict(_fresh_tariff()),
+        **tariff_to_dict(_this_years_card()),
         "_seen_on": seen_on.isoformat(),
         "_sources": [],
     }
@@ -3909,7 +3918,7 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
     entry = await _setup_entry(hass, _down)
     coordinator = hass.data[DOMAIN][entry.entry_id]
     data = coordinator.data
-    assert data.tariff == _fresh_tariff()
+    assert data.tariff == _this_years_card()
     assert data.fetched_at.date() == seen_on
     assert "HTTP 503" in data.last_error
     today = dt_util.now().date()
@@ -4152,6 +4161,103 @@ async def test_a_card_archived_this_morning_is_not_dated_after_now(
     data = hass.data[DOMAIN][entry.entry_id].data
     assert data.fetched_at <= dt_util.utcnow()
     assert not data.snapshot_stale
+
+
+def test_last_years_card_is_stale_from_1_april(freezer: Any) -> None:
+    """A December card held into the new year stands until 31 March, as it
+    does when an extractor serves it, and no longer than that."""
+    from datetime import UTC, datetime
+
+    from custom_components.be_water_prices.coordinator import WaterCoordinator
+
+    december = _fresh_tariff(date(2026, 12, 31))
+    freezer.move_to("2027-03-31 10:00:00+00:00")
+    assert WaterCoordinator._is_stale(december, datetime.now(UTC)) is False
+    freezer.move_to("2027-04-01 10:00:00+00:00")
+    assert WaterCoordinator._is_stale(december, datetime.now(UTC)) is True
+    # The grace never cuts short a card dated past it.
+    longer = _fresh_tariff(date(2027, 12, 31))
+    assert WaterCoordinator._is_stale(longer, datetime.now(UTC)) is False
+    undated = replace(_fresh_tariff(), valid_until=None)
+    assert WaterCoordinator._is_stale(undated, datetime.now(UTC)) is False
+
+
+@pytest.mark.asyncio
+async def test_a_december_card_held_into_january_is_not_stale(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """Fetched on 31 December, the card still says 31 December. The first
+    refresh in January that failed found it past its date and raised the
+    stale-snapshot Repair, where the same card fetched that day would have
+    stood until 31 March."""
+    freezer.move_to("2026-12-31 12:00:00+00:00")
+    up = {"value": True}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        if up["value"]:
+            return _fresh_tariff(date(2026, 12, 31))
+        raise ExtractorError("HTTP 503 from upstream")
+
+    entry = await _setup_entry(hass, _fetch)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert not coordinator.data.snapshot_stale
+
+    up["value"] = False
+    freezer.move_to("2027-01-02 10:00:00+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.data.last_error
+    assert coordinator.data.tariff.valid_until == date(2026, 12, 31)
+    assert not coordinator.data.snapshot_stale
+    issue_reg = ir.async_get(hass)
+    assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
+
+    freezer.move_to("2027-04-01 10:00:00+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.data.snapshot_stale
+    assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_a_failing_refresh_on_last_years_card_takes_the_archived_new_one(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, freezer: Any
+) -> None:
+    """Last year's card is not stale until 31 March, but the archive may
+    already hold the new one. A failing refresh in January still asks, and
+    takes a newer capture over the December card it holds."""
+    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers.base import tariff_to_dict
+
+    new_card = replace(
+        _fresh_tariff(date(2027, 12, 31)),
+        valid_from=date(2027, 1, 1),
+        publication_label="VIVAQUA test 2027",
+    )
+    row = {**tariff_to_dict(new_card), "_seen_on": "2027-01-01", "_sources": []}
+
+    async def archived(_session: Any, _utility: str, _commune: str, month: date) -> Any:
+        return row if month.year == 2027 else None
+
+    monkeypatch.setattr(module, "_archived_row", archived)
+    freezer.move_to("2026-12-31 12:00:00+00:00")
+    up = {"value": True}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        if up["value"]:
+            return _fresh_tariff(date(2026, 12, 31))
+        raise ExtractorError("HTTP 503 from upstream")
+
+    entry = await _setup_entry(hass, _fetch)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.data.tariff.publication_label == "VIVAQUA test 2026"
+
+    up["value"] = False
+    freezer.move_to("2027-01-02 10:00:00+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.data.tariff.publication_label == "VIVAQUA test 2027"
+    assert not coordinator.data.snapshot_stale
 
 
 @pytest.mark.asyncio

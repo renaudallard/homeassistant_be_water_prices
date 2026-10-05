@@ -28,7 +28,8 @@
 `snapshot_stale`: the coordinator raises it under Settings -> Repairs
 when the last successful tariff fetch has aged out
 (:data:`SNAPSHOT_STALE_AFTER_DAYS` days) or the parsed
-``valid_until`` has already passed. Clicking the card opens a flow
+``valid_until`` has already passed, last year's card counting as valid
+until 31 March. Clicking the card opens a flow
 that triggers an immediate coordinator refresh; the issue auto-clears
 in :func:`coordinator._sync_repair_issue` when the next fetch returns
 a fresh snapshot.

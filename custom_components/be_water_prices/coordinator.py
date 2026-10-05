@@ -94,7 +94,12 @@ from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, TransientFetchError, WaterTariff, get
 from .providers._pdf import fetch_text
 from .providers._postcodes import resolve_candidates
-from .providers.base import WaterExtractor, relabel_with_human_commune, tariff_from_dict
+from .providers.base import (
+    WaterExtractor,
+    carry_prior_year_card,
+    relabel_with_human_commune,
+    tariff_from_dict,
+)
 
 if TYPE_CHECKING:
     import aiohttp
@@ -1119,7 +1124,14 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         age_days = delta.days
         if age_days > SNAPSHOT_STALE_AFTER_DAYS:
             return True
-        return tariff.valid_until is not None and tariff.valid_until < dt_util.now().date()
+        # Last year's card stands until 31 March, as it does when an
+        # extractor serves it. A card held from a December fetch, or a
+        # December row of the archive, still says 31 December, and the
+        # first failed refresh in January raised the Repair on it. The
+        # grace only ever adds time: a card dated later stands to its date.
+        today = dt_util.now().date()
+        carried = carry_prior_year_card(tariff, today.year).valid_until
+        return all(d is not None and d < today for d in (tariff.valid_until, carried))
 
     @property
     def stale_issue_id(self) -> str:
@@ -1132,10 +1144,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         The last good snapshot, with the failure scrubbed into last_error
         and the stale check re-run, so a dashboard sees the age and the
         reason rather than every sensor going blank. With no snapshot to
-        fall back on, or with one that has gone stale and a newer card in
-        the project's archive, the archived card is served instead. With
-        neither the refresh fails, which on a first refresh is the entry's
-        "not ready" reason.
+        fall back on, or with one that has gone stale or is last year's
+        card and a newer card in the project's archive, the archived card
+        is served instead. With neither the refresh fails, which on a first
+        refresh is the entry's "not ready" reason.
         """
         if out_of_time:
             # A bare TimeoutError, whose str() is empty. The parse thread
@@ -1154,10 +1166,16 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # outage that outlives the staleness window: the archive files a
         # row a month, and an entry that adopted one in January would
         # otherwise serve that same January card until Home Assistant
-        # restarts, Repair card and all. Only a capture newer than what is
-        # held replaces it.
+        # restarts, Repair card and all. Last year's card is asked about
+        # too, although it is not stale until 31 March: the archive may
+        # already hold the new one. Only a capture newer than what is held
+        # replaces it.
         card: tuple[WaterTariff, datetime] | None = None
-        if held is None or self._is_stale(held.tariff, held.fetched_at):
+        if (
+            held is None
+            or self._is_stale(held.tariff, held.fetched_at)
+            or held.tariff.valid_from.year < dt_util.now().year
+        ):
             archived = await self._from_card_archive()
             if archived is not None and (held is None or archived[1] > held.fetched_at):
                 card = archived
@@ -1208,12 +1226,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         Asked when a refresh failed with nothing to serve, which is a
         restart or a fresh install while the utility is down, and again
-        once what is held has gone stale. The entry then loads on that
-        card, stale after the usual 35 days, instead of retrying setup
-        until the utility is back. This month's row first, since the
-        archive writes one per month, then back a month at a time: last
-        month's covers the first days of a month, and the ones before it a
-        utility the daily run cannot reach at all.
+        once what is held has gone stale or is last year's card. The entry
+        then loads on that card, stale after the usual 35 days, instead of
+        retrying setup until the utility is back. This month's row first,
+        since the archive writes one per month, then back a month at a
+        time: last month's covers the first days of a month, and the ones
+        before it a utility the daily run cannot reach at all.
         """
         if not self.entry.options.get(CONF_CARD_ARCHIVE, DEFAULT_CARD_ARCHIVE):
             return None
@@ -1295,8 +1313,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         Surfaces in Settings -> Repairs as a warning card when the
         snapshot has not refreshed for SNAPSHOT_STALE_AFTER_DAYS days
-        or the parsed valid_until is in the past. Auto-clears on the
-        next successful, fresh fetch.
+        or the parsed valid_until is in the past, last year's card
+        counting as valid until 31 March. Auto-clears on the next
+        successful, fresh fetch.
         """
         if not self._owns_the_entry():
             return
