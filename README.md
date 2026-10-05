@@ -65,7 +65,7 @@ publication and how to parse it.
 - **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own, and a year holding a bucket that claims more than the days behind it could hold is not offered at all: that is a re-based or reset counter rather than water, and it would otherwise be proposed as your yearly consumption. The days behind it count because a meter that was away comes back with the whole absence in one bucket, and a year that really did have an outage is still a year worth offering.
 - **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card the project's daily archive captured (see *The card archive* below) instead of retrying setup until the utility is back, and an outage that drags on past the staleness window picks up whatever the archive has captured since; a box in the options switches that off.
-- **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to now, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
+- **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to the last hour Home Assistant's recorder has compiled, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.).
 - **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so it cannot notice a move in the decreed constants above; every Walloon parser fails outright if the CVA or FSE its page publishes leaves the constant behind, or if its page stops printing a CVA at all, which is what puts that move on the live check instead. Note what that means each 1 January: when CWaPE moves the CVA, every Walloon page picks it up at once and all nine Walloon extractors stop together, each entry holding its last good snapshot behind a stale-snapshot Repair, until a release carries the new `WALLONIA_CVA_EUR_PER_M3` / `WALLONIA_FSE_EUR_PER_M3` in `const.py`. That is deliberate: the constants are what the household is billed on, so failing open would bill everyone on last year's figure with nothing to show for it.
 
@@ -635,7 +635,8 @@ moment.
 On the first setup of a calendar year, and on any later daily tick that
 finds the gate below has moved, the integration imports
 hourly flat-line rows from **1 January of the current year up to the
-previous full hour** for the five flat-line price sensors on the entry
+last hour Home Assistant's recorder has compiled** for the five
+flat-line price sensors on the entry
 (`yearly_fixed_fee`, `basis_rate`, `comfort_rate` on Flemish entries,
 `sewerage_rate`, `all_in_basis_rate`). `projected_annual_cost` is
 `MEASUREMENT`-class too but is deliberately not among them: it moves
@@ -657,7 +658,12 @@ an install that never restarts between January and the card landing gets
 the rewrite on the tick that brings the card in. If the
 snapshot is stale it waits instead, so a year is never filled in with
 rates that had already expired. The window also stops at the tariff's own
-`valid_until`. The meter-driven sensors
+`valid_until`. It never reaches an hour the recorder has not compiled
+yet, which is usually the hour that just ended, or every hour Home
+Assistant was down for at a restart: the recorder writes those rows
+itself, and a row imported ahead of it makes its insert fail and drops
+that hour's statistics for every entity, not just these. The recorder
+fills those hours in from the sensors' recorded state. The meter-driven sensors
 (`current_year_cost`, `year_to_date_consumption` and the rolling and
 projected year) are intentionally excluded because their values come from
 the user's actual meter history.

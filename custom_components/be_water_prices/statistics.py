@@ -31,8 +31,8 @@ table. A fresh config entry starts with that table empty, so the price
 line only appears from the install moment forward.
 
 This module backfills hourly rows from the configured start
-(default Jan 1 of the current year) up to the previous full hour,
-flat-lining at the currently-known tariff value for every
+(default Jan 1 of the current year) up to the last hour the recorder
+has compiled, flat-lining at the currently-known tariff value for every
 ``MEASUREMENT``-class price sensor on the entry. The ``TOTAL`` YTD
 sensors depend on the user's actual meter history and are intentionally
 excluded -- synthesising them would invent consumption.
@@ -167,7 +167,7 @@ async def async_backfill_prices(
         start = valid_from_dt
 
     start_utc = start.astimezone(dt_util.UTC).replace(minute=0, second=0, microsecond=0)
-    end_utc = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    end_utc = await _async_compiled_until(hass)
     # Clamp the far end to the snapshot too. Only the near end was
     # clamped, so on a year rollover against a page that has not
     # published the new year yet, last year's rates were flat-lined
@@ -261,6 +261,51 @@ async def async_backfill_prices(
         " (cleared first)" if cleared_done else "",
     )
     return rows_total
+
+
+def _newest_statistics_run(hass: HomeAssistant) -> datetime | None:
+    """Start of the newest period the recorder has compiled, recorder thread only."""
+    from homeassistant.components.recorder.db_schema import StatisticsRuns
+    from homeassistant.components.recorder.models import process_timestamp
+    from homeassistant.helpers.recorder import session_scope
+    from sqlalchemy import func
+
+    with session_scope(hass=hass, read_only=True) as session:
+        start: datetime | None = session.query(func.max(StatisticsRuns.start)).scalar()
+    return process_timestamp(start)
+
+
+async def _async_compiled_until(hass: HomeAssistant) -> datetime:
+    """End of the newest hour the recorder has compiled long-term rows for.
+
+    The recorder writes an hour's row when it compiles that hour's last
+    five-minute period, ten seconds after the hour, and longer after a
+    restart, since the catch-up waits for Home Assistant to finish
+    starting. It inserts those rows without an upsert, so a row this
+    import got in first makes the insert fail, and the recorder then
+    rolls back that whole period for every entity along with its run
+    marker, and never compiles it again. Each compiled period leaves a
+    StatisticsRuns marker, and the catch-up only resumes after the
+    newest one, so every hour that ends by the end of that period is
+    settled and safe to write.
+    """
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+    from homeassistant.components.recorder.db_schema import StatisticsShortTerm
+
+    hour = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    try:
+        newest = await get_instance(hass).async_add_executor_job(_newest_statistics_run, hass)
+    except Exception as err:
+        _LOGGER.debug("could not read the recorder's last statistics run: %s", err)
+        newest = None
+    if newest is None:
+        # Without the marker the best guess is that the recorder is on
+        # time, which leaves only the hour that just ended uncompiled.
+        return hour - timedelta(hours=1)
+    end: datetime = newest + StatisticsShortTerm.duration
+    return min(hour, end.replace(minute=0, second=0, microsecond=0))
 
 
 async def _async_has_statistics_before(
@@ -421,7 +466,7 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     # ``clear=False`` is sufficient: async_import_statistics overwrites
     # rows at matching (statistic_id, bucket_start) timestamps, so
     # re-running for the same year just replaces the old operator's
-    # flat-line for Jan 1..now without wiping older historical rows
+    # flat-line for the year so far without wiping older historical rows
     # (prior years, manual annotations). The flatline replacement is
     # what we actually want on an operator switch.
     rows = await async_backfill_prices(hass, entry, start=_jan_1_local(), clear=False)

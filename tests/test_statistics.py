@@ -456,6 +456,52 @@ async def test_a_start_past_the_window_says_so(
     assert "nothing written or cleared" in caplog.text
 
 
+async def test_an_unreadable_run_marker_leaves_the_last_hour_out(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """Without the recorder's run marker the hour that just ended stays unwritten.
+
+    The recorder compiles that hour ten seconds after it closes, and a row
+    imported ahead of it makes the compile fail for every entity.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    freezer.move_to("2026-10-05 14:00:05+00:00")
+    entry = _entry(hass)
+    coordinator = MagicMock()
+    coordinator.data = CoordinatorData(
+        tariff=_fresh_tariff(),
+        fetched_at=datetime.now(UTC),
+        snapshot_age_hours=0.0,
+        snapshot_stale=False,
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
+    )
+    recorder = MagicMock()
+    recorder.async_add_executor_job = AsyncMock(side_effect=RuntimeError("db locked"))
+    hass.data[DATA_INSTANCE] = recorder
+    imported: list[Any] = []
+    with (
+        patch("homeassistant.components.recorder.get_instance", return_value=recorder),
+        patch(
+            "homeassistant.components.recorder.statistics.async_import_statistics",
+            side_effect=lambda *a, **k: imported.append(a),
+        ),
+    ):
+        rows = await async_backfill_prices(hass, entry, start=datetime(2026, 10, 5, tzinfo=UTC))
+
+    assert rows > 0
+    last = imported[-1][2][-1]["start"]
+    assert last + timedelta(hours=1) == datetime(2026, 10, 5, 13, tzinfo=UTC)
+
+
 async def test_the_auto_once_gate_holds_for_the_same_year_and_utility(hass: HomeAssistant) -> None:
     """Deleting the gate re-ran the backfill on every setup and nothing noticed.
 
