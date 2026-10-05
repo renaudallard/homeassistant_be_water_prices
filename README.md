@@ -534,10 +534,12 @@ you paid is worth more than a tidy chart.
   `current_year_cost` on the next January 1, while
   `projected_annual_cost` reflects it immediately.
 
-  Registering *more* residents raises a Flemish bill rather than lowering
-  it, since the vastrecht korting is capped at five but the basisvolume
-  is not: 80 m³ on Farys/Gent costs € 586,38 at four residents and
-  € 791,28 at one.
+  Registering more residents lowers a Flemish bill: each one adds 30 m³
+  to the basisvolume billed at the basis rate, and takes the korting off
+  the vastrecht until five residents have cancelled it. 80 m³ on
+  Farys/Gent costs € 791,28 at one resident and € 586,38 at four. Past
+  five only the basisvolume still grows, which saves money once the
+  year's water goes over the 180 m³ that five residents already cover.
 
   Four Flemish operators print the sum of their own three legs next to
   them, and each of those parsers checks its legs against that sum:
