@@ -1380,6 +1380,36 @@ def test_a_recorder_that_has_spoken_before_brings_the_year_back_down() -> None:
     assert out.cycle.recorder_hwm == 41.0
 
 
+def test_a_dropout_tick_does_not_bring_the_year_down() -> None:
+    """The frame is never rebuilt on a glitch value.
+
+    A recorder answer still climbing is not proof every day was read, and
+    a tick landing while the meter reads 0 used to take the answer, lower
+    the year and rebuild the frame on the 0. The meter coming back was
+    then held and arbitrated against the lowered figure, and the year
+    stayed short until January.
+    """
+    year = _anchored(60.0, 1200.0, cost=_bill(60.0), recorder_hwm=55.0)
+    out = _round(year, reading=0.0, recorder_m3=57.5)
+
+    assert out.m3 == 60.0
+    assert out.cost == _bill(60.0)
+    assert out.cycle.offset_m3 == 1200.0
+    assert out.cycle.recorder_hwm == 57.5  # but the answer is remembered
+
+    back = _round(out.cycle, reading=1260.5, hold_run=out.hold_run, run_m3=out.run_m3)
+    assert back.m3 == 60.5
+
+
+def test_a_tick_with_no_reading_does_not_bring_the_year_down() -> None:
+    """Without a reading there is no frame to rebuild, only a dip to publish."""
+    year = _anchored(60.0, 1200.0, cost=_bill(60.0), recorder_hwm=55.0)
+    out = _round(year, reading=None, recorder_m3=57.5)
+
+    assert out.m3 == 60.0
+    assert out.cycle.offset_m3 == 1200.0
+
+
 def test_a_recorder_answering_for_the_first_time_may_not() -> None:
     """Nothing behind it shows its history is whole.
 

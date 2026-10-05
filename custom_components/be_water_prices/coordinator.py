@@ -676,10 +676,13 @@ def _fold(
     if recorder_m3 is not None and (recorder_hwm is None or recorder_m3 >= recorder_hwm):
         # A recorder answer only climbs while its history is intact, since
         # consumption accumulates. One at or above every previous answer is
-        # therefore a database that still holds the year, and it read the
-        # same meter's own statistics for all of it, so water it has no
-        # record of did not flow. One below is a database that has lost
-        # some, and it is ignored rather than believed against the year.
+        # therefore a database that has not lost any of the year, and it
+        # read the same meter's own statistics for all of it, so water it
+        # has no record of did not flow. That is not proof every day was
+        # read: a day the reader refuses stays refused on every later
+        # query, and the answers keep climbing short of it. One below is a
+        # database that has lost some, and it is ignored rather than
+        # believed against the year.
         recorder_hwm = recorder_m3
         if (
             candidate is not None
@@ -699,7 +702,13 @@ def _fold(
                 recorder_m3,
             )
             candidate = None
-        if spoken_before and mark is not None and mark - recorder_m3 > _RECORDER_LAG_M3:
+        if (
+            spoken_before
+            and reading is not None
+            and (bar is None or reading >= bar)
+            and mark is not None
+            and mark - recorder_m3 > _RECORDER_LAG_M3
+        ):
             # And the mark comes down with it. A spike smaller than the step
             # bound is admitted on sight, raises the mark, and the mark only
             # ever climbed, so it stood until January however plainly the
@@ -711,6 +720,13 @@ def _fold(
             # year. One answering for the first time has nothing behind it
             # to show its history is whole, and a database that lost the
             # year before anyone asked would read exactly like this.
+            #
+            # And only on a round whose reading sits in the frame. The
+            # spike this is for leaves the meter there, while a dropout
+            # tick would rebuild the frame on the glitch value, and the
+            # meter coming back would then be held and arbitrated against
+            # the lowered figure. A tick with no reading has no frame to
+            # rebuild and only dipped the year until the next one.
             _LOGGER.warning(
                 "the water meter's year stood at %.1f m3 against the recorder's %.1f; "
                 "taking the recorder, which has the year's own statistics behind it",
@@ -719,9 +735,8 @@ def _fold(
             )
             mark = recorder_m3
             floor = None
-            if reading is not None:
-                offset = reading - recorder_m3
-                high_m3 = reading
+            offset = reading - recorder_m3
+            high_m3 = reading
 
     if candidate is not None and reading is not None:
         # The meter was seen, which means it gave an answer this round could
@@ -2448,12 +2463,17 @@ def _admitted_changes(
     # artefact, not evidence about the year. A year every guard rejects
     # sums to the same 0.0 as a year with no statistics at all, and the
     # caller may anchor an empty year at zero but not an unreadable one: a
-    # cumulative meter that republishes 0 on a nightly reconnect leaves
-    # every bucket carrying the whole register, all of them dropped, and
-    # the year restarted at zero with the water already used lost until
-    # January.
+    # cumulative meter that republishes 0 on a nightly reconnect and is
+    # still at 0 when each day closes leaves every bucket carrying the
+    # whole register with no climb to measure it by, all of them dropped,
+    # and the year restarted at zero with the water already used lost
+    # until January.
     admitted: list[tuple[float | None, float]] = []
     refused = 0
+    # The register at the end of the bucket before, which the bucket
+    # after a dip climbs from. Unknown before the first row: the window
+    # holds nothing earlier.
+    register: float | None = None
     # A register drop waiting for the bucket after it, see below.
     pending_drop = 0.0
     # Asking for a day period makes Home Assistant re-align the end of the
@@ -2471,6 +2491,9 @@ def _admitted_changes(
     # water is in whichever bucket comes next.
     previous = dt_util.start_of_local_day(start).timestamp() - _SECONDS_PER_DAY
     for index, row in enumerate(rows):
+        before = register
+        state = row.get("state")
+        register = None if state is None else float(state)
         delta = row.get("change")
         if delta is None:
             continue
@@ -2535,6 +2558,22 @@ def _admitted_changes(
             # meter that briefly reported 0 leaves a day whose change is
             # its entire register. Billed into the year that became the
             # high-water mark and pinned both sensors until January.
+            #
+            # The day still drew water, and the register's climb from the
+            # end of the bucket before is that water. Dropping the bucket
+            # whole lost it for good, and every later answer stayed short
+            # by it while still climbing, which is exactly what a whole
+            # history looks like to the fold. A previous register of 0 is
+            # the dip itself rather than a reading to climb from, and one
+            # above this bucket's is a different register, so either way
+            # the day is refused.
+            if register is not None and before is not None and 0.0 < before <= register:
+                climb = register - before
+                if _exceeds_a_day(climb, entity_id, "recovered", gap_days, level=level):
+                    refused += 1
+                    continue
+                admitted.append((bucket, climb))
+                continue
             _LOGGER.debug(
                 "%s: dropping a bucket whose change %s exceeds the register %s",
                 entity_id,

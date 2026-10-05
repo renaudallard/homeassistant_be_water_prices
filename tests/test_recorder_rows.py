@@ -53,16 +53,53 @@ async def test_a_day_whose_change_is_the_whole_register_is_not_water() -> None:
 
     Home Assistant treats the dip as a reset and adds the recovered
     reading to the sum. Billed into the year it became the high-water
-    mark and pinned both sensors until January.
+    mark and pinned both sensors until January. The register's climb
+    over the day is still that day's water, though: dropping the day
+    whole left every later answer short by it while still climbing, and
+    the fold took that short answer for the year's.
     """
     rows = [
         _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
-        _row(date(2026, 3, 2), change=4050.0, state=4050.0, total=4150.3),
-        _row(date(2026, 3, 3), change=0.2, state=4050.2, total=4150.5),
+        # 0.2 before the dip, then the whole recovered register.
+        _row(date(2026, 3, 2), change=4000.9, state=4000.7, total=4101.2),
+        _row(date(2026, 3, 3), change=0.2, state=4000.9, total=4101.4),
     ]
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
-    assert total == 0.5
+    assert total == pytest.approx(0.9)  # 4000.0 -> 4000.9
+
+
+async def test_a_register_that_comes_back_lower_is_still_refused() -> None:
+    """A dip that recovers onto a different register has no climb to read.
+
+    The register before it stands above the one after, so whatever the
+    day drew cannot be told from the swap, and the day is dropped as it
+    always was.
+    """
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=12.2, state=12.0, total=112.5),
+        _row(date(2026, 3, 3), change=0.2, state=12.2, total=112.7),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+    assert total == pytest.approx(0.5)
+
+
+async def test_a_climb_no_day_could_hold_is_still_refused() -> None:
+    """A dip that recovers onto a re-based register climbs by the re-base.
+
+    The day's bound applies to the climb as it does to any other change,
+    or the counter re-based from 4000.3 to 8050.0 would bill 4049.7 m3.
+    """
+    rows = [
+        _row(date(2026, 3, 1), change=0.3, state=4000.3, total=100.3),
+        _row(date(2026, 3, 2), change=8050.2, state=8050.0, total=8150.5),
+        _row(date(2026, 3, 3), change=0.2, state=8050.2, total=8150.7),
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        total = await co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 3))  # type: ignore[arg-type]
+    assert total == pytest.approx(0.5)
 
 
 async def test_the_day_a_meter_returns_carries_the_whole_absence() -> None:
@@ -250,9 +287,13 @@ async def test_a_bucket_dated_after_the_window_is_not_billed_into_it() -> None:
 
 
 async def test_a_year_whose_every_bucket_is_refused_is_unreadable_not_empty() -> None:
-    """A meter that republishes 0 nightly poisons every bucket; that is not zero."""
+    """A meter still at 0 when each day closes poisons every bucket; that is not zero.
+
+    Its register at the end of the day before is the dip itself, so there
+    is no climb to read the day's water from.
+    """
     rows = [
-        _row(date(2026, 1, 1 + n), change=0.3, state=0.3, total=0.3 * (n + 1)) for n in range(5)
+        _row(date(2026, 1, 1 + n), change=0.3, state=0.0, total=0.3 * (n + 1)) for n in range(5)
     ]
     with (
         patch(_ROWS, new=AsyncMock(return_value=rows)),
@@ -327,7 +368,7 @@ async def test_the_first_days_of_a_year_are_empty_not_unreadable() -> None:
 async def test_a_month_of_refusals_is_still_unreadable() -> None:
     """The distinction is how many, not whether."""
     rows = [
-        _row(date(2026, 3, 1 + n), change=0.3, state=0.3, total=0.3 * (n + 1)) for n in range(10)
+        _row(date(2026, 3, 1 + n), change=0.3, state=0.0, total=0.3 * (n + 1)) for n in range(10)
     ]
     with (
         patch(_ROWS, new=AsyncMock(return_value=rows)),

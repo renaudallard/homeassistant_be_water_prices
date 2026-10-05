@@ -113,7 +113,12 @@ def test_the_fold_warnings_name_no_entity(caplog: pytest.LogCaptureFixture) -> N
             ),
             20.0,
         )
-        _fold_round(_YtdCycle(meter=_METER, year=2026, m3=20.0, recorder_hwm=10.0, basis="b"), None)
+        _fold_round(
+            _YtdCycle(
+                meter=_METER, year=2026, m3=20.0, offset_m3=0.0, recorder_hwm=10.0, basis="b"
+            ),
+            20.0,
+        )
     assert _warned(caplog, "a reading of the water meter implying 20.0 m3")
     assert _warned(caplog, "the water meter's year stood at 20.0 m3")
     assert _METER not in caplog.text
