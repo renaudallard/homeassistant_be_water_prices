@@ -588,16 +588,23 @@ def test_streams_that_share_their_bytes_are_refused() -> None:
 def test_many_stream_keywords_are_scanned_in_linear_time() -> None:
     """A megabyte of keywords with no stream behind them, and every
     "endstream" of two hundred images, once cost a rescan of the whole
-    prefix each."""
+    prefix each. Neither reaches the decompressor, so ten thousand tiny
+    Flate streams check that each one stops at its own end instead of
+    feeding it the rest of the file."""
     import time
+    import zlib
 
     junk = b"%PDF-1.4\n1 0 obj\n" + b"stream\n" * 150_000
     image = b"<</Type/XObject/Subtype/Image/Filter/DCTDecode/Length 65536>>stream\n"
     image += b"\xff\xd8\xff\xe0" + bytes(range(256)) * 256 + b"\nendstream\n"
     images = b"%PDF-1.4\n" + b"".join(b"%d 0 obj\n" % n + image for n in range(1, 201))
+    body = zlib.compress(b"BT (x) Tj ET")
+    flate = b"<</Length %d/Filter/FlateDecode>>stream\n" % len(body) + body + b"\nendstream\n"
+    flates = b"%PDF-1.4\n" + b"".join(b"%d 0 obj\n" % n + flate for n in range(1, 10_001))
     started = time.perf_counter()
     _pdf.guard_pdf_streams(junk)
     _pdf.guard_pdf_streams(images)
+    _pdf.guard_pdf_streams(flates)
     assert time.perf_counter() - started < 5
 
 
