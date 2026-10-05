@@ -214,9 +214,10 @@ async def _check[T](
     except Exception:  # top-level: report anything unexpected as a failure row
         # Out of time is a failure, not a hiccup: a refresh gives up on the
         # same budget and users stay on their held card, and a commune list
-        # that slow leaves the config flow waiting as long. The parse
-        # thread runs on to its end; only the job's own timeout bounds one
-        # that never returns.
+        # that slow leaves the config flow waiting as long. A PDF render it
+        # gave up on ends when the reader kills its child process at
+        # PDF_READER_TIMEOUT_S. A text or HTML parse thread runs on to its
+        # end; only the job's own timeout bounds one that never returns.
         if budget.expired():
             detail = f"did not finish within {FETCH_BUDGET_S} s"
         else:
