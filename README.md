@@ -23,4 +23,5 @@ Written daily by `.github/workflows/archive_cards.yml` running
 To get the original card of a utility, commune and month: open
 `coverage.md`, open the utility's sheet, find the row, click `pdf` or
 `page`; `json` is what the integration parsed out of it. Months more than
-twelve before the running one are removed.
+twelve before the running one are removed; a PDF stays as long as a
+remaining month names it.
