@@ -897,6 +897,9 @@ pytest tests/
 python scripts/live_check.py    # hits real utility endpoints
 ```
 
+`scripts/gate.sh` runs the checks above, all but the live check, against a
+snapshot of HEAD, which is what to use before a push.
+
 Tests run against fixture HTML and PDF snippets in
 [`tests/fixtures/`](./tests/fixtures/) (real 2026 publications from
 every registered utility). Refresh a fixture with the utility's
