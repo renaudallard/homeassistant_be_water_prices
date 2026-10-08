@@ -349,8 +349,11 @@ jobs:
             echo "has a working token."
           } > token_body.md
           echo "token expires $expires" > token_fingerprint.txt
+          # Its own label: file_ci_issue.sh finds the open issue by label, so
+          # sharing the failure issue's would post this warning inside an open
+          # failure thread, and a failure inside this one.
           bash scripts/file_ci_issue.sh \
-            --label archive-cards \
+            --label archive-cards-token \
             --title "[archive-cards] the upload token expires soon" \
             --body token_body.md \
             --fingerprint token_fingerprint.txt \
