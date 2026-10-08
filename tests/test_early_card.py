@@ -135,7 +135,7 @@ async def test_next_years_card_in_december_leaves_the_closing_year_alone(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         bill = coordinator.data.current_year_cost_eur
         assert coordinator.data.ytd_consumption_m3 == 75.0
         assert bill == coordinator._ytd_cost_from_m3(_CARD_2026, 75.0, 2026)
@@ -159,7 +159,7 @@ async def test_next_years_card_in_december_leaves_the_closing_year_alone(
         assert stored["valid_from"] == "2026-01-01"
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.current_year_cost_eur == bill
         assert coordinator._ytd.basis == _basis(2026)
 
@@ -210,7 +210,7 @@ async def test_a_fresh_install_in_december_prices_on_the_card_it_has(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data.current_year_cost_eur == coordinator._ytd_cost_from_m3(card, 75.0, 2026)
     assert coordinator._ytd_card is None
 

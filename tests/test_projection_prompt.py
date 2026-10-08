@@ -338,7 +338,7 @@ async def test_measured_year_far_from_the_configured_one_raises_the_prompt(
     hass: HomeAssistant,
 ) -> None:
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=131.4))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue = ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id)
     assert issue is not None
     assert issue.is_fixable
@@ -365,7 +365,7 @@ async def test_a_different_meter_is_re_checked_without_an_options_change(
     """Energy-dashboard auto-discovery repoints the meter with no reload."""
     full_year = AsyncMock(return_value=131.0)
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert full_year.await_count == 1
     with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
         # Same year, same configured figure, different meter: that is a
@@ -387,7 +387,7 @@ async def test_a_different_meter_is_re_checked_without_an_options_change(
 async def test_an_absurd_year_is_not_offered(hass: HomeAssistant) -> None:
     """The figure has to be writable through the options form's own bounds."""
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=9000.0))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
 
 
@@ -395,14 +395,14 @@ async def test_an_absurd_year_is_not_offered(hass: HomeAssistant) -> None:
 async def test_a_year_with_no_consumption_is_not_offered(hass: HomeAssistant) -> None:
     """An empty year is below the form's minimum and says nothing about usage."""
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=0.0))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
 
 
 @pytest.mark.asyncio
 async def test_unloading_the_entry_clears_the_card(hass: HomeAssistant) -> None:
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=131.0))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue_id = coordinator.projection_issue_id
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
     assert await hass.config_entries.async_unload(entry.entry_id)
@@ -416,14 +416,14 @@ async def test_measured_year_close_to_the_configured_one_stays_quiet(
 ) -> None:
     """A household varies year to year without the projection being wrong."""
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=85.0))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
 
 
 @pytest.mark.asyncio
 async def test_partial_year_never_prompts(hass: HomeAssistant) -> None:
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=None))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
 
 
@@ -432,7 +432,7 @@ async def test_answer_is_not_re_queried_while_nothing_changed(hass: HomeAssistan
     """One thirteen-month query per (year, configured figure), not one per tick."""
     full_year = AsyncMock(return_value=131.0)
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
         await coordinator.async_refresh()
         await hass.async_block_till_done()
@@ -448,7 +448,7 @@ async def test_unreadable_recorder_is_retried_rather_than_believed(
     """A database hiccup must not settle the question until the next restart."""
     full_year = AsyncMock(side_effect=[RecorderUnavailable("locked"), 131.0])
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
     with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
         await coordinator.async_refresh()
@@ -465,7 +465,7 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
     publish a figure the stale locals would then overwrite with a lower one.
     """
     entry = await _setup_entry(hass, configured=80)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     # Setup anchored the year on reading 100 against 20 m³ from the
     # recorder, so the meter contributes reading - 80 from here.
     assert coordinator.data.ytd_consumption_m3 == 20.0
@@ -527,7 +527,7 @@ async def test_fix_flow_writes_the_measured_year_into_the_options(
     hass: HomeAssistant,
 ) -> None:
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=131.0))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue = ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id)
     assert issue is not None
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch_tariff)
@@ -600,7 +600,7 @@ async def test_opening_the_card_shows_a_form_before_doing_anything(
 
     assert await async_setup_component(hass, "repairs", {})
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=131.0))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     before = dict(entry.options)
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch_tariff)
 

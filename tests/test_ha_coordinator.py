@@ -143,7 +143,7 @@ async def test_successful_fetch_does_not_raise_repair_issue(hass: HomeAssistant)
         return _fresh_tariff()
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data is not None
     assert coordinator.data.snapshot_stale is False
 
@@ -159,7 +159,7 @@ async def test_expired_valid_until_raises_repair_issue(hass: HomeAssistant) -> N
         return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data is not None
     assert coordinator.data.snapshot_stale is True
 
@@ -179,7 +179,7 @@ async def test_repair_issue_clears_when_next_fetch_is_fresh(hass: HomeAssistant)
         return fetch_results.pop(0)
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue_reg = ir.async_get(hass)
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
 
@@ -202,7 +202,7 @@ async def test_extractor_error_serves_cached_snapshot(hass: HomeAssistant) -> No
         return result
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     first = coordinator.data
     assert first is not None
     assert first.last_error == ""
@@ -225,7 +225,7 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
         return fetch_results.pop(0)
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue_reg = ir.async_get(hass)
     issue = issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id)
     assert issue is not None and issue.is_fixable
@@ -272,7 +272,7 @@ async def test_opening_the_stale_card_does_not_refresh(hass: HomeAssistant) -> N
         return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
     before = fetches
 
@@ -321,7 +321,7 @@ async def test_one_absurd_reading_does_not_pin_the_year(hass: HomeAssistant) -> 
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 20.0
 
         # A 32-bit sentinel escaping the meter integration.
@@ -383,7 +383,7 @@ async def test_recorder_fallback_does_not_publish_below_the_live_mark(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # Draw up to 130: baseline 80, live mark 130, so YTD is 50.
         hass.states.async_set("sensor.water_meter", "130")
@@ -460,7 +460,7 @@ async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssist
         return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue_reg = ir.async_get(hass)
     issue = issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id)
     assert issue is not None
@@ -519,7 +519,7 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # baseline = live(100) - recorder_ytd(20) == reading at Jan 1.
         assert coordinator._ytd.offset_m3 == 80.0
         assert coordinator.data.ytd_consumption_m3 == 20.0
@@ -586,7 +586,7 @@ async def test_meter_events_do_not_starve_the_daily_refresh(hass: HomeAssistant)
         await hass.async_block_till_done()
         assert fetches == 1
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # The pending refresh is stored as the TimerHandle's bound cancel().
         scheduled = coordinator._unsub_refresh
         assert scheduled is not None
@@ -646,7 +646,7 @@ async def test_live_tracking_follows_a_changed_auto_discovered_meter(
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 20.0
 
         # The dashboard is re-pointed at another meter; the next tick
@@ -704,7 +704,7 @@ async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # live 100 m³ - recorder_ytd 20 m³ == reading at Jan 1.
         assert coordinator._ytd.offset_m3 == 80.0
         assert coordinator.data.ytd_consumption_m3 == 20.0
@@ -750,7 +750,7 @@ async def test_live_ytd_reanchors_on_year_rollover(hass: HomeAssistant) -> None:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # Pretend the baseline was anchored last year and never re-ticked.
         # The recorder figure has to age with it: a current-year recorder
         # year alongside a prior-year baseline means the tick did run this
@@ -802,7 +802,7 @@ async def test_live_ytd_recovers_after_meter_unavailable_at_tick(hass: HomeAssis
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # No baseline could be captured, but the recorder YTD still shows.
         assert coordinator._ytd.offset_m3 is None
         assert coordinator.data.ytd_consumption_m3 == 20.0
@@ -856,7 +856,7 @@ async def test_live_ytd_recovery_resets_when_meter_down_across_year_boundary(
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 is None
         # Pretend the recorder figure (20) was captured in the prior year.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
@@ -905,7 +905,7 @@ async def test_live_ytd_republishes_when_only_cost_changes(hass: HomeAssistant) 
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         real_cost = coordinator.data.current_year_cost_eur
         assert real_cost is not None
         # Simulate a stale cost (e.g. left over from a prior-year tick)
@@ -954,7 +954,7 @@ async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # baseline = live(100) - recorder_ytd(20) == reading at Jan 1.
         assert coordinator._ytd.offset_m3 == 80.0
 
@@ -971,7 +971,7 @@ async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator2 = hass.data[DOMAIN][entry.entry_id]
+        coordinator2 = entry.runtime_data
         # Baseline restored from the Store (80), not re-derived to 130-45=85.
         assert coordinator2._ytd.offset_m3 == 80.0
         # YTD stays live-baseline (50), no downward snap to the recorder's 45.
@@ -1013,7 +1013,7 @@ async def test_live_ytd_ignores_meter_glitch_down(hass: HomeAssistant) -> None:
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # Draw to 105 m³: YTD 20 -> 25.
         hass.states.async_set("sensor.water_meter", "105")
@@ -1090,7 +1090,7 @@ async def test_live_ytd_cost_held_when_tariff_drops(hass: HomeAssistant) -> None
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         cost_peak = coordinator.data.current_year_cost_eur
         assert cost_peak is not None
 
@@ -1136,7 +1136,7 @@ async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         cost_peak = coordinator.data.current_year_cost_eur
         assert cost_peak is not None
 
@@ -1147,7 +1147,7 @@ async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator2 = hass.data[DOMAIN][entry.entry_id]
+        coordinator2 = entry.runtime_data
         # cost_hwm restored from the Store clamps the cheaper recomputed cost.
         assert coordinator2._ytd.cost == cost_peak
         assert coordinator2.data.current_year_cost_eur == cost_peak
@@ -1186,7 +1186,7 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 20.0
         cost_peak = coordinator.data.current_year_cost_eur
         assert cost_peak is not None
@@ -1245,7 +1245,7 @@ async def test_meter_recovery_keeps_the_new_year_recorder_figure(hass: HomeAssis
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # Down across Jan 1: last year's cycle kept, recorder serves 5 m³.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
@@ -1302,7 +1302,7 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 == 80.0
 
         # Live draw to 130 between daily ticks: mark climbs, YTD 20 -> 50.
@@ -1323,7 +1323,7 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        coordinator2 = hass.data[DOMAIN][entry.entry_id]
+        coordinator2 = entry.runtime_data
         # The persisted mark (130) clamps the glitch: YTD holds at 50, not
         # the un-clamped 120 - 80 = 40.
         assert coordinator2._ytd.m3 == 50.0
@@ -1359,7 +1359,7 @@ async def _setup_metered_entry(hass: HomeAssistant) -> Any:
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 == 80.0
         # Draw to 105 m³ so the cycle has a high-water mark to hold: YTD 25.
         hass.states.async_set("sensor.water_meter", "105")
@@ -1455,7 +1455,7 @@ async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None
         return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     issue_reg = ir.async_get(hass)
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
     # The meter and postcode cards need their own setups to come up, and
@@ -1889,7 +1889,7 @@ async def test_explicit_meter_option_wins_over_discovery(hass: HomeAssistant) ->
         await hass.config.async_set_time_zone("Europe/Brussels")
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._meter_entity_id == "sensor.chosen"
 
 
@@ -1928,7 +1928,7 @@ async def test_unusable_meter_readings_leave_the_total_alone(hass: HomeAssistant
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         hass.states.async_set("sensor.water_meter", "105")
         await hass.async_block_till_done()
@@ -2005,7 +2005,7 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 20.0
         # The recorder holds meter_a's year, so it runs from 1 January.
         assert coordinator.data.ytd_started_at is None
@@ -2078,7 +2078,7 @@ async def test_a_reading_that_lands_during_the_recorder_query_is_used(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # The tick framed the year on the reading that arrived mid-query.
         assert coordinator._ytd.offset_m3 == 80.0
@@ -2124,7 +2124,7 @@ async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssist
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # The anchor is last year's, the meter is down, and the recorder
         # has no statistics for the new year yet.
@@ -2183,7 +2183,7 @@ async def test_transient_recorder_gap_does_not_reset_the_year(hass: HomeAssistan
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # The meter has been down since December, so the cycle has this
         # year's 12 m3 from the recorder and no frame to read a meter with.
@@ -2246,7 +2246,7 @@ async def test_a_recorder_gap_across_a_restart_keeps_the_year(hass: HomeAssistan
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # The meter has been down since December, so this year's 12 m3 came
         # from the recorder and no frame was ever built.
         assert coordinator.data.ytd_consumption_m3 == 12.0
@@ -2259,7 +2259,7 @@ async def test_a_recorder_gap_across_a_restart_keeps_the_year(hass: HomeAssistan
         recorder.side_effect = RecorderUnavailable("database is locked")
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # The 12 m3 came back off disk, so they are still served.
         assert coordinator._ytd.m3 == 12.0
         assert coordinator.data.ytd_consumption_m3 == 12.0
@@ -2325,7 +2325,7 @@ async def test_tick_defers_the_anchor_when_the_recorder_query_fails(
         # recorder query fails, so there is nothing to anchor from.
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.year == dt_util.now().year - 1
         assert coordinator.data.ytd_consumption_m3 is None
 
@@ -2375,7 +2375,7 @@ async def test_an_old_recorder_failure_does_not_block_the_new_year(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # Some tick in March: the meter blips out and the database is locked.
         hass.states.async_set("sensor.water_meter", "unavailable")
@@ -2453,7 +2453,7 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
     # The year and its frame came back. The floor did not, and must not:
     # v0.7.8 wrote no basis, so nothing says who that 999.0 was measured
@@ -2510,7 +2510,7 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         # A full year of consumption served straight off the recorder; the
         # cycle never anchored, so there is no baseline year at all.
@@ -2570,7 +2570,7 @@ async def test_resuming_live_tracking_keeps_the_cost_floor(hass: HomeAssistant) 
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 is None  # never anchored, meter down
         peak = coordinator.data.current_year_cost_eur
         assert peak is not None
@@ -2622,7 +2622,7 @@ async def test_recorder_hiccup_does_not_blank_a_known_figure(hass: HomeAssistant
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         hass.states.async_set("sensor.water_meter", "130")
         await hass.async_block_till_done()
@@ -2690,7 +2690,7 @@ async def test_cost_floor_from_an_older_store_still_drops_at_rollover(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
     assert coordinator.data.ytd_consumption_m3 == 2.0
     # Last year's EUR 999 floor must not clamp the new year's small bill.
@@ -2734,7 +2734,7 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         # bare reading and the figure starts at zero consumption.
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 == 100.0
 
         hass.states.async_set("sensor.water_meter", "105")
@@ -2836,7 +2836,7 @@ async def test_undatable_cost_floor_from_an_older_store_is_dropped(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
     assert coordinator.data.ytd_consumption_m3 == 2.0
     cost = coordinator.data.current_year_cost_eur
@@ -2883,7 +2883,7 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 is None  # never anchors
         assert coordinator.data.ytd_consumption_m3 == 70.0
         cost = coordinator.data.current_year_cost_eur
@@ -2965,7 +2965,7 @@ async def test_first_anchor_of_a_running_year_still_anchors_after_a_migration(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
     # The meter anchored this year for the first time, but the year's bill
     # had already been published, so it must not drop.
@@ -3015,7 +3015,7 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator._ytd.offset_m3 is None  # never anchors
         assert coordinator.data.ytd_consumption_m3 == 45.0
 
@@ -3076,7 +3076,7 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 20.0
 
         # Make the next tick's Store save yield, and draw water while it does.
@@ -3137,7 +3137,7 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         real_save = coordinator._store.async_save
 
@@ -3210,7 +3210,7 @@ async def test_meter_draw_does_not_churn_the_rate_sensors(hass: HomeAssistant) -
         # the attribute is rounded to 0.01 h, so within one test run only
         # real elapsed time makes the difference visible, exactly as it does
         # for a meter reporting every few minutes.
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         coordinator.data = replace(
             coordinator.data, fetched_at=coordinator.data.fetched_at - timedelta(hours=2)
         )
@@ -3270,7 +3270,7 @@ async def test_unreadable_cycle_store_does_not_block_setup(hass: HomeAssistant) 
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
     # Bootstrapped fresh from the recorder rather than failing setup.
     assert coordinator.data.ytd_consumption_m3 == 20.0
@@ -3374,14 +3374,14 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         # Same household as the record: the floor still stands.
 
         # Now a resident is registered. The bill is lower for the rest of
         # the year and the floor must not hold it up.
         hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_PERSONS: 3})
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.current_year_cost_eur is not None
         assert coordinator.data.current_year_cost_eur < 999.0
         assert coordinator._ytd.basis == _cost_basis(
@@ -3489,7 +3489,7 @@ async def test_several_energy_water_sources_raise_a_repair(hass: HomeAssistant) 
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         issue = ir.async_get(hass).async_get_issue(DOMAIN, coordinator.several_meters_issue_id)
         assert issue is not None
         assert issue.translation_placeholders == {"utility": "VIVAQUA", "count": "2"}
@@ -3527,7 +3527,7 @@ async def test_one_energy_water_source_raises_nothing(hass: HomeAssistant) -> No
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert (
             ir.async_get(hass).async_get_issue(DOMAIN, coordinator.several_meters_issue_id) is None
         )
@@ -3811,7 +3811,7 @@ async def test_a_swap_moves_the_sensors_reset_to_its_start(hass: HomeAssistant) 
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         entity_id = er.async_get(hass).async_get_entity_id(
             "sensor", DOMAIN, f"{entry.entry_id}_ytd_consumption"
         )
@@ -3970,7 +3970,7 @@ async def test_first_anchor_keeps_a_floor_it_can_account_for(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 30.0
         assert coordinator.data.current_year_cost_eur == 177.25
 
@@ -4028,7 +4028,7 @@ async def test_a_floor_measured_by_an_earlier_release_is_rebuilt_once(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert coordinator.data.ytd_consumption_m3 == 30.0
         # Rebuilt from what the cheaper card actually costs, not held at 177.25.
         assert coordinator.data.current_year_cost_eur is not None
@@ -4077,7 +4077,7 @@ async def test_a_postcode_that_now_resolves_elsewhere_says_so(
     with patch("custom_components.be_water_prices.coordinator.get", new=_get):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         issue = issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id)
         assert issue is not None
         assert issue.translation_placeholders == {"utility": "Pidpa", "resolved": "Water-link"}
@@ -4106,7 +4106,7 @@ async def test_a_postcode_that_still_resolves_here_is_left_alone(
         with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
             assert await hass.config_entries.async_setup(entry.entry_id)
             await hass.async_block_till_done()
-            coordinator = hass.data[DOMAIN][entry.entry_id]
+            coordinator = entry.runtime_data
             assert issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id) is None, (
                 postcode
             )
@@ -4153,7 +4153,7 @@ async def test_an_operator_picked_by_hand_is_left_alone_until_the_resolver_chang
         with patch("custom_components.be_water_prices.coordinator.get", new=_get):
             assert await hass.config_entries.async_setup(entry.entry_id)
             await hass.async_block_till_done()
-            coordinator = hass.data[DOMAIN][entry.entry_id]
+            coordinator = entry.runtime_data
             issue = issue_registry.async_get_issue(DOMAIN, coordinator.operator_issue_id)
             assert (issue is not None) is raised, recorded
             if raised:
@@ -4215,7 +4215,7 @@ async def test_picking_the_same_operator_again_settles_an_older_hand_pick(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        issue_id = hass.data[DOMAIN][entry.entry_id].operator_issue_id
+        issue_id = entry.runtime_data.operator_issue_id
         assert issue_registry.async_get_issue(DOMAIN, issue_id) is not None
 
         result = await entry.start_reconfigure_flow(hass)
@@ -4319,7 +4319,7 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
 
     monkeypatch.setattr(module, "_archived_row", archived)
     entry = await _setup_entry(hass, _down)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     data = coordinator.data
     assert data.tariff == _this_years_card()
     assert data.fetched_at.date() == seen_on
@@ -4372,7 +4372,7 @@ async def test_a_stale_snapshot_follows_the_archive(
 
     monkeypatch.setattr(module, "_archived_row", archived)
     entry = await _setup_entry(hass, _down)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data.snapshot_stale
     assert coordinator.data.tariff.publication_label == "VIVAQUA archived in the spring"
     assert asked == 1
@@ -4415,7 +4415,7 @@ async def test_a_failing_refresh_folds_the_year_once(
 
     monkeypatch.setattr(module, "_archived_row", archived)
     entry = await _setup_entry(hass, _down)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     # Stale, so the refresh below asks the archive, and the archive has
     # nothing newer than the card it already handed over.
     assert coordinator.data.snapshot_stale
@@ -4488,7 +4488,7 @@ async def test_the_archive_is_walked_back_month_by_month(
 
     monkeypatch.setattr(module, "_archived_row", archived)
     entry = await _setup_entry(hass, _down)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data.fetched_at.date() == stored
     assert coordinator.data.snapshot_stale
     # One month per ask, newest first, and nothing beyond the hit.
@@ -4538,7 +4538,7 @@ async def test_an_archived_commune_row_is_relabelled_for_the_household(
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     assert asked == ["25071"]
-    label = hass.data[DOMAIN][entry.entry_id].data.tariff.publication_label
+    label = entry.runtime_data.data.tariff.publication_label
     assert label == "Tarieven 2026 (9000 - Gent-centrum (Gent))"
 
 
@@ -4561,7 +4561,7 @@ async def test_a_card_archived_this_morning_is_not_dated_after_now(
 
     monkeypatch.setattr(module, "_archived_row", archived)
     entry = await _setup_entry(hass, _down)
-    data = hass.data[DOMAIN][entry.entry_id].data
+    data = entry.runtime_data.data
     assert data.fetched_at <= dt_util.utcnow()
     assert not data.snapshot_stale
 
@@ -4602,7 +4602,7 @@ async def test_a_december_card_held_into_january_is_not_stale(
         raise ExtractorError("HTTP 503 from upstream")
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert not coordinator.data.snapshot_stale
 
     up["value"] = False
@@ -4652,7 +4652,7 @@ async def test_a_failing_refresh_on_last_years_card_takes_the_archived_new_one(
         raise ExtractorError("HTTP 503 from upstream")
 
     entry = await _setup_entry(hass, _fetch)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data.tariff.publication_label == "VIVAQUA test 2026"
 
     up["value"] = False

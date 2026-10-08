@@ -1819,6 +1819,7 @@ async def test_a_failed_setup_leaves_no_coordinator(hass: HomeAssistant) -> None
 
     from homeassistant.config_entries import ConfigEntryState
 
+    from custom_components.be_water_prices.coordinator import entry_coordinator
     from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
     from custom_components.be_water_prices.statistics import SERVICE_BACKFILL_PRICES
 
@@ -1857,7 +1858,7 @@ async def test_a_failed_setup_leaves_no_coordinator(hass: HomeAssistant) -> None
         await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.SETUP_ERROR
-    assert entry.entry_id not in hass.data.get(DOMAIN, {})
+    assert entry_coordinator(entry) is None
     assert hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)
 
 

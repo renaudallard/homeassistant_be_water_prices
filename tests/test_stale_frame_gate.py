@@ -75,7 +75,7 @@ async def test_a_frame_that_reproduces_the_figure_to_the_femtolitre_is_not_stale
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         published = 0.1
         reading = 1234.567
         coordinator._ytd = replace(

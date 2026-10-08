@@ -43,10 +43,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
@@ -54,9 +52,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-
-if TYPE_CHECKING:
-    from .coordinator import WaterCoordinator
+from .coordinator import WaterConfigEntry, entry_coordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,7 +99,7 @@ def _jan_1_local() -> datetime:
 
 async def async_backfill_prices(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: WaterConfigEntry,
     *,
     start: datetime,
     clear: bool = False,
@@ -147,7 +143,7 @@ async def async_backfill_prices(
 
     from .sensor import SENSORS  # local import: sensor.py imports from coordinator
 
-    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    coordinator = entry_coordinator(entry)
     if coordinator is None or coordinator.data is None:
         _LOGGER.debug("coordinator not ready for %s; skipping backfill", entry.entry_id)
         return 0
@@ -340,7 +336,7 @@ async def _async_has_statistics_before(
     return bool(stats.get(entity_id))
 
 
-async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: WaterConfigEntry) -> None:
     """Clear LTS rows for backfill keys the *current* operator's tariff
     does not produce (orphan rows left over by the previous operator).
 
@@ -368,7 +364,7 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
     if DATA_INSTANCE not in hass.data:
         return
 
-    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    coordinator = entry_coordinator(entry)
     if coordinator is None or coordinator.data is None:
         return
     ent_reg = er.async_get(hass)
@@ -395,7 +391,7 @@ async def _async_clear_orphan_backfill_keys(hass: HomeAssistant, entry: ConfigEn
         recorder.async_clear_statistics([entity_id])
 
 
-async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_maybe_backfill_once(hass: HomeAssistant, entry: WaterConfigEntry) -> None:
     """Run the auto-once backfill, gated by ``(year, utility)``.
 
     The flag records the calendar year the entry was last backfilled, the
@@ -408,7 +404,7 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
     """
     from .const import CONF_COMMUNE, CONF_UTILITY
 
-    coordinator_now: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    coordinator_now = entry_coordinator(entry)
     current_year = dt_util.now().year
     current_utility = entry.data.get(CONF_UTILITY)
     # The card's own year is part of the gate. Publishers run late, and
@@ -454,7 +450,7 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
         if previous_utility != str(current_utility):
             await _async_clear_orphan_backfill_keys(hass, entry)
 
-    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    coordinator = entry_coordinator(entry)
     if coordinator is not None and coordinator.data is not None and coordinator.data.snapshot_stale:
         # The snapshot cannot cover the window we are about to fill, and
         # stamping the gate anyway would lock in whatever we wrote: the
@@ -485,7 +481,7 @@ def async_register_services(hass: HomeAssistant) -> None:
     """Register the ``backfill_prices`` service, once for the integration."""
 
     async def _handle_backfill(call: ServiceCall) -> None:
-        entries_data: dict[str, Any] = hass.data.get(DOMAIN, {})
+        loaded = [entry.entry_id for entry in hass.config_entries.async_loaded_entries(DOMAIN)]
 
         target_id = call.data.get(ATTR_ENTRY_ID)
         clear = bool(call.data.get(ATTR_CLEAR, False))
@@ -500,7 +496,7 @@ def async_register_services(hass: HomeAssistant) -> None:
                 translation_domain=DOMAIN, translation_key="clear_needs_entry"
             )
         if target_id:
-            if target_id not in entries_data:
+            if target_id not in loaded:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
                     translation_key="unknown_entry",
@@ -508,7 +504,7 @@ def async_register_services(hass: HomeAssistant) -> None:
                 )
             target_ids = [target_id]
         else:
-            target_ids = list(entries_data.keys())
+            target_ids = loaded
 
         start_date = call.data.get(ATTR_START_DATE)
         if start_date is not None:

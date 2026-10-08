@@ -45,6 +45,8 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.typing import ConfigType
 
+    from .coordinator import WaterConfigEntry, WaterCoordinator
+
 PLATFORMS = ["sensor"]
 
 # Set up from config entries only. Declared here and built on first read
@@ -72,7 +74,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> bool:
     from homeassistant.exceptions import ConfigEntryNotReady
 
     from .const import CONF_UTILITY
@@ -135,12 +137,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "pricing on the operator-wide default until a commune is picked again",
             get_extractor(entry.data[CONF_UTILITY]).label,
         )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     # Home Assistant runs the on_unload callbacks when setup fails further
     # down as well, and never calls async_unload_entry for an entry that
-    # did not load, so this is what keeps a failed setup from leaving the
-    # coordinator in the bucket for good.
-    entry.async_on_unload(lambda: _forget_coordinator(hass, entry.entry_id))
+    # did not load, so this is what retires the coordinator of a failed
+    # setup and takes its Repair cards down.
+    entry.async_on_unload(lambda: _forget_coordinator(hass, coordinator))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Update the running-cost / YTD sensors live on each meter reading,
     # not just on the daily tick. Subscribes to the resolved meter entity
@@ -184,34 +186,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        # ``hass.data[DOMAIN]`` is populated only AFTER the coordinator
-        # first refresh succeeds. If async_setup_entry raised before
-        # that point (transient first-fetch failure, ImportError, etc.)
-        # the bucket is missing and a naive lookup crashes the unload --
-        # blocking the user from removing the entry without an HA
-        # restart. Tolerate both the missing bucket and the missing
-        # entry_id. The on_unload callbacks that run next drop the
-        # coordinator and its Repair cards.
-        coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-        if coordinator is not None:
-            # Stop listening to the meter before the flush, not after it in
-            # the on_unload callbacks: the flush awaits the executor, and a
-            # meter event handled in that window scheduled a debounced save
-            # on this coordinator's Store, which wrote the file back thirty
-            # seconds after the entry had been removed.
-            coordinator.async_unsub_live_tracking()
-            # Persist a pending YTD cycle change before the coordinator is
-            # dropped so a reload / restart keeps the climbing high-water
-            # mark instead of reverting to the last daily-tick value.
-            await coordinator.async_save_ytd_state()
+        # Home Assistant unloads only an entry that loaded, so the
+        # coordinator is there. The on_unload callbacks that run next
+        # retire it and drop its Repair cards.
+        coordinator = entry.runtime_data
+        # Stop listening to the meter before the flush, not after it in
+        # the on_unload callbacks: the flush awaits the executor, and a
+        # meter event handled in that window scheduled a debounced save
+        # on this coordinator's Store, which wrote the file back thirty
+        # seconds after the entry had been removed.
+        coordinator.async_unsub_live_tracking()
+        # Persist a pending YTD cycle change before the coordinator is
+        # dropped so a reload / restart keeps the climbing high-water
+        # mark instead of reverting to the last daily-tick value.
+        await coordinator.async_save_ytd_state()
     return unloaded
 
 
-def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
-    """Drop the entry's coordinator and its Repair cards.
+def _forget_coordinator(hass: HomeAssistant, coordinator: WaterCoordinator) -> None:
+    """Retire the entry's coordinator and drop its Repair cards.
 
     Runs from the entry's on_unload callbacks, which Home Assistant fires
     after a clean unload and after a setup that failed past the first
@@ -220,13 +216,11 @@ def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
     """
     from homeassistant.helpers import issue_registry as ir
 
-    coordinator = hass.data.get(DOMAIN, {}).pop(entry_id, None)
-    if coordinator is not None:
-        coordinator.async_retire()
-        ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
-        ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
-        ir.async_delete_issue(hass, DOMAIN, coordinator.several_meters_issue_id)
-        ir.async_delete_issue(hass, DOMAIN, coordinator.operator_issue_id)
+    coordinator.async_retire()
+    ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
+    ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
+    ir.async_delete_issue(hass, DOMAIN, coordinator.several_meters_issue_id)
+    ir.async_delete_issue(hass, DOMAIN, coordinator.operator_issue_id)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

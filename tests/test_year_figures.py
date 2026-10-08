@@ -347,7 +347,7 @@ async def test_the_meter_is_read_once_a_day(hass: HomeAssistant, freezer: Any) -
     freezer.move_to(_NOW)
     rows = AsyncMock(return_value=_a_year_of_water())
     entry = await _setup_entry(hass, rows)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=rows):
         await coordinator.async_refresh()
         await hass.async_block_till_done()
@@ -364,7 +364,7 @@ async def test_an_unreadable_recorder_keeps_the_last_read(
 ) -> None:
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     freezer.tick(timedelta(days=1))
     with (
         patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
@@ -382,7 +382,7 @@ async def test_a_read_kept_too_long_is_dropped(hass: HomeAssistant, freezer: Any
     """A recorder that stays broken must not publish an old year as today's."""
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     broken = AsyncMock(side_effect=RecorderUnavailable("locked"))
     with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=broken):
         freezer.tick(timedelta(days=7))
@@ -401,7 +401,7 @@ async def test_the_volume_is_projected_without_a_running_bill(
 ) -> None:
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     figures = coordinator._year_figures(_tariff(), 20.0, None)
     assert figures.projected_m3 == pytest.approx(46.75)
     assert figures.projected_end_cost_eur is None
@@ -413,7 +413,7 @@ async def test_a_draw_during_the_read_is_not_overwritten(hass: HomeAssistant, fr
     meter event handled meanwhile is overwritten by the tick's stale locals."""
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     # Setup framed the meter on the recorder's answer and asks it once more
     # on the next tick; that tick comes first, so the one below is the
     # meter's alone.
@@ -441,7 +441,7 @@ async def test_a_running_bill_held_by_its_floor_carries_into_the_year_end(
 ) -> None:
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     tariff = _tariff()
     on_today = compute_ytd_cost(tariff, 20.0, 1, 258 / 365)
     assert on_today is not None
@@ -459,7 +459,7 @@ async def test_next_years_card_in_december_does_not_price_the_year_figures(
     freezer.move_to("2026-12-15 10:00:00+00:00")
     rows = AsyncMock(return_value=_buckets(_span(date(2025, 11, 1), date(2026, 12, 14))))
     entry = await _setup_entry(hass, rows)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     held = coordinator.data.year_figures
     assert held.rolling_cost_eur is not None
     assert held.projected_end_cost_eur is not None
@@ -491,7 +491,7 @@ async def test_a_tick_that_returns_after_midnight_projects_the_year_it_folded(
         return 90.0, 0.0
 
     entry = await _setup_entry(hass, rows, AsyncMock(side_effect=_past_midnight))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert dt_util.now().year == 2027
     assert coordinator.data.ytd_consumption_m3 == 90.0
     assert coordinator.data.year_figures.projected_m3 == 90.0
@@ -512,7 +512,7 @@ async def test_a_refused_day_is_not_warned_about_on_every_read(
     days[date(2026, 2, 10)] = 500.0
     rows = AsyncMock(return_value=_buckets(days))
     entry = await _setup_entry(hass, rows)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     caplog.clear()
     caplog.set_level(logging.DEBUG)
     with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=rows):
@@ -536,7 +536,7 @@ async def test_a_read_of_another_meter_is_not_kept(hass: HomeAssistant, freezer:
     old meter's year is not that meter's, even when its own read fails."""
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data.year_figures.rolling_m3 == pytest.approx(91.25)
     hass.states.async_set("sensor.other_meter", "40")
     with (
@@ -557,7 +557,7 @@ async def test_a_meter_that_goes_away_takes_its_year_along(
 ) -> None:
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.data.year_figures.rolling_m3 == pytest.approx(91.25)
     with patch.object(coordinator, "async_resolve_meter_entity", AsyncMock(return_value=None)):
         await coordinator.async_refresh()
@@ -696,7 +696,7 @@ async def test_a_read_landing_after_removal_does_not_bring_the_file_back(
 ) -> None:
     freezer.move_to(_NOW)
     entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     freezer.tick(timedelta(days=1))

@@ -111,7 +111,7 @@ async def _setup(hass: HomeAssistant) -> tuple[MockConfigEntry, WaterCoordinator
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    return entry, hass.data[DOMAIN][entry.entry_id]
+    return entry, entry.runtime_data
 
 
 async def _tick(hass: HomeAssistant, coordinator: WaterCoordinator) -> None:

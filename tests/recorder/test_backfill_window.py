@@ -91,7 +91,7 @@ async def _backfill_after(
         snapshot_age_hours=0.0,
         snapshot_stale=False,
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     # Past the run marker the recorder stamps on a new database.
     zero = dt_util.utcnow().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)

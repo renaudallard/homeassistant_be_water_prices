@@ -1051,7 +1051,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     """Fetches the configured utility's tariff once a day."""
 
     def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, *, defer_meter_history: bool = False
+        self, hass: HomeAssistant, entry: WaterConfigEntry, *, defer_meter_history: bool = False
     ) -> None:
         self.entry = entry
         utility_id = entry.data[CONF_UTILITY]
@@ -1425,8 +1425,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         Called when the entry forgets it, on unload and on a failed
         setup. Read from the entry's state alone, the old coordinator of
         a reload still looked like the owner while the new setup was in
-        progress and the bucket not yet filled, and took the owner's
-        save path.
+        progress and the entry not yet handed the new one, and took the
+        owner's save path.
         """
         self._retired = True
         self.async_unsub_live_tracking()
@@ -2243,6 +2243,23 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             year_figures=self._year_figures(self.data.tariff, ytd_m3, ytd_cost),
         )
         self.async_update_listeners()
+
+
+type WaterConfigEntry = ConfigEntry[WaterCoordinator]
+
+
+def entry_coordinator(entry: WaterConfigEntry) -> WaterCoordinator | None:
+    """The coordinator the entry is set up with, None while it has none.
+
+    Setup hands it over once the first refresh has succeeded. Home
+    Assistant takes it back when the entry unloads, but a setup that fails
+    after the handover leaves it on the entry, retired by the teardown,
+    until the next attempt replaces it.
+    """
+    coordinator: WaterCoordinator | None = getattr(entry, "runtime_data", None)
+    if coordinator is None or not coordinator._owns_the_entry():
+        return None
+    return coordinator
 
 
 def _priced_on(year: int) -> date:

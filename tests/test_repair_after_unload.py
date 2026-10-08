@@ -49,7 +49,7 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import RecorderUnavailable
+from custom_components.be_water_prices.coordinator import RecorderUnavailable, entry_coordinator
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 from tests.test_ha_coordinator import _fresh_tariff
 
@@ -102,7 +102,7 @@ async def test_no_repair_card_for_an_entry_that_is_no_longer_loaded(hass: HomeAs
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         stale = replace(coordinator.data, snapshot_stale=True)
 
         # Loaded: the card is raised, as before.
@@ -146,7 +146,7 @@ async def test_a_late_refresh_does_not_write_the_store_of_a_removed_entry(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         assert store_key in hass_storage
 
         refresh = hass.loop.create_task(coordinator.async_refresh())
@@ -196,7 +196,7 @@ async def test_a_late_refresh_does_not_raise_the_projection_card_after_unload(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
 
         task = hass.async_create_task(coordinator.async_refresh())
         await asyncio.wait_for(entered.wait(), 5)
@@ -259,11 +259,11 @@ async def test_the_coordinator_a_reload_replaced_no_longer_raises_cards(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        previous = hass.data[DOMAIN][entry.entry_id]
+        previous = entry.runtime_data
         assert await hass.config_entries.async_reload(entry.entry_id)
         await hass.async_block_till_done()
         assert entry.state is ConfigEntryState.LOADED
-        assert hass.data[DOMAIN][entry.entry_id] is not previous
+        assert entry.runtime_data is not previous
 
         previous._sync_repair_issue(replace(previous.data, snapshot_stale=True))
     assert ir.async_get(hass).async_get_issue(DOMAIN, previous.stale_issue_id) is None
@@ -311,10 +311,10 @@ async def test_the_coordinator_a_reload_replaced_leaves_the_new_cards_up(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        previous = hass.data[DOMAIN][entry.entry_id]
+        previous = entry.runtime_data
         assert await hass.config_entries.async_reload(entry.entry_id)
         await hass.async_block_till_done()
-        assert hass.data[DOMAIN][entry.entry_id] is not previous
+        assert entry.runtime_data is not previous
 
         registry = ir.async_get(hass)
         assert registry.async_get_issue(DOMAIN, previous.operator_issue_id) is not None
@@ -369,7 +369,7 @@ async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        old = hass.data[DOMAIN][entry.entry_id]
+        old = entry.runtime_data
 
         # Retry on the stale card: a refresh in the flow's task, with a slow fetch.
         refresh = hass.loop.create_task(old.async_refresh())
@@ -385,11 +385,11 @@ async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
         for _ in range(300):
             if (
                 entry.state is ConfigEntryState.LOADED
-                and hass.data[DOMAIN].get(entry.entry_id) is not old
+                and getattr(entry, "runtime_data", None) is not old
             ):
                 break
             await asyncio.sleep(0.01)
-        assert hass.data[DOMAIN][entry.entry_id] is not old
+        assert entry.runtime_data is not old
         assert old._meter_unsub is None
 
         gate.set()
@@ -413,7 +413,8 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
     hass: HomeAssistant,
 ) -> None:
     """Read from the entry's state alone, the old coordinator still owned the entry
-    while the reload's new setup was in progress and the bucket not yet filled."""
+    while the reload's new setup was in progress and the entry not yet handed the
+    new one."""
     await hass.config.async_set_time_zone("Europe/Brussels")
     gate = asyncio.Event()
     calls = 0
@@ -439,7 +440,7 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        old = hass.data[DOMAIN][entry.entry_id]
+        old = entry.runtime_data
 
         refresh = hass.loop.create_task(old.async_refresh())
         for _ in range(6):
@@ -453,7 +454,7 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
             await asyncio.sleep(0.01)
         assert calls == 3
         assert entry.state is ConfigEntryState.SETUP_IN_PROGRESS
-        assert entry.entry_id not in hass.data.get(DOMAIN, {})
+        assert entry_coordinator(entry) is None
         assert not old._owns_the_entry()
 
         # The old refresh lands inside the window: no owner save, no card.

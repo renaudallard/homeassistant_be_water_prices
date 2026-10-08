@@ -131,7 +131,7 @@ async def test_a_fault_on_the_cached_path_does_not_print_the_raw_fetch_error(
     with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         outage = True
         with patch.object(coordinator, "_compute_ytd", side_effect=RuntimeError("fault")):
             await coordinator.async_refresh()

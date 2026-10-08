@@ -49,7 +49,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import issue_registry as ir
 
-from .const import CONF_CONSUMPTION_M3_PER_YEAR, DOMAIN
+from .const import CONF_CONSUMPTION_M3_PER_YEAR
+from .coordinator import entry_coordinator
 
 
 class SnapshotStaleRepairFlow(RepairsFlow):
@@ -77,7 +78,8 @@ class SnapshotStaleRepairFlow(RepairsFlow):
             placeholders = issue.translation_placeholders
         if user_input is None:
             return self.async_show_form(step_id="confirm", description_placeholders=placeholders)
-        coordinator = self.hass.data.get(DOMAIN, {}).get(self._entry_id)
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        coordinator = entry_coordinator(entry) if entry is not None else None
         if coordinator is not None:
             await coordinator.async_refresh()
         if coordinator is None or coordinator.data is None or coordinator.data.snapshot_stale:

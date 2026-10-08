@@ -35,6 +35,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
@@ -85,10 +86,8 @@ async def test_clear_without_an_entry_id_is_refused(hass: HomeAssistant) -> None
 
 async def test_clear_with_an_entry_id_is_allowed(hass: HomeAssistant) -> None:
     """The targeted form must still get through the guard."""
-    from types import SimpleNamespace
-
     entry = _entry(hass)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = SimpleNamespace(data=None)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
     async_register_services(hass)
     # No recorder in this harness, so the call is a no-op past the guard.
     await hass.services.async_call(
@@ -187,7 +186,7 @@ async def test_orphan_clear_only_touches_keys_the_tariff_lost(hass: HomeAssistan
         snapshot_age_hours=0.0,
         snapshot_stale=False,
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     ent_reg = er.async_get(hass)
     for key in ("basis_rate", "comfort_rate", "yearly_fee"):
@@ -241,7 +240,7 @@ async def test_orphan_clear_keeps_a_key_that_has_older_history(hass: HomeAssista
         snapshot_age_hours=0.0,
         snapshot_stale=False,
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     ent_reg = er.async_get(hass)
     ent_reg.async_get_or_create(
@@ -297,7 +296,7 @@ async def test_backfill_stops_at_the_snapshot_s_validity(hass: HomeAssistant) ->
         snapshot_age_hours=0.0,
         snapshot_stale=True,
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     ent_reg = er.async_get(hass)
     ent_reg.async_get_or_create(
         "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
@@ -404,13 +403,13 @@ async def test_orphan_cleanup_runs_before_a_stale_snapshot_defers_the_backfill(
     entry.add_to_hass(hass)
     # A real CoordinatorData always carries a tariff; the gate reads its
     # year, so the stub has to as well.
-    stale = SimpleNamespace(
+    stale = MagicMock(
         data=SimpleNamespace(
             snapshot_stale=True,
             tariff=SimpleNamespace(valid_from=_date(2026, 1, 1)),
         )
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = stale
+    entry.runtime_data = stale
 
     with (
         patch(
@@ -453,7 +452,7 @@ async def test_backfill_writes_the_card_s_last_hour(hass: HomeAssistant) -> None
     coordinator.data = CoordinatorData(
         tariff=expired, fetched_at=None, snapshot_age_hours=0.0, snapshot_stale=True
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     er.async_get(hass).async_get_or_create(
         "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
     )
@@ -494,7 +493,7 @@ async def test_a_start_past_the_window_says_so(
         snapshot_age_hours=0.0,
         snapshot_stale=False,
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     er.async_get(hass).async_get_or_create(
         "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
     )
@@ -534,7 +533,7 @@ async def test_an_unreadable_run_marker_leaves_the_last_hour_out(
         snapshot_age_hours=0.0,
         snapshot_stale=False,
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     er.async_get(hass).async_get_or_create(
         "sensor", DOMAIN, f"{entry.entry_id}_basis_rate", suggested_object_id="v_basis_rate"
     )
@@ -594,7 +593,6 @@ async def test_the_price_line_starts_on_1_january(hass: HomeAssistant, freezer: 
     start that moved to the 1st of the month would agree with itself.
     """
     from datetime import datetime
-    from types import SimpleNamespace
 
     from custom_components.be_water_prices.statistics import async_maybe_backfill_once
 
@@ -602,7 +600,8 @@ async def test_the_price_line_starts_on_1_january(hass: HomeAssistant, freezer: 
     freezer.move_to("2026-07-15 10:00:00+00:00")
     jan_1 = datetime(2026, 1, 1, tzinfo=dt_util.get_time_zone("Europe/Brussels"))
     entry = _entry(hass)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = SimpleNamespace(data=None)
+    entry.runtime_data = MagicMock(data=None)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
     async_register_services(hass)
     with patch(
         "custom_components.be_water_prices.statistics.async_backfill_prices",
@@ -743,8 +742,8 @@ async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
     )
     entry.add_to_hass(hass)
 
-    def _coordinator(card_year: int) -> SimpleNamespace:
-        return SimpleNamespace(
+    def _coordinator(card_year: int) -> MagicMock:
+        return MagicMock(
             data=SimpleNamespace(
                 snapshot_stale=False,
                 tariff=SimpleNamespace(valid_from=_date(card_year, 1, 1)),
@@ -752,7 +751,7 @@ async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
         )
 
     # January: carry_prior_year_card is serving last year's card.
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = _coordinator(now_year - 1)
+    entry.runtime_data = _coordinator(now_year - 1)
     with patch(
         "custom_components.be_water_prices.statistics.async_backfill_prices",
         new=AsyncMock(return_value=99),
@@ -763,7 +762,7 @@ async def test_a_prior_year_card_does_not_stamp_the_gate_for_the_whole_year(
 
     # March: the operator publishes this year's card. The line has to be
     # rewritten at the rate that actually applied from 1 January.
-    hass.data[DOMAIN][entry.entry_id] = _coordinator(now_year)
+    entry.runtime_data = _coordinator(now_year)
     with patch(
         "custom_components.be_water_prices.statistics.async_backfill_prices",
         new=AsyncMock(return_value=99),
@@ -812,7 +811,7 @@ async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
     fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
 
     async def _backfill(hass_: HomeAssistant, entry_: Any, **_k: Any) -> int:
-        tariff = hass_.data[DOMAIN][entry_.entry_id].data.tariff
+        tariff = entry_.runtime_data.data.tariff
         written.append((tariff.valid_from.year, tariff.linear_eur_per_m3))
         return 99
 
@@ -837,7 +836,7 @@ async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
 
         # The operator finally publishes, and the daily tick picks it up.
         card_year = year
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = entry.runtime_data
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -889,7 +888,7 @@ async def _backfill_a_metered_entry(
             assert desc.value_fn(data) is not None, desc.key
     coordinator = MagicMock()
     coordinator.data = data
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
     ent_reg = er.async_get(hass)
     for desc in SENSORS:
         ent_reg.async_get_or_create(

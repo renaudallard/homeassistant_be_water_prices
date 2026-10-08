@@ -31,7 +31,6 @@ from dataclasses import asdict
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from ._redact import scrub_tokens, sensitive_tokens
@@ -41,9 +40,8 @@ from .const import (
     CONF_POSTCODE,
     CONF_POSTCODE_RESOLVED,
     CONF_WATER_METER_SENSOR,
-    DOMAIN,
 )
-from .coordinator import WaterCoordinator
+from .coordinator import WaterConfigEntry, entry_coordinator
 
 # Fields that uniquely or near-uniquely identify the household; the
 # diagnostics file ends up attached to GitHub issues so anything that
@@ -60,11 +58,11 @@ _REDACT_KEYS = {
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: WaterConfigEntry
 ) -> dict[str, Any]:
     # The dump can be asked for on an entry that never loaded, or is
     # retrying: no coordinator then, and the config alone is the answer.
-    coordinator: WaterCoordinator | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    coordinator = entry_coordinator(entry)
     data = coordinator.data if coordinator is not None else None
     snapshot = (
         {

@@ -54,7 +54,7 @@ from .const import (
     DOMAIN,
     REGION_FLANDERS,
 )
-from .coordinator import CoordinatorData, WaterCoordinator, utility_device_info
+from .coordinator import CoordinatorData, WaterConfigEntry, WaterCoordinator, utility_device_info
 from .providers import get
 
 # Kept under the old private name so the sensor attribute and the
@@ -336,10 +336,10 @@ def _is_applicable(desc: WaterSensorDescription, *, region: str) -> bool:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: WaterConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: WaterCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     region = get(entry.data[CONF_UTILITY]).region
     applicable = [desc for desc in SENSORS if _is_applicable(desc, region=region)]
     async_add_entities(WaterSensor(coordinator, desc) for desc in applicable)

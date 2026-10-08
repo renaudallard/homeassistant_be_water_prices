@@ -98,7 +98,7 @@ async def test_a_malformed_record_starts_a_fresh_cycle(
         await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
     assert "starting a fresh one" in caplog.text
-    assert hass.data[DOMAIN][entry.entry_id].data.ytd_consumption_m3 == 20.0
+    assert entry.runtime_data.data.ytd_consumption_m3 == 20.0
 
 
 def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
