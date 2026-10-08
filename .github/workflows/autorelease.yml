@@ -11,14 +11,56 @@ on:
 permissions:
   contents: write
 
+# Two manifest bumps in quick succession would otherwise race on git tag and
+# gh release create. Serialise them per ref and never cancel a run in
+# progress, so no release is left half published. Only one run can wait in
+# the group, and a newer push replaces it: a version bumped over before its
+# run started gets no release of its own, its changes go out with the next.
+concurrency:
+  group: autorelease-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # A version that fails the suite must not reach HACS users.
   verify:
     uses: ./.github/workflows/test.yml
+    # The test suite installs and runs third-party packages; it needs no
+    # write token, and a reusable workflow gets the caller's.
+    permissions:
+      contents: read
+
+  # Nor one HACS or hassfest would refuse.
+  hacs:
+    runs-on: ubuntu-latest
+    # Floating-ref actions get no write token from the workflow-level grant.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    runs-on: ubuntu-latest
+    # Floating-ref actions get no write token from the workflow-level grant.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: home-assistant/actions/hassfest@master
 
   release:
     runs-on: ubuntu-latest
-    needs: [verify]
+    needs: [verify, hacs, hassfest]
+    env:
+      # A release counts once it is published with the zip the README's
+      # manual install downloads.
+      # gh release create makes a draft, uploads, then publishes, and the
+      # lookup by tag finds a draft too, so one left by a create that died
+      # before the upload or at the publish call would otherwise pass for
+      # the release.
+      PUBLISHED: '(.isDraft | not) and any(.assets[]; .name == "be_water_prices.zip")'
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -36,24 +78,27 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "tag=v$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Check if tag and release exist
+      - name: Check if the release exists
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${{ steps.version.outputs.tag }}"
-          if git ls-remote --tags --exit-code origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          # The release, not the tag. The tag is pushed before the release is
+          # created, so when every attempt below fails it is already on
+          # origin, and a re-run that tested the tag would skip the release
+          # and end green with nothing published.
+          # The step runs under bash -e and the lookup fails whenever there
+          # is no release yet, which is the usual case, hence the || true.
+          published=$(gh release view "${{ steps.version.outputs.tag }}" \
+            --json isDraft,assets --jq "$PUBLISHED" 2>/dev/null || true)
+          if [ "$published" = "true" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
-          fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "release_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "release_exists=false" >> "$GITHUB_OUTPUT"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build release zip
+        if: steps.check.outputs.exists == 'false'
         run: |
           mkdir -p dist
           cd custom_components/be_water_prices
@@ -62,34 +107,19 @@ jobs:
           cd ../..
           unzip -l dist/be_water_prices.zip
 
-      - name: Push tag (when missing)
-        if: steps.check.outputs.tag_exists == 'false'
+      - name: Tag and release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set +e
           tag="${{ steps.version.outputs.tag }}"
+          # Tag and push stay outside the retry loop: on a re-run after every
+          # attempt below failed the tag is already on origin, and the run
+          # still has to go on to create the release. The push fails
+          # harmlessly on a tag that exists, as it would locally.
           git tag "$tag"
           git push origin "$tag"
-
-      - name: Add the zip to a release that exists without one
-        if: steps.check.outputs.release_exists == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${{ steps.version.outputs.tag }}"
-          # A run that created the release and died before the upload
-          # left it without its asset, and a re-run saw the release and
-          # did nothing. Upload the missing asset; leave a present one.
-          if gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx 'be_water_prices.zip'; then
-            echo "release $tag already carries be_water_prices.zip"
-          else
-            gh release upload "$tag" dist/be_water_prices.zip
-          fi
-
-      - name: Create release (with retry on transient API errors)
-        if: steps.check.outputs.release_exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${{ steps.version.outputs.tag }}"
           # GitHub guesses the previous release when it writes the notes,
           # and guessed wrong here twice: no start at all for v0.7.3 and
           # v0.7.2 for v0.7.4. Hand it the highest tag below this one.
@@ -102,12 +132,42 @@ jobs:
           if [ -n "$prev" ]; then
             args+=(--notes-start-tag "$prev")
           fi
-          set +e
-          for delay in 10 30 90; do
-            gh release create "$tag" "${args[@]}" dist/be_water_prices.zip && exit 0
-            echo "release create failed, sleeping ${delay}s..." >&2
-            sleep "$delay"
+          # A draft an earlier attempt left behind is dropped before the next
+          # one, keeping the tag. Only a draft: the lookup finds a published
+          # release first, and that is never deleted.
+          drop_draft() {
+            if [ "$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+              gh release delete "$tag" --yes
+            fi
+          }
+          drop_draft
+          # gh release create is the call a 5xx from GitHub's API loses a
+          # release to. Retried five times with a growing pause, so one blip
+          # does not strand a tag without its zip.
+          attempts=5
+          delays="10 30 60 120"
+          set -- $delays
+          for i in $(seq 1 "$attempts"); do
+            echo "::group::release attempt $i"
+            gh release create "$tag" "${args[@]}" dist/be_water_prices.zip
+            rc=$?
+            echo "::endgroup::"
+            if [ $rc -eq 0 ]; then
+              break
+            fi
+            # An attempt that died mid-call may still have published the
+            # release; that is success. A draft is not.
+            if [ "$(gh release view "$tag" --json isDraft,assets --jq "$PUBLISHED" 2>/dev/null)" = "true" ]; then
+              echo "release $tag already published, treating as success"
+              rc=0
+              break
+            fi
+            drop_draft
+            if [ "$i" -lt "$attempts" ]; then
+              sleep_for=$1
+              shift
+              echo "release attempt $i failed (exit $rc), sleeping ${sleep_for}s..." >&2
+              sleep "$sleep_for"
+            fi
           done
-          # Final attempt; surface its exit code so the run fails if it still
-          # returns non-zero after the three retries.
-          gh release create "$tag" "${args[@]}" dist/be_water_prices.zip
+          exit $rc
