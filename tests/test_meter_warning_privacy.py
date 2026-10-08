@@ -144,7 +144,6 @@ def _rows(days: dict[date, float]) -> list[dict[str, Any]]:
 async def test_the_year_to_date_reader_warns_without_the_entity(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _rows({date(2026, 3, 2): 1189.6, date(2026, 3, 3): 0.3})
     with (
         patch.object(module, "_recorder_daily_rows", new=AsyncMock(return_value=rows)),
@@ -158,7 +157,6 @@ async def test_the_year_to_date_reader_warns_without_the_entity(
 async def test_the_full_year_reader_warns_without_the_entity(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
     start = date(2024, 12, 20)
     days = {start + timedelta(days=n): 0.2 for n in range(380)}
     days[date(2025, 6, 2)] = 1180.0
@@ -176,7 +174,6 @@ async def test_a_quiet_refusal_still_names_the_meter(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
     """At DEBUG the id stays, so a household with two entries can tell them apart."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _rows({date(2026, 3, 2): 1189.6, date(2026, 3, 3): 0.3})
     with caplog.at_level(logging.DEBUG):
         _admitted_changes(rows, _METER, date(2026, 3, 1), date(2026, 3, 5), level=logging.DEBUG)

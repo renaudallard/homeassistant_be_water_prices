@@ -105,7 +105,6 @@ async def _setup_entry(
     test wants to observe happens HERE, not on a later refresh: patching it
     only afterwards leaves the memo already written and the mock untouched.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     entry = MockConfigEntry(
@@ -136,7 +135,6 @@ async def _setup_entry(
 @pytest.mark.asyncio
 async def test_full_year_sums_only_the_year_itself(hass: HomeAssistant) -> None:
     """History either side proves the year; December of the year before is not in it."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),  # proves the meter predates the year
@@ -164,7 +162,6 @@ async def test_a_re_based_register_is_not_offered_as_the_year(hass: HomeAssistan
     through: 1262 m3 offered as the year, and a 6791.93 EUR projection
     written into the options if the Repair was accepted.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),
@@ -181,7 +178,6 @@ async def test_a_re_based_register_is_not_offered_as_the_year(hass: HomeAssistan
 @pytest.mark.asyncio
 async def test_a_swap_after_the_year_does_not_refuse_it(hass: HomeAssistant) -> None:
     """The negative delta is in the next year's bucket, so it is not this year's."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),
@@ -216,7 +212,6 @@ def _daily(
 @pytest.mark.asyncio
 async def test_history_on_both_sides_of_a_hole_is_not_a_full_year(hass: HomeAssistant) -> None:
     """Unavailable from January to November, back for December: two sides, no year."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(
         [(date(2024, 12, 15), 3.0), *_daily(date(2025, 12, 1), date(2025, 12, 31), 0.1)]
     )
@@ -226,7 +221,6 @@ async def test_history_on_both_sides_of_a_hole_is_not_a_full_year(hass: HomeAssi
 
 @pytest.mark.asyncio
 async def test_a_summer_away_still_makes_a_full_year(hass: HomeAssistant) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
     away = (date(2025, 7, 1), date(2025, 8, 31))
     rows = _buckets(
         [(date(2024, 12, 15), 3.0), *_daily(date(2025, 1, 1), date(2025, 12, 31), 0.1, away)]
@@ -238,7 +232,6 @@ async def test_a_summer_away_still_makes_a_full_year(hass: HomeAssistant) -> Non
 
 @pytest.mark.asyncio
 async def test_a_meter_off_for_half_the_year_is_not_a_full_year(hass: HomeAssistant) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
     off = (date(2025, 3, 1), date(2025, 9, 30))
     rows = _buckets(
         [(date(2024, 12, 15), 3.0), *_daily(date(2025, 1, 1), date(2025, 12, 31), 0.1, off)]
@@ -254,7 +247,6 @@ async def test_meter_installed_mid_year_is_not_a_full_year(hass: HomeAssistant) 
     A bucket every day from 10 March covers two days in three, so only
     the missing history before the year tells it apart.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(_daily(date(2025, 3, 10), date(2025, 12, 31), 0.25))
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
@@ -269,7 +261,6 @@ async def test_meter_that_stopped_before_december_is_not_a_full_year(
     A bucket every day until then covers two days in three, so only the
     missing December tells it apart from a whole year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets([(date(2024, 12, 15), 3.0), *_daily(date(2025, 1, 1), date(2025, 9, 30), 0.25)])
     with patch(_ROWS, new=AsyncMock(return_value=rows)):
         assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
@@ -278,7 +269,6 @@ async def test_meter_that_stopped_before_december_is_not_a_full_year(
 @pytest.mark.asyncio
 async def test_meter_swapped_mid_year_is_refused(hass: HomeAssistant) -> None:
     """A register that went backwards makes the deltas around it meaningless."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     swap = date(2025, 3, 1)
     rows = _buckets(
         [
@@ -293,7 +283,6 @@ async def test_meter_swapped_mid_year_is_refused(hass: HomeAssistant) -> None:
 
 @pytest.mark.asyncio
 async def test_no_statistics_at_all_is_not_a_full_year(hass: HomeAssistant) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
     with patch(_ROWS, new=AsyncMock(return_value=[])):
         assert await _recorder_full_year_m3(hass, "sensor.water_meter", 2025) is None
 
@@ -301,7 +290,6 @@ async def test_no_statistics_at_all_is_not_a_full_year(hass: HomeAssistant) -> N
 @pytest.mark.asyncio
 async def test_quiet_days_without_a_bucket_still_count(hass: HomeAssistant) -> None:
     """A household away over New Year has no January 1 bucket and a full year."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(
         [
             (date(2024, 12, 3), 1.0),
@@ -316,7 +304,6 @@ async def test_quiet_days_without_a_bucket_still_count(hass: HomeAssistant) -> N
 
 @pytest.mark.asyncio
 async def test_rows_without_a_change_value_are_skipped(hass: HomeAssistant) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
     rows = _buckets(
         [
             (date(2024, 12, 15), 3.0),
@@ -495,7 +482,6 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
 
 @pytest.mark.asyncio
 async def test_no_meter_asks_nothing(hass: HomeAssistant) -> None:
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _tariff()
@@ -561,7 +547,6 @@ async def test_fix_flow_keeps_the_other_options(hass: HomeAssistant) -> None:
     Losing persons, the social tariff, the commune or the meter would bill
     the entry as one resident on the operator default from then on.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     others = {
         CONF_PERSONS: 3,
         CONF_SOCIAL_TARIFF: True,
@@ -621,7 +606,6 @@ async def test_opening_the_card_shows_a_form_before_doing_anything(
 @pytest.mark.asyncio
 async def test_fix_flow_aborts_when_the_entry_cannot_be_updated(hass: HomeAssistant) -> None:
     """Completing would delete the issue; aborting leaves the card in place."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     flow = ProjectionOutdatedRepairFlow(entry_id="does-not-exist", consumption_m3=131)
     flow.hass = hass
     flow.handler = DOMAIN

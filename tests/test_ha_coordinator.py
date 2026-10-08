@@ -107,13 +107,6 @@ async def _setup_entry(
     options: dict[str, Any] | None = None,
     loads: bool = True,
 ) -> MockConfigEntry:
-    # The integration is Belgium-only and production code reads HA-local
-    # time (the valid_until staleness check uses dt_util.now().date()).
-    # The harness defaults to US/Pacific which silently flips date
-    # comparisons during the ~8 h overnight window where the system UTC
-    # date is one day ahead of Pacific, making CI flaky around midnight
-    # UTC. Pin to Europe/Brussels so the test clock matches the user's.
-    await hass.config.async_set_time_zone("Europe/Brussels")
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="VIVAQUA",
@@ -294,7 +287,6 @@ async def test_one_absurd_reading_does_not_pin_the_year(hass: HomeAssistant) -> 
     and the cost to it until January, and it gets persisted on the way.
     A real catch-up repeats the reading and is accepted on the next one.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -358,7 +350,6 @@ async def test_recorder_fallback_does_not_publish_below_the_live_mark(
     Jan 1 last_reset, and the statistics engine books a same-cycle
     decrease as water given back, which a dip never was.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -433,7 +424,6 @@ async def test_removing_the_entry_deletes_its_ytd_store(
             new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
-        await hass.config.async_set_time_zone("Europe/Brussels")
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
@@ -490,7 +480,6 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
     The daily recorder query is stubbed to anchor a Jan 1 baseline; from
     there the running total must track the meter without another query.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     # Seed the meter before setup so _compute_ytd captures the baseline.
     hass.states.async_set("sensor.water_meter", "100")
 
@@ -554,7 +543,6 @@ async def test_meter_events_do_not_starve_the_daily_refresh(hass: HomeAssistant)
     once a day, so the tariff fetch would never come due again and the
     snapshot would stay frozen until HA restarts.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
     fetches = 0
 
@@ -612,7 +600,6 @@ async def test_live_tracking_follows_a_changed_auto_discovered_meter(
     entity would feed that meter's unrelated cumulative reading into the
     running total.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.meter_a", "100")
     hass.states.async_set("sensor.meter_b", "500")
     discovered = "sensor.meter_a"
@@ -675,7 +662,6 @@ async def test_litre_meter_is_converted_to_m3(hass: HomeAssistant) -> None:
     Without unit normalisation a litre reading would be billed as if it
     were already cubic metres (~1000× too high).
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     # 100 000 L == 100 m³, seeded before setup so _compute_ytd anchors it.
     hass.states.async_set("sensor.water_meter", "100000", {"unit_of_measurement": "L"})
 
@@ -722,7 +708,6 @@ async def test_live_ytd_reanchors_on_year_rollover(hass: HomeAssistant) -> None:
     Until the next daily tick re-anchors, a live event would otherwise
     compute ``live - last_year_baseline`` -- nearly a full extra year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -773,7 +758,6 @@ async def test_live_ytd_recovers_after_meter_unavailable_at_tick(hass: HomeAssis
     The recorder figure still surfaces, and once the meter returns the
     baseline is reconstructed so live tracking resumes immediately.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     # Meter is unavailable at the moment of the setup (daily) tick.
     hass.states.async_set("sensor.water_meter", "unavailable")
 
@@ -828,7 +812,6 @@ async def test_live_ytd_recovery_resets_when_meter_down_across_year_boundary(
     The recovery branch must not reconstruct from the stale prior-year
     recorder figure, which would report nearly a full extra year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "unavailable")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -877,7 +860,6 @@ async def test_live_ytd_republishes_when_only_cost_changes(hass: HomeAssistant) 
     """
     from dataclasses import replace
 
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -929,7 +911,6 @@ async def test_live_ytd_baseline_survives_restart(hass: HomeAssistant) -> None:
     trailing daily figure (which lags the live meter and used to pull the
     published cost downward on every restart / reload).
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -986,7 +967,6 @@ async def test_live_ytd_ignores_meter_glitch_down(hass: HomeAssistant) -> None:
     down-rounded cumulative reading is clamped to the cycle high-water
     mark rather than published as a decrease.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1058,7 +1038,6 @@ async def test_live_ytd_cost_held_when_tariff_drops(hass: HomeAssistant) -> None
     clamped to the cycle cost high-water mark so the running bill never
     decreases while consumption stays flat.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     # First fetch (setup) is the normal rate; every later fetch returns a
@@ -1107,7 +1086,6 @@ async def test_live_ytd_cost_held_when_tariff_drops(hass: HomeAssistant) -> None
 async def test_ytd_cost_floor_survives_restart(hass: HomeAssistant) -> None:
     """The cost high-water mark is persisted, so a lower tariff after a
     restart is still clamped to the pre-restart peak."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     rate = {"linear": 2.62}
@@ -1161,7 +1139,6 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
     the recorder-fallback path (meter unavailable) serves the small new-year
     figure rather than clamping it up to last year's peak.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1220,7 +1197,6 @@ async def test_meter_recovery_keeps_the_new_year_recorder_figure(hass: HomeAssis
     reconstruct the baseline from that figure; re-anchoring on the raw
     reading instead would publish a decrease inside the same year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1277,7 +1253,6 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
     the first low-but-valid reading after the restart was published as a
     decrease. The mark must survive so the glitch is still clamped.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1332,7 +1307,6 @@ async def test_live_ytd_hwm_survives_restart_against_glitch(hass: HomeAssistant)
 
 async def _setup_metered_entry(hass: HomeAssistant) -> Any:
     """Set up a Brussels entry with a meter at 100 m³ and a Jan 1 baseline of 80."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1886,7 +1860,6 @@ async def test_explicit_meter_option_wins_over_discovery(hass: HomeAssistant) ->
             new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
-        await hass.config.async_set_time_zone("Europe/Brussels")
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         coordinator = entry.runtime_data
@@ -1901,7 +1874,6 @@ async def test_unusable_meter_readings_leave_the_total_alone(hass: HomeAssistant
     reading carrying a unit that is not a volume both reach the same
     sanitiser, and either one landing in the cycle would corrupt the year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1963,7 +1935,6 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
     live path finds no baseline and would reconstruct one from the figure
     still on screen, which belongs to the meter just left behind.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.meter_a", "100")
     hass.states.async_set("sensor.meter_b", "unavailable")
     discovered = "sensor.meter_a"
@@ -2045,7 +2016,6 @@ async def test_a_reading_that_lands_during_the_recorder_query_is_used(
     the next one costs a day of live tracking, and the frame it eventually
     builds is placed against a figure a day out of date.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "unavailable")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2099,7 +2069,6 @@ async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssist
     has to re-anchor the year rather than wait for the next daily tick,
     which is a day of missing history.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2158,7 +2127,6 @@ async def test_transient_recorder_gap_does_not_reset_the_year(hass: HomeAssistan
     reading, and because the baseline year then matches, no later tick ever
     consults the recorder again: the year's usage is gone for good.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "unavailable")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2221,7 +2189,6 @@ async def test_a_recorder_gap_across_a_restart_keeps_the_year(hass: HomeAssistan
     event as test_transient_recorder_gap_does_not_reset_the_year with a
     restart in the middle of it, and it has to resolve the same way.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "unavailable")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2286,7 +2253,6 @@ async def test_tick_defers_the_anchor_when_the_recorder_query_fails(
     stored anchor is last year's while the stored recorder year says this
     year does have statistics.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "4520")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2350,7 +2316,6 @@ async def test_an_old_recorder_failure_does_not_block_the_new_year(
     healthy the verdict is never refreshed, and a hiccup back in March would
     still be blocking the first reading of January.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2414,7 +2379,6 @@ async def test_a_record_an_older_release_wrote_back_is_not_emptied(
     Reading that label rather than the keys would fold a current record as
     if it were the old shape and empty it.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "4100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2481,7 +2445,6 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
     reset on that year meant the cost mark was never dropped and the new
     year opened pinned to the old year's final bill.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -2540,7 +2503,6 @@ async def test_resuming_live_tracking_keeps_the_cost_floor(hass: HomeAssistant) 
     which clears the cost mark. A tariff cut during the dropout would then
     surface as a decrease in the running bill inside one year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "unavailable")
 
     cheap = False
@@ -2597,7 +2559,6 @@ async def test_recorder_hiccup_does_not_blank_a_known_figure(hass: HomeAssistant
     high-water mark is still in memory, so both sensors can keep reporting
     it instead of going unknown for a whole day.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2649,7 +2610,6 @@ async def test_cost_floor_from_an_older_store_still_drops_at_rollover(
     fallback the mark would look unstamped and the reset would never fire
     for exactly the installs upgrading into it.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "unavailable")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2707,7 +2667,6 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
     still knows about the year. Once that larger figure has been published,
     every later path that reports the mark has to be at or above it.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2792,7 +2751,6 @@ async def test_undatable_cost_floor_from_an_older_store_is_dropped(
     that year and the clamp branch never stamps one, so such a mark would
     pin the bill at the old peak in this year and every year after it.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -2855,7 +2813,6 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
     already published is this year's, so keep serving it rather than
     reporting unknown for a whole day.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -2918,7 +2875,6 @@ async def test_first_anchor_of_a_running_year_still_anchors_after_a_migration(
     anchoring itself. The companion test below seeds a record that does
     carry a basis and pins the floor being kept.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -2987,7 +2943,6 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
     `total` sensor unconditionally, so a meter that steps backwards, or a
     user adjusting the statistic, really does lower the same-year total.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -3049,7 +3004,6 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
     handled while that runs advances the mark, so publishing the earlier
     snapshot walks both YTD sensors backwards inside the year.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -3110,7 +3064,6 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
     sight: the step bound is scaled by that gap, and the meter reported a
     moment ago, which is why the cycle moved and why this round exists.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -3170,7 +3123,6 @@ async def test_meter_draw_does_not_churn_the_rate_sensors(hass: HomeAssistant) -
     attribute on every entity, so all eight sensors wrote a recorder row
     per reading rather than the two that moved.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -3234,7 +3186,6 @@ async def test_unreadable_cycle_store_does_not_block_setup(hass: HomeAssistant) 
     raising there would leave the integration unusable until the user found
     and deleted the file.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -3329,7 +3280,6 @@ async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
     hass: HomeAssistant, hass_storage: dict[str, Any]
 ) -> None:
     """Granted in July, the running bill stayed on the old figure until January."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "4100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -3781,7 +3731,6 @@ async def test_a_swap_moves_the_sensors_reset_to_its_start(hass: HomeAssistant) 
 
     from custom_components.be_water_prices.coordinator import _cycle_from_record
 
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "1000.0")
     failing = False
 
@@ -3927,7 +3876,6 @@ async def test_first_anchor_keeps_a_floor_it_can_account_for(
     decrease, and after a restart the anchor tick is the path that runs,
     so the floor persisted to survive restarts was the one thrown away.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -3987,7 +3935,6 @@ async def test_a_floor_measured_by_an_earlier_release_is_rebuilt_once(
     now, which means one rebuild on upgrade and the corrected figure the
     same day. Pinned here so it stays one rebuild.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -4050,7 +3997,6 @@ async def test_a_postcode_that_now_resolves_elsewhere_says_so(
     Water-link and every entry already on one kept paying 121.09 EUR a
     year too much with no signal anywhere.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -4088,7 +4034,6 @@ async def test_a_postcode_that_still_resolves_here_is_left_alone(
     hass: HomeAssistant, issue_registry: Any
 ) -> None:
     """And a split postcode counts as resolving: the household picked one."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -4123,7 +4068,6 @@ async def test_an_operator_picked_by_hand_is_left_alone_until_the_resolver_chang
     says that, the pick stands; once it says something else, that is a
     correction the household has not seen yet.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -4176,7 +4120,6 @@ async def test_picking_the_same_operator_again_settles_an_older_hand_pick(
     the saved commune and clear the card, even though nothing else on
     the entry changes.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -4347,8 +4290,6 @@ async def test_a_stale_snapshot_follows_the_archive(
     from custom_components.be_water_prices import coordinator as module
     from custom_components.be_water_prices.providers.base import tariff_to_dict
 
-    # The coordinator reads Brussels time; so must the months asked for.
-    await hass.config.async_set_time_zone("Europe/Brussels")
     today = dt_util.now().date()
 
     def _row(label: str, days_ago: int) -> dict[str, Any]:
@@ -4469,8 +4410,6 @@ async def test_the_archive_is_walked_back_month_by_month(
     from custom_components.be_water_prices import coordinator as module
     from custom_components.be_water_prices.providers.base import tariff_to_dict
 
-    # The coordinator reads Brussels time; so must the months asked for.
-    await hass.config.async_set_time_zone("Europe/Brussels")
     months = [dt_util.now().date()]
     for _ in range(5):
         months.append(months[-1].replace(day=1) - timedelta(days=1))
@@ -4514,7 +4453,6 @@ async def test_an_archived_commune_row_is_relabelled_for_the_household(
         raise ExtractorError("HTTP 503 from upstream")
 
     monkeypatch.setattr(module, "_archived_row", archived)
-    await hass.config.async_set_time_zone("Europe/Brussels")
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Farys",
@@ -4678,8 +4616,6 @@ async def test_an_archive_that_does_not_answer_is_not_walked_past(
         tariff_to_dict,
     )
 
-    # The coordinator reads Brussels time; so must the month asked for.
-    await hass.config.async_set_time_zone("Europe/Brussels")
     today = dt_util.now().date()
     older = {
         **tariff_to_dict(_fresh_tariff()),

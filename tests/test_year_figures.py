@@ -204,7 +204,6 @@ async def _setup_entry(
     or whatever ``ytd`` has the recorder say, on ``card`` or the Brussels
     one, with ``options`` laid over the defaults."""
     card = card or _tariff()
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
     entry = MockConfigEntry(
         domain=DOMAIN,

@@ -55,7 +55,6 @@ async def test_a_frame_that_reproduces_the_figure_to_the_femtolitre_is_not_stale
     hass: HomeAssistant,
 ) -> None:
     """1234.567 - (1234.567 - 0.1) is 0.09999999999990905, which is not below 0.1."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "1234.567")
     entry = MockConfigEntry(
         domain=DOMAIN,

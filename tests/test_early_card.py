@@ -86,7 +86,6 @@ def _basis(card_year: int) -> str:
 
 async def _entry(hass: HomeAssistant, hass_storage: dict[str, Any]) -> MockConfigEntry:
     """A VIVAQUA entry whose meter has drawn 75 m3 of 2026."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "4075")
     entry = MockConfigEntry(
         domain=DOMAIN,

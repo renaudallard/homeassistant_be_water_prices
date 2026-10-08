@@ -27,7 +27,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -52,13 +51,9 @@ _JAN_1 = datetime(2026, 1, 1, tzinfo=_BRUSSELS)
 
 
 @pytest.fixture
-def _mid_july_in_brussels(freezer: Any) -> Iterator[None]:
-    """Pin the clock and the zone the year-to-date sensors reset in."""
-    zone = dt_util.get_default_time_zone()
-    dt_util.set_default_time_zone(_BRUSSELS)
+def _mid_july_in_brussels(freezer: Any) -> None:
+    """Pin the clock the year-to-date sensors reset by."""
     freezer.move_to(datetime(2026, 7, 15, 12, tzinfo=_BRUSSELS))
-    yield
-    dt_util.set_default_time_zone(zone)
 
 
 class _StubEntry:

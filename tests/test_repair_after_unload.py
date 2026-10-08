@@ -127,7 +127,6 @@ async def test_a_late_refresh_does_not_write_the_store_of_a_removed_entry(
     hass: HomeAssistant, hass_storage: dict[str, Any]
 ) -> None:
     """Removal deletes the YTD file; the fetch in flight brought it back."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     gate = asyncio.Event()
     calls = 0
 
@@ -170,7 +169,6 @@ async def test_a_late_refresh_does_not_raise_the_projection_card_after_unload(
     hass: HomeAssistant,
 ) -> None:
     """The stale card was gated in the previous round; the projection card was not."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     entered = asyncio.Event()
     release = asyncio.Event()
     calls = 0
@@ -213,7 +211,6 @@ async def test_a_setup_that_fails_after_the_first_refresh_takes_its_cards_down(
     hass: HomeAssistant,
 ) -> None:
     """The failed-setup path forgot the coordinator but left both cards behind."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     yesterday = date.today() - timedelta(days=1)
 
     async def _stale(_session: Any) -> WaterTariff:
@@ -277,7 +274,6 @@ async def test_the_coordinator_a_reload_replaced_leaves_the_new_cards_up(
     A late refresh on the retired coordinator took both down right after
     the new one had raised them.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
 
     async def _fetch(_session: Any) -> WaterTariff:
         return _fresh_tariff()
@@ -341,7 +337,6 @@ async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
 
     One reading later its debounced save wrote the deleted YTD file back.
     """
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.meter_a", "100")
     hass.states.async_set("sensor.meter_b", "500")
     gate = asyncio.Event()
@@ -415,7 +410,6 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
     """Read from the entry's state alone, the old coordinator still owned the entry
     while the reload's new setup was in progress and the entry not yet handed the
     new one."""
-    await hass.config.async_set_time_zone("Europe/Brussels")
     gate = asyncio.Event()
     calls = 0
 

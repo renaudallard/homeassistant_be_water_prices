@@ -1763,7 +1763,6 @@ async def test_failed_first_refresh_leaves_no_meter_listener(hass: HomeAssistant
             sanering_gemeentelijk_eur_per_m3=2.5,
         )
 
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.water_meter", "100")
 
     async def _fetch_ok(_session: object) -> object:

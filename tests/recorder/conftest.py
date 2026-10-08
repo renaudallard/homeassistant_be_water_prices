@@ -46,3 +46,12 @@ def auto_enable_custom_integrations():  # type: ignore[no-untyped-def]
     enable.
     """
     yield
+
+
+@pytest.fixture(autouse=True)
+def _force_brussels_timezone():  # type: ignore[no-untyped-def]
+    """Override the suite-wide one, which requests ``hass`` too.
+
+    Each test here sets the zone itself once ``hass`` exists.
+    """
+    yield

@@ -596,7 +596,6 @@ async def test_the_price_line_starts_on_1_january(hass: HomeAssistant, freezer: 
 
     from custom_components.be_water_prices.statistics import async_maybe_backfill_once
 
-    await hass.config.async_set_time_zone("Europe/Brussels")
     freezer.move_to("2026-07-15 10:00:00+00:00")
     jan_1 = datetime(2026, 1, 1, tzinfo=dt_util.get_time_zone("Europe/Brussels"))
     entry = _entry(hass)
@@ -862,7 +861,6 @@ async def _backfill_a_metered_entry(
     from custom_components.be_water_prices.sensor import SENSORS
     from tests.test_ha_coordinator import _fresh_tariff
 
-    await hass.config.async_set_time_zone("Europe/Brussels")
     freezer.move_to("2026-10-04 20:30:00+00:00")
     entry = _entry(hass)
     data = CoordinatorData(

@@ -38,6 +38,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from homeassistant.core import HomeAssistant
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -69,3 +70,15 @@ def auto_enable_custom_integrations(enable_custom_integrations):  # type: ignore
     second across the pure tests, which is not worth the fragility.
     """
     yield
+
+
+@pytest.fixture(autouse=True)
+async def _force_brussels_timezone(hass: HomeAssistant) -> None:
+    """Pin every test to Europe/Brussels.
+
+    The hass fixture defaults to US/Pacific, which hides every year and
+    month boundary bug a Belgian integration can have, and flips date
+    comparisons in the hours where the UTC date is a day ahead of
+    Pacific. Every test has hass already, through the fixture above.
+    """
+    await hass.config.async_set_time_zone("Europe/Brussels")

@@ -111,7 +111,6 @@ async def test_dump_carries_no_postcode_commune_or_meter(hass) -> None:  # type:
     )
     from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 
-    await hass.config.async_set_time_zone("Europe/Brussels")
     hass.states.async_set("sensor.my_house_water_meter", "100")
 
     async def _fetch(_session):  # type: ignore[no-untyped-def]
