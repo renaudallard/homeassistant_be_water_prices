@@ -1,0 +1,170 @@
+name: Bug report
+description: Report a problem with the integration
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report. Please fill in every section you
+        can: a missing utility, commune or version is the most common reason a
+        bug takes weeks instead of hours to fix.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: What is the issue about?
+      description: Helps route the report to the right area of the code.
+      options:
+        - Wrong rate (Basis rate, Comfort rate, Sewerage rate, All-in basis rate, Yearly fixed fee)
+        - Wrong cost (Projected annual cost, Current year cost, Rolling year cost, Projected year-end cost)
+        - Water meter not read, or consumption wrong
+        - Postcode matched to the wrong utility or commune
+        - Setup, options or reconfigure flow
+        - Stale tariff or repair issue
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: e.g. 2026.9.4
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: Settings -> Devices & services -> Belgian Water Prices -> three-dot menu -> "Download diagnostics" shows it under `integration_manifest.version`.
+      placeholder: e.g. 0.8.4
+    validations:
+      required: true
+
+  - type: input
+    id: when_started
+    attributes:
+      label: When did it start?
+      description: First version it broke under, or a date or event ("after upgrading to 0.8.4", "since 1 January"). Many reports line up with a utility publishing its new yearly tariff; a date narrows it.
+      placeholder: e.g. since 0.8.4, or "since 1 January"
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Install method
+      options:
+        - HACS
+        - Manual copy into custom_components
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: utility
+    attributes:
+      label: Utility
+      description: The water utility the integration was set up with.
+      options:
+        - VIVAQUA
+        - De Watergroep
+        - Pidpa
+        - Aquaduin
+        - AGSO Knokke-Heist
+        - Water-link
+        - Farys
+        - SWDE
+        - inBW
+        - CILE
+        - INASEP
+        - IEG
+        - AIEM
+        - AIEC
+        - CIESAC
+        - IDEN
+    validations:
+      required: true
+
+  - type: input
+    id: postcode_commune
+    attributes:
+      label: Postcode and commune
+      description: Your postcode, and the commune the options hold for De Watergroep, Farys, Pidpa or Water-link. The sewerage rates differ per commune, so it is the first thing to check on a wrong rate.
+      placeholder: e.g. 9000, Gent; or 1000, no commune
+    validations:
+      required: true
+
+  - type: input
+    id: annual_consumption
+    attributes:
+      label: Yearly consumption
+      description: The annual consumption set in the options, in m³. It drives the projected annual cost.
+      placeholder: e.g. 80
+
+  - type: input
+    id: flanders_household
+    attributes:
+      label: Registered residents and social tariff (Flanders only)
+      description: What the options hold. The residents set the basis volume and the fixed fee discount, so they change every Flemish cost.
+      placeholder: e.g. 3 residents, no social tariff; or "not applicable"
+
+  - type: dropdown
+    id: water_meter
+    attributes:
+      label: Water meter
+      description: Where the integration reads consumption from.
+      options:
+        - A water meter sensor picked in the options
+        - Left blank, read from the Energy dashboard
+        - No water meter
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: What you observed, including the values you think are wrong (rate, cost, consumption).
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The figure from your bill or from the utility's tariff page, if you have it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Enable debug logging in `configuration.yaml`, reload the integration,
+        then paste the lines from `home-assistant.log` that mention
+        `be_water_prices`.
+
+        ```yaml
+        logger:
+          default: warning
+          logs:
+            custom_components.be_water_prices: debug
+        ```
+      render: shell
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics download (optional but very helpful)
+      description: Settings -> Devices & services -> Belgian Water Prices -> three-dot menu -> "Download diagnostics", then drag the JSON file into this box. The postcode, commune and meter are redacted.

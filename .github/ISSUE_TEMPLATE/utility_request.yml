@@ -1,0 +1,65 @@
+name: Utility request
+description: Ask for a Belgian water utility or commune that is not covered yet
+labels: [utility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Adding a utility is a self-contained pull request, as the README's
+        *Supported utilities* section explains. If you would rather not write
+        one, ask here. A water tariff page carries a few things that are easy
+        to read almost right: which leg a rate belongs to (drinking water,
+        communal or supra-communal sewerage), whether a figure includes VAT,
+        whether a fee is per year or per connection, which year a table is
+        for. Each of those misprices a bill quietly. What takes the time is
+        getting them right against the real page, so the page is the useful
+        thing to send.
+
+  - type: input
+    id: utility
+    attributes:
+      label: Utility
+      description: The operator's name as it appears on your water bill, or the commune for a régie communale.
+      placeholder: e.g. the régie communale of Chimay
+    validations:
+      required: true
+
+  - type: input
+    id: communes
+    attributes:
+      label: Communes or postcodes served
+      description: Your own postcode at least; the whole list if the utility publishes it.
+      placeholder: e.g. 6460 Chimay
+    validations:
+      required: true
+
+  - type: input
+    id: tariff
+    attributes:
+      label: Link to the tariff page
+      description: >
+        The page or PDF the utility publishes its water prices on. This is the
+        one field that cannot be worked around: without it there is nothing to
+        read prices from.
+      placeholder: https://...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: region
+    attributes:
+      label: Region
+      options:
+        - Flanders
+        - Wallonia
+        - Brussels
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything unusual about it
+      description: >
+        A rate that differs per commune, a tariff published only as a
+        picture or on the bill. Optional, and useful.
