@@ -328,6 +328,8 @@ async def test_a_pdf_the_archive_holds_is_not_rendered_again(
     import hashlib
     import json
 
+    import card_texts  # type: ignore[import-not-found]
+
     from custom_components.be_water_prices.providers import _pdf
     from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
     from scripts import live_check
@@ -347,6 +349,7 @@ async def test_a_pdf_the_archive_holds_is_not_rendered_again(
                         "variant": "layout",
                         "text": "texts/abc.txt",
                         "pdf": digest,
+                        "readers": card_texts.readers_line(),
                     }
                 ]
             }

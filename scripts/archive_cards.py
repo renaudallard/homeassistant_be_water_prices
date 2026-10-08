@@ -33,12 +33,14 @@ texts its parse read, so the run replays each row through the current
 extractor with those texts served from the branch, the clock pinned to
 the day the row was captured and no utility contacted, and rewrites the
 row when the parse came out differently. That happens only when the
-parser sources changed since the branch was last replayed (a digest of
-them is stamped in ``parser.txt``); ``--reparse`` forces it. A parser that
-now reads a PDF the row has no text for gets the kept PDF back from the
-cards releases. When the PDF reader or its render code changed, which the
-stamp records on its second line, every card is rendered afresh that way,
-in the walk and in the replay; ``--rerender`` forces it.
+parser sources or the PDF reader changed since the branch was last
+replayed (a digest of them is stamped in ``parser.txt``); ``--reparse``
+forces it. A parser that now reads a PDF the row has no text for gets the
+kept PDF back from the cards releases. Each PDF source names the reader
+version and render code that made its text, which is served again only to
+the same, so after a reader upgrade or a render fix the replay reads those
+cards back that way and renders them afresh; ``--rerender`` does it for
+every card.
 
 Exits 0 when at least one card was stored or confirmed unchanged and 1
 when none was: that is a runner-wide problem rather than a utility's, so
@@ -63,7 +65,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
-import importlib.metadata
 import json
 import os
 import re
@@ -87,7 +88,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # scripts/ is not a package; the line above puts it on sys.path so the render
 # cache is the one the live check reads too, and the runner skip list is
 # the live check's own.
-from card_texts import StoredTexts, digest_of, read_text  # noqa: E402
+from card_texts import StoredTexts, digest_of, read_text, readers_line  # noqa: E402
 from live_check import CI_BLOCKED  # noqa: E402
 
 from custom_components.be_water_prices.providers import all_extractors  # noqa: E402
@@ -148,12 +149,6 @@ _LEGEND = (
 # What a parse depends on: the extractors, the shared readers beside them
 # and the constants they key on.
 _PARSER_SOURCES = ("providers/*.py", "const.py")
-# What turns a card's bytes into text: the PDF reader, which pins the
-# pdfminer.six it runs on, and the code that drives it. A stored text is
-# only what these made of the card, so when either moves every kept card is
-# rendered again, as under --rerender.
-_READER = "pdfplumber"
-_RENDER_CODE = ROOT / "custom_components" / "be_water_prices" / "providers" / "_pdf.py"
 
 _README = """# Tariff card archive
 
@@ -426,35 +421,15 @@ class _Pending:
 
 
 def _parser_digest() -> str:
-    """One digest over every source a parse depends on."""
+    """One digest over every source a parse depends on, and the PDF reader,
+    so a reader upgrade replays the months the walk no longer downloads."""
     root = ROOT / "custom_components" / "be_water_prices"
-    digest = hashlib.sha256()
+    digest = hashlib.sha256(readers_line().encode())
     for pattern in _PARSER_SOURCES:
         for path in sorted(root.glob(pattern)):
             digest.update(path.relative_to(root).as_posix().encode("utf-8"))
             digest.update(path.read_bytes())
     return digest.hexdigest()
-
-
-def _readers_line() -> str:
-    """The reader version and a digest of the render code, as the stamp
-    records them."""
-    try:
-        version = importlib.metadata.version(_READER)
-    except importlib.metadata.PackageNotFoundError:
-        version = "absent"
-    render = hashlib.sha256(_RENDER_CODE.read_bytes()).hexdigest()[:16]
-    return f"{_READER}=={version} render={render}"
-
-
-def _read_stamp(stamp: Path, parser: str, readers: str) -> tuple[str, str]:
-    """The parser digest and the readers line the branch was last replayed
-    with. A fresh branch reads as this run's, so its first run only stamps
-    it; a stamp from before the readers were recorded renders once."""
-    if not stamp.exists():
-        return parser, readers
-    lines = [*stamp.read_text(encoding="utf-8").splitlines(), "", ""]
-    return lines[0].strip(), lines[1].strip()
 
 
 def _month_id(year: int, month: int) -> str:
@@ -484,10 +459,13 @@ class _Source:
     pdf: str | None = None
 
     def entry(self, path: str) -> dict[str, str]:
-        """The row's record of it, with the text stored at ``path``."""
+        """The row's record of it, with the text stored at ``path``. A text
+        is only ever stored as the installed reader made it, since one other
+        readers made is neither served nor seeded."""
         out = {"url": self.url, "variant": self.variant, "text": path}
         if self.pdf is not None:
             out["pdf"] = self.pdf
+            out["readers"] = readers_line()
         return out
 
 
@@ -911,9 +889,10 @@ async def _replay_row(
 ) -> None:
     """Re-run one stored row through the current parser, offline.
 
-    Under ``rerender`` the PDF texts are not seeded, so every card is
-    fetched back from the kept copy and rendered afresh; the pages still
-    come from the branch, since there is nothing to re-render there.
+    A PDF text other readers or render code made is not seeded, nor any
+    under ``rerender``, so the card is fetched back from the kept copy and
+    rendered afresh; the pages still come from the branch, since there is
+    nothing to re-render there.
     """
     out = cards.out
     utility, commune = path.parts[-3], path.parts[-2]
@@ -927,12 +906,13 @@ async def _replay_row(
         summary.unreplayable.append(f"{label}: no extractor registered")
         return
     memo = _RecordingMemo()
+    readers = readers_line()
     for source in row.get("_sources", []):
         text_path = out / source["text"]
         if not text_path.exists():
             summary.unreplayable.append(f"{label}: {source['text']} is missing")
             return
-        if rerender and source["variant"] != "text":
+        if "pdf" in source and (rerender or source.get("readers") != readers):
             continue
         key = (
             source["url"]
@@ -1022,12 +1002,6 @@ async def archive(
     out.mkdir(parents=True, exist_ok=True)
     if on_ci is None:
         on_ci = os.environ.get("GITHUB_ACTIONS") == "true"
-    stamp = out / _PARSER_STAMP
-    parser, readers = _parser_digest(), _readers_line()
-    stamped, rendered_by = _read_stamp(stamp, parser, readers)
-    # Other readers or render code made the stored texts: they are not
-    # served, in the walk or the replay, and every card is rendered again.
-    rerender = rerender or rendered_by != readers
     cards = _Cards(out, pdf_dir, seen_month, serve_texts=not rerender)
     run = _Run(out, seen_month, today, _RecordingMemo(), cards, _Patience(), _Summary(), sleep)
     registry = tuple(all_extractors() if extractors is None else extractors)
@@ -1035,7 +1009,11 @@ async def archive(
     async with aiohttp.ClientSession() as session:
         with memoise_text_fetches(run.memo), render_through(cards.render):
             await _walk(run, session, targets, defaults_only=defaults_only)
-        # A changed parser digest replays the rows.
+        # A fresh archive holds nothing older than this parser, so the first
+        # run only stamps it; from then on a changed digest replays the rows.
+        stamp = out / _PARSER_STAMP
+        parser = _parser_digest()
+        stamped = stamp.read_text(encoding="utf-8").strip() if stamp.exists() else parser
         if reparse or rerender or stamped != parser:
             replay = _ReplaySession(session, pdf_dir, pdf_base_url, cards.kept)
             await _replay_all(
@@ -1046,12 +1024,12 @@ async def archive(
                 run.summary,
                 rerender=rerender,
             )
-            if replay.download_failed and rendered_by != readers:
-                # Stamped now, the rows that missed their card would keep
-                # the old text until the readers move again.
-                readers = rendered_by
-                print("a kept card could not be downloaded; the next run renders the cards again")
-        stamp.write_text(f"{parser}\n{readers}\n", encoding="utf-8")
+            if replay.download_failed:
+                # Stamped now, the rows that missed their card would not be
+                # replayed again until the parser or the readers move.
+                parser = stamped
+                print("a kept card could not be downloaded; the next run replays the rows again")
+        stamp.write_text(parser + "\n", encoding="utf-8")
     cards.file_the_rest()
     summary = run.summary
     summary.rendered = cards.rendered

@@ -17,9 +17,24 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import importlib.metadata
 import json
 from collections.abc import Callable
 from pathlib import Path
+
+# The PDF reader, which pins the pdfminer.six it runs on, and the code that
+# drives it. A stored text is only what these made of a card, so each PDF
+# source of a row names them, and a text is served again only to the same
+# version and code: a reader upgrade or a render fix reads every card
+# afresh, in the archive, the live check and the drift check alike.
+_READER = "pdfplumber"
+_RENDER_CODE = (
+    Path(__file__).resolve().parent.parent
+    / "custom_components"
+    / "be_water_prices"
+    / "providers"
+    / "_pdf.py"
+)
 
 
 def read_text(path: Path) -> str:
@@ -34,23 +49,35 @@ def digest_of(pdf: str) -> str:
     return Path(pdf).stem
 
 
+def readers_line() -> str:
+    """The reader version and a digest of the render code, as a PDF source
+    records them."""
+    try:
+        version = importlib.metadata.version(_READER)
+    except importlib.metadata.PackageNotFoundError:
+        version = "absent"
+    render = hashlib.sha256(_RENDER_CODE.read_bytes()).hexdigest()[:16]
+    return f"{_READER}=={version} render={render}"
+
+
 class StoredTexts:
     """What the branch already knows about card bytes."""
 
     def __init__(self, archive: Path, *, serve: bool = True) -> None:
         self.archive = archive
-        # False when every card must be rendered afresh, which is how a
-        # reader upgrade reaches the stored months.
+        # False when every card must be rendered afresh (--rerender).
         self.serve = serve
-        # (variant, digest) -> text path on the branch, from every stored row.
+        # (variant, digest) -> text path on the branch, from every stored row
+        # whose text the installed reader and render code made.
         self.texts: dict[tuple[str, str], str] = {}
+        readers = readers_line()
         for row in archive.glob("*/*/????-??.json"):
             try:
                 sources = json.loads(row.read_text(encoding="utf-8")).get("_sources", [])
             except ValueError:
                 continue
             for source in sources:
-                if "pdf" in source:
+                if "pdf" in source and source.get("readers") == readers:
                     self.texts[(source["variant"], digest_of(source["pdf"]))] = source["text"]
         # What this run rendered, so a second card on the same bytes is
         # served too.
