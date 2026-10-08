@@ -66,42 +66,42 @@ publication and how to parse it.
 - **Translated UI** — English, Dutch, French and German.
 - **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own, and a year holding a bucket that claims more than the days behind it could hold is not offered at all: that is a re-based or reset counter rather than water, and it would otherwise be proposed as your yearly consumption. The days behind it count because a meter that was away comes back with the whole absence in one bucket, and a year that really did have an outage is still a year worth offering.
 - **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it. An operator picked by hand on an older release, before that answer was kept, has none, so the integration cannot tell it from a correction and the Repair appears; picking the same operator again under Reconfigure > Pick the utility directly records the answer and clears it, as the Repair says.
-- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card it fetched, which is kept on disk, or, when it has none, on the last card the project's daily archive captured (see *The card archive* below), instead of retrying setup until the utility is back, and an outage that drags on past the staleness window, or a failing refresh on last year's card, picks up whatever the archive has captured since; a box in the options switches that off.
+- **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card it fetched, which is kept on disk, or, when it has none, on the last card the project's daily archive captured (see [the card archive](./docs/ci-and-testing.md#the-card-archive)), instead of retrying setup until the utility is back, and an outage that drags on past the staleness window, or a failing refresh on last year's card, picks up whatever the archive has captured since; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to the last hour Home Assistant's recorder has compiled, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.).
-- **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so it cannot notice a move in the decreed constants above; the live check carries that instead. The constants `WALLONIA_CVA_EUR_PER_M3` / `WALLONIA_FSE_EUR_PER_M3` in `const.py` are the figures in force in `WALLONIA_SPGE_YEAR`. A Walloon card of that year (or an earlier one) is priced on them, and its parser fails outright if the CVA or FSE its page publishes leaves the constant behind, or if its page stops printing a CVA at all. A card of a later year is priced on the CVA and FSE its own page prints, so when CWaPE moves the CVA on 1 January the Walloon entries keep serving instead of stopping together until a release; a later card whose page prints no CVA or no FSE fails, since the constant is not known to hold for that year. The daily live check still prompts the release: it fails while any Walloon card is past `WALLONIA_SPGE_YEAR`, and whenever the Walloon cards of one year disagree on the CVA or the FSE, which is what catches a page that misread or lags on its figure. AIEC's transcribed card prints no CVA: one of `WALLONIA_SPGE_YEAR` is built on the constants and keeps its grace until 31 March of the next year, and a transcription for a later year cannot be built until the constants move.
+- **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so a move in the decreed constants above is the live check's to catch: it fails while any Walloon card is past the year the CVA and FSE constants are for, and when the Walloon cards of one year disagree on either figure. A card of a later year is priced on the figures its own page prints, so the Walloon entries keep serving on 1 January instead of stopping until a release ([pricing model](./docs/pricing-model.md#wallonia-the-cwape-tiers)).
 
 ## Supported utilities
 
 | Utility | Region | Coverage | Source |
 | --- | --- | --- | --- |
-| **AGSO Knokke-Heist** | Flanders (1 commune) | ~33 k | [`providers/agso_knokke.py`](./custom_components/be_water_prices/providers/agso_knokke.py) — bs4 walker over the per-component "Integrale waterprijs" table at `agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers`. Page shows previous + current year side-by-side, each under a dated heading; parser picks the table dated with the year in force and falls back to the higher-priced one when a heading carries no year or no dated table has started yet, since rates only ever index up; an undated table is taken as the year after the newest dated one beside it, never later than the current year, so in January last year's card still turns stale after 31 March |
-| **AIEC** | Wallonia (Condroz) | small | [`providers/aiec.py`](./custom_components/be_water_prices/providers/aiec.py) — AIEC publishes its card only as a picture on `eauxducondroz.be/Prix.htm`, and the picture's name carries the day it took effect (`Tarif-2026-04-1-*.jpg`). Its rate is transcribed in the module against that date: while the page shows a card that has been read, that rate is served and the aggregator is not consulted. A card nobody has read yet, or a page that has moved, falls back to `callmepower.be/fr/eau/distributeurs/aiec` dated from the picture, with a warning; a transient failure is raised instead, so a blip on that one-page site cannot quietly swap the operator's rate for the aggregator's. This is the one hardcoded per-distributor rate, and it earns it: the aggregator sat on 2,460 for the five months after AIEC moved to 3,050, under-billing an 80 m³ household by 53.16 €/year with nothing to show it. The weekly drift check compares against AIEC's own page, so a new picture fails it |
-| **AIEM** | Wallonia (Molignée) | ~12 k connections (~25 k people) | [`providers/aiem.py`](./custom_components/be_water_prices/providers/aiem.py) — `aiem.be/prix-de-l-eau`. The page spells out formula examples (`0,5 x CVD (soit 1,435€)`) before listing the actual current value, so the shared parser anchors on `actuelle du CVD` to skip the example, and reads the `à partir du DD/MM/YYYY` next to it as the card's `valid_from` when that day is in the card's year |
-| **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py) — gold-standard numeric PDF linked from `aquaduin.be/nl/zelf-regelen/tarieven/tarieven-<year>` (the PDF URL is scraped from that page). Publishes a single integrated basistarief (drinkwater + sanering combined) rather than the usual split — the card also states the year it applies from ("Overzicht tarieven per 1 januari `<year>`"), and the parser holds the page URL's year to it |
-| **CIESAC** | Wallonia (Clavier / Durbuy / Ouffet / Tinlot) | 4 communes | [`providers/ciesac.py`](./custom_components/be_water_prices/providers/ciesac.py) — same Callmepower path. **The rate is unverified**: `ciesac.be` has answered `ERR_UPDATING_SERVER` on every path for months, so there is no second source, and Callmepower prints this CVD with one decimal where every other Walloon operator publishes two or four |
-| **CILE** | Wallonia (Liège region) | 24 communes (~560 k) | [`providers/cile.py`](./custom_components/be_water_prices/providers/cile.py) — clean 4-row HTML table on [cile.be/facturation/le-prix-de-leau](https://www.cile.be/facturation/le-prix-de-leau). Same pattern as SWDE / inBW: CVD parsed live, CVA / FSE held to the SPGE constants for a card of their year, read off the table for a later one |
-| **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) — full integrale waterprijs out of the box, exact per-commune numbers when a commune is configured | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py) — the cookie-driven `/Tarief/UpdateDetailTariefJaar/<year>` endpoint with `dwg_l=<GUID>` (default GUID = Halle / 1500 if no commune is configured, otherwise the user-picked one) returns the full per-commune bill (drinkwater + gemeentelijke + bovengemeentelijke saneringsbijdragen); the year is read off the answer's active tab, and while the new year's endpoint has nothing, last year's card is fetched from its own endpoint and stands until 31 March. There is no fallback under it: the news article `over-de-watergroep/nieuws/tarieven-<year>` used to be one and carries the drinkwater leg alone, which bills € 355,32 a year at 80 m³ where the Halle card bills € 782,73, with nothing on the entry to say which was served. When De Watergroep prints "De kostprijs kan momenteel niet getoond worden" in place of a saneringsbijdrage the fetch does not bill that leg at zero, and neither does a card that simply omits the row: all 699 commune pages carry both legs, so an absent one is a parser problem and never a commune that levies nothing. A commune whose current page will not show a leg is served the current operator default instead of nothing, and instead of its own last-year card, which would go stale on 1 April, labelled so you can see it (3660 Opglabbeek has printed that sentence for months and could not be set up at all); an omitted row still fails |
-| **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py) — POSTs to the Drupal AJAX form at `farys.be/nl/watertarieven?ajax_form=1` with the commune ID baked in (Gent-centrum = 25071 by default) and parses the per-commune integrale waterprijs out of the `insert` command's HTML payload. Pick a different commune in the OptionsFlow to switch (~265 options; 23 phantom entries that Farys lists but doesn't actually serve are filtered out so users can't pick a crashing option). Five of the 266 communes are not on the default card, so their postcodes are pre-selected in the config flow: Drogenbos (1620) levies a lower gemeentelijke saneringsbijdrage, and 1930 / 1932 / 1933 / 1935 in Zaventem carry the tussenkomst below. A commune that pays part of the drinkwater leg for its residents has it printed as a negative `Gemeentelijke tussenkomst` row under the tarief it applies to, and the rate is netted before the card is checked against the integrale waterprijs Farys prints two rows further down (Zaventem covers € 0,0807/m³ of the basistarief) |
-| **IDEN** | Wallonia (Nandrin / Tinlot / Modave) | 3 communes | [`providers/iden.py`](./custom_components/be_water_prices/providers/iden.py) — the operator's own card on `iden-eau.be/iden_web/fr/Tarification.awp`: three read-only fields headed "Depuis le 1er janvier `<year>`", carrying the CVD, the CVA and the Fonds social. The CVA and FSE rows are handled like every other Walloon page's: held to the SPGE constants for a card of their year, used as printed for a later one |
-| **IEG** | Wallonia (Mouscron) | ~50 k | [`providers/ieg.py`](./custom_components/be_water_prices/providers/ieg.py) — operator's own page at `ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/`. Uses the shared CWaPE residential tier math via [`_walloon_simple.py`](./custom_components/be_water_prices/providers/_walloon_simple.py) |
-| **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py) — INASEP lists the CVD on the *Prix de l'eau et évolution* page under the heading "Coût-Vérité Distribution (CVD) = N,NNNN €/m³". Parser anchors on that heading (tolerating accent-stripped variants) and dates the tariff from the day the page says the CVD applies (27 April for the 2026 card) |
-| **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py) — bs4 walker over the per-tier facture table on [eau.inbw.be/prix-de-leau](https://eau.inbw.be/prix-de-leau). The server's TLS chain is misconfigured (GoDaddy intermediate not sent). The fetch verifies first and only retries with `verify_ssl=False` after a TLS-specific failure, logging a warning when it does; risk note in the module docstring |
-| **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py) — two paths: the per-commune `/ons-aanbod/je-gemeente/<slug>` HTML page, which carries the current published rates and which the no-commune fetch also reads for a fixed default commune (Geel), the rate 60 of the 63 communes pay. Nijlen, Wommelgem and Kasterlee publish a lower gemeentelijke saneringsbijdrage, so their postcodes are pre-selected in the config flow; and the multi-year `Tariefplan_2025-2030_simulatie_type_gezin.pdf` parsed via `pdfplumber`, a May-2024 projection whose 2026 column runs 14 % under the commune pages. It is no longer served as a fallback: a card that short is worse than none, so an unreadable page leaves the last good snapshot in place and raises the stale-snapshot Repair. The drift check still parses the PDF against itself. Commune list comes from Pidpa's public sitemap (63 communes) |
-| **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py) — bs4-anchored on the `<h3>` headings of [swde.be/en/water-prices-swde](https://www.swde.be/en/water-prices-swde) (the FR slug 4xxs, the EN one works). CVA / FSE come from the SPGE flat-Wallonia constants for a card of their year, the fetch failing if the page has moved off them, and from the page for a later card. The page states no year, so the card is dated by the clock: a page left on last year's rates is never stale by date, and nothing detects a CVD left on last year's value (the CVA / FSE hold only fails the fetch when those two move) |
-| **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py) — HTML table on [vivaqua.be/en/the-domestic-linear-rate](https://www.vivaqua.be/en/the-domestic-linear-rate/), picks the current-year section by header and divides by VAT to keep the ex-VAT convention |
-| **Water-link** | Flanders (all of Antwerp city + Hove, Mortsel, Edegem, Beveren-Kruibeke-Zwijndrecht) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py) — the per-year PDF `water-link.be/sites/default/files/<YYYY>-<MM>/<YYYY>%20HH.pdf` parsed via `pdfplumber`, its link discovered from the Antwerpen tariff page since the upload directory carries the publication month. Drinkwater + zuivering are uniform across the service area; gemeentelijke afvoer differs per commune (Antwerpen at 1.3345 €/m³, ring communes at 1.9572). Defaults to Antwerpen; pick your commune in the OptionsFlow (Edegem, Hove, Mortsel, Beveren-Kruibeke-Zwijndrecht, …) to get the right sanering. Postcodes 2070 (Zwijndrecht / Burcht), 2540 (Hove), 2640 (Mortsel) and 2650 (Edegem) sit in the ring group on Water-link's own card, not in Antwerpen, so the config flow pre-selects their commune rather than letting the Antwerpen default stand; the city's own districts need no pre-selection because the card bills all of them on the Antwerpen row — the card also states the year it applies from ("Geldig vanaf 1 januari `<year>`"), and the parser holds the link's year to it |
+| **AGSO Knokke-Heist** | Flanders (1 commune) | ~33 k | [`providers/agso_knokke.py`](./custom_components/be_water_prices/providers/agso_knokke.py), [notes](./docs/providers/agso_knokke.md): year tables on agsoknokke-heist.be, the one in force picked by its dated heading; the three legs are checked against the printed integrale waterprijs |
+| **AIEC** | Wallonia (Condroz) | small | [`providers/aiec.py`](./custom_components/be_water_prices/providers/aiec.py), [notes](./docs/providers/aiec.md): the card is only a picture on eauxducondroz.be, so its rate is transcribed in the module against the picture's date, with Callmepower as the fallback |
+| **AIEM** | Wallonia (Molignée) | ~12 k connections (~25 k people) | [`providers/aiem.py`](./custom_components/be_water_prices/providers/aiem.py), [notes](./docs/providers/aiem.md): the CVD read from "Valeur actuelle du CVD" on aiem.be, skipping the worked examples around it |
+| **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py), [notes](./docs/providers/aquaduin.md): numeric PDF linked from the yearly tarieven page; one integrated basistarief, and the year the card states must match the link's |
+| **CIESAC** | Wallonia (Clavier / Durbuy / Ouffet / Tinlot) | 4 communes | [`providers/ciesac.py`](./custom_components/be_water_prices/providers/ciesac.py), [notes](./docs/providers/ciesac.md): Callmepower's page, since ciesac.be has been down for months; **the rate is unverified** |
+| **CILE** | Wallonia (Liège region) | 24 communes (~560 k) | [`providers/cile.py`](./custom_components/be_water_prices/providers/cile.py), [notes](./docs/providers/cile.md): four-row table on cile.be, its value column picked by year |
+| **De Watergroep** | Flanders | 167 communes (~3.3 M, ~49.5 % share) | [`providers/de_watergroep.py`](./custom_components/be_water_prices/providers/de_watergroep.py), [notes](./docs/providers/de_watergroep.md): cookie-driven per-commune endpoint, Halle by default; the full integrale waterprijs, and a missing saneringsbijdrage is never billed as zero |
+| **Farys** (TMVW) | Flanders (Oost-Vl. + parts of West-Vl. & Vl-Br.) | 85 communes (~1.5 M, ~22 % share) | [`providers/farys.py`](./custom_components/be_water_prices/providers/farys.py), [notes](./docs/providers/farys.md): Drupal AJAX answer per commune, Gent-centrum by default; a communal tussenkomst is netted and the legs are checked against the printed integrale waterprijs |
+| **IDEN** | Wallonia (Nandrin / Tinlot / Modave) | 3 communes | [`providers/iden.py`](./custom_components/be_water_prices/providers/iden.py), [notes](./docs/providers/iden.md): the operator's own three-field card on iden-eau.be |
+| **IEG** | Wallonia (Mouscron) | ~50 k | [`providers/ieg.py`](./custom_components/be_water_prices/providers/ieg.py), [notes](./docs/providers/ieg.md): the operator's own prose page on ieg.be, read by the shared Walloon parser |
+| **INASEP** | Wallonia (Namur sud) | 10 communes (~38 k subscribers) | [`providers/inasep.py`](./custom_components/be_water_prices/providers/inasep.py), [notes](./docs/providers/inasep.md): the CVD heading of the "Prix de l'eau et évolution" page, dated from the day the page says the CVD applies |
+| **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py), [notes](./docs/providers/inbw.md): per-tier facture table on eau.inbw.be with internal cross-checks; TLS is verified first, and retried unverified only after a TLS failure |
+| **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py), [notes](./docs/providers/pidpa.md): per-commune page, Geel by default, three communes pre-selected by postcode; the 2024 projection PDF is no longer served |
+| **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py), [notes](./docs/providers/swde.md): the `<h3>` sections of swde.be's English page; the page states no year, so the card is dated by the clock |
+| **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py), [notes](./docs/providers/vivaqua.md): the current year's linear-rate table on vivaqua.be, its VAT-inclusive figures divided by 1.06 |
+| **Water-link** | Flanders (all of Antwerp city + Hove, Mortsel, Edegem, Beveren-Kruibeke-Zwijndrecht) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py), [notes](./docs/providers/water_link.md): household PDF linked from the Antwerpen page, Antwerpen by default, four postcodes pre-selected; GitHub's runners cannot reach it |
 
 **Still deferred:**
 
 - **~30 régies communales** (Chimay, Theux, Libramont, …) — no central publication channel; deferred indefinitely on dev-hours / customer ratio.
 
-Adding another utility is a self-contained PR: drop a new module under
+Adding another utility is a self-contained PR: a new module under
 [`custom_components/be_water_prices/providers/`](./custom_components/be_water_prices/providers/),
-register it in [`providers/__init__.py`](./custom_components/be_water_prices/providers/__init__.py),
-extend the postcode resolver in [`providers/_postcodes.py`](./custom_components/be_water_prices/providers/_postcodes.py),
-and ship a fixture-based unit test. SWDE is the cleanest reference for a
-single-page HTML utility; Aquaduin is the reference for a PDF-based one.
+its registration, its postcodes and a fixture-based unit test, as
+[`docs/provider-framework.md`](./docs/provider-framework.md#adding-a-utility)
+lists step by step. SWDE is the cleanest reference for a single-page HTML
+utility; Aquaduin is the reference for a PDF-based one.
 To ask for one instead, open a
 [utility request](https://github.com/renaudallard/homeassistant_be_water_prices/issues/new?template=utility_request.yml)
 with the link to its tariff page.
@@ -144,8 +144,8 @@ Water tariffs are annual. The coordinator ticks **once a day**; that is
 enough to catch the 1 January re-pricing within hours, and the rest of
 the year is mostly a "did the page change shape" canary. There is no
 spot-style hourly fetch, no separate probe path, and no shared cache
-across entries — water utilities don't overlap, so a single HA instance
-has at most one entry per address. This daily cadence governs only the
+across entries: an entry's unique id is its utility, so a single HA
+instance has at most one entry per utility. This daily cadence governs only the
 network fetch; the meter-derived running-cost and YTD-consumption
 sensors update live from your local water meter (see
 [Refresh cadence](#refresh-cadence)).
@@ -945,206 +945,12 @@ python scripts/live_check.py    # hits real utility endpoints
 `scripts/gate.sh` runs the checks above, all but the live check, against a
 snapshot of HEAD, which is what to use before a push.
 
-A version bump in `manifest.json` releases itself:
-[`.github/workflows/autorelease.yml`](./.github/workflows/autorelease.yml)
-runs the test suite, HACS and hassfest, then tags the version and
-publishes the release with `be_water_prices.zip`. A release counts only
-once it is published with the zip: a draft a failed attempt left is
-dropped before the next one, keeping the tag, and two bumps in a row are
-released one after the other.
-
-Tests run against fixture HTML and PDF snippets in
-[`tests/fixtures/`](./tests/fixtures/) (real 2026 publications from
-every registered utility). Refresh a fixture with the utility's
-current page or PDF to re-run against new data; the file naming
-convention is `<utility>_<year>.<ext>`.
-
-Two cron workflows guard against silent regressions:
-
-- [`.github/workflows/live_check.yml`](./.github/workflows/live_check.yml)
-  runs daily, hits every registered extractor against its real
-  publication URL, fetches the commune list of De Watergroep, Farys,
-  Pidpa and Water-link as a row of its own (an error, or fewer
-  communes than the floor in `MIN_COMMUNES`, fails it: the config flow
-  drops the commune selector when that list fails, and a new entry is
-  then billed on the operator's default commune), retries up to five
-  times with exponential backoff, and opens or updates one GitHub
-  issue, found by its `live-check` label (`[live-check] water extractor broken …`), on
-  persistent parser failure. The failing utilities are the fingerprint,
-  a commune list counting apart from its utility's card: a utility that
-  stays broken gets one comment a week rather than one a day, and a
-  failure that changes shape is posted at once. Transient
-  upstream hiccups (timeout, connection reset,
-  HTTP 5xx / 429) are reported as a `TRANSIENT` row and retried but
-  never open an issue — only a real regression (parse / shape error,
-  HTTP 3xx / 4xx) does, so a brief outage at a utility is not mistaken for a
-  broken extractor. A card or commune list that takes longer than
-  `FETCH_BUDGET_S` in `const.py` (180 s, parse included), the time the
-  integration itself waits before serving its held card, is a `FAIL` row
-  and not a `TRANSIENT` one, since that is exactly the failure users see.
-  A last row sets the Walloon cards side by side: it fails when the cards
-  of one year disagree on the CVA or the FSE, or when any card is past
-  `WALLONIA_SPGE_YEAR`, the year of the constants in `const.py`.
-- [`.github/workflows/fixture_drift.yml`](./.github/workflows/fixture_drift.yml)
-  runs weekly, parses each utility's live publication and diffs
-  the result against the parser's output on the committed test
-  fixture. Opens or updates one issue, found by its `fixture-drift`
-  label (`[fixture-drift] water fixtures need refresh …`), when any
-  tariff field drifts above the threshold (rates `> 0.001` €/m³, fees
-  `> 0.01` €/year), the drifted fields being the fingerprint so an
-  unchanged drift gets one comment a week. Catches *silent
-  rate drift* that the live check misses. A run where a utility was
-  unreachable on a blip exits 2 rather than 0, so it neither opens an
-  issue nor comments "drift cleared" on an open one it did not recheck.
-  A live fetch past the same 180 s budget is an error, as in the live
-  check.
-
-Both scripts skip Water-link in CI: its CDN HTTP-403s GitHub
-Actions IP ranges. Reachable from residential IPs; rerun either
-script locally to drift-check Water-link. The skip is keyed on the
-runner's `GITHUB_ACTIONS` variable, so a local run does check it.
-
-Both checks read the archive branch's texts when a checkout is given
-(`--texts tmp/archive`, which the workflows pass after fetching the
-branch): a PDF whose bytes the archive already holds is downloaded and
-parsed as before, but its text is taken from the branch instead of being
-rendered again, and the report ends with how many were served that way.
-
-The readers in `providers/_pdf.py` carry two seams for scripts that walk
-every utility in one go, both off in Home Assistant itself: a text memo
-(`memoise_text_fetches`) that serves a page or a rendered PDF read twice
-in one walk from memory, and a render hook (`render_through`) that is
-handed the bytes of every downloaded PDF before they are rendered, so a
-caller can skip the render of a card it has already seen or keep the
-bytes. A provider that obtains a PDF some other way than through
-`fetch_pdf_text_layout` renders it with `render_pdf`, so the hook still
-sees it.
-
-### The card archive
-
-`scripts/archive_cards.py` walks every registered utility, fetches the
-tariff the integration would price on right now, once for the utility's
-default and once for each commune a per-commune utility lists, and
-writes what it parsed into a checkout of the `archive` branch:
-
-```bash
-python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa]
-```
-
-The branch holds, per utility and commune, one JSON file per month
-(`<utility>/<commune>/<YYYY-MM>.json`, `default` being the no-commune
-fetch, otherwise the commune id the integration uses with the commune's
-label inside the file), the text of every page and rendered PDF a parse
-read (`texts/<sha256>.txt`, stored once and shared between the rows that
-read it), and a manifest of where each PDF is kept. A water tariff is
-annual, so a month whose card is the same as the previous month's points
-at the texts that month already holds rather than storing the page again.
-A day on which nothing changed writes nothing; months more than twelve
-before the running one are removed, with the texts and the manifest
-entries nothing refers to any more. A PDF is kept under the month it was
-first seen, so an unchanged card stays as long as a remaining month
-names it.
-
-The PDFs themselves (Aquaduin's, Pidpa's and Water-link's cards) are kept
-under `--pdfs` for upload to the releases of the shared cards repository,
-named by their SHA-256; a card whose bytes have not changed is served the
-text the branch already holds instead of being rendered again. When the
-parser sources change, every stored month is replayed offline through the
-current parser from its stored texts, the clock pinned to the day the
-row was captured, and rewritten where the parse came out differently
-(`--reparse` forces it). Each PDF names the pdfplumber release and render
-code that read it, and its text is served again only to the same, so after
-a reader upgrade or a render fix every kept PDF is rendered afresh, in the
-walk, the replay, the live check and the drift check (`--rerender` forces
-it). `--index-only` rewrites the listing on the branch,
-`coverage.md` and one sheet per utility under `coverage/` (per commune,
-the months held, each linking to the PDF or the page it was parsed from
-and to the parsed JSON), without fetching anything.
-
-[`.github/workflows/archive_cards.yml`](./.github/workflows/archive_cards.yml)
-runs the archiver every morning at 05:23 UTC against the `archive`
-branch, walking the communes of the per-commune utilities on Sundays
-and the sixteen default rows only on the other days (the tariffs are
-annual, and De Watergroep alone lists about seven hundred communes; a
-manual run walks them unless its `communes` input is unticked, and
-`--defaults-only` is the local equivalent), uploads the PDFs of the day
-to the releases of the shared cards
-repository [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
-(`water-<YYYY-MM>`, one per month the cards were seen in, deleted once
-it is more than twelve months old and the manifest no longer points into
-it; the electricity
-and gas integrations' live beside them as `electricity-<YYYY-MM>` and
-`gas-<YYYY-MM>`), rewrites the
-index and the per-utility sheets so each month links to a file that
-exists, publishes them under `water/` in that repository (rebasing and
-trying again when the electricity or gas archive pushed there first), and
-commits the branch when anything changed. The job's own token, which writes the
-branch, is not kept in the checkout while the walk runs third-party
-code; only the push is given it, and the listings push gets the cards
-token the same way, so neither lands in a checkout's config. The upload needs a fine-grained token
-with contents read and write on the cards repository in the
-`BE_WATER_CARDS` secret; without it the branch still gets the parsed
-cards and their texts and the step says so. An upload or a listings push
-that fails, an expired token among them, does not hold the branch back
-either: the PDFs it missed are offered again by the next run. A run that
-stores nothing, a refused push or an expired token files an issue
-labelled `archive-cards`, one per problem with a comment per further
-failing run, and the token's expiry is announced two weeks ahead the
-same way, under a label of its own, `archive-cards-token`, so the
-warning never lands in an open failure thread. A manual run can ask for `--reparse` or `--rerender`.
-Water-link is skipped on a runner, as the checks skip it; an archive run
-from a residential address stores it.
-
-**Finding a stored card by hand.** Everything on the
-[`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
-branch is addressed by the two ids the integration uses, which are the
-directory names: the utility (`pidpa`, `farys`, `inbw`, ...) and the
-commune, as the id the integration passes to the extractor (`geel` for
-Pidpa, the numeric id for Farys, the GUID for De Watergroep, the name for
-Water-link), or `default` for the no-commune fetch. Browse the branch to
-see them; the commune's label is inside each file.
-
-1. **The parsed card** is one JSON per month at
-   `<utility>/<commune>/<YYYY-MM>.json`, for example
-   [`pidpa/geel/2026-09.json`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/pidpa/geel/2026-09.json).
-   It holds the tariff exactly as the integration parsed it, plus
-   `_seen_on` (the day it was captured), `_commune` and `_commune_label`
-   for a commune row, and `_sources`: every page or document the parse
-   read, each with its text file under `texts/` and, for a PDF, the
-   digest of the file.
-2. **The page or the PDF the parser read** is easiest through
-   [`coverage.md`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/coverage.md)
-   at the branch root, which names one sheet per utility under
-   `coverage/`: a row per commune, a column per month. Each month cell
-   carries two links: `page` opens the text of
-   the page as it was read, on the branch (`pdf` downloads the card from
-   the cards repository's releases instead, for a card parsed from a PDF),
-   and `json` opens the parsed row above. The same sheets are published
-   under
-   [`water/`](https://github.com/renaudallard/be_price_cards/tree/main/water)
-   in the cards repository itself, and each release's notes point there,
-   so a file seen on the releases page can be named too: search that
-   repository for the file's name. Behind them is `pdfs.json`, which maps a digest to
-   `water-<YYYY-MM>/<digest>.pdf` in those releases; the digest in a
-   JSON's `_sources` is the same key.
-3. **The text the parser read** is under `texts/`, named by the digest
-   of the text itself and listed in the JSON's `_sources`, for checking a
-   figure against the page without fetching it again. A month whose card
-   is the same as the previous month's names that month's text, so the
-   same page is not stored twelve times a year.
-
-The integration itself reads the branch in two cases: a refresh that
-fails with nothing to serve, which is a restart or a fresh install while
-the utility's site is down, and a failing refresh whose snapshot has gone
-stale or is last year's card. It asks for this month's row of its utility and commune
-(`default` without a commune), then back a month at a time for up to a
-year, and loads on the first card it finds, dated the first day that
-month's row saw it, rather than retrying setup until the site is back or standing
-on a card the archive has already replaced. A month GitHub does not
-answer for (a network failure, a 5xx, a rate limit) ends the walk rather
-than being skipped: an older month in its place would be an older card,
-last year's in January.
-Every other refresh goes to the utility.
+The internals are documented under [`docs/`](./docs/README.md): the
+architecture, the coordinator, the pricing model, the setup flow, the
+entities and one page per utility. The tests, the workflows (the release,
+the daily live check, the weekly drift check) and the card archive,
+including how to find a stored card by hand, are in
+[`docs/ci-and-testing.md`](./docs/ci-and-testing.md).
 
 ## License
 
