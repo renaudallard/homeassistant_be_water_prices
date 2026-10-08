@@ -34,6 +34,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
+        with:
+          # github.token can write issues; the extractors run third-party
+          # code, which must not find it on disk. The archive branch fetch
+          # below needs none, the repository is public.
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
