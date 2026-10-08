@@ -229,8 +229,11 @@ jobs:
           CARDS_REPO: renaudallard/be_price_cards
         run: |
           [ -n "$CARDS_TOKEN" ] || exit 0
-          cards_url="https://x-access-token:${CARDS_TOKEN}@github.com/${CARDS_REPO}.git"
-          git clone -q --depth=1 "$cards_url" tmp/cards
+          # The repository is public, so the clone needs no token. The push
+          # gets it as an authorization header on that call only, as
+          # actions/checkout passes its own, never written to .git/config.
+          auth="http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$CARDS_TOKEN" | base64 -w0)"
+          git clone -q --depth=1 "https://github.com/${CARDS_REPO}.git" tmp/cards
           mkdir -p tmp/cards/water
           printf '%s\n' \
             "# Price cards" \
@@ -281,7 +284,7 @@ jobs:
           # texts drift, -X theirs (the commit being replayed) keeps this
           # job's, which lists all three namespaces.
           for attempt in 1 2 3 4 5; do
-            git push -q origin HEAD:main && exit 0
+            git -c "$auth" push -q origin HEAD:main && exit 0
             [ "$attempt" -lt 5 ] || break
             sleep $((attempt * 3))
             git pull -q --rebase -X theirs origin main

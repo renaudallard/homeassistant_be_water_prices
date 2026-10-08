@@ -1040,17 +1040,17 @@ def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> Non
         "PATH": f"{stubs}:{os.environ['PATH']}",
         "CARDS_TOKEN": token,
         "CARDS_REPO": "renaudallard/be_price_cards",
-        # The step's GitHub URL, token and all, is the local origin here.
+        # The step's GitHub URL is the local origin here.
         "GIT_CONFIG_COUNT": "1",
         "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
-        "GIT_CONFIG_VALUE_0": (
-            f"https://x-access-token:{token}@github.com/renaudallard/be_price_cards.git"
-        ),
+        "GIT_CONFIG_VALUE_0": "https://github.com/renaudallard/be_price_cards.git",
     }
     done = subprocess.run(
         ["bash", "-e", "-c", script], cwd=work, env=env, capture_output=True, text=True
     )
     assert done.returncode == 0, done.stderr
+    # The job goes on after this step; the token must not stay on disk.
+    assert token not in (work / "tmp" / "cards" / ".git" / "config").read_text()
     log = git("log", "--format=%s", "main", cwd=origin).splitlines()
     assert log[:2] == ["Water listings of 2026-10-01", "Cards seen"]
     assert git("show", "main:electricity/row.json", cwd=origin) == "{}\n"
