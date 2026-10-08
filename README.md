@@ -100,6 +100,9 @@ register it in [`providers/__init__.py`](./custom_components/be_water_prices/pro
 extend the postcode resolver in [`providers/_postcodes.py`](./custom_components/be_water_prices/providers/_postcodes.py),
 and ship a fixture-based unit test. SWDE is the cleanest reference for a
 single-page HTML utility; Aquaduin is the reference for a PDF-based one.
+To ask for one instead, open a
+[utility request](https://github.com/renaudallard/homeassistant_be_water_prices/issues/new?template=utility_request.yml)
+with the link to its tariff page.
 
 ### Postcode auto-resolution
 
@@ -191,7 +194,7 @@ exist. The tables below list the suffix on an English install; the real
 id of each entity is under Settings > Devices & services > Entities.
 Rename the device and the prefix follows.
 
-Up to twelve entities per entry: `comfort_rate` only appears for
+Up to twelve sensors per entry: `comfort_rate` only appears for
 Flemish utilities; `current_year_cost`, `year_to_date_consumption` and
 the four rolling and projected year sensors are always created and
 report `unknown` until a water meter is wired up (explicit override in
@@ -244,6 +247,9 @@ and `last_error` as attributes for dashboards and automations. The
 publication label, the source URL and the error text are scrubbed of the
 commune before they are published, so an entry configured for one commune
 does not name it on every sensor.
+
+Each entry also carries a diagnostic **Refresh tariff** button, which
+fetches the tariff again at once; see [Refresh cadence](#refresh-cadence).
 
 ## Installation
 
@@ -405,7 +411,12 @@ you paid is worth more than a tidy chart.
 ### Refresh cadence
 
 - **Tariff snapshot** — once every 24 h. Water tariffs are annual; a
-  fresh January 1 publication is picked up within a day.
+  fresh January 1 publication is picked up within a day. To fetch it
+  now, press the entry's **Refresh tariff** button, which stays
+  available while the sensors are not, or call the
+  `be_water_prices.refresh` service, for one `entry_id` or, without
+  one, every loaded entry. The call returns once the fetches are done,
+  so an automation step after it reads the new figures.
 - **Projected cost** — recomputed every coordinator tick **and**
   immediately when you save new options, so changing your consumption
   or household size shows up without waiting for the next refresh.
@@ -760,7 +771,11 @@ re-imported — because the recorder has no windowed delete. Whatever
 sat before `start_date` is gone and is not written back. It
 **requires** an explicit `entry_id`; the service rejects the blanket
 combination (`clear: true` without `entry_id`) to keep one careless
-call from wiping long-term statistics across every loaded entry.
+call from wiping long-term statistics across every loaded entry. An
+`entry_id` that names no loaded entry is refused too, rather than
+reported as done. Both services are registered with the integration, so
+a call naming an entry that is retrying setup gets that error instead of
+an unknown service.
 
 You rarely need it: the default gap-fill upserts on
 `(statistic_id, start)`, so re-running without `clear` overwrites the
@@ -783,6 +798,30 @@ URL, the error text and the price-history gate, which names the commune
 it was drawn for. The file can go on an issue as it is. An entry that has not
 loaded dumps its state and config with an empty snapshot. Attach it
 when reporting an issue.
+
+### Troubleshooting
+
+Turn on debug logging for the integration, either with **Enable debug
+logging** in the three-dot menu of **Settings → Devices & services →
+Belgian Water Prices**, which applies at once, or in
+`configuration.yaml`, which takes a restart:
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.be_water_prices: debug
+```
+
+then read the lines that mention `be_water_prices` in
+`home-assistant.log` (**Settings → System → Logs**). Whatever the
+integration needs you to act on, a stale tariff, a projection the meter
+contradicts, a postcode that now points to another operator or a second
+water meter on the Energy dashboard, is raised as a card under
+**Settings → Repairs**, and the dump described under
+[Diagnostics](#diagnostics) carries the rest. A
+[bug report](https://github.com/renaudallard/homeassistant_be_water_prices/issues/new?template=bug_report.yml)
+asks for both.
 
 ## Known limitations
 
@@ -899,6 +938,14 @@ python scripts/live_check.py    # hits real utility endpoints
 
 `scripts/gate.sh` runs the checks above, all but the live check, against a
 snapshot of HEAD, which is what to use before a push.
+
+A version bump in `manifest.json` releases itself:
+[`.github/workflows/autorelease.yml`](./.github/workflows/autorelease.yml)
+runs the test suite, HACS and hassfest, then tags the version and
+publishes the release with `be_water_prices.zip`. A release counts only
+once it is published with the zip: a draft a failed attempt left is
+dropped before the next one, keeping the tag, and two bumps in a row are
+released one after the other.
 
 Tests run against fixture HTML and PDF snippets in
 [`tests/fixtures/`](./tests/fixtures/) (real 2026 publications from
@@ -1024,7 +1071,8 @@ exists, publishes them under `water/` in that repository (rebasing and
 trying again when the electricity or gas archive pushed there first), and
 commits the branch when anything changed. The job's own token, which writes the
 branch, is not kept in the checkout while the walk runs third-party
-code; only the push is given it. The upload needs a fine-grained token
+code; only the push is given it, and the listings push gets the cards
+token the same way, so neither lands in a checkout's config. The upload needs a fine-grained token
 with contents read and write on the cards repository in the
 `BE_WATER_CARDS` secret; without it the branch still gets the parsed
 cards and their texts and the step says so. An upload or a listings push
@@ -1033,7 +1081,8 @@ either: the PDFs it missed are offered again by the next run. A run that
 stores nothing, a refused push or an expired token files an issue
 labelled `archive-cards`, one per problem with a comment per further
 failing run, and the token's expiry is announced two weeks ahead the
-same way. A manual run can ask for `--reparse` or `--rerender`.
+same way, under a label of its own, `archive-cards-token`, so the
+warning never lands in an open failure thread. A manual run can ask for `--reparse` or `--rerender`.
 Water-link is skipped on a runner, as the checks skip it; an archive run
 from a residential address stores it.
 
