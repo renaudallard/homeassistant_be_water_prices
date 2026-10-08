@@ -2,7 +2,7 @@ name: Archive tariff cards
 
 on:
   schedule:
-    # 05:23 UTC = 06:23 CET / 07:23 CEST, before the 06:00 live check. Off
+    # 05:23 UTC = 06:23 CET / 07:23 CEST, before the 06:11 live check. Off
     # the hour, since the top of the hour is where GitHub sheds scheduled
     # runs first.
     - cron: "23 5 * * *"

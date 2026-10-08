@@ -5,11 +5,17 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: "0 6 * * *"
+    # Off the hour for the reason live_check.yml spells out: the top of the
+    # hour is where GitHub sheds scheduled runs first.
+    - cron: "37 6 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   hacs:

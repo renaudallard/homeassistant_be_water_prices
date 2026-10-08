@@ -2,14 +2,25 @@ name: Live extractor check
 
 on:
   schedule:
-    # 06:00 UTC = 07:00 CET / 08:00 CEST. Water tariffs are annual so the
-    # daily run is mostly a "did the page change shape" canary.
-    - cron: "0 6 * * *"
+    # 06:11 UTC = 07:11 CET / 08:11 CEST, after the card archive (05:23),
+    # whose texts this reads. Water tariffs are annual so the daily run is
+    # mostly a "did the page change shape" canary. Off the hour on purpose:
+    # GitHub documents the start of every hour as a high-load slot for the
+    # schedule event and drops queued runs out of it when the load is bad
+    # enough, which took the electricity integration's 06:00 runs on
+    # 2026-08-27 with no run created at all.
+    - cron: "11 6 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
+
+# A run still going when the next is triggered would otherwise file the
+# same issue twice. The newer run wins.
+concurrency:
+  group: live-check-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:

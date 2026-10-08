@@ -2,7 +2,7 @@ name: Fixture drift check
 
 on:
   schedule:
-    # 06:30 UTC Sunday = 30 min after the daily live_check fires.
+    # 06:30 UTC Sunday, after the daily live_check's 06:11 slot.
     # Tariffs are annual; weekly is plenty for catching mid-year revisions.
     - cron: "30 6 * * 0"
   workflow_dispatch:
