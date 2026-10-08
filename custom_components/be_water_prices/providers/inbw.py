@@ -31,9 +31,10 @@ The page exposes one ``<table class="table">`` with the full per-tier
 breakdown of an example 100 m³ residential bill. Each row carries the
 unit price ("Prix unitaire" column), so we read CVD straight off the
 "Consommation entre 30 et 5000 m³" row (= full CVD) and cross-check
-against the "Redevance annuelle (20 x CVD)" row. CVA / FSE come from
-the SPGE flat-Wallonia constants (:mod:`const`) and are cross-checked
-against their published values; a move fails the fetch.
+against the "Redevance annuelle (20 x CVD)" row. CVA / FSE are the
+SPGE flat-Wallonia figures: the constants (:mod:`const`) for a card of
+their year, cross-checked against their published values with a move
+failing the fetch, and the published values for a later card.
 
 inBW's TLS chain is misconfigured -- the server does not send the
 GoDaddy intermediate certificate, so the default Python trust path
@@ -57,18 +58,9 @@ import ssl
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
-from ..const import (
-    REGION_WALLONIA,
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
+from ..const import REGION_WALLONIA
 from ._html import extract_amounts, fetch_html
-from ._walloon_simple import (
-    build_tariff,
-    detect_published_year,
-    hold_to_constant,
-    warn_constant_drift,
-)
+from ._walloon_simple import build_tariff, detect_published_year, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
@@ -153,36 +145,29 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
             f"inBW redevance {redevance_cvd_text} does not equal 20·CVD ({20 * cvd:.2f})"
         )
 
-    # Drift checks against the SPGE flat-Wallonia constants. Both values
-    # appear in the table (CVA in the "30 x CVA" row's Prix unitaire,
-    # FSE in the "Fonds Social" row's Prix unitaire). The redevance cell
-    # shows 30 x CVA, not the CVA itself. A moved CVA fails the fetch like
-    # a moved FSE does; it used to log and price on the old figure.
-    cva_row = _row_amount_after_label(table, ("redevance", "30", "cva"))
-    hold_to_constant(
-        published=cva_row / 30.0 if cva_row is not None else None,
-        constant=WALLONIA_CVA_EUR_PER_M3,
-        label="inBW CVA",
-        logger=_LOGGER,
-    )
-    warn_constant_drift(
-        published=_row_amount_after_label(table, ("fonds social",)),
-        constant=WALLONIA_FSE_EUR_PER_M3,
-        label="inBW FSE",
-        logger=_LOGGER,
-        threshold=0.001,
-    )
-
     # The page says "Tarifs YYYY": date the card from that rather than the
     # clock, so a page still on last year's card in January looks stale
     # instead of being relabelled as this year's.
     target = year or detect_published_year(soup.get_text(" ", strip=True)) or belgian_today().year
+    # Both SPGE figures appear in the table (CVA in the "30 x CVA" row's
+    # Prix unitaire, FSE in the "Fonds Social" row's Prix unitaire). The
+    # redevance cell shows 30 x CVA, not the CVA itself.
+    cva_row = _row_amount_after_label(table, ("redevance", "30", "cva"))
+    cva, fse = spge_components(
+        cva=cva_row / 30.0 if cva_row is not None else None,
+        fse=_row_amount_after_label(table, ("fonds social",)),
+        year=target,
+        label="inBW",
+        logger=_LOGGER,
+    )
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
         source_url=SOURCE_URL,
         publication_label=f"inBW prix de l'eau {target}",
         year=target,
+        cva=cva,
+        fse=fse,
     )
 
 

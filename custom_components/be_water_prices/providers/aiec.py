@@ -71,7 +71,7 @@ import aiohttp
 
 from ..const import REGION_WALLONIA
 from ._html import fetch_html
-from ._walloon_simple import build_extractor, build_tariff
+from ._walloon_simple import build_extractor, build_tariff, spge_components
 from ._walloon_simple import parse_tariff as _parse_tariff
 from .base import ExtractorError, TransientFetchError, WaterExtractor, WaterTariff
 
@@ -130,12 +130,24 @@ def card_from_operator_page(published: date | None) -> WaterTariff | None:
     cvd = _TRANSCRIBED_CVD.get(published)
     if cvd is None:
         return None
+    # The picture page prints no CVA or FSE, so a card of the constants'
+    # year is built on them and a later one cannot be built at all.
+    cva, fse = spge_components(
+        cva=None,
+        fse=None,
+        year=published.year,
+        label=LABEL,
+        logger=_LOGGER,
+        cva_required=False,
+    )
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
         source_url=OPERATOR_URL,
         publication_label=f"AIEC tarifs au {published.strftime('%d/%m/%Y')}",
         year=published.year,
+        cva=cva,
+        fse=fse,
         valid_from=published,
     )
 

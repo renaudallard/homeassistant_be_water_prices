@@ -527,3 +527,63 @@ def test_every_commune_lister_has_a_floor() -> None:
 
     listers = {e.id for e in all_extractors() if e.supports_communes}
     assert set(MIN_COMMUNES) == listers
+
+
+# --- the Walloon SPGE figures ------------------------------------------------
+
+
+def _walloon(year: int, cva: float, fse: float) -> Any:
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    return WaterTariff(
+        utility="x",
+        region="wallonia",
+        valid_from=date(year, 1, 1),
+        valid_until=date(year, 12, 31),
+        publication_label="x",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=20 * 3.0 + 30 * cva,
+        cvd_eur_per_m3=3.0,
+        cva_eur_per_m3=cva,
+        fse_eur_per_m3=fse,
+    )
+
+
+def test_the_walloon_cards_of_a_year_must_agree_on_the_spge_figures() -> None:
+    """Past the constants' year each page prices on its own figures, so a
+    page that misread one stands out only against the others."""
+    from custom_components.be_water_prices.const import WALLONIA_SPGE_YEAR
+    from scripts.live_check import _check_spge
+
+    year = WALLONIA_SPGE_YEAR
+    agreed = _check_spge(
+        {"SWDE": _walloon(year, 2.748, 0.0339), "CILE": _walloon(year, 2.748, 0.0339)}
+    )
+    assert agreed is not None and agreed.status == "OK"
+    apart = _check_spge(
+        {"SWDE": _walloon(year, 2.748, 0.0339), "CILE": _walloon(year, 2.748, 0.0400)}
+    )
+    assert apart is not None and apart.status == "FAIL"
+    assert "disagree on the FSE" in apart.detail
+    assert "disagree on the CVA" not in apart.detail
+    # Cards of two years may differ: January has pages on either.
+    mixed = _check_spge(
+        {"SWDE": _walloon(year - 1, 2.6, 0.03), "CILE": _walloon(year, 2.748, 0.0339)}
+    )
+    assert mixed is not None and mixed.status == "OK"
+    # Nothing Walloon came back: no row at all.
+    assert _check_spge({}) is None
+
+
+def test_a_walloon_card_past_the_constants_year_fails_the_check() -> None:
+    """Its entries keep serving on the page's figures, but the release that
+    moves the constants is still due."""
+    from custom_components.be_water_prices.const import WALLONIA_SPGE_YEAR
+    from scripts.live_check import _check_spge, _exit_code
+
+    later = WALLONIA_SPGE_YEAR + 1
+    row = _check_spge({"SWDE": _walloon(later, 2.9, 0.04), "CILE": _walloon(later, 2.9, 0.04)})
+    assert row is not None and row.status == "FAIL"
+    assert f"past {WALLONIA_SPGE_YEAR}" in row.detail
+    assert "CILE, SWDE" in row.detail
+    assert _exit_code([row]) == EXIT_REAL_FAIL

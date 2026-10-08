@@ -85,9 +85,13 @@ SNAPSHOT_STALE_AFTER_DAYS = 35
 # Wallonia uses two flat-Wallonia volumetric components on top of each
 # distributor's CVD. Both come from SPGE / CWaPE, not from the distributor's
 # own publication, so they live here. Source: SPGE / CWaPE annual rate
-# decision, mirrored on each Walloon distributor's tariff page.
+# decision, mirrored on each Walloon distributor's tariff page. They are the
+# figures in force in WALLONIA_SPGE_YEAR: a card for a later year is priced
+# on the CVA and FSE its own page prints; see spge_components in
+# providers/_walloon_simple.py. Move the year with the figures.
 WALLONIA_CVA_EUR_PER_M3 = 2.748
 WALLONIA_FSE_EUR_PER_M3 = 0.0339
+WALLONIA_SPGE_YEAR = 2026
 
 # Standard Belgian residential VAT rate on water.
 DEFAULT_VAT_RATE = 0.06

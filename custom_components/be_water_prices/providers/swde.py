@@ -46,10 +46,12 @@ the EUR value::
     <h3>4. Social Water Fund</h3>
     <p>The current Social Water Fund amounts to <strong>€ 0.0339/m³</strong>.</p>
 
-CVA and FSE are flat-Wallonia constants (set by SPGE / CWaPE) and live
-in :mod:`const`; the parsed values are held to them and a move fails
-the fetch, so the stale-snapshot Repair and the live check carry the
-news rather than a log line.
+CVA and FSE are flat-Wallonia figures set by SPGE / CWaPE. A card of
+the constants' year in :mod:`const` is priced on them, the parsed
+values held to them and a move failing the fetch, so the stale-snapshot
+Repair and the live check carry the news rather than a log line; a
+later card is priced on the values the page prints (see
+:func:`_walloon_simple.spge_components`).
 
 The redevance (annual fixed fee) is the regulator-defined
 ``20·CVD + 30·CVA`` formula; we materialise it into
@@ -72,12 +74,10 @@ from bs4 import BeautifulSoup, Tag
 
 from ..const import (
     REGION_WALLONIA,
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
 )
 from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents
-from ._walloon_simple import build_tariff, hold_to_constant, warn_constant_drift
+from ._walloon_simple import build_tariff, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
@@ -142,28 +142,19 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if cvd is None:
         raise ExtractorError("could not find SWDE CVD on the tariff page")
 
-    hold_to_constant(
-        published=_find_component(soup, _CVA_HEADINGS),
-        constant=WALLONIA_CVA_EUR_PER_M3,
-        label="SWDE CVA",
-        logger=_LOGGER,
-    )
-    warn_constant_drift(
-        published=_find_component(soup, _FSE_HEADINGS),
-        constant=WALLONIA_FSE_EUR_PER_M3,
-        label="SWDE FSE",
-        logger=_LOGGER,
-        # The Fonds Social is ~0.03 EUR/m3, so the 0.005 default would let a
-        # 15% move pass unreported. CILE and inBW already check it at 0.001.
-        threshold=0.001,
-    )
-
     # SWDE's page states no tariff year anywhere, so the card can only be
     # dated from the clock. That means a page left on last year's rate is
     # served as this year's and the staleness check can never notice, so
     # the label says which it is rather than implying the page said so.
     stated = year is not None
     target = year or belgian_today().year
+    cva, fse = spge_components(
+        cva=_find_component(soup, _CVA_HEADINGS),
+        fse=_find_component(soup, _FSE_HEADINGS),
+        year=target,
+        label="SWDE",
+        logger=_LOGGER,
+    )
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
@@ -174,6 +165,8 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
             else f"SWDE water prices {target} (page states no year)"
         ),
         year=target,
+        cva=cva,
+        fse=fse,
     )
 
 

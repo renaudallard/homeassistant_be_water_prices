@@ -29,7 +29,7 @@ Despite the name (electricity & gas), IEG also runs the water network
 for Mouscron + a few neighbouring communes. The CVD lives on the
 operator's own site; the rest of the bill (CVA, FSE, redevance) is the
 standard CWaPE residential structure shared with SWDE / inBW / CILE /
-INASEP, computed in :mod:`pricing` from the SPGE constants.
+INASEP, computed in :mod:`pricing` on the SPGE figures.
 
 Source: https://ieg.be/eau/espace-client/facturation/structure-du-prix-de-leau/
 """

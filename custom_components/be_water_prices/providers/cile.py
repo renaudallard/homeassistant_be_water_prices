@@ -37,9 +37,10 @@ The page exposes a clean 4-row table::
     Fonds social     | 0,0339 €/m³
     TVA 6%           |
 
-CVA / FSE come from the SPGE flat-Wallonia constants and are
-cross-checked here: a divergence between page and constant fails the
-fetch.
+CVA / FSE are the SPGE flat-Wallonia figures, handled by
+:func:`_walloon_simple.spge_components`: the constants for a card of
+their year, cross-checked against the page with a divergence failing
+the fetch, and the page's own for a later card.
 
 Stores tariff like SWDE / inBW: ``cvd_eur_per_m3`` for the
 distributor's value, ``cva_eur_per_m3`` and ``fse_eur_per_m3`` for
@@ -55,18 +56,9 @@ import logging
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
-from ..const import (
-    REGION_WALLONIA,
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
+from ..const import REGION_WALLONIA
 from ._html import extract_amounts, fetch_and_parse
-from ._walloon_simple import (
-    build_tariff,
-    detect_published_year,
-    hold_to_constant,
-    warn_constant_drift,
-)
+from ._walloon_simple import build_tariff, detect_published_year, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
@@ -132,18 +124,12 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if cvd is None:
         raise ExtractorError("could not find CILE CVD row")
 
-    hold_to_constant(
-        published=_row_amount(table, "c.v.a", column),
-        constant=WALLONIA_CVA_EUR_PER_M3,
-        label="CILE CVA",
+    cva, fse = spge_components(
+        cva=_row_amount(table, "c.v.a", column),
+        fse=_row_amount(table, "fonds social", column),
+        year=target,
+        label="CILE",
         logger=_LOGGER,
-    )
-    warn_constant_drift(
-        published=_row_amount(table, "fonds social", column),
-        constant=WALLONIA_FSE_EUR_PER_M3,
-        label="CILE FSE",
-        logger=_LOGGER,
-        threshold=0.001,
     )
 
     return build_tariff(
@@ -152,6 +138,8 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         source_url=SOURCE_URL,
         publication_label=f"CILE prix de l'eau {target}",
         year=target,
+        cva=cva,
+        fse=fse,
     )
 
 

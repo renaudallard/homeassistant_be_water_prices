@@ -79,7 +79,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # rendered again here.
 from card_texts import StoredTexts  # noqa: E402
 
-from custom_components.be_water_prices.const import FETCH_BUDGET_S  # noqa: E402
+from custom_components.be_water_prices.const import (  # noqa: E402
+    FETCH_BUDGET_S,
+    REGION_WALLONIA,
+    WALLONIA_SPGE_YEAR,
+)
 from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterExtractor,
     WaterTariff,
@@ -102,6 +106,10 @@ MIN_FEE_EUR_YEAR = 5.0
 MAX_FEE_EUR_YEAR = 500.0
 MIN_RATE_EUR_M3 = 0.5
 MAX_RATE_EUR_M3 = 20.0
+
+# How far apart the Walloon cards of one year may put the SPGE figures,
+# the thresholds the extractors hold a page to the constants with.
+SPGE_TOLERANCE = {"CVA": 0.005, "FSE": 0.001}
 
 # Fewest communes each lister may return before the list is called
 # broken. A restyled dropdown the parser only half matches yields a short
@@ -227,15 +235,63 @@ async def _check[T](
     return CheckResult(check_id, label, region, status, detail)
 
 
-async def _check_one(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
+async def _check_one(
+    session: aiohttp.ClientSession,
+    extractor: WaterExtractor,
+    seen: dict[str, WaterTariff] | None = None,
+) -> CheckResult:
+    """One extractor's card, kept in ``seen`` under its label when given."""
+
+    def judge(tariff: WaterTariff) -> tuple[str, str]:
+        if seen is not None:
+            seen[extractor.label] = tariff
+        return _judge_tariff(tariff, extractor.region)
+
     return await _check(
         session,
         extractor,
         check_id=extractor.id,
         label=extractor.label,
         call=extractor.fetch,
-        judge=lambda tariff: _judge_tariff(tariff, extractor.region),
+        judge=judge,
     )
+
+
+def _check_spge(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
+    """The CVA and FSE the Walloon cards were priced on, side by side.
+
+    A card past WALLONIA_SPGE_YEAR is priced on its own page's figures,
+    so a misread there bills its entries wrong with no constant to catch
+    it, and the constants in const.py are a year behind. Both fail here:
+    a card past the year, until a release moves the constants and the
+    year, and the cards of one year that disagree on either figure.
+    None when no Walloon card came back to compare.
+    """
+    walloon = {label: t for label, t in tariffs.items() if t.region == REGION_WALLONIA}
+    if not walloon:
+        return None
+    problems: list[str] = []
+    later = sorted(label for label, t in walloon.items() if t.valid_from.year > WALLONIA_SPGE_YEAR)
+    if later:
+        problems.append(
+            f"{', '.join(later)} on a card past {WALLONIA_SPGE_YEAR}, the year of the "
+            f"constants in const.py: move WALLONIA_SPGE_YEAR and the figures"
+        )
+    for year in sorted({t.valid_from.year for t in walloon.values()}):
+        cards = {label: t for label, t in walloon.items() if t.valid_from.year == year}
+        for name, tolerance in SPGE_TOLERANCE.items():
+            values = {
+                label: t.cva_eur_per_m3 if name == "CVA" else t.fse_eur_per_m3
+                for label, t in cards.items()
+            }
+            if max(values.values()) - min(values.values()) > tolerance:
+                listed = ", ".join(f"{label} {value}" for label, value in sorted(values.items()))
+                problems.append(f"{year} cards disagree on the {name}: {listed}")
+    if problems:
+        status, detail = "FAIL", "; ".join(problems)
+    else:
+        status, detail = "OK", f"{len(walloon)} Walloon cards agree on the CVA and FSE"
+    return CheckResult("spge", "Walloon SPGE figures", REGION_WALLONIA, status, detail)
 
 
 async def _check_communes(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
@@ -283,10 +339,14 @@ async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, Store
             hooks.enter_context(render_through(cache.render))
         async with aiohttp.ClientSession() as session:
             results = []
+            seen: dict[str, WaterTariff] = {}
             for e in all_extractors():
-                results.append(await _check_one(session, e))
+                results.append(await _check_one(session, e, seen))
                 if e.supports_communes:
                     results.append(await _check_communes(session, e))
+            spge = _check_spge(seen)
+            if spge is not None:
+                results.append(spge)
     return results, _exit_code(results), cache
 
 

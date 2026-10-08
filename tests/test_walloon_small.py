@@ -28,13 +28,17 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import date
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
 from custom_components.be_water_prices.const import (
     WALLONIA_CVA_EUR_PER_M3,
     WALLONIA_FSE_EUR_PER_M3,
+    WALLONIA_SPGE_YEAR,
 )
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers._walloon_simple import parse_cvd
@@ -240,6 +244,8 @@ def test_the_builder_refuses_a_cvd_outside_the_plausible_window(cvd: float) -> N
             source_url="https://example.invalid/",
             publication_label="test",
             year=2026,
+            cva=2.748,
+            fse=0.0339,
         )
 
 
@@ -690,3 +696,94 @@ async def test_a_blip_on_the_aiec_page_does_not_serve_the_aggregator() -> None:
     ):
         await aiec.fetch(object())
     aggregator.assert_not_awaited()
+
+
+# --- the SPGE figures by year ------------------------------------------------
+
+_LATER = WALLONIA_SPGE_YEAR + 1
+_PROSE_LATER = (
+    f"<html><body><p>Tarifs {_LATER}. Coût vérité distribution (CVD) : 2,870 €/m³. "
+    "Coût vérité assainissement (CVA) : 2,900 €/m³. "
+    "Fonds social de l'eau : 0,0400 €/m³.</p></body></html>"
+)
+_TODAY = "custom_components.be_water_prices.providers._walloon_simple.belgian_today"
+
+
+def _parse_prose(page: str) -> Any:
+    from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
+
+    return parse_tariff(
+        page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
+    )
+
+
+def test_a_card_of_the_constants_year_that_differs_fails() -> None:
+    """Inside the window the page is held to the constant, as before."""
+    page = _PROSE_LATER.replace(str(_LATER), str(WALLONIA_SPGE_YEAR))
+    with (
+        patch(_TODAY, return_value=date(WALLONIA_SPGE_YEAR, 6, 1)),
+        pytest.raises(ExtractorError, match="CVA published value"),
+    ):
+        _parse_prose(page)
+
+
+def test_a_card_past_the_constants_year_is_priced_on_its_own_figures() -> None:
+    """CWaPE moves the CVA on 1 January; a page on the new card keeps serving."""
+    with patch(_TODAY, return_value=date(_LATER, 1, 10)):
+        tariff = _parse_prose(_PROSE_LATER)
+    assert tariff.valid_from == date(_LATER, 1, 1)
+    assert tariff.cva_eur_per_m3 == 2.9
+    assert tariff.fse_eur_per_m3 == 0.04
+    assert tariff.yearly_fixed_fee == pytest.approx(20 * 2.87 + 30 * 2.9)
+
+
+@pytest.mark.parametrize(
+    ("printed", "missing"),
+    [
+        ("Coût vérité assainissement (CVA) : 2,900 €/m³. ", "FSE"),
+        ("Fonds social de l'eau : 0,0400 €/m³. ", "CVA"),
+    ],
+)
+def test_a_card_past_the_constants_year_without_a_figure_fails(printed: str, missing: str) -> None:
+    """Outside its year the constant is not known to hold, so it does not stand in."""
+    from custom_components.be_water_prices.providers._walloon_simple import spge_components
+
+    page = (
+        f"<html><body><p>Tarifs {_LATER}. Coût vérité distribution (CVD) : 2,870 €/m³. "
+        f"{printed}</p></body></html>"
+    )
+    with (
+        patch(_TODAY, return_value=date(_LATER, 1, 10)),
+        pytest.raises(ExtractorError, match=f"{missing} is not printed on its {_LATER} card"),
+    ):
+        _parse_prose(page)
+    # The FSE is optional inside the window only, and so is IDEN's CVA.
+    with pytest.raises(ExtractorError, match="CVA is not printed"):
+        spge_components(
+            cva=None,
+            fse=0.04,
+            year=_LATER,
+            label="iden",
+            logger=logging.getLogger(__name__),
+            cva_required=False,
+        )
+
+
+def test_aiecs_transcribed_card_depends_on_the_constants_year() -> None:
+    """Its picture page prints no CVA: a card of the constants' year is built
+    on them and keeps its 31 March grace, and a later card cannot be built."""
+    from custom_components.be_water_prices.providers import aiec
+
+    in_force = date(WALLONIA_SPGE_YEAR, 4, 1)
+    later = date(_LATER, 1, 1)
+    with (
+        patch(_TODAY, return_value=date(_LATER, 2, 1)),
+        patch.dict(aiec._TRANSCRIBED_CVD, {in_force: 3.05, later: 3.1}),
+    ):
+        card = aiec.card_from_operator_page(in_force)
+        assert card is not None
+        assert card.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
+        assert card.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
+        assert card.valid_until == date(_LATER, 3, 31)
+        with pytest.raises(ExtractorError, match=f"CVA is not printed on its {_LATER} card"):
+            aiec.card_from_operator_page(later)

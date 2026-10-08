@@ -48,10 +48,10 @@ import re
 import aiohttp
 from bs4 import BeautifulSoup
 
-from ..const import REGION_WALLONIA, WALLONIA_CVA_EUR_PER_M3, WALLONIA_FSE_EUR_PER_M3
+from ..const import REGION_WALLONIA
 from ._html import fetch_and_parse
 from ._pdf import to_float
-from ._walloon_simple import build_tariff, detect_published_year, warn_constant_drift
+from ._walloon_simple import build_tariff, detect_published_year, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,31 +99,27 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     """Parse IDEN's own tariff card."""
     text = _text_with_field_values(html)
     cvd = _amount(text, _CVD_RE, "CVD")
-    # The page prints the two flat-Wallonia components next to the CVD, so
-    # hold them to the SPGE constants the same way every other Walloon
-    # extractor does.
-    warn_constant_drift(
-        published=_amount(text, _CVA_RE, "CVA"),
-        constant=WALLONIA_CVA_EUR_PER_M3,
-        label=f"{UTILITY_ID} CVA",
-        logger=_LOGGER,
-    )
-    warn_constant_drift(
-        published=_amount(text, _FSE_RE, "FSE"),
-        constant=WALLONIA_FSE_EUR_PER_M3,
-        label=f"{UTILITY_ID} FSE",
-        logger=_LOGGER,
-        threshold=0.001,
-    )
     target = year or detect_published_year(text)
     if target is None:
         raise ExtractorError(f"IDEN states no tariff year on {SOURCE_URL}")
+    # The page prints the two flat-Wallonia components next to the CVD, so
+    # they are handled the same way as on every other Walloon page.
+    cva, fse = spge_components(
+        cva=_amount(text, _CVA_RE, "CVA"),
+        fse=_amount(text, _FSE_RE, "FSE"),
+        year=target,
+        label=UTILITY_ID,
+        logger=_LOGGER,
+        cva_required=False,
+    )
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
         source_url=SOURCE_URL,
         publication_label=f"{_LABEL_PREFIX} {target}",
         year=target,
+        cva=cva,
+        fse=fse,
     )
 
 

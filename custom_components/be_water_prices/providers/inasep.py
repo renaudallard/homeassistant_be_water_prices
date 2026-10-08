@@ -36,9 +36,10 @@ e.g.::
     Coût-Vérité Assainissement (CVA) = 2,748 €/m³ depuis le 1er janvier 2026
     Fonds social de l'Eau = 0,0339 €/m³ depuis le 1er janvier 2026
 
-CVA and FSE are the SPGE flat-Wallonia constants; the values the page
-prints are held to them and a move fails the fetch, as on every other
-Walloon page. The parser anchors the CVD on the literal phrase
+CVA and FSE are the SPGE flat-Wallonia figures, handled as on every
+other Walloon page: the constants for a card of their year, the values
+the page prints held to them and a move failing the fetch, and the
+page's own for a later card. The parser anchors the CVD on the literal phrase
 ``Coût-Vérité Distribution (CVD)`` so the unrelated euros amounts
 elsewhere on the page (annual-impact figures, per-glass examples)
 can't win.
@@ -141,18 +142,20 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     if match is None:
         raise ExtractorError("could not find INASEP CVD on the tariff page")
     cvd = to_float(match.group(1))
-    check_spge_constants(text, utility_id=UTILITY_ID, logger=_LOGGER)
 
     # The block is headed "Tarifs YYYY": date the card from that rather
     # than the clock, so a page still on last year's card in January
     # looks stale instead of being relabelled as this year's.
     target = year or detect_published_year(text) or belgian_today().year
+    cva, fse = check_spge_constants(text, year=target, utility_id=UTILITY_ID, logger=_LOGGER)
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,
         source_url=SOURCE_URL,
         publication_label=f"INASEP votre eau au coût-vérité {target}",
         year=target,
+        cva=cva,
+        fse=fse,
         valid_from=_cvd_effective_date(match, target),
     )
 
