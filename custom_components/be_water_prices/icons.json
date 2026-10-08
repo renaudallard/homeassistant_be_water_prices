@@ -1,0 +1,49 @@
+{
+  "entity": {
+    "sensor": {
+      "yearly_fee": {
+        "default": "mdi:cash-multiple"
+      },
+      "basis_rate": {
+        "default": "mdi:currency-eur"
+      },
+      "comfort_rate": {
+        "default": "mdi:currency-eur"
+      },
+      "sanering_rate": {
+        "default": "mdi:pipe"
+      },
+      "all_in_basis": {
+        "default": "mdi:currency-eur"
+      },
+      "projected_annual_cost": {
+        "default": "mdi:chart-line"
+      },
+      "rolling_year_consumption": {
+        "default": "mdi:water-sync"
+      },
+      "rolling_year_cost": {
+        "default": "mdi:cash-sync"
+      },
+      "projected_year_consumption": {
+        "default": "mdi:water-plus"
+      },
+      "projected_year_end_cost": {
+        "default": "mdi:chart-line"
+      }
+    },
+    "button": {
+      "refresh": {
+        "default": "mdi:refresh"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "service": "mdi:refresh"
+    },
+    "backfill_prices": {
+      "service": "mdi:history"
+    }
+  }
+}
