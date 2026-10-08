@@ -126,6 +126,9 @@ _YTD_STORE_MINOR_VERSION = 2
 # The meter's days behind the year figures, in a Store of their own: they
 # are read once a day and have nothing to do with the YTD cycle's shape.
 _METERED_STORE_VERSION = 1
+# The last good card and when it was fetched, in a Store of its own too, so
+# a restart while the utility is down still serves it.
+_CARD_STORE_VERSION = 1
 # Debounce window for the live path's best-effort Store flush. The daily
 # tick and a clean unload save authoritatively; this only bounds how much of
 # the climbing high-water mark a hard crash between ticks can lose.
@@ -331,14 +334,21 @@ def _ytd_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
 
 
 async def async_remove_stores(hass: HomeAssistant, entry_id: str) -> None:
-    """Delete an entry's persisted YTD cycle anchor and its meter's days."""
+    """Delete an entry's persisted YTD cycle anchor, its meter's days and
+    its last good card."""
     await _ytd_store(hass, entry_id).async_remove()
     await _metered_store(hass, entry_id).async_remove()
+    await _card_store(hass, entry_id).async_remove()
 
 
 def _metered_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
     """The per-entry Store holding the last read of the meter's days."""
     return Store(hass, _METERED_STORE_VERSION, f"{DOMAIN}.{entry_id}.metered")
+
+
+def _card_store(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
+    """The per-entry Store holding the last good card and its fetch time."""
+    return Store(hass, _CARD_STORE_VERSION, f"{DOMAIN}.{entry_id}.card")
 
 
 @dataclass(frozen=True)
@@ -1056,7 +1066,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.entry = entry
         utility_id = entry.data[CONF_UTILITY]
         self._extractor: WaterExtractor = get(utility_id)
-        self._last_good: CoordinatorData | None = None
+        # The last good card and when it was fetched or captured, restored
+        # from _card_store at setup: what a failed refresh serves.
+        self._last_good: tuple[WaterTariff, datetime] | None = None
         # Resolved meter entity and the meter's reading back at Jan 1,
         # captured on each daily tick so meter state-change events can
         # recompute YTD live without re-querying the recorder.
@@ -1132,6 +1144,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self.meter_history_pending = False
         self._store: Store[dict[str, Any]] = _ytd_store(hass, entry.entry_id)
         self._metered_store = _metered_store(hass, entry.entry_id)
+        self._card_store = _card_store(hass, entry.entry_id)
         super().__init__(
             hass,
             _LOGGER,
@@ -1143,18 +1156,26 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             update_interval=timedelta(hours=UPDATE_INTERVAL_HOURS),
         )
 
+    def _fetched_commune(self) -> str | None:
+        """The commune the utility's card is fetched for, None for its
+        default card."""
+        commune = self.entry.options.get(CONF_COMMUNE)
+        if commune and self._extractor.fetch_for_commune is not None:
+            return str(commune)
+        return None
+
     async def _async_update_data(self) -> CoordinatorData:
         session = async_get_clientsession(self.hass)
-        commune = self.entry.options.get(CONF_COMMUNE)
+        commune = self._fetched_commune()
         budget = asyncio.timeout(FETCH_BUDGET_S)
         failure: Exception | None = None
         try:
             async with budget:
-                if commune and self._extractor.fetch_for_commune is not None:
-                    tariff = await self._extractor.fetch_for_commune(session, str(commune))
+                if commune is not None and self._extractor.fetch_for_commune is not None:
+                    tariff = await self._extractor.fetch_for_commune(session, commune)
                     tariff = relabel_with_human_commune(
                         tariff,
-                        commune_id=str(commune),
+                        commune_id=commune,
                         commune_label=self.entry.options.get(CONF_COMMUNE_LABEL),
                     )
                 else:
@@ -1198,7 +1219,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             ytd_started_at=self._ytd.started,
             year_figures=self._year_figures(tariff, ytd_m3, ytd_cost),
         )
-        self._last_good = data
+        self._hold(tariff, now)
         self._sync_repair_issue(data)
         self._sync_operator_issue()
         if self.entry.state is ConfigEntryState.LOADED and self._owns_the_entry():
@@ -1278,9 +1299,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _serve_cached(self, failure: Exception, out_of_time: bool) -> CoordinatorData:
         """What a refresh publishes when its fetch failed with ``failure``.
 
-        The last good snapshot, with the failure scrubbed into last_error
-        and the stale check re-run, so a dashboard sees the age and the
-        reason rather than every sensor going blank. With no snapshot to
+        The last good snapshot, kept across restarts, with the failure
+        scrubbed into last_error and the stale check re-run, so a dashboard
+        sees the age and the reason rather than every sensor going blank. With no snapshot to
         fall back on, or with one that has gone stale or is last year's
         card and a newer card in the project's archive, the archived card
         is served instead. With neither the refresh fails, which on a first
@@ -1299,6 +1320,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             str(failure), sensitive_tokens(self.entry), placeholder="**redacted**"
         )
         held = self._last_good
+        held_at = held[1] if held is not None else None
         # Nothing to serve, or what is held has gone stale: ask the
         # archive. Asking again on a stale snapshot is what carries an
         # outage that outlives the staleness window: the archive files a
@@ -1309,13 +1331,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # already hold the new one. Only a capture newer than what is held
         # replaces it.
         card: tuple[WaterTariff, datetime] | None = None
-        if (
-            held is None
-            or self._is_stale(held.tariff, held.fetched_at)
-            or held.tariff.valid_from.year < dt_util.now().year
-        ):
+        if held is None or self._is_stale(*held) or held[0].valid_from.year < dt_util.now().year:
             archived = await self._from_card_archive()
-            if archived is not None and (held is None or archived[1] > held.fetched_at):
+            if archived is not None and (held_at is None or archived[1] > held_at):
                 card = archived
         if card is not None:
             tariff, fetched_at = card
@@ -1326,7 +1344,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 scrubbed,
             )
         elif held is not None:
-            tariff, fetched_at = held.tariff, held.fetched_at
+            tariff, fetched_at = held
             _LOGGER.warning(
                 "water tariff fetch failed (%s), serving cached: %s",
                 type(failure).__name__,
@@ -1352,11 +1370,49 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         )
         if card is not None:
             # From here on the archived card is the last good snapshot,
-            # ageing like one. The failure is not part of it; the round
-            # that serves it writes its own.
-            self._last_good = replace(data, last_error="")
+            # ageing like one.
+            self._hold(tariff, fetched_at)
         self._sync_repair_issue(data)
         return data
+
+    def _hold(self, tariff: WaterTariff, fetched_at: datetime) -> None:
+        """Keep ``tariff`` as the card a failed refresh serves, here and in
+        the Store, so a restart while the utility is down serves it too.
+
+        Saved after the refresh returns rather than awaited: an await here
+        is the window a live meter event uses to publish a figure the
+        refresh would then overwrite.
+        """
+        self._last_good = (tariff, fetched_at)
+        if not self._owns_the_entry():
+            return
+        record = {
+            "card": tariff_to_dict(tariff),
+            "fetched_at": fetched_at.isoformat(),
+            "commune": self._fetched_commune(),
+        }
+        self._card_store.async_delay_save(lambda: record, 0)
+
+    async def async_load_last_good(self) -> None:
+        """Restore the last good card before the first refresh.
+
+        Only one fetched for the utility and commune the entry has now: a
+        reconfigured entry would otherwise serve the old operator's card.
+        A record that cannot be read is dropped, as the entry then starts
+        with nothing held, as it did before the card was stored.
+        """
+        try:
+            data = await self._card_store.async_load()
+        except Exception:
+            _LOGGER.exception("could not load the last good card; starting without one")
+            return
+        held = _held_from_record(data)
+        if held is None:
+            return
+        tariff, fetched_at, commune = held
+        if tariff.utility != self._extractor.id or commune != self._fetched_commune():
+            return
+        self._last_good = (tariff, fetched_at)
 
     async def _from_card_archive(self) -> tuple[WaterTariff, datetime] | None:
         """The last card the project's archive holds for this entry and the
@@ -1364,7 +1420,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         unreachable, or has nothing for this utility and commune.
 
         Asked when a refresh failed with nothing to serve, which is a
-        restart or a fresh install while the utility is down, and again
+        fresh install while the utility is down, or a restart with no card
+        stored for the entry's utility and commune, and again
         once what is held has gone stale or is last year's card. The entry
         then loads on that card, stale after the usual 35 days, instead of
         retrying setup until the utility is back. This month's row first,
@@ -1374,10 +1431,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         """
         if not self.entry.options.get(CONF_CARD_ARCHIVE, DEFAULT_CARD_ARCHIVE):
             return None
-        commune = self.entry.options.get(CONF_COMMUNE)
-        key = (
-            str(commune) if commune and self._extractor.fetch_for_commune is not None else "default"
-        )
+        key = self._fetched_commune() or "default"
         session = async_get_clientsession(self.hass)
         month = dt_util.now().date()
         row: dict[str, Any] | None = None
@@ -2402,6 +2456,24 @@ def _card_from_record(data: object) -> tuple[WaterTariff, str | None] | None:
         return tariff_from_dict(data), commune
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _held_from_record(data: object) -> tuple[WaterTariff, datetime, str | None] | None:
+    """The persisted last good card, its fetch time and the commune it was
+    fetched for, or None when the record holds none it can read."""
+    if not isinstance(data, dict):
+        return None
+    commune = data.get("commune")
+    if commune is not None and not isinstance(commune, str):
+        return None
+    try:
+        tariff = tariff_from_dict(data["card"])
+        fetched_at = datetime.fromisoformat(str(data["fetched_at"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if fetched_at.tzinfo is None:
+        return None
+    return tariff, fetched_at, commune
 
 
 def _metered_from_record(data: object) -> _MeteredDays | None:

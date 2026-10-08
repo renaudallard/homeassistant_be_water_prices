@@ -139,6 +139,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> boo
     # And the last read of the meter's days, which the first refresh leaves
     # for later: the year figures stand where they stood meanwhile.
     await coordinator.async_load_metered_days()
+    # And the last good card, so a restart while the utility is down serves
+    # it instead of retrying setup until the utility is back.
+    await coordinator.async_load_last_good()
     # Own the teardown before the first refresh, not after: that refresh
     # resolves the meter and subscribes to it, so a ConfigEntryNotReady
     # here would otherwise leave a live listener behind on every retry.
