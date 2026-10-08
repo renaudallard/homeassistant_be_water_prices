@@ -47,7 +47,9 @@ if TYPE_CHECKING:
 
     from .coordinator import WaterConfigEntry, WaterCoordinator
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "button"]
+
+SERVICE_REFRESH = "refresh"
 
 # Set up from config entries only. Declared here and built on first read
 # by __getattr__ below, which Home Assistant's lookup reaches: the CI
@@ -67,9 +69,32 @@ def __getattr__(name: str) -> Callable[[dict[Any, Any]], dict[Any, Any]]:
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the service once, whatever the number of entries."""
+    """Register the services once, whatever the number of entries."""
+    import asyncio
+
+    import voluptuous as vol
+    from homeassistant.core import ServiceCall
+    from homeassistant.helpers import config_validation as cv
+
+    from .coordinator import loaded_entries
     from .statistics import async_register_services
 
+    async def _refresh(call: ServiceCall) -> None:
+        # Done when the fetches are, so what follows the call reads the
+        # tariff they give; the entries side by side.
+        await asyncio.gather(
+            *(
+                entry.runtime_data.async_refresh()
+                for entry in loaded_entries(hass, call.data.get("entry_id"))
+            )
+        )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REFRESH,
+        _refresh,
+        schema=vol.Schema({vol.Optional("entry_id"): cv.string}),
+    )
     async_register_services(hass)
     return True
 

@@ -149,9 +149,24 @@
       "projected_year_end_cost": {
         "name": "Coût prévu en fin d'année"
       }
+    },
+    "button": {
+      "refresh": {
+        "name": "Rafraîchir le tarif"
+      }
     }
   },
   "services": {
+    "refresh": {
+      "name": "Rafraîchir le tarif",
+      "description": "Récupère à nouveau le tarif de la compagnie maintenant plutôt qu'au prochain rafraîchissement quotidien.",
+      "fields": {
+        "entry_id": {
+          "name": "Entrée de configuration",
+          "description": "Optionnel. L'entrée de configuration à rafraîchir. Laissez vide pour rafraîchir chaque entrée chargée."
+        }
+      }
+    },
     "backfill_prices": {
       "name": "Backfill de l'historique des prix",
       "description": "Importe des lignes long-term-statistics horaires pour les capteurs de prix de cette intégration, afin que les tableaux de bord History et Energy affichent une courbe de tarif remontant avant la date d'installation.",

@@ -125,9 +125,22 @@
       "rolling_year_cost": {"name": "Rolling year cost"},
       "projected_year_consumption": {"name": "Projected year consumption"},
       "projected_year_end_cost": {"name": "Projected year-end cost"}
+    },
+    "button": {
+      "refresh": {"name": "Refresh tariff"}
     }
   },
   "services": {
+    "refresh": {
+      "name": "Refresh tariff",
+      "description": "Fetch the utility's tariff again now instead of at the next daily refresh.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional. The config entry to refresh. Leave empty to refresh every loaded entry."
+        }
+      }
+    },
     "backfill_prices": {
       "name": "Backfill price history",
       "description": "Import flat-line hourly long-term-statistics rows for this integration's price sensors so the History and Energy dashboards show a tariff line going back further than the install date.",

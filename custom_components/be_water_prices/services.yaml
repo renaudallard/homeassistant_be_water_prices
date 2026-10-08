@@ -1,3 +1,19 @@
+refresh:
+  name: Refresh tariff
+  description: >
+    Fetch the utility's tariff again now instead of at the next daily
+    refresh. The call returns once the fetches are done, so an
+    automation step after it reads the new figures.
+  fields:
+    entry_id:
+      name: Config entry
+      description: >
+        Optional. The config entry to refresh. Leave empty to refresh
+        every loaded entry.
+      example: 01H8WZK0WZK0WZK0WZK0WZK0WZ
+      selector:
+        config_entry:
+          integration: be_water_prices
 backfill_prices:
   name: Backfill price history
   description: >

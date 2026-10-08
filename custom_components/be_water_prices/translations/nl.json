@@ -149,9 +149,24 @@
       "projected_year_end_cost": {
         "name": "Verwachte kosten op het jaareinde"
       }
+    },
+    "button": {
+      "refresh": {
+        "name": "Tarief vernieuwen"
+      }
     }
   },
   "services": {
+    "refresh": {
+      "name": "Tarief vernieuwen",
+      "description": "Haal het tarief van de watermaatschappij nu opnieuw op in plaats van bij de volgende dagelijkse vernieuwing.",
+      "fields": {
+        "entry_id": {
+          "name": "Configuratie-invoer",
+          "description": "Optioneel. De configuratie-invoer om te vernieuwen. Laat leeg om elke geladen invoer te vernieuwen."
+        }
+      }
+    },
     "backfill_prices": {
       "name": "Prijsgeschiedenis aanvullen",
       "description": "Importeert vlakke uurlijkse long-term-statistics rijen voor de prijssensoren van deze integratie, zodat de History- en Energy-dashboards een tarieflijn tonen die verder teruggaat dan de installatiedatum.",

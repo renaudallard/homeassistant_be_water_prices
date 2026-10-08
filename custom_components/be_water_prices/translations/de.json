@@ -149,9 +149,24 @@
       "projected_year_end_cost": {
         "name": "Erwartete Kosten zum Jahresende"
       }
+    },
+    "button": {
+      "refresh": {
+        "name": "Tarif aktualisieren"
+      }
     }
   },
   "services": {
+    "refresh": {
+      "name": "Tarif aktualisieren",
+      "description": "Ruft den Tarif des Wasserversorgers jetzt erneut ab statt bei der nächsten täglichen Aktualisierung.",
+      "fields": {
+        "entry_id": {
+          "name": "Konfigurationseintrag",
+          "description": "Optional. Der zu aktualisierende Konfigurationseintrag. Leer lassen, um jeden geladenen Eintrag zu aktualisieren."
+        }
+      }
+    },
     "backfill_prices": {
       "name": "Preisverlauf nachladen",
       "description": "Importiert flache stündliche Long-Term-Statistics-Zeilen für die Preissensoren dieser Integration, sodass die History- und Energy-Dashboards eine Tariflinie vor dem Installationszeitpunkt anzeigen.",

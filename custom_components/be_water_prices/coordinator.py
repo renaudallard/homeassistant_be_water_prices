@@ -55,7 +55,7 @@ from homeassistant.core import (
     State,
     callback,
 )
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -2260,6 +2260,26 @@ def entry_coordinator(entry: WaterConfigEntry) -> WaterCoordinator | None:
     if coordinator is None or not coordinator._owns_the_entry():
         return None
     return coordinator
+
+
+def loaded_entries(hass: HomeAssistant, entry_id: str | None) -> list[WaterConfigEntry]:
+    """The loaded entries a service call targets: the one named, else all.
+
+    A named entry that is not loaded is refused, so the caller is told
+    rather than shown a call that did nothing.
+    """
+    entries: list[WaterConfigEntry] = [
+        entry
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+        if entry_id is None or entry.entry_id == entry_id
+    ]
+    if entry_id is not None and not entries:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_entry",
+            translation_placeholders={"entry_id": entry_id},
+        )
+    return entries
 
 
 def _priced_on(year: int) -> date:

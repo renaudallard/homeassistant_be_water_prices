@@ -52,7 +52,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .coordinator import WaterConfigEntry, entry_coordinator
+from .coordinator import WaterConfigEntry, entry_coordinator, loaded_entries
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -481,8 +481,6 @@ def async_register_services(hass: HomeAssistant) -> None:
     """Register the ``backfill_prices`` service, once for the integration."""
 
     async def _handle_backfill(call: ServiceCall) -> None:
-        loaded = [entry.entry_id for entry in hass.config_entries.async_loaded_entries(DOMAIN)]
-
         target_id = call.data.get(ATTR_ENTRY_ID)
         clear = bool(call.data.get(ATTR_CLEAR, False))
         # clear=True wipes the long-term-statistics rows for every
@@ -495,16 +493,7 @@ def async_register_services(hass: HomeAssistant) -> None:
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="clear_needs_entry"
             )
-        if target_id:
-            if target_id not in loaded:
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="unknown_entry",
-                    translation_placeholders={"entry_id": target_id},
-                )
-            target_ids = [target_id]
-        else:
-            target_ids = loaded
+        targets = loaded_entries(hass, target_id or None)
 
         start_date = call.data.get(ATTR_START_DATE)
         if start_date is not None:
@@ -517,10 +506,7 @@ def async_register_services(hass: HomeAssistant) -> None:
         else:
             start_dt = _jan_1_local()
 
-        for entry_id in target_ids:
-            entry = hass.config_entries.async_get_entry(entry_id)
-            if entry is None:
-                continue
+        for entry in targets:
             await async_backfill_prices(hass, entry, start=start_dt, clear=clear)
 
     hass.services.async_register(
