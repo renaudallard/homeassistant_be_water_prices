@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING, Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
@@ -481,9 +482,7 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: ConfigEntry) -> 
 
 @callback
 def async_register_services(hass: HomeAssistant) -> None:
-    """Register the ``backfill_prices`` service if not already registered."""
-    if hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES):
-        return
+    """Register the ``backfill_prices`` service, once for the integration."""
 
     async def _handle_backfill(call: ServiceCall) -> None:
         entries_data: dict[str, Any] = hass.data.get(DOMAIN, {})
@@ -497,14 +496,17 @@ def async_register_services(hass: HomeAssistant) -> None:
         # Refuse the blanket combination loudly so the user has to
         # opt in per-entry.
         if clear and not target_id:
-            raise vol.Invalid(
-                "backfill_prices: clear=true requires an explicit entry_id"
-                " (refuses to wipe long-term-statistics for every loaded entry)"
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="clear_needs_entry"
             )
         if target_id:
-            target_ids = [target_id] if target_id in entries_data else []
-            if not target_ids:
-                _LOGGER.warning("backfill_prices: no loaded entry %s", target_id)
+            if target_id not in entries_data:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="unknown_entry",
+                    translation_placeholders={"entry_id": target_id},
+                )
+            target_ids = [target_id]
         else:
             target_ids = list(entries_data.keys())
 
@@ -531,10 +533,3 @@ def async_register_services(hass: HomeAssistant) -> None:
         _handle_backfill,
         schema=SERVICE_BACKFILL_SCHEMA,
     )
-
-
-@callback
-def async_unregister_services(hass: HomeAssistant) -> None:
-    """Drop the service when the last entry of this integration unloads."""
-    if hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES):
-        hass.services.async_remove(DOMAIN, SERVICE_BACKFILL_PRICES)

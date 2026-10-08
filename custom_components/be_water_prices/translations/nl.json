@@ -208,5 +208,13 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "Geen geladen invoer van Belgische Waterprijzen heeft id {entry_id}."
+    },
+    "clear_needs_entry": {
+      "message": "Wissen voor importeren vereist een configuratie-invoer: alle geladen invoeren tegelijk wissen is onomkeerbaar."
+    }
   }
 }

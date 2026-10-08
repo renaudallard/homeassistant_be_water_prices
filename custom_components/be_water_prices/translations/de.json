@@ -208,5 +208,13 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "Kein geladener Eintrag von Belgische Wasserpreise hat die ID {entry_id}."
+    },
+    "clear_needs_entry": {
+      "message": "Vor dem Import löschen erfordert einen Konfigurationseintrag: alle geladenen Einträge auf einmal zu löschen ist unumkehrbar."
+    }
   }
 }

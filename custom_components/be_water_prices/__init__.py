@@ -33,7 +33,8 @@ when the integration runs in HA proper).
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from .const import DOMAIN
 
@@ -42,8 +43,33 @@ _LOGGER = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.typing import ConfigType
 
 PLATFORMS = ["sensor"]
+
+# Set up from config entries only. Declared here and built on first read
+# by __getattr__ below, which Home Assistant's lookup reaches: the CI
+# checks import the extractors without Home Assistant installed, and that
+# import runs this module.
+CONFIG_SCHEMA: Callable[[dict[Any, Any]], dict[Any, Any]]
+
+
+def __getattr__(name: str) -> Callable[[dict[Any, Any]], dict[Any, Any]]:
+    if name == "CONFIG_SCHEMA":
+        from homeassistant.helpers import config_validation as cv
+
+        schema = cv.config_entry_only_config_schema(DOMAIN)
+        globals()[name] = schema
+        return schema
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the service once, whatever the number of entries."""
+    from .statistics import async_register_services
+
+    async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -53,10 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WaterCoordinator
     from .providers import async_load as async_load_providers
     from .providers import get as get_extractor
-    from .statistics import (
-        async_maybe_backfill_once,
-        async_register_services,
-    )
+    from .statistics import async_maybe_backfill_once
 
     # Drop any phantom commune id the runtime list_communes filter
     # blocks. Runs on every setup (not only v1->v2 migration) so a
@@ -116,7 +139,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Home Assistant runs the on_unload callbacks when setup fails further
     # down as well, and never calls async_unload_entry for an entry that
     # did not load, so this is what keeps a failed setup from leaving the
-    # coordinator in the bucket and the service registered for good.
+    # coordinator in the bucket for good.
     entry.async_on_unload(lambda: _forget_coordinator(hass, entry.entry_id))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Update the running-cost / YTD sensors live on each meter reading,
@@ -144,7 +167,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # one-shot annoyance on first install / operator switch.
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
-    async_register_services(hass)
     # Auto-once price-history backfill so the History/Energy graphs
     # are not empty before the first natural day of recording. Wrapped
     # in a broad except so a backfill failure logs loudly without
@@ -172,7 +194,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # blocking the user from removing the entry without an HA
         # restart. Tolerate both the missing bucket and the missing
         # entry_id. The on_unload callbacks that run next drop the
-        # coordinator, its Repair cards and the service.
+        # coordinator and its Repair cards.
         coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
         if coordinator is not None:
             # Stop listening to the meter before the flush, not after it in
@@ -189,8 +211,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
-    """Drop the entry's coordinator and its Repair cards, and the service
-    once no entry is left.
+    """Drop the entry's coordinator and its Repair cards.
 
     Runs from the entry's on_unload callbacks, which Home Assistant fires
     after a clean unload and after a setup that failed past the first
@@ -199,18 +220,13 @@ def _forget_coordinator(hass: HomeAssistant, entry_id: str) -> None:
     """
     from homeassistant.helpers import issue_registry as ir
 
-    from .statistics import async_unregister_services
-
-    domain_data = hass.data.get(DOMAIN, {})
-    coordinator = domain_data.pop(entry_id, None)
+    coordinator = hass.data.get(DOMAIN, {}).pop(entry_id, None)
     if coordinator is not None:
         coordinator.async_retire()
         ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.several_meters_issue_id)
         ir.async_delete_issue(hass, DOMAIN, coordinator.operator_issue_id)
-    if not domain_data:
-        async_unregister_services(hass)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

@@ -208,5 +208,13 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "Aucune entrée chargée de Prix de l'eau en Belgique n'a l'identifiant {entry_id}."
+    },
+    "clear_needs_entry": {
+      "message": "Effacer avant import nécessite une entrée de configuration : tout effacer d'un coup est irréversible."
+    }
   }
 }

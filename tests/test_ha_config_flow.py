@@ -1808,8 +1808,11 @@ async def test_failed_first_refresh_leaves_no_meter_listener(hass: HomeAssistant
 
 
 @pytest.mark.asyncio
-async def test_a_failed_setup_leaves_no_coordinator_and_no_service(hass: HomeAssistant) -> None:
-    """Home Assistant skips async_unload_entry for an entry that never loaded."""
+async def test_a_failed_setup_leaves_no_coordinator(hass: HomeAssistant) -> None:
+    """Home Assistant skips async_unload_entry for an entry that never loaded.
+
+    The service belongs to the integration, not to an entry, so it stays.
+    """
     from datetime import date
     from typing import Any
     from unittest.mock import AsyncMock, patch
@@ -1855,7 +1858,7 @@ async def test_a_failed_setup_leaves_no_coordinator_and_no_service(hass: HomeAss
 
     assert entry.state is ConfigEntryState.SETUP_ERROR
     assert entry.entry_id not in hass.data.get(DOMAIN, {})
-    assert not hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)
+    assert hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)
 
 
 @pytest.mark.asyncio

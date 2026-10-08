@@ -35,8 +35,8 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import voluptuous as vol
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -73,26 +73,80 @@ async def test_clear_without_an_entry_id_is_refused(hass: HomeAssistant) -> None
     and the service is reachable from any automation.
     """
     async_register_services(hass)
-    with pytest.raises(vol.Invalid, match="requires an explicit entry_id"):
+    with pytest.raises(ServiceValidationError) as err:
         await hass.services.async_call(
             DOMAIN,
             SERVICE_BACKFILL_PRICES,
             {"clear": True},
             blocking=True,
         )
+    assert err.value.translation_key == "clear_needs_entry"
 
 
 async def test_clear_with_an_entry_id_is_allowed(hass: HomeAssistant) -> None:
     """The targeted form must still get through the guard."""
+    from types import SimpleNamespace
+
     entry = _entry(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = SimpleNamespace(data=None)
     async_register_services(hass)
-    # No coordinator in hass.data, so the call is a no-op past the guard.
+    # No recorder in this harness, so the call is a no-op past the guard.
     await hass.services.async_call(
         DOMAIN,
         SERVICE_BACKFILL_PRICES,
         {"clear": True, "entry_id": entry.entry_id},
         blocking=True,
     )
+
+
+async def test_the_service_belongs_to_the_integration(hass: HomeAssistant) -> None:
+    """Registered once at integration setup, it is there before any entry
+    loads and stays after the last one unloads, so an automation calling
+    it on an entry that is retrying gets told rather than an unknown
+    service."""
+    from homeassistant.setup import async_setup_component
+
+    from custom_components.be_water_prices.providers.base import WaterExtractor
+    from tests.test_ha_coordinator import _fresh_tariff
+
+    async def _fetch(_session: Any) -> Any:
+        return _fresh_tariff()
+
+    assert await async_setup_component(hass, DOMAIN, {})
+    assert hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)
+    entry = _entry(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+    assert hass.services.has_service(DOMAIN, SERVICE_BACKFILL_PRICES)
+
+
+async def test_an_unknown_entry_id_is_refused(hass: HomeAssistant) -> None:
+    """A mistyped or unloaded entry says so to the caller.
+
+    Only logged, an automation calling the service on a removed entry
+    reported success and backfilled nothing.
+    """
+    entry = _entry(hass)
+    async_register_services(hass)
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_BACKFILL_PRICES,
+            {"entry_id": entry.entry_id},
+            blocking=True,
+        )
+    assert err.value.translation_key == "unknown_entry"
+    assert err.value.translation_placeholders == {"entry_id": entry.entry_id}
 
 
 async def test_backfill_skips_cleanly_without_a_recorder(hass: HomeAssistant) -> None:

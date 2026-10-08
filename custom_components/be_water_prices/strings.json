@@ -184,5 +184,13 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "No loaded Belgian Water Prices entry has the id {entry_id}."
+    },
+    "clear_needs_entry": {
+      "message": "Clear before importing needs a config entry: clearing every loaded entry at once cannot be undone."
+    }
   }
 }
