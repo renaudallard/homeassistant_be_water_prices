@@ -12,9 +12,20 @@ on:
 permissions:
   contents: read
 
+# Cancel a stale push or PR run when a new commit lands. github.workflow is
+# the CALLER's name, so the standalone run and the one autorelease calls land
+# in different groups; sharing one on a push to main, cancel-in-progress
+# would kill the release's own gate.
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A job takes about three minutes, the suite on one core; this only
+    # keeps a hung run from idling for the six-hour default.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +65,7 @@ jobs:
   # freezegun is left to the harness, which pins its own.
   test-current-ha:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       HA_VERSION: "2026.9.4"
       HARNESS_VERSION: "0.13.367"
