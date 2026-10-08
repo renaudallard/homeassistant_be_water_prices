@@ -36,8 +36,9 @@ row when the parse came out differently. That happens only when the
 parser sources changed since the branch was last replayed (a digest of
 them is stamped in ``parser.txt``); ``--reparse`` forces it. A parser that
 now reads a PDF the row has no text for gets the kept PDF back from the
-cards releases; ``--rerender`` asks for that on every card, which is the
-way to pick up a PDF reader upgrade.
+cards releases. When the PDF reader or its render code changed, which the
+stamp records on its second line, every card is rendered afresh that way,
+in the walk and in the replay; ``--rerender`` forces it.
 
 Exits 0 when at least one card was stored or confirmed unchanged and 1
 when none was: that is a runner-wide problem rather than a utility's, so
@@ -62,6 +63,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import importlib.metadata
 import json
 import os
 import re
@@ -146,6 +148,12 @@ _LEGEND = (
 # What a parse depends on: the extractors, the shared readers beside them
 # and the constants they key on.
 _PARSER_SOURCES = ("providers/*.py", "const.py")
+# What turns a card's bytes into text: the PDF reader, which pins the
+# pdfminer.six it runs on, and the code that drives it. A stored text is
+# only what these made of the card, so when either moves every kept card is
+# rendered again, as under --rerender.
+_READER = "pdfplumber"
+_RENDER_CODE = ROOT / "custom_components" / "be_water_prices" / "providers" / "_pdf.py"
 
 _README = """# Tariff card archive
 
@@ -364,6 +372,9 @@ class _ReplaySession:
         self.pdfs: dict[str, str] = {}
         self._cache = Path(tempfile.mkdtemp(prefix="cards-replay-"))
         self.cookie_jar = _NoJar()
+        # Set when a kept card the manifest names could not be downloaded:
+        # the rows that read it kept their old text.
+        self.download_failed = False
 
     def get(self, url: str, **_kw: Any) -> _Pending:
         return _Pending(self._fetch(url))
@@ -385,14 +396,18 @@ class _ReplaySession:
         path = self._kept.get(digest)
         if self._pdf_base_url is None or path is None:
             raise aiohttp.ClientConnectionError(f"no kept copy of {url} to replay from")
-        async with self._session.get(
-            f"{self._pdf_base_url}/{path}", timeout=aiohttp.ClientTimeout(total=60)
-        ) as resp:
-            if resp.status >= 400:
-                raise aiohttp.ClientConnectionError(
-                    f"HTTP {resp.status} fetching the kept copy of {url}"
-                )
-            payload = await resp.read()
+        try:
+            async with self._session.get(
+                f"{self._pdf_base_url}/{path}", timeout=aiohttp.ClientTimeout(total=60)
+            ) as resp:
+                if resp.status >= 400:
+                    raise aiohttp.ClientConnectionError(
+                        f"HTTP {resp.status} fetching the kept copy of {url}"
+                    )
+                payload = await resp.read()
+        except (aiohttp.ClientError, TimeoutError):
+            self.download_failed = True
+            raise
         cached.write_bytes(payload)
         return payload
 
@@ -419,6 +434,27 @@ def _parser_digest() -> str:
             digest.update(path.relative_to(root).as_posix().encode("utf-8"))
             digest.update(path.read_bytes())
     return digest.hexdigest()
+
+
+def _readers_line() -> str:
+    """The reader version and a digest of the render code, as the stamp
+    records them."""
+    try:
+        version = importlib.metadata.version(_READER)
+    except importlib.metadata.PackageNotFoundError:
+        version = "absent"
+    render = hashlib.sha256(_RENDER_CODE.read_bytes()).hexdigest()[:16]
+    return f"{_READER}=={version} render={render}"
+
+
+def _read_stamp(stamp: Path, parser: str, readers: str) -> tuple[str, str]:
+    """The parser digest and the readers line the branch was last replayed
+    with. A fresh branch reads as this run's, so its first run only stamps
+    it; a stamp from before the readers were recorded renders once."""
+    if not stamp.exists():
+        return parser, readers
+    lines = [*stamp.read_text(encoding="utf-8").splitlines(), "", ""]
+    return lines[0].strip(), lines[1].strip()
 
 
 def _month_id(year: int, month: int) -> str:
@@ -986,6 +1022,12 @@ async def archive(
     out.mkdir(parents=True, exist_ok=True)
     if on_ci is None:
         on_ci = os.environ.get("GITHUB_ACTIONS") == "true"
+    stamp = out / _PARSER_STAMP
+    parser, readers = _parser_digest(), _readers_line()
+    stamped, rendered_by = _read_stamp(stamp, parser, readers)
+    # Other readers or render code made the stored texts: they are not
+    # served, in the walk or the replay, and every card is rendered again.
+    rerender = rerender or rendered_by != readers
     cards = _Cards(out, pdf_dir, seen_month, serve_texts=not rerender)
     run = _Run(out, seen_month, today, _RecordingMemo(), cards, _Patience(), _Summary(), sleep)
     registry = tuple(all_extractors() if extractors is None else extractors)
@@ -993,11 +1035,7 @@ async def archive(
     async with aiohttp.ClientSession() as session:
         with memoise_text_fetches(run.memo), render_through(cards.render):
             await _walk(run, session, targets, defaults_only=defaults_only)
-        # A fresh archive holds nothing older than this parser, so the first
-        # run only stamps it; from then on a changed digest replays the rows.
-        stamp = out / _PARSER_STAMP
-        parser = _parser_digest()
-        stamped = stamp.read_text(encoding="utf-8").strip() if stamp.exists() else parser
+        # A changed parser digest replays the rows.
         if reparse or rerender or stamped != parser:
             replay = _ReplaySession(session, pdf_dir, pdf_base_url, cards.kept)
             await _replay_all(
@@ -1008,7 +1046,12 @@ async def archive(
                 run.summary,
                 rerender=rerender,
             )
-        stamp.write_text(parser + "\n", encoding="utf-8")
+            if replay.download_failed and rendered_by != readers:
+                # Stamped now, the rows that missed their card would keep
+                # the old text until the readers move again.
+                readers = rendered_by
+                print("a kept card could not be downloaded; the next run renders the cards again")
+        stamp.write_text(f"{parser}\n{readers}\n", encoding="utf-8")
     cards.file_the_rest()
     summary = run.summary
     summary.rendered = cards.rendered
@@ -1070,7 +1113,7 @@ def main() -> int:
     parser.add_argument(
         "--rerender",
         action="store_true",
-        help="replay every row with its PDFs rendered afresh, for a reader upgrade",
+        help="replay every row with its PDFs rendered afresh, as a reader upgrade does",
     )
     parser.add_argument(
         "--index-only",

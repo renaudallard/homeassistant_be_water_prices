@@ -19,7 +19,7 @@ on:
         required: false
         type: boolean
       rerender:
-        description: Replay every stored month with its PDFs rendered afresh, for a PDF reader upgrade.
+        description: Replay every stored month with its PDFs rendered afresh, as a PDF reader or render code change does by itself.
         default: false
         required: false
         type: boolean

@@ -433,7 +433,7 @@ async def test_stored_rows_are_replayed_only_when_the_parser_changed(
     monkeypatch.setattr(ac, "_parser_digest", lambda: "digest-a")
     august = datetime(2026, 8, 5, 6, 0, tzinfo=UTC)
     await ac.archive(tmp_path, extractors=[extractor], now=august, sleep=_no_sleep)
-    assert (tmp_path / "parser.txt").read_text().strip() == "digest-a"
+    assert (tmp_path / "parser.txt").read_text().splitlines()[0] == "digest-a"
     row = tmp_path / "acme/default/2026-08.json"
     assert json.loads(row.read_text())["yearly_fixed_fee"] == 100.0
 
@@ -459,7 +459,7 @@ async def test_stored_rows_are_replayed_only_when_the_parser_changed(
     card = json.loads(row.read_text())
     assert card["yearly_fixed_fee"] == 200.0
     assert card["_seen_on"] == "2026-08-05"
-    assert (tmp_path / "parser.txt").read_text().strip() == "digest-b"
+    assert (tmp_path / "parser.txt").read_text().splitlines()[0] == "digest-b"
     assert seen == [date.today(), date(2026, 8, 5), date(2026, 9, 18)]
 
     # And the forced flag replays even when the digest matches.
@@ -545,6 +545,84 @@ async def test_a_rerender_reads_every_card_back_from_the_kept_copy(
     after = json.loads(row.read_text())
     assert after["yearly_fixed_fee"] == before["yearly_fixed_fee"]
     assert after["_seen_on"] == "2026-09-05"
+
+
+async def test_a_reader_upgrade_renders_every_card_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, renders: list[bytes]
+) -> None:
+    """A pdfplumber release, or a fix to the render code, and nothing else:
+    the stored texts are not served, every kept card is rendered again, and
+    the next run serves what the new readers made."""
+    out, pdfs = tmp_path / "out", tmp_path / "pdfs"
+    session = _Session({PDF_URL: b"%PDF v1"})
+    monkeypatch.setattr(ac, "_parser_digest", lambda: "digest-a")
+    monkeypatch.setattr(ac, "_readers_line", lambda: "pdfplumber==1 render=a")
+    await ac.archive(
+        out,
+        extractors=[_extractor(_pdf_fetch(session))],
+        pdf_dir=pdfs,
+        now=NOW.replace(day=5),
+        sleep=_no_sleep,
+    )
+    session.pages.clear()
+    monkeypatch.setattr(ac, "_readers_line", lambda: "pdfplumber==2 render=a")
+    for day, rendered in ((6, 2), (7, 2)):
+        summary = await ac.archive(
+            out,
+            extractors=[_extractor(_pdf_fetch(session))],
+            pdf_dir=pdfs,
+            now=NOW.replace(day=day),
+            sleep=_no_sleep,
+        )
+        assert len(renders) == rendered
+    assert (summary.replayed, summary.unreplayable) == (0, [])
+    stamp = (out / "parser.txt").read_text().splitlines()
+    assert stamp == ["digest-a", "pdfplumber==2 render=a"]
+
+
+async def test_a_kept_card_not_downloaded_renders_the_cards_again_next_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, renders: list[bytes]
+) -> None:
+    """The stamp keeps the old readers while a row could not get its card
+    back, so the rows that missed it are not left on the old text."""
+    out, pdfs = tmp_path / "out", tmp_path / "pdfs"
+    session = _Session({PDF_URL: b"%PDF v1"})
+    monkeypatch.setattr(ac, "_parser_digest", lambda: "digest-a")
+    monkeypatch.setattr(ac, "_readers_line", lambda: "pdfplumber==1 render=a")
+    await ac.archive(
+        out,
+        extractors=[_extractor(_pdf_fetch(session))],
+        pdf_dir=pdfs,
+        now=NOW.replace(day=5),
+        sleep=_no_sleep,
+    )
+    digest = hashlib.sha256(b"%PDF v1").hexdigest()
+    (out / "pdfs.json").write_text(json.dumps({digest: f"water-2026-09/{digest}.pdf"}))
+    session.pages.clear()
+
+    class _Down:
+        async def __aenter__(self) -> _Down:
+            return self
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+        def get(self, url: str, **_kw: Any) -> Any:
+            raise aiohttp.ClientConnectionError(f"down: {url}")
+
+    monkeypatch.setattr(ac.aiohttp, "ClientSession", lambda *_a, **_kw: _Down())
+    monkeypatch.setattr(ac, "_readers_line", lambda: "pdfplumber==2 render=a")
+    summary = await ac.archive(
+        out,
+        extractors=[_extractor(_pdf_fetch(session))],
+        pdf_dir=tmp_path / "elsewhere",
+        pdf_base_url="https://cards.test",
+        now=NOW.replace(day=6),
+        sleep=_no_sleep,
+    )
+    assert len(renders) == 1
+    assert summary.unreplayable
+    assert (out / "parser.txt").read_text().splitlines()[1] == "pdfplumber==1 render=a"
 
 
 async def test_a_commune_row_replays_through_the_commune_it_was_captured_for(

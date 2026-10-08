@@ -993,8 +993,9 @@ text the branch already holds instead of being rendered again. When the
 parser sources change, every stored month is replayed offline through the
 current parser from its stored texts, the clock pinned to the day the
 row was captured, and rewritten where the parse came out differently
-(`--reparse` forces it, `--rerender` also renders every kept PDF afresh
-for a reader upgrade). `--index-only` rewrites the listing on the branch,
+(`--reparse` forces it). When the pdfplumber release or the render code
+changed, which the same stamp records, every kept PDF is rendered afresh
+as well, in the walk and in the replay; `--rerender` forces that. `--index-only` rewrites the listing on the branch,
 `coverage.md` and one sheet per utility under `coverage/` (per commune,
 the months held, each linking to the PDF or the page it was parsed from
 and to the parsed JSON), without fetching anything.
