@@ -16,7 +16,7 @@
     <img src="https://img.shields.io/badge/Home%20Assistant-2026.2.3%2B-41BDF5?logo=home-assistant&logoColor=white&style=flat-square" alt="Home Assistant"/>
   </a>
   <a href="https://hacs.xyz">
-    <img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square" alt="HACS"/>
+    <img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=flat-square" alt="HACS"/>
   </a>
   <a href="./LICENSE">
     <img src="https://img.shields.io/github/license/renaudallard/homeassistant_be_water_prices?style=flat-square" alt="License"/>
@@ -257,10 +257,21 @@ fetches the tariff again at once; see [Refresh cadence](#refresh-cadence).
 
 ### HACS (recommended)
 
-1. Open HACS, three-dot menu → **Custom repositories**.
-2. Add `https://github.com/renaudallard/homeassistant_be_water_prices` as type **Integration**.
-3. Install **Belgian Water Prices** and restart Home Assistant.
-4. **Settings → Devices & services → Add integration → Belgian Water Prices**.
+[![Open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=renaudallard&repository=homeassistant_be_water_prices&category=integration)
+
+That button opens HACS on your own Home Assistant, already on this
+integration: download it there, then restart Home Assistant and add it with
+
+[![Add the integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=be_water_prices)
+
+Both links go through [my.home-assistant.io](https://my.home-assistant.io),
+which redirects to whatever address you use for Home Assistant; the first
+time, it asks you for it once and remembers.
+
+By hand, if you would rather: open HACS and search for **Belgian Water
+Prices** (it ships in the HACS default store, so no custom repository is
+needed), download it, restart, then **Settings → Devices & services → Add
+integration → Belgian Water Prices**.
 
 ### Manual
 
