@@ -10,6 +10,7 @@
   },
   {
    "pdf": "36ebc7a3bd2a7c4c163ccc192d3fb79113074a9baa8b4b40fc99041bf2023086",
+   "readers": "pdfplumber==0.11.9 render=c1393eefeb75ad4f",
    "text": "texts/8cea3e21edc660849031f356c512b393cce6fa7ad67125cf0faa19b2b8799f6a.txt",
    "url": "https://water-link.be/sites/default/files/2026-01/2026%20HH.pdf",
    "variant": "layout"
