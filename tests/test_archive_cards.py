@@ -1134,7 +1134,7 @@ def _keep_step(
 
 
 def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> None:
-    """The store step deletes a water release more than twelve months old
+    """The store step deletes a water release more than thirty-six months old
     only when no manifest entry points into it, matching the tag whole so
     one month's overflow release is judged on its own."""
     deleted = tmp_path / "deleted.txt"
@@ -1148,8 +1148,8 @@ def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> 
         "c": "water-2026-10/c.pdf",
     }
     gh = f'"release list") printf "%s\\n" {tags} ;;\n"release delete") echo "$3" >> {deleted} ;;\n'
-    # Run on 2027-10-01: the cutoff is water-2026-10.
-    done, _work = _keep_step(tmp_path, manifest, {}, gh, "2027-10-01")
+    # Run on 2029-10-01: the cutoff is water-2026-10.
+    done, _work = _keep_step(tmp_path, manifest, {}, gh, "2029-10-01")
     assert done.returncode == 0, done.stderr
     assert deleted.read_text().split() == ["water-2026-09-2", "water-2026-08", "water-2026-07"]
 

@@ -192,7 +192,7 @@ jobs:
               jq -s '.[0] + .[1]' "$manifest" landed.json > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
             fi
           done
-          # A month more than twelve back goes, unless the manifest still
+          # A month more than thirty-six back goes, unless the manifest still
           # points into it: a card is uploaded once, under the month it was
           # first seen, and every later month on the branch names that copy,
           # so the release lives as long as a row that read the card. The tag
@@ -200,10 +200,10 @@ jobs:
           # Only this integration's releases, not the electricity or gas ones,
           # and counted from the 1st so no day of the month shifts the cutoff.
           # Listed with an explicit limit: gh stops at 30 by default, and the
-          # three namespaces keep about forty releases between them, so the
+          # three namespaces keep over a hundred releases between them, so the
           # oldest water ones would sit beyond it, never listed and never
           # deleted.
-          cutoff="water-$(date -u -d "$(date -u +%Y-%m-01) -12 months" +%Y-%m)"
+          cutoff="water-$(date -u -d "$(date -u +%Y-%m-01) -36 months" +%Y-%m)"
           gh release list --repo "$CARDS_REPO" --limit 1000 --json tagName --jq '.[].tagName' \
             | while read -r tag; do
               case "$tag" in water-*) ;; *) continue ;; esac

@@ -146,9 +146,9 @@ _VOLATILE_KEYS = ("_seen_on",)
 # The digest of the parser sources the branch was last replayed with.
 _PARSER_STAMP = "parser.txt"
 _MANIFEST = "pdfs.json"
-# The running month and the twelve before it, the same retention the
-# electricity and gas namespaces keep.
-_KEEP_MONTHS = 12
+# The running month and the thirty-six before it, the same retention the
+# electricity and gas namespaces keep, so all three hold the same span.
+_KEEP_MONTHS = 36
 # This integration's namespace in the cards repository, which it shares
 # with the electricity and gas integrations: its releases are
 # water-<YYYY-MM>, its listings live under water/ in that repository's tree.
@@ -198,7 +198,7 @@ Written daily by `.github/workflows/archive_cards.yml` running
 To get the original card of a utility, commune and month: open
 `coverage.md`, open the utility's sheet, find the row, click `pdf`,
 `picture` or `page`; `json` is what the integration parsed out of it.
-Months more than twelve before the running one are removed; a PDF or a
+Months more than thirty-six before the running one are removed; a PDF or a
 picture stays as long as a remaining month names it.
 """
 

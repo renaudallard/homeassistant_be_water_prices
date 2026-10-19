@@ -47,7 +47,7 @@ utility lists, and rewrites a month's row only when the card changed
 (`_same_card` ignores `_seen_on` and the text paths). `_seen_on` is
 therefore the first day that month's row saw its card. A month whose card
 matches the month before points at that month's texts rather than storing
-them again, and months more than twelve before the running one
+them again, and months more than thirty-six before the running one
 (`_KEEP_MONTHS`) are pruned, with the texts nothing refers to any more.
 When the parser sources (`providers/*.py`, `const.py`), the PDF reader or
 Tesseract change, every stored row is replayed offline from its texts with

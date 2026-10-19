@@ -262,7 +262,7 @@ workflow does. It uploads the PDFs and card pictures of the day to the
 releases of the shared cards repository
 [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
 (`water-<YYYY-MM>`, one per month the cards were seen in, deleted once it
-is more than twelve months old and the manifest no longer points into it;
+is more than thirty-six months old and the manifest no longer points into it;
 the electricity and gas integrations' releases live beside them as
 `electricity-<YYYY-MM>` and `gas-<YYYY-MM>`). It then rewrites the index
 and the per-utility sheets so each month links to a file that exists,
