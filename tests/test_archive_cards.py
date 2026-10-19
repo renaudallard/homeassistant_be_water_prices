@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import shutil
+import subprocess
 import sys
 from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, date, datetime
@@ -1057,12 +1058,14 @@ def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> Non
     assert git("show", "main:water/coverage/farys.md", cwd=origin) == "# Farys\n"
 
 
-def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> None:
-    """The store step deletes a water release more than twelve months old
-    only when no manifest entry points into it, matching the tag whole so
-    one month's overflow release is judged on its own."""
+def _keep_step(
+    tmp_path: Path, manifest: dict[str, str], cards: dict[str, bytes], gh: str, today: str
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    """Run the workflow's "Keep the cards themselves" step in a scratch
+    checkout: ``manifest`` as the branch's pdfs.json, ``cards`` written
+    under tmp/pdfs, ``gh`` the body of a case over the stub's first two
+    arguments, and ``today`` what the stub date prints."""
     import os
-    import subprocess
 
     import yaml  # type: ignore[import-untyped]
 
@@ -1087,34 +1090,18 @@ def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> 
 
     work = tmp_path / "work"
     (work / "tmp" / "archive").mkdir(parents=True)
-    (work / "tmp" / "archive" / "pdfs.json").write_text(
-        json.dumps(
-            {
-                "a": "water-2026-09/a.pdf",
-                "b": "water-2026-08-2/b.pdf",
-                "c": "water-2026-10/c.pdf",
-            }
-        )
-    )
+    (work / "tmp" / "archive" / "pdfs.json").write_text(json.dumps(manifest))
+    for rel, payload in cards.items():
+        path = work / "tmp" / "pdfs" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
 
     stubs = tmp_path / "bin"
     stubs.mkdir()
-    deleted = tmp_path / "deleted.txt"
-    tags = (
-        "water-2026-10 water-2026-09 water-2026-09-2 water-2026-08 water-2026-08-2"
-        " water-2026-07 electricity-2020-01"
-    )
-    (stubs / "gh").write_text(
-        "#!/bin/sh\n"
-        'case "$1 $2" in\n'
-        f'"release list") printf "%s\\n" {tags} ;;\n'
-        f'"release delete") echo "$3" >> {deleted} ;;\n'
-        "esac\n"
-    )
-    # Run on 2027-10-01: the cutoff is water-2026-10.
+    (stubs / "gh").write_text(f'#!/bin/sh\ncase "$1 $2" in\n{gh}esac\n')
     real_date = shutil.which("date")
     (stubs / "date").write_text(
-        f'#!/bin/sh\ncase "$*" in *-d*) exec {real_date} "$@" ;; esac\necho 2027-10-01\n'
+        f'#!/bin/sh\ncase "$*" in *-d*) exec {real_date} "$@" ;; esac\necho {today}\n'
     )
     for stub in stubs.iterdir():
         stub.chmod(0o755)
@@ -1143,5 +1130,212 @@ def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> 
         capture_output=True,
         text=True,
     )
+    return done, work
+
+
+def test_a_release_is_kept_while_the_manifest_points_into_it(tmp_path: Path) -> None:
+    """The store step deletes a water release more than twelve months old
+    only when no manifest entry points into it, matching the tag whole so
+    one month's overflow release is judged on its own."""
+    deleted = tmp_path / "deleted.txt"
+    tags = (
+        "water-2026-10 water-2026-09 water-2026-09-2 water-2026-08 water-2026-08-2"
+        " water-2026-07 electricity-2020-01"
+    )
+    manifest = {
+        "a": "water-2026-09/a.pdf",
+        "b": "water-2026-08-2/b.pdf",
+        "c": "water-2026-10/c.pdf",
+    }
+    gh = f'"release list") printf "%s\\n" {tags} ;;\n"release delete") echo "$3" >> {deleted} ;;\n'
+    # Run on 2027-10-01: the cutoff is water-2026-10.
+    done, _work = _keep_step(tmp_path, manifest, {}, gh, "2027-10-01")
     assert done.returncode == 0, done.stderr
     assert deleted.read_text().split() == ["water-2026-09-2", "water-2026-08", "water-2026-07"]
+
+
+def test_a_card_picture_is_uploaded_and_recorded_like_a_pdf(tmp_path: Path) -> None:
+    """The upload took *.pdf only, and named the manifest entry by cutting
+    .pdf off the file name; a picture is a card too."""
+    uploaded = tmp_path / "uploaded.txt"
+    digest = "f" * 64
+    gh = (
+        '"release view") exit 1 ;;\n'
+        f'"release upload") echo "$3 $4" >> {uploaded} ;;\n'
+        '"release list") ;;\n'
+    )
+    cards = {f"water-2026-10/{digest}.jpg": b"\xff\xd8\xff"}
+    done, work = _keep_step(tmp_path, {}, cards, gh, "2026-10-19")
+    assert done.returncode == 0, done.stderr
+    assert uploaded.read_text().split() == ["water-2026-10", f"tmp/pdfs/water-2026-10/{digest}.jpg"]
+    manifest = json.loads((work / "tmp" / "archive" / "pdfs.json").read_text())
+    assert manifest == {digest: f"water-2026-10/{digest}.jpg"}
+
+
+PICTURE_URL = "https://acme.test/tarif.jpg"
+JPEG_V1 = b"\xff\xd8\xff card v1"
+
+
+def _picture_fetch(session: _Session) -> Fetch:
+    """A fetch that reads its card through the picture reader, as AIEC does,
+    and refuses a reading that says so."""
+
+    async def fetch(_session: Any) -> WaterTariff:
+        reader = session if PICTURE_URL in session.pages else _session
+
+        async def unread() -> str | None:
+            return None
+
+        text = await _pdf.fetch_picture_text(reader, PICTURE_URL, unread)
+        if text is None:
+            return _tariff(fee=1.0)
+        if "refuse" in text:
+            _pdf.note_unread_picture(f"{PICTURE_URL}: refused")
+            return _tariff(fee=1.0)
+        return _tariff(fee=100.0 if "v1" in text else 200.0)
+
+    return fetch
+
+
+@pytest.fixture
+def ocr(monkeypatch: pytest.MonkeyPatch) -> list[bytes]:
+    """Tesseract, as far as the archiver can tell: installed, at one
+    version, reading what it is given back as text and counting it."""
+    read: list[bytes] = []
+
+    def picture(payload: bytes) -> str:
+        read.append(payload)
+        return f"read {payload[3:].decode()}"
+
+    monkeypatch.setattr(card_texts, "ocr_picture", picture)
+    monkeypatch.setattr(card_texts, "ocr_available", lambda: True)
+    monkeypatch.setattr(ac, "ocr_available", lambda: True)
+    _tesseract(monkeypatch, "tesseract==5 -l fra --psm 6 prep=a")
+    return read
+
+
+def _tesseract(monkeypatch: pytest.MonkeyPatch, line: str) -> None:
+    """Install a Tesseract that reads ``line``."""
+    monkeypatch.setattr(card_texts, "ocr_line", lambda: line)
+    monkeypatch.setattr(ac, "ocr_line", lambda: line)
+
+
+async def test_a_picture_is_read_once_kept_and_marked(tmp_path: Path, ocr: list[bytes]) -> None:
+    """The first run reads the picture, keeps its bytes as a .jpg for the
+    release and marks the source with the engine that read it; a later run
+    with the same bytes is served the stored text and reads nothing."""
+    out, pdfs = tmp_path / "out", tmp_path / "pdfs"
+    session = _Session({PICTURE_URL: JPEG_V1})
+    extractor = _extractor(_picture_fetch(session))
+    summary = await ac.archive(out, extractors=[extractor], pdf_dir=pdfs, now=NOW, sleep=_no_sleep)
+    digest = hashlib.sha256(JPEG_V1).hexdigest()
+    assert (summary.rendered, summary.pdfs_saved, summary.unread_pictures) == (1, 1, [])
+    assert (pdfs / f"water-2026-09/{digest}.jpg").read_bytes() == JPEG_V1
+    card = _row(out)
+    [source] = card["_sources"]
+    assert source == {
+        "url": PICTURE_URL,
+        "variant": "ocr",
+        "picture": digest,
+        "ocr": "tesseract==5 -l fra --psm 6 prep=a",
+        "text": source["text"],
+    }
+    assert (out / source["text"]).read_text() == "read  card v1"
+    assert card["yearly_fixed_fee"] == 100.0
+
+    summary = await ac.archive(
+        out, extractors=[extractor], pdf_dir=pdfs, now=NOW.replace(day=13), sleep=_no_sleep
+    )
+    assert (summary.rendered, summary.unrendered, summary.unchanged) == (0, 1, 1)
+    assert ocr == [JPEG_V1]
+
+
+async def test_a_tesseract_upgrade_reads_every_picture_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ocr: list[bytes]
+) -> None:
+    """A new Tesseract and nothing else: the replay reads each kept picture
+    again from its copy, the row names the new engine, and the next run
+    replays nothing."""
+    out, pdfs = tmp_path / "out", tmp_path / "pdfs"
+    session = _Session({PICTURE_URL: JPEG_V1})
+    await ac.archive(
+        out,
+        extractors=[_extractor(_picture_fetch(session))],
+        pdf_dir=pdfs,
+        now=NOW.replace(day=5),
+        sleep=_no_sleep,
+    )
+    session.pages.clear()
+    _tesseract(monkeypatch, "tesseract==6 -l fra --psm 6 prep=a")
+    for day, replayed in ((6, 1), (7, 0)):
+        summary = await ac.archive(
+            out,
+            extractors=[_extractor(_picture_fetch(session))],
+            pdf_dir=pdfs,
+            now=NOW.replace(day=day),
+            sleep=_no_sleep,
+        )
+        assert (summary.replayed, summary.unreplayable, len(ocr)) == (replayed, [], 2)
+    row = _row(out)
+    assert [s["ocr"] for s in row["_sources"]] == ["tesseract==6 -l fra --psm 6 prep=a"]
+    assert row["yearly_fixed_fee"] == 100.0
+
+
+async def test_without_tesseract_a_picture_is_left_to_the_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A walk on a machine without Tesseract reads no picture: the provider
+    is handed the archive's reading, as an installation is."""
+    monkeypatch.setattr(ac, "ocr_available", lambda: False)
+    session = _Session({PICTURE_URL: JPEG_V1})
+    out = tmp_path / "out"
+    await ac.archive(
+        out, extractors=[_extractor(_picture_fetch(session))], now=NOW, sleep=_no_sleep
+    )
+    assert session.hits == 0
+    assert _row(out)["yearly_fixed_fee"] == 1.0
+
+
+def test_a_refused_picture_is_listed_for_an_issue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ocr: list[bytes]
+) -> None:
+    """What the provider refused reaches the summary, and main writes it to
+    the file the workflow files an issue from."""
+    session = _Session({PICTURE_URL: b"\xff\xd8\xff refuse me"})
+    failures = tmp_path / "ocr_failures.txt"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["archive_cards.py", "--out", str(tmp_path / "out"), "--ocr-failures", str(failures)],
+    )
+    monkeypatch.setattr(ac, "all_extractors", lambda: (_extractor(_picture_fetch(session)),))
+    assert ac.main() == 0
+    assert failures.read_text() == f"{PICTURE_URL}: refused\n"
+
+
+def test_the_coverage_table_links_a_picture_as_a_picture(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    digest = "d" * 64
+    row = {"_seen_on": "2026-09-12", "_sources": [{"picture": digest, "text": "texts/x.txt"}]}
+    (out / "aiec" / "default").mkdir(parents=True)
+    (out / "aiec" / "default" / "2026-09.json").write_text(json.dumps(row))
+    ac._write_coverage(out, "https://cards.test", "https://branch.test")
+    assert "| card " not in (out / "coverage" / "aiec.md").read_text()
+    assert "| picture [json]" in (out / "coverage" / "aiec.md").read_text()
+    (out / "pdfs.json").write_text(json.dumps({digest: f"water-2026-09/{digest}.jpg"}))
+    ac._write_coverage(out, "https://cards.test", "https://branch.test")
+    sheet = (out / "coverage" / "aiec.md").read_text()
+    assert f"[picture](https://cards.test/water-2026-09/{digest}.jpg)" in sheet
+
+
+def test_prune_keeps_a_picture_a_remaining_month_still_names(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    digest = "e" * 64
+    (out / "texts").mkdir(parents=True)
+    (out / "texts" / "x.txt").write_text("read")
+    row = {"_seen_on": "2026-09-12", "_sources": [{"picture": digest, "text": "texts/x.txt"}]}
+    (out / "aiec" / "default").mkdir(parents=True)
+    (out / "aiec" / "default" / "2026-09.json").write_text(json.dumps(row))
+    (out / "pdfs.json").write_text(json.dumps({digest: f"water-2024-01/{digest}.jpg"}))
+    ac._prune(out, 12, date(2026, 9, 12))
+    assert json.loads((out / "pdfs.json").read_text()) == {digest: f"water-2024-01/{digest}.jpg"}

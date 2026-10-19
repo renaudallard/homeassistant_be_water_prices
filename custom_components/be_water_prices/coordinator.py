@@ -90,6 +90,7 @@ from .const import (
 from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, TransientFetchError, WaterTariff, get
 from .providers._archive import ARCHIVE_MONTHS_BACK as _ARCHIVE_MONTHS_BACK
+from .providers._archive import archive_reads
 from .providers._archive import archived_row as _archived_row
 from .providers._postcodes import resolve_candidates
 from .providers.base import (
@@ -1131,17 +1132,21 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         commune = self._fetched_commune()
         budget = asyncio.timeout(FETCH_BUDGET_S)
         failure: Exception | None = None
+        # An extractor whose card is a picture reads the archive's reading
+        # of it, which the card_archive option switches off with the rest.
+        archive = self.entry.options.get(CONF_CARD_ARCHIVE, DEFAULT_CARD_ARCHIVE)
         try:
             async with budget:
-                if commune is not None and self._extractor.fetch_for_commune is not None:
-                    tariff = await self._extractor.fetch_for_commune(session, commune)
-                    tariff = relabel_with_human_commune(
-                        tariff,
-                        commune_id=commune,
-                        commune_label=self.entry.options.get(CONF_COMMUNE_LABEL),
-                    )
-                else:
-                    tariff = await self._extractor.fetch(session)
+                with archive_reads(archive):
+                    if commune is not None and self._extractor.fetch_for_commune is not None:
+                        tariff = await self._extractor.fetch_for_commune(session, commune)
+                        tariff = relabel_with_human_commune(
+                            tariff,
+                            commune_id=commune,
+                            commune_label=self.entry.options.get(CONF_COMMUNE_LABEL),
+                        )
+                    else:
+                        tariff = await self._extractor.fetch(session)
         except Exception as err:
             # Catch broader than ExtractorError so a future extractor
             # that forgets to wrap (asyncio.TimeoutError, ssl.SSLError,

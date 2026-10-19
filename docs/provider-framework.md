@@ -165,12 +165,24 @@ The module is a vendored subset of the electricity integration's reader.
   exception, so no page text and no pdfminer warnings reach Home
   Assistant. A timeout, a signal, a non-zero exit or an empty text layer
   is an `ExtractorError`.
+- `fetch_picture_text(session, url, archived)` returns the text of a card
+  published as a picture (AIEC's). A text already in the memo is served as
+  it is; with a picture reader installed (`read_pictures_through(reader)`,
+  which the card archiver does where Tesseract is installed) the picture
+  is downloaded under the guards above (30 s, the size cap, the redirect
+  guard, a JPEG or PNG signature) and handed to `reader(url, payload)`, a
+  reader failure becoming an `ExtractorError`; without one, which is
+  always the case in Home Assistant, `archived()` gives the archive's
+  reading or None. `reads_pictures()` says whether a reader is installed,
+  and `note_unread_picture(message)` reports a refused reading to whoever
+  installed `collect_unread_pictures(store)`.
 - `memoise_text_fetches(store)`: inside the block, a page read twice is
-  served from `store`, keyed by URL, and a rendered PDF by
-  `"layout\0<url>"`. A provider that asks one endpoint for several answers
-  puts what it asked for in the key through `memoised_text` (De Watergroep
-  adds `#dwg_l=<commune>`, Farys `#municipality=<id>`). The card archiver
-  and the live check install it; Home Assistant never does.
+  served from `store`, keyed by URL, a rendered PDF by `"layout\0<url>"`
+  and a picture's text by `"ocr\0<url>"`. A provider that asks one
+  endpoint for several answers puts what it asked for in the key through
+  `memoised_text` (De Watergroep adds `#dwg_l=<commune>`, Farys
+  `#municipality=<id>`). The card archiver and the live check install it;
+  Home Assistant never does.
 - `render_through(hook)`: inside the block, every PDF render is handed to
   `hook(variant, url, payload, render)`, which the archiver and both checks
   use to skip rendering a card whose bytes they already hold.
@@ -190,7 +202,14 @@ The module is a vendored subset of the electricity integration's reader.
 archive branch (see [data-sources.md](data-sources.md#the-card-archive)),
 raising `TransientFetchError` when the archive could not be asked and
 returning None for a month it does not hold or a body that is not a row.
-`ARCHIVE_MONTHS_BACK` (12) is how far back a read walks.
+`archived_picture_text(session, utility, url, today)` gives the text the
+archive's OCR read off the picture at `url`: the newest row of the
+utility's default card, walking back up to `ARCHIVE_MONTHS_BACK` (12)
+months, and the text of its `ocr` source of that URL, fetched only from
+`texts/<sha256>.txt` and only kept when its SHA-256 is its name.
+`archive_reads(enabled)` states the entry's `card_archive` option for a
+block; the coordinator wraps every fetch in it, and with it off the
+picture's text is never asked for.
 
 ### `_card_figures.py`: the tariff a card's figures agree on
 
@@ -202,7 +221,8 @@ decimals, and raises `ExtractorError` naming the missing figures
 otherwise. It looks for no label and no position, so it reads any layout
 that prints those figures. The texts it is tested on are what Tesseract
 5.5 read off AIEC's pictures of June 2021, January 2023, January 2026 and
-April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`).
+April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`). See
+[providers/aiec.md](providers/aiec.md#the-check).
 
 ### `_html.py`: HTML
 

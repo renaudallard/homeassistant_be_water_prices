@@ -48,13 +48,16 @@ if str(ROOT) not in sys.path:
 @pytest.fixture(autouse=True)
 def _card_archive_holds_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the suite off GitHub: a failing refresh with nothing fresh to
-    serve asks the project's card archive, and only the tests of that path
-    answer it."""
+    serve asks the project's card archive, and so does AIEC for its
+    picture's reading; only the tests of those paths answer it."""
 
     async def nothing(*_args: object) -> None:
         return None
 
     monkeypatch.setattr("custom_components.be_water_prices.coordinator._archived_row", nothing)
+    monkeypatch.setattr(
+        "custom_components.be_water_prices.providers._archive.archived_row", nothing
+    )
 
 
 @pytest.fixture(autouse=True)

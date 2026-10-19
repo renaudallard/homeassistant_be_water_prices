@@ -623,15 +623,15 @@ def test_aiec_parses_its_operator_page_off_the_event_loop() -> None:
     from custom_components.be_water_prices.providers import aiec
 
     threads: list[threading.Thread] = []
-    real = aiec.published_card_date
+    real = aiec.published_card
 
-    def recording(html: str) -> date | None:
+    def recording(html: str) -> aiec.Picture | None:
         threads.append(threading.current_thread())
         return real(html)
 
     page = fixture_html("aiec_operator_2026.html")
     with (
-        patch.object(aiec, "published_card_date", new=recording),
+        patch.object(aiec, "published_card", new=recording),
         patch.object(aiec, "fetch_html", new=AsyncMock(return_value=page)),
     ):
         got = asyncio.run(aiec.fetch(session=None))  # type: ignore[arg-type]

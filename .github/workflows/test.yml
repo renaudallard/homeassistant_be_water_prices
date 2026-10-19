@@ -45,6 +45,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+      - name: Install Tesseract
+        # The card archive reads AIEC's card picture with it, and the suite
+        # holds the engine Ubuntu ships to AIEC's last two pictures, so an
+        # upgrade that reads worse fails here before a walk relies on it.
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-fra
       - name: Lint
         run: |
           ruff check .

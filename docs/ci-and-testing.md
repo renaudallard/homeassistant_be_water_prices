@@ -45,9 +45,10 @@ paths with partial stubs and wrong inputs.
 
 `tests/conftest.py` sets up three autouse fixtures:
 
-- `_card_archive_holds_nothing` replaces `coordinator._archived_row`, so
-  a failing refresh never asks GitHub for the card archive; only the tests
-  of that path answer it.
+- `_card_archive_holds_nothing` replaces `coordinator._archived_row` and
+  `providers._archive.archived_row`, so neither a failing refresh nor AIEC
+  asking for its picture's reading reaches GitHub; only the tests of those
+  paths answer it.
 - `auto_enable_custom_integrations` loads the custom integration for every
   test. It pulls `hass` in for the pure parser tests too, which is what
   sets up their event loop.
@@ -82,6 +83,9 @@ On every push to main, on pull requests, by hand, and called by
 - `test` runs ruff, both mypy runs and pytest on Python 3.13 and 3.14.
   3.13 is the oldest Python the floor release of Home Assistant accepts;
   3.14 is what a current Debian or Raspberry Pi OS gives a local checkout.
+  It installs Tesseract and its French data from apt, so the suite holds
+  the engine the archive runs to AIEC's last two pictures
+  (`tests/test_aiec_picture.py`); the job below skips that test.
 - `test-current-ha` runs the type check and the suite against a recent
   Home Assistant, pinned as a matching pair (`HA_VERSION` 2026.9.4 with
   `HARNESS_VERSION` 0.13.367) since the harness pins one exact release.
@@ -203,15 +207,17 @@ branch): a PDF whose bytes the archive already holds is downloaded and
 parsed as before, but its text is taken from the branch instead of being
 rendered again, and the report ends with how many were served that way.
 
-The readers in `providers/_pdf.py` carry two seams for scripts that walk
-every utility in one go, both off in Home Assistant itself: a text memo
-(`memoise_text_fetches`) that serves a page or a rendered PDF read twice
-in one walk from memory, and a render hook (`render_through`) that is
-handed the bytes of every downloaded PDF before it is rendered, so a
-caller can skip the render of a card it has already seen or keep the
-bytes. A provider that obtains a PDF some other way than through
-`fetch_pdf_text_layout` renders it with `render_pdf`, so the hook still
-sees it.
+The readers in `providers/_pdf.py` carry three seams for scripts that
+walk every utility in one go, all off in Home Assistant itself: a text
+memo (`memoise_text_fetches`) that serves a page, a rendered PDF or a
+picture's text read twice in one walk from memory, a render hook
+(`render_through`) that is handed the bytes of every downloaded PDF before
+it is rendered, so a caller can skip the render of a card it has already
+seen or keep the bytes, and a picture reader (`read_pictures_through`)
+that is handed a card picture's bytes and returns its text, which the
+archiver installs where Tesseract is. A provider that obtains a PDF some
+other way than through `fetch_pdf_text_layout` renders it with
+`render_pdf`, so the hook still sees it.
 
 ## The card archive
 
@@ -231,6 +237,11 @@ pdfplumber release and render code that read it, and its text is served
 again only to the same, so after a reader upgrade or a render fix every
 kept PDF is rendered afresh, in the walk, the replay, the live check and
 the drift check (`--rerender` forces it, `--reparse` forces the replay).
+A card picture (AIEC's) names the Tesseract that read it the same way, and
+a Tesseract upgrade reads the kept pictures again. The readings a provider
+refused, and a reading of AIEC's transcribed card that disagrees with the
+transcription, are listed in the summary and, with `--ocr-failures FILE`,
+written there one per line.
 `--index-only` rewrites `coverage.md` and the per-utility sheets under
 `coverage/` without fetching anything.
 
@@ -239,8 +250,10 @@ the `archive` branch. It walks the communes of the per-commune utilities
 on Sundays and the sixteen default rows only on the other days (the
 tariffs are annual, and De Watergroep alone lists about seven hundred
 communes); a manual run walks them unless its `communes` input is
-unticked, and `--defaults-only` is the local equivalent. It uploads the
-PDFs of the day to the releases of the shared cards repository
+unticked, and `--defaults-only` is the local equivalent. It installs
+Tesseract and its French data from apt for AIEC's picture, and only this
+workflow does. It uploads the PDFs and card pictures of the day to the
+releases of the shared cards repository
 [`be_price_cards`](https://github.com/renaudallard/be_price_cards)
 (`water-<YYYY-MM>`, one per month the cards were seen in, deleted once it
 is more than twelve months old and the manifest no longer points into it;
@@ -262,14 +275,17 @@ needs a fine-grained token with contents read and write on the cards
 repository in the `BE_WATER_CARDS` secret; without it the branch still
 gets the parsed cards and their texts and the step says so. An upload or
 a listings push that fails, an expired token among them, does not hold
-the branch back either: the PDFs it missed are offered again by the next
+the branch back either: the cards it missed are offered again by the next
 run.
 
 A run that stores nothing, a refused push or an expired token files an
 issue labelled `archive-cards`, one per problem with a comment per
 further failing run. The token's expiry is announced two weeks ahead the
 same way, under a label of its own, `archive-cards-token`, so the warning
-never lands in an open failure thread.
+never lands in an open failure thread. A card picture whose reading was
+refused, or disagrees with a transcription, is filed under
+`archive-cards-ocr`, fingerprinted on the list of refusals, so the same
+pictures failing again within the week add nothing.
 
 ### Finding a stored card by hand
 

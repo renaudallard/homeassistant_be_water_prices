@@ -28,7 +28,8 @@
 Vendored subset of the sibling ``be_electricity_prices`` integration's
 ``providers/_pdf.py``: keeps only what water extractors need (sign /
 formula parsing, hourly month resolution, layout-aligned PDF reading
-are electricity-only).
+are electricity-only). A card published as a picture is fetched here too,
+through the same guards, though only the card archiver ever reads one.
 """
 
 from __future__ import annotations
@@ -591,11 +592,11 @@ def memoise_text_fetches(store: dict[str, str]) -> Iterator[None]:
 
 async def memoised_text(key: str, fetch: Callable[[], Awaitable[str]]) -> str:
     """``fetch`` once per ``key`` inside memoise_text_fetches, every time
-    outside it. The key is the URL for a page and ``layout\0<url>`` for a
-    rendered PDF; a provider that asks one endpoint for several answers (a
-    commune in a cookie, or in a form field) puts what it asked for in the
-    key, since the URL alone would serve the first commune's answer to
-    every other."""
+    outside it. The key is the URL for a page, ``layout\0<url>`` for a
+    rendered PDF and ``ocr\0<url>`` for a picture read; a provider that
+    asks one endpoint for several answers (a commune in a cookie, or in a
+    form field) puts what it asked for in the key, since the URL alone
+    would serve the first commune's answer to every other."""
     memo = _TEXT_MEMO.get()
     if memo is not None and key in memo:
         return memo[key]
@@ -660,6 +661,98 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
         return await render_pdf("layout", url, payload, extract_pdf_text_layout)
 
     return await memoised_text(f"layout\0{url}", read)
+
+
+# A card some utility publishes only as a picture. Nothing in Home Assistant
+# decodes one: the card archiver reads it with an OCR engine and keeps the
+# text, and an installation reads that text back from the archive. The
+# reader is installed by the archiver and the scripts that walk with it;
+# None, the default everywhere in Home Assistant, means ask the archive.
+PictureReader = Callable[[str, bytes], Awaitable[str]]
+_PICTURE_READER: ContextVar[PictureReader | None] = ContextVar("_PICTURE_READER", default=None)
+# Pictures read and refused inside a walk, for the archiver to report.
+_UNREAD_PICTURES: ContextVar[list[str] | None] = ContextVar("_UNREAD_PICTURES", default=None)
+# What a JPEG and a PNG start with; anything else is not the card.
+_PICTURE_SIGNATURES = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n")
+
+
+@contextmanager
+def read_pictures_through(reader: PictureReader) -> Iterator[None]:
+    """Route every picture inside this block through ``reader``."""
+    token = _PICTURE_READER.set(reader)
+    try:
+        yield
+    finally:
+        _PICTURE_READER.reset(token)
+
+
+def reads_pictures() -> bool:
+    """Whether a picture reader is installed here."""
+    return _PICTURE_READER.get() is not None
+
+
+@contextmanager
+def collect_unread_pictures(store: list[str]) -> Iterator[None]:
+    """Collect into ``store`` what :func:`note_unread_picture` reports here."""
+    token = _UNREAD_PICTURES.set(store)
+    try:
+        yield
+    finally:
+        _UNREAD_PICTURES.reset(token)
+
+
+def note_unread_picture(message: str) -> None:
+    """Report a picture whose reading was refused, when someone collects."""
+    store = _UNREAD_PICTURES.get()
+    if store is not None:
+        store.append(message)
+
+
+async def fetch_picture_text(
+    session: aiohttp.ClientSession,
+    url: str,
+    archived: Callable[[], Awaitable[str | None]],
+) -> str | None:
+    """The text of the card pictured at ``url``.
+
+    A text already read in this walk, or seeded by a replay, is served as
+    it is. With a picture reader installed the picture is downloaded and
+    handed to it; without one, ``archived`` gives the archive's reading,
+    or None when the archive has none.
+    """
+    key = f"ocr\0{url}"
+    memo = _TEXT_MEMO.get()
+    if memo is not None and key in memo:
+        return memo[key]
+    reader = _PICTURE_READER.get()
+    if reader is None:
+        return await archived()
+    installed = reader
+
+    async def read() -> str:
+        try:
+            async with session.get(
+                url,
+                headers={"User-Agent": USER_AGENT},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if not 200 <= resp.status < 300:
+                    raise _http_error(url, resp.status)
+                _guard_redirect(url, resp)
+                content_type = resp.content_type
+                payload = await _read_capped(resp, url)
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err
+        if not payload.startswith(_PICTURE_SIGNATURES):
+            raise ExtractorError(f"the answer from {url} ({content_type}) is not a JPEG or a PNG")
+        try:
+            return await installed(url, payload)
+        except ExtractorError:
+            raise
+        except Exception as err:  # an OCR engine fails in ways of its own
+            raise ExtractorError(f"could not read the picture at {url}: {error_text(err)}") from err
+
+    return await memoised_text(key, read)
 
 
 async def fetch_text(

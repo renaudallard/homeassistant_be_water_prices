@@ -4376,6 +4376,26 @@ async def test_a_failing_refresh_folds_the_year_once(
 
 
 @pytest.mark.asyncio
+async def test_a_fetch_sees_the_archive_switched_off_with_the_option(
+    hass: HomeAssistant,
+) -> None:
+    """AIEC reads its picture's text from the archive inside the fetch, so
+    the card_archive option has to reach the fetch too, not only the
+    failed-refresh path."""
+    from custom_components.be_water_prices.const import CONF_CARD_ARCHIVE
+    from custom_components.be_water_prices.providers import _archive
+
+    seen: list[bool] = []
+
+    async def fetch(_session: Any) -> WaterTariff:
+        seen.append(_archive._ARCHIVE_READS.get())
+        return _fresh_tariff()
+
+    await _setup_entry(hass, fetch, options={CONF_CARD_ARCHIVE: False})
+    assert seen == [False]
+
+
+@pytest.mark.asyncio
 async def test_the_archive_is_not_asked_when_switched_off(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:

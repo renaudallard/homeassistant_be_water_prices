@@ -64,8 +64,8 @@ registry.
 | --- | --- |
 | `__init__.py` | The registry: `_MODULE_NAMES`, built lazily (`async_load` off the event loop) |
 | `base.py` | `WaterExtractor`, `WaterTariff`, `CommuneOption`, the errors, `belgian_today`, `carry_prior_year_card` |
-| `_html.py`, `_pdf.py` | Fetching and reading pages and PDFs, with their guards |
-| `_archive.py` | Reading a row of the card archive |
+| `_html.py`, `_pdf.py` | Fetching and reading pages, PDFs and card pictures, with their guards |
+| `_archive.py` | Reading the card archive: a stored row, and the text its OCR read off a picture |
 | `_card_figures.py` | The one CWaPE tariff a card's printed figures agree on |
 | `_flanders.py` | The Flemish integrale waterprijs builder |
 | `_walloon_simple.py` | The Walloon CWaPE builder, the CVD scan and the SPGE figures |
@@ -82,8 +82,10 @@ the card archiver and the postcode map refresher, and `tests/` the suite
 ## Design rules
 
 - **No price in the source.** Every per-utility rate is read from the
-  utility's publication on each fetch, bar AIEC's, whose card is a picture
-  transcribed against the date its file name carries
+  utility's publication on each fetch. AIEC's card is a picture: the card
+  archive reads it with Tesseract, and the integration takes the reading
+  only once its own check finds one tariff every derived figure agrees
+  with; the one transcribed card stands before it
   ([providers/aiec.md](providers/aiec.md)). What is uniform by decree,
   the Flemish vastrecht and korting and the Walloon CVA and FSE, is read
   off each card too, and so is the VAT rate.

@@ -21,7 +21,7 @@ is, how each figure is read, its communes and its quirks.
 
 ## A note on prices
 
-No utility price is typed into the source, bar AIEC's transcribed card, and
+No utility price is typed into the source, bar AIEC's one transcribed card, and
 these pages follow the same rule: any figure quoted is a regulated one the
 code carries, or one read off a real publication in the test fixtures, and
 says so.

@@ -27,13 +27,23 @@
 
 The ``archive`` branch holds one row per utility, commune and month, and
 the texts each row was parsed from (see ``scripts/archive_cards.py``). The
-coordinator reads a row when a refresh fails with nothing to serve.
+coordinator reads a row when a refresh fails with nothing to serve; an
+extractor whose card is a picture reads the text the archive's OCR made of
+it, since nothing in Home Assistant decodes a picture.
+
+Both obey the entry's ``card_archive`` option, which the coordinator
+states for the duration of a fetch with :func:`archive_reads`.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
-from datetime import date
+import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from datetime import date, timedelta
 from typing import Any
 from urllib.parse import quote
 
@@ -53,6 +63,21 @@ from .base import ExtractorError, TransientFetchError
 # extractor already stands on in January, and the staleness clock still
 # runs from the day it was captured.
 ARCHIVE_MONTHS_BACK = 12
+# A text is stored under the SHA-256 of its own bytes, which is what makes
+# it checkable: anything else in a row's ``text`` is not followed.
+_TEXT_PATH_RE = re.compile(r"texts/([0-9a-f]{64})\.txt")
+
+_ARCHIVE_READS: ContextVar[bool] = ContextVar("_ARCHIVE_READS", default=True)
+
+
+@contextmanager
+def archive_reads(enabled: bool) -> Iterator[None]:
+    """Allow or forbid reading the archive inside this block."""
+    token = _ARCHIVE_READS.set(enabled)
+    try:
+        yield
+    finally:
+        _ARCHIVE_READS.reset(token)
 
 
 async def archived_row(
@@ -76,3 +101,58 @@ async def archived_row(
     except ValueError:
         return None
     return row if isinstance(row, dict) else None
+
+
+async def _archived_text(session: aiohttp.ClientSession, path: str) -> str | None:
+    """A stored text, or None when it is missing or not what its name says."""
+    match = _TEXT_PATH_RE.fullmatch(path)
+    if match is None:
+        return None
+    try:
+        text = await fetch_text(session, f"{CARD_ARCHIVE_URL}/{path}")
+    except TransientFetchError:
+        raise
+    except ExtractorError:
+        return None
+    if hashlib.sha256(text.encode("utf-8")).hexdigest() != match.group(1):
+        return None
+    return text
+
+
+async def archived_picture_text(
+    session: aiohttp.ClientSession, utility: str, url: str, today: date
+) -> str | None:
+    """What the archive's OCR read off the picture at ``url``.
+
+    The newest row of the utility's default card, this month's first, then
+    back a month at a time until one is found. That row names the picture
+    it read when the archive has read the one the page shows now; a row
+    that names another picture, or none, means it has not, and an older
+    row cannot have either. None with ``card_archive`` off.
+
+    Raises :class:`TransientFetchError` when the archive could not be asked.
+    """
+    if not _ARCHIVE_READS.get():
+        return None
+    month = today
+    for _ in range(ARCHIVE_MONTHS_BACK):
+        row = await archived_row(session, utility, "default", month)
+        if row is not None:
+            break
+        # The first of the month, a day back: the last day of the one
+        # before, whatever its length.
+        month = month.replace(day=1) - timedelta(days=1)
+    else:
+        return None
+    sources = row.get("_sources")
+    if not isinstance(sources, list):
+        return None
+    for source in sources:
+        if (
+            isinstance(source, dict)
+            and source.get("variant") == "ocr"
+            and source.get("url") == url
+            and isinstance(source.get("text"), str)
+        ):
+            return await _archived_text(session, source["text"])
+    return None

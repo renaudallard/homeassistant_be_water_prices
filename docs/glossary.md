@@ -8,7 +8,7 @@
 | Basisvolume (basisverbruik) | The Flemish first block: 30 m³ a year for the dwelling plus 30 m³ per registered resident, uncapped, billed at the basistarief (`basis_volume` in `pricing.py`). |
 | Basistarief | The Flemish rate per m³ inside the basisvolume (`basis_eur_per_m3` for the drinkwater leg). |
 | Brugel | The Brussels regulator, which approves VIVAQUA's multi-year tariff. |
-| Callmepower | The aggregator site callmepower.be, which lists Walloon distributors' prices. CIESAC is read from it, and AIEC falls back to it when its own card has not been transcribed. |
+| Callmepower | The aggregator site callmepower.be, which lists Walloon distributors' prices. CIESAC is read from it, and AIEC falls back to it when its own card has been neither transcribed nor read. |
 | Card, tariff card | One utility's published tariff for a year: a page, a PDF or, for AIEC, a picture. Parsed into a `WaterTariff`. |
 | Comforttarief | The Flemish rate above the basisvolume, twice the basistarief on every leg (`comfort_eur_per_m3` for the drinkwater). |
 | Comfortvolume (comfortverbruik) | What a household draws above its basisvolume, billed at the comforttarief (`consumed_comfort` in `pricing.py`). |

@@ -93,6 +93,10 @@ dated 06:00 UTC on its `_seen_on` day, never later than now, so a row
 written this morning is not a snapshot from the future. Where the rows
 come from is in [data-sources.md](data-sources.md).
 
+Every fetch runs inside `archive_reads` (`providers/_archive.py`) with the
+same option, so an extractor that reads the archive itself, AIEC for the
+text the archive read off its picture, is switched off with the rest.
+
 ## Staleness
 
 `_is_stale` is true when the fetch time is in the future, when the card is

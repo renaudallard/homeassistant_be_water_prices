@@ -63,6 +63,11 @@ jobs:
           # proved, plus freezegun, which pins the clock to a row's capture
           # day while a stored month is replayed through the current parser.
           pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 freezegun
+          # Tesseract and its French data read AIEC's card, which is only
+          # ever a picture. Installed here alone: no installation decodes a
+          # picture, it reads the text this run stores.
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-fra
 
       - name: Check out the archive branch
         # The archive lives on its own branch so three years of daily
@@ -93,6 +98,7 @@ jobs:
             communes='--defaults-only'
           fi
           python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs \
+            --ocr-failures tmp/ocr_failures.txt \
             --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download" \
             --archive-base-url "${{ github.server_url }}/${{ github.repository }}/blob/archive" \
             $communes \
@@ -101,12 +107,13 @@ jobs:
 
       - name: Keep the cards themselves
         id: keep
-        # The PDFs go to the releases of be_price_cards, a repository shared
-        # with the electricity and gas integrations: this integration's
-        # releases are named water-<YYYY-MM> after the month the cards were
-        # seen in, the files by their SHA-256. Few water utilities publish a
-        # PDF, so a month holds a handful of files, but a card is a card and
-        # it belongs with the others rather than on a git branch. GitHub caps
+        # The PDFs and card pictures go to the releases of be_price_cards, a
+        # repository shared with the electricity and gas integrations: this
+        # integration's releases are named water-<YYYY-MM> after the month
+        # the cards were seen in, the files by their SHA-256. Few water
+        # utilities publish a PDF or a picture, so a month holds a handful of
+        # files, but a card is a card and it belongs with the others rather
+        # than on a git branch. GitHub caps
         # a release at a thousand assets; should a month ever overflow it
         # spills into water-YYYY-MM-2, and the manifest on the branch says
         # which release holds each file. Needs a fine-grained token with
@@ -118,7 +125,7 @@ jobs:
           CARDS_REPO: renaudallard/be_price_cards
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "BE_WATER_CARDS is not set: today's PDFs are not kept" >&2
+            echo "BE_WATER_CARDS is not set: today's cards are not kept" >&2
             exit 0
           fi
           # A release needs a commit to tag, and a repository created empty
@@ -144,7 +151,7 @@ jobs:
           [ -s "$manifest" ] || echo '{}' > "$manifest"
           ensure_release() {
             gh release view "$1" --repo "$CARDS_REPO" >/dev/null 2>&1 && return 0
-            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The PDF tariff cards seen in $2 that the archive branch of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: search this repository for the file name; the sheets under https://github.com/${CARDS_REPO}/tree/main/water/coverage link every utility, commune and month to its card and to what was parsed out of it."
+            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The tariff cards, PDFs and pictures, seen in $2 that the archive branch of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: search this repository for the file name; the sheets under https://github.com/${CARDS_REPO}/tree/main/water/coverage link every utility, commune and month to its card and to what was parsed out of it."
           }
           for dir in tmp/pdfs/water-*/; do
             [ -d "$dir" ] || continue
@@ -165,19 +172,20 @@ jobs:
             # Where each file landed, merged into the manifest once per
             # month rather than once per file.
             : > landed.txt
-            for pdf in "$dir"*.pdf; do
-              name=$(basename "$pdf")
+            for card in "$dir"*; do
+              [ -f "$card" ] || continue
+              name=$(basename "$card")
               where=$(awk -v f="$name" '$1 == f {print $2; exit}' have.txt)
               if [ -z "$where" ]; then
                 if [ "$count" -ge 1000 ]; then
                   n=$((n + 1)); tag="$base-$n"; count=0
                   ensure_release "$tag" "$month"
                 fi
-                gh release upload "$tag" "$pdf" --repo "$CARDS_REPO"
+                gh release upload "$tag" "$card" --repo "$CARDS_REPO"
                 count=$((count + 1))
                 where=$tag
               fi
-              echo "${name%.pdf} $where/$name" >> landed.txt
+              echo "${name%.*} $where/$name" >> landed.txt
             done
             if [ -s landed.txt ]; then
               jq -Rn '[inputs | split(" ") | {(.[0]): .[1]}] | add // {}' landed.txt > landed.json
@@ -254,11 +262,13 @@ jobs:
             "The tariff cards homeassistant_be_water_prices parsed, kept as the assets of the" \
             "\`water-<YYYY-MM>\` releases of this repository and named by their SHA-256. Most" \
             "water utilities publish a page rather than a PDF; the text of every page as it" \
-            "was read is on the archive branch, and the coverage table links to it." \
+            "was read is on the archive branch, and the coverage table links to it. AIEC" \
+            "publishes its card as a picture, kept here too; the text Tesseract read off it" \
+            "is on the archive branch beside the row it made." \
             "" \
             "- \`coverage.md\`: the index of one sheet per utility under \`coverage/\`; each sheet" \
-            "  lists per commune the months held, each linking to the PDF or the page it was" \
-            "  parsed from and to the tariff as the integration parsed it." \
+            "  lists per commune the months held, each linking to the PDF, the picture or the" \
+            "  page it was parsed from and to the tariff as the integration parsed it." \
             "" \
             "The parsed cards themselves are the \`archive\` branch of" \
             "https://github.com/renaudallard/homeassistant_be_water_prices." \
@@ -317,6 +327,32 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)" \
               push origin archive
 
+      - name: File the card pictures that were not read
+        # A picture the walk read and the check refused leaves installations
+        # on the aggregator until a person transcribes it, and a reading
+        # that disagrees with a transcription means one of the two is wrong.
+        # Either way a person has to look, so it is filed, once per set of
+        # pictures: the same refusals again within the week add nothing.
+        if: ${{ !cancelled() && steps.store.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -s tmp/ocr_failures.txt ] || exit 0
+          {
+            echo "## Card pictures not read"
+            echo
+            sed 's/^/- /' tmp/ocr_failures.txt
+            echo
+            echo "Until a reading checks out, installations price on the aggregator. Read the"
+            echo "picture and add its figures to \`_TRANSCRIBED\` in \`providers/aiec.py\`."
+          } > ocr_body.md
+          bash scripts/file_ci_issue.sh \
+            --label archive-cards-ocr \
+            --title "[archive-cards] a card picture was not read" \
+            --body ocr_body.md \
+            --fingerprint tmp/ocr_failures.txt \
+            --workflow .github/workflows/archive_cards.yml
+
       - name: Warn before the upload token expires
         # A fine-grained token lives a year at most, and the first sign of
         # its expiry would otherwise be the failure issue on the morning
@@ -345,7 +381,7 @@ jobs:
             echo
             echo "$left day(s) left. Create a new fine-grained token with contents read and"
             echo "write on the cards repository and store it as the BE_WATER_CARDS secret;"
-            echo "until then the PDFs of each day are offered again by the next run that"
+            echo "until then the cards of each day are offered again by the next run that"
             echo "has a working token."
           } > token_body.md
           echo "token expires $expires" > token_fingerprint.txt

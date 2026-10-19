@@ -31,10 +31,14 @@ one JSON file per utility, commune and month:
 passes to `fetch_for_commune` (Pidpa's slug, Farys's numeric id, De
 Watergroep's GUID), or `default` for the no-commune fetch. A row is
 `tariff_to_dict` of the card plus `_seen_on` (the capture day),
-`_commune` and `_commune_label` on a commune row, and `_sources`, the pages
-and PDFs the parse read, each pointing at its text under
-`texts/<sha256>.txt` and, for a PDF, naming its digest. `pdfs.json` maps a
-digest to `<release tag>/<sha256>.pdf`; `coverage.md` and
+`_commune` and `_commune_label` on a commune row, and `_sources`, the pages,
+PDFs and pictures the parse read, each pointing at its text under
+`texts/<sha256>.txt` and, for a PDF, naming its digest (`pdf`, with the
+`readers` that rendered it). A picture read by OCR (AIEC's card) is a
+source of variant `ocr` naming its digest (`picture`) and the engine
+(`ocr`: Tesseract's version, its arguments and a digest of the code that
+prepares the picture). `pdfs.json` maps a digest to
+`<release tag>/<sha256>.pdf` (`.jpg`, `.png`); `coverage.md` and
 `coverage/<utility>.md` list the months held.
 
 `scripts/archive_cards.py` writes it. It walks every registered utility,
@@ -45,33 +49,38 @@ therefore the first day that month's row saw its card. A month whose card
 matches the month before points at that month's texts rather than storing
 them again, and months more than twelve before the running one
 (`_KEEP_MONTHS`) are pruned, with the texts nothing refers to any more.
-When the parser sources (`providers/*.py`, `const.py`) or the PDF reader
-change, every stored row is replayed offline from its texts with the clock
-pinned to its `_seen_on`, and rewritten where the parse differs
+When the parser sources (`providers/*.py`, `const.py`), the PDF reader or
+Tesseract change, every stored row is replayed offline from its texts with
+the clock pinned to its `_seen_on`, and rewritten where the parse differs
 (`--reparse` forces the replay, `--rerender` a fresh render of every
-PDF). The workflow `.github/workflows/archive_cards.yml` runs it daily
+PDF and a fresh reading of every picture). A picture is read only where
+Tesseract is installed, which the workflow does; a run without it takes
+the archive's reading as an installation does and says so. The workflow `.github/workflows/archive_cards.yml` runs it daily
 at 05:23 UTC, walking the communes on Sundays only; how it pushes and
 reports is in [ci-and-testing.md](ci-and-testing.md). Water-link's CDN
 refuses GitHub's runners, so its rows are stored by running the script
 from a residential address.
 
-With `--pdfs DIR` each PDF whose bytes the branch has not recorded is
-written to `DIR/water-<YYYY-MM>/<sha256>.pdf` and the workflow uploads it
-to the release of that name in
+With `--pdfs DIR` each PDF or picture whose bytes the branch has not
+recorded is written to `DIR/water-<YYYY-MM>/<sha256>.pdf` (`.jpg`, `.png`)
+and the workflow uploads it to the release of that name in
 [be_price_cards](https://github.com/renaudallard/be_price_cards), the
 repository the electricity and gas integrations share. The integration
-never reads those releases; only the archiver's replay fetches a kept PDF
+never reads those releases; only the archiver's replay fetches a kept card
 back.
 
 The integration reads the branch through `CARD_ARCHIVE_URL`
-(`raw.githubusercontent.com`, the `archive` branch) in one place:
-`archived_row` in `providers/_archive.py` asks for
+(`raw.githubusercontent.com`, the `archive` branch) from
+`providers/_archive.py`: `archived_row` asks for
 `<utility>/<commune>/<YYYY-MM>.json`, the commune percent-encoded, with the
 usual User-Agent and nothing else. A transient failure is raised; any
 other HTTP error (a missing month is a 404), a body that is not JSON or a
-JSON value that is not an object reads as no row. When it is asked, and
-how far back it walks, is in [coordinator.md](coordinator.md). The
-`card_archive` option (`CONF_CARD_ARCHIVE`, on by default) turns it off.
+JSON value that is not an object reads as no row. The coordinator reads a
+row when a refresh fails (when it is asked, and how far back it walks, is
+in [coordinator.md](coordinator.md)), and AIEC reads the text the archive's
+OCR made of its picture (`archived_picture_text`, a text only from
+`texts/<sha256>.txt` and only when its SHA-256 is its name). The
+`card_archive` option (`CONF_CARD_ARCHIVE`, on by default) turns both off.
 
 ## The recorder and the Energy dashboard
 
@@ -190,8 +199,8 @@ options, so an addition reaches entries that picked the commune earlier.
   (`_check_vat`).
 
 The Walloon CVA and FSE are not constants either. Every Walloon page
-prints both beside its CVD (AIEC's picture too, transcribed with its
-CVD), and each extractor reads them and passes them through
+prints both beside its CVD (AIEC's picture too, read or transcribed
+with its CVD), and each extractor reads them and passes them through
 `spge_components` in `providers/_walloon_simple.py`, directly or through
 `read_spge` for pages printing them in prose. A figure the page does not
 print fails the fetch, and `scripts/live_check.py` fails when the cards of

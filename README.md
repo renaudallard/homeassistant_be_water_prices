@@ -35,12 +35,13 @@ structure of each operator: Brussels linear, Flemish *integrale
 waterprijs* (basis/comfort blocks), and Walloon CWaPE tiers.
 
 Tariffs are fetched **live** from each utility's own published page or
-PDF. **Every per-distributor rate is fetched bar one**: AIEC publishes
-its card only as a picture, so that one rate is transcribed from the
-picture against the date its file name carries, and the card AIEC's page
-is showing decides which transcription applies. The figures that are
-uniform by decree are read off each card too, the Flemish vastrecht and
-korting and the flat-Wallonia SPGE CVA and FSE, and the daily live check
+PDF. AIEC publishes its card only as a picture: the project's card archive
+reads it with Tesseract in CI and keeps the text, and an installation
+serves that reading only once its own check has found the one tariff
+every derived figure on the card agrees with; a hand transcription of the
+card stands before it. The figures that are uniform by decree are read off
+each card too, the Flemish vastrecht and korting and the flat-Wallonia
+SPGE CVA and FSE, and the daily live check
 holds the cards of each region to each other on them. So is the VAT rate,
 stated in words or given by a figure printed beside the same figure with
 VAT; the 6 % default stands in only for IDEN, whose page gives none. Add a
@@ -77,7 +78,7 @@ publication and how to parse it.
 | Utility | Region | Coverage | Source |
 | --- | --- | --- | --- |
 | **AGSO Knokke-Heist** | Flanders (1 commune) | ~33 k | [`providers/agso_knokke.py`](./custom_components/be_water_prices/providers/agso_knokke.py), [notes](./docs/providers/agso_knokke.md): year tables on agsoknokke-heist.be, the one in force picked by its dated heading; the three legs are checked against the printed integrale waterprijs |
-| **AIEC** | Wallonia (Condroz) | small | [`providers/aiec.py`](./custom_components/be_water_prices/providers/aiec.py), [notes](./docs/providers/aiec.md): the card is only a picture on eauxducondroz.be, so its rate is transcribed in the module against the picture's date, with Callmepower as the fallback |
+| **AIEC** | Wallonia (Condroz) | small | [`providers/aiec.py`](./custom_components/be_water_prices/providers/aiec.py), [notes](./docs/providers/aiec.md): the card is only a picture on eauxducondroz.be, read by the card archive with Tesseract and checked against its own arithmetic before it is served; a transcription in the module wins, and Callmepower stands in for a picture nobody has read |
 | **AIEM** | Wallonia (Molignée) | ~12 k connections (~25 k people) | [`providers/aiem.py`](./custom_components/be_water_prices/providers/aiem.py), [notes](./docs/providers/aiem.md): the CVD read from "Valeur actuelle du CVD" on aiem.be, skipping the worked examples around it |
 | **Aquaduin** | Flanders (Westkust) | 6 communes (~80 k year-round) | [`providers/aquaduin.py`](./custom_components/be_water_prices/providers/aquaduin.py), [notes](./docs/providers/aquaduin.md): numeric PDF linked from the yearly tarieven page; one integrated basistarief, and the year the card states must match the link's |
 | **CIESAC** | Wallonia (Clavier / Durbuy / Ouffet / Tinlot) | 4 communes | [`providers/ciesac.py`](./custom_components/be_water_prices/providers/ciesac.py), [notes](./docs/providers/ciesac.md): Callmepower's page, since ciesac.be has been down for months; **the rate is unverified** |
@@ -956,6 +957,11 @@ python scripts/live_check.py    # hits real utility endpoints
 
 `scripts/gate.sh` runs the checks above, all but the live check, against a
 snapshot of HEAD, which is what to use before a push.
+
+The card archive reads AIEC's card picture with Tesseract and its French
+data (`apt install tesseract-ocr tesseract-ocr-fra`); with them installed
+the suite also holds the engine to AIEC's last two pictures, and without
+them that test is skipped.
 
 The internals are documented under [`docs/`](./docs/README.md): the
 architecture, the coordinator, the pricing model, the setup flow, the

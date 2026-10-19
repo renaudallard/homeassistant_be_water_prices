@@ -20,13 +20,22 @@ to any more.
 
 The cards themselves are kept too. With ``--pdfs DIR`` every PDF whose
 bytes the branch has not recorded yet is written to
-``DIR/water-<YYYY-MM>/<sha256>.pdf`` and the workflow uploads each
+``DIR/water-<YYYY-MM>/<sha256>.pdf``, a card picture to
+``DIR/water-<YYYY-MM>/<sha256>.jpg`` (or ``.png``), and the workflow uploads each
 directory as the assets of the release of that name in the cards
 repository shared with the electricity and gas integrations. Where each
 one landed is recorded in ``<out>/pdfs.json``; a row's ``_sources`` entry
-names its PDF by digest alone. The same digest keeps a daily run cheap: a
-card whose bytes have not changed is served the text the branch already
-holds for it instead of being rendered again.
+names its PDF or its picture by digest alone. The same digest keeps a daily
+run cheap: a card whose bytes have not changed is served the text the
+branch already holds for it instead of being rendered again.
+
+A card published as a picture (AIEC's) is read with Tesseract when it is
+installed, and its source is marked ``"ocr"`` with the engine that read
+it; a picture whose bytes are known is served its stored text. The
+readings a provider refuses are listed, and with ``--ocr-failures FILE``
+written there for the workflow to file. Without Tesseract a picture is not
+read here, and the provider takes the archive's reading of it as an
+installation would.
 
 A parser fix reaches the stored months on its own. Every row carries the
 texts its parse read, so the run replays each row through the current
@@ -55,7 +64,7 @@ communes are walked on Sundays and on request.
 
 Usage:
     python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa ...]
-        [--defaults-only] [--reparse] [--rerender]
+        [--defaults-only] [--reparse] [--rerender] [--ocr-failures FILE]
         [--pdf-base-url https://github.com/<owner>/<cards repo>/releases/download]
         [--archive-base-url https://github.com/<owner>/<this repo>/blob/archive]
 """
@@ -71,6 +80,7 @@ import re
 import sys
 import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from functools import partial
@@ -88,12 +98,21 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # scripts/ is not a package; the line above puts it on sys.path so the render
 # cache is the one the live check reads too, and the runner skip list is
 # the live check's own.
-from card_texts import StoredTexts, digest_of, read_text, readers_line  # noqa: E402
+from card_texts import (  # noqa: E402
+    StoredTexts,
+    digest_of,
+    ocr_available,
+    ocr_line,
+    read_text,
+    readers_line,
+)
 from live_check import CI_BLOCKED  # noqa: E402
 
 from custom_components.be_water_prices.providers import all_extractors  # noqa: E402
 from custom_components.be_water_prices.providers._pdf import (  # noqa: E402
+    collect_unread_pictures,
     memoise_text_fetches,
+    read_pictures_through,
     render_through,
 )
 from custom_components.be_water_prices.providers.base import (  # noqa: E402
@@ -119,6 +138,8 @@ _GIVE_UP_AFTER = 3
 _CARD_TIMEOUT_S = 300
 # The row of a utility's no-commune fetch.
 _DEFAULT = "default"
+# The variant the readers key a picture read by OCR under.
+_OCR = "ocr"
 # Keys the daily run rewrites; two files that differ only here hold the
 # same card and the older one is kept.
 _VOLATILE_KEYS = ("_seen_on",)
@@ -142,9 +163,9 @@ _COVERAGE = "coverage.md"
 _COVERAGE_DIR = "coverage"
 _LEGEND = (
     "Each month links to what its tariff was parsed from and to what came out of it:",
-    "`pdf` is the card itself, in the cards repository's releases, `page` the text of",
-    "the page as it was read, and `json` the tariff as the integration parsed it, both",
-    "on this branch. A blank cell is a month the branch does not hold.",
+    "`pdf` or `picture` is the card itself, in the cards repository's releases, `page`",
+    "the text of the page as it was read, and `json` the tariff as the integration",
+    "parsed it, both on this branch. A blank cell is a month the branch does not hold.",
 )
 # What a parse depends on: the extractors, the shared readers beside them
 # and the constants they key on.
@@ -160,10 +181,12 @@ Written daily by `.github/workflows/archive_cards.yml` running
   or for one commune of a per-commune utility, named by the commune id the
   integration uses (`_commune_label` in the file says which commune that
   is).
-- `texts/<sha256>.txt`: every page and rendered PDF a parse read, stored
-  once and shared between the rows that read it. Each row lists its own
-  under `_sources`, and names a PDF it read by SHA-256.
-- `pdfs.json`: where each PDF is kept, as `<release tag>/<sha256>.pdf` in
+- `texts/<sha256>.txt`: every page, rendered PDF and picture read by OCR
+  that a parse read, stored once and shared between the rows that read
+  it. Each row lists its own under `_sources`, and names a PDF or a
+  picture it read by SHA-256; a picture's source is marked `ocr`.
+- `pdfs.json`: where each PDF or picture is kept, as
+  `<release tag>/<sha256>.pdf` (`.jpg`, `.png`) in
   the releases of the cards repository (`be_price_cards`, shared with the
   electricity and gas integrations; this integration's releases are
   `water-<YYYY-MM>`).
@@ -173,10 +196,10 @@ Written daily by `.github/workflows/archive_cards.yml` running
   index naming them.
 
 To get the original card of a utility, commune and month: open
-`coverage.md`, open the utility's sheet, find the row, click `pdf` or
-`page`; `json` is what the integration parsed out of it. Months more than
-twelve before the running one are removed; a PDF stays as long as a
-remaining month names it.
+`coverage.md`, open the utility's sheet, find the row, click `pdf`,
+`picture` or `page`; `json` is what the integration parsed out of it.
+Months more than twelve before the running one are removed; a PDF or a
+picture stays as long as a remaining month names it.
 """
 
 
@@ -216,6 +239,7 @@ class _Summary:
     unreplayable: list[str] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)
     given_up: list[str] = field(default_factory=list)
+    unread_pictures: list[str] = field(default_factory=list)
 
 
 def _transient(err: BaseException) -> bool:
@@ -273,23 +297,25 @@ class _Cards(StoredTexts):
         if manifest.exists():
             self.kept = json.loads(manifest.read_text(encoding="utf-8"))
         self.saved: dict[str, str] = {}
-        # Downloaded, not recorded anywhere yet, waiting for a row to name it.
-        self.pending: dict[str, bytes] = {}
+        # Downloaded, not recorded anywhere yet, waiting for a row to name
+        # it, with the extension its file gets.
+        self.pending: dict[str, tuple[bytes, str]] = {}
 
-    def keep(self, digest: str, payload: bytes) -> None:
+    def keep(self, digest: str, payload: bytes, suffix: str = "pdf") -> None:
         if self.pdf_dir is None or digest in self.kept or digest in self.saved:
             return
-        self.pending[digest] = payload
+        self.pending[digest] = (payload, suffix)
 
     def file(self, month_id: str, digests: Iterable[str]) -> None:
         """Write the pending bytes a row read under that row's month."""
         if self.pdf_dir is None:
             return
         for digest in digests:
-            payload = self.pending.pop(digest, None)
-            if payload is None:
+            held = self.pending.pop(digest, None)
+            if held is None:
                 continue
-            rel = f"{_RELEASE_PREFIX}-{month_id}/{digest}.pdf"
+            payload, suffix = held
+            rel = f"{_RELEASE_PREFIX}-{month_id}/{digest}.{suffix}"
             path = self.pdf_dir / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(payload)
@@ -382,10 +408,10 @@ class _ReplaySession:
         if digest is None:
             raise aiohttp.ClientConnectionError(f"offline replay has nothing for {url}")
         if self._pdf_dir is not None:
-            local = next(self._pdf_dir.glob(f"*/{digest}.pdf"), None)
+            local = next(self._pdf_dir.glob(f"*/{digest}.*"), None)
             if local is not None:
                 return local.read_bytes()
-        cached = self._cache / f"{digest}.pdf"
+        cached = self._cache / digest
         if cached.exists():
             return cached.read_bytes()
         path = self._kept.get(digest)
@@ -420,11 +446,26 @@ class _Pending:
         return None
 
 
+def _readers(memo: dict[str, str], cards: _Cards, summary: _Summary) -> ExitStack:
+    """What every fetch of a walk or a replay reads through: the text memo,
+    the render cache, the list of refused pictures and, where Tesseract is
+    installed, the picture reader."""
+    stack = ExitStack()
+    stack.enter_context(memoise_text_fetches(memo))
+    stack.enter_context(render_through(cards.render))
+    stack.enter_context(collect_unread_pictures(summary.unread_pictures))
+    if ocr_available():
+        stack.enter_context(read_pictures_through(cards.read_picture))
+    return stack
+
+
 def _parser_digest() -> str:
-    """One digest over every source a parse depends on, and the PDF reader,
-    so a reader upgrade replays the months the walk no longer downloads."""
+    """One digest over every source a parse depends on, the PDF reader and
+    Tesseract, so a reader upgrade replays the months the walk no longer
+    downloads."""
     root = ROOT / "custom_components" / "be_water_prices"
     digest = hashlib.sha256(readers_line().encode())
+    digest.update(ocr_line().encode())
     for pattern in _PARSER_SOURCES:
         for path in sorted(root.glob(pattern)):
             digest.update(path.relative_to(root).as_posix().encode("utf-8"))
@@ -450,8 +491,8 @@ def _months_before(today: date, months: int) -> str:
 
 @dataclass(frozen=True)
 class _Source:
-    """One thing a parse read: a page or a rendered PDF, its text, and the
-    PDF's digest when there was one."""
+    """One thing a parse read: a page, a rendered PDF or a picture read by
+    OCR, its text, and the digest of the PDF or picture when there was one."""
 
     url: str
     variant: str
@@ -463,18 +504,28 @@ class _Source:
         is only ever stored as the installed reader made it, since one other
         readers made is neither served nor seeded."""
         out = {"url": self.url, "variant": self.variant, "text": path}
-        if self.pdf is not None:
+        if self.pdf is not None and self.variant == _OCR:
+            out["picture"] = self.pdf
+            out["ocr"] = ocr_line()
+        elif self.pdf is not None:
             out["pdf"] = self.pdf
             out["readers"] = readers_line()
         return out
 
 
+def _card_digest(source: dict[str, Any]) -> str | None:
+    """The digest of the PDF or the picture a stored source read, if any."""
+    kept = source.get("pdf") or source.get("picture")
+    return digest_of(kept) if isinstance(kept, str) else None
+
+
 def _source_of(key: str, text: str, cards: _Cards) -> _Source:
     """Describe one memo entry: the readers key a rendered PDF as
-    ``<variant>\\0<url>`` and a page by its URL alone (with what was
-    asked of the endpoint after a ``#`` when the URL does not say). A
-    rendered PDF also names its bytes by digest when they were seen;
-    ``pdfs.json`` says where that digest lives."""
+    ``<variant>\\0<url>``, a picture read as ``ocr\\0<url>``, and a page by
+    its URL alone (with what was asked of the endpoint after a ``#`` when
+    the URL does not say). A rendered PDF or a picture also names its bytes
+    by digest when they were seen; ``pdfs.json`` says where that digest
+    lives."""
     variant, sep, url = key.partition("\0")
     if not sep:
         return _Source(key, "text", text)
@@ -606,7 +657,7 @@ def _prune(out: Path, keep_months: int, today: date) -> int:
         source for path in _rows(out) for source in (_read_row(path) or {}).get("_sources", [])
     ]
     referenced = {source["text"] for source in sources}
-    named = {digest_of(source["pdf"]) for source in sources if "pdf" in source}
+    named = {d for d in (_card_digest(source) for source in sources) if d is not None}
     for path in out.glob("texts/*.txt"):
         if path.relative_to(out).as_posix() not in referenced:
             path.unlink()
@@ -618,7 +669,7 @@ def _prune(out: Path, keep_months: int, today: date) -> int:
     manifest = out / _MANIFEST
     if manifest.exists():
         kept = json.loads(manifest.read_text(encoding="utf-8"))
-        # A release path is <prefix>-<YYYY-MM>[-n]/<digest>.pdf. A card is
+        # A release path is <prefix>-<YYYY-MM>[-n]/<digest>.<ext>. A card is
         # filed once, under the month it was first seen, and every later
         # month that read it names that copy, so an entry older than the
         # cutoff stays while a remaining row names it. The workflow keeps a
@@ -637,14 +688,15 @@ class _Held:
     """One stored month, as the coverage table needs it."""
 
     label: str
-    digests: list[str]
+    # The PDFs and pictures it read: digest, and "pdf" or "picture".
+    cards: list[tuple[str, str]]
     page: str | None
     path: str
 
 
 def _kept_rows(out: Path) -> tuple[dict[str, dict[str, dict[str, _Held]]], dict[str, str]]:
     """Every row on disk, by utility and commune, then month: the commune's
-    label, the digests of the PDFs it read, the page it read and its own
+    label, the PDFs and pictures it read, the page it read and its own
     path; and the manifest."""
     held: dict[str, dict[str, dict[str, _Held]]] = {}
     for path in _rows(out):
@@ -656,7 +708,11 @@ def _kept_rows(out: Path) -> tuple[dict[str, dict[str, dict[str, _Held]]], dict[
         pages = [s["text"] for s in sources if s.get("variant") == "text"]
         held.setdefault(utility, {}).setdefault(commune, {})[path.stem] = _Held(
             row.get("_commune_label", ""),
-            [digest_of(s["pdf"]) for s in sources if "pdf" in s],
+            [
+                (d, "pdf" if "pdf" in s else "picture")
+                for s in sources
+                if (d := _card_digest(s)) is not None
+            ],
             pages[0] if pages else None,
             path.relative_to(out).as_posix(),
         )
@@ -691,11 +747,16 @@ def _cell(
     parse produced."""
     if held is None:
         return ""
-    links = [link for link in (_pdf_link(d, kept, pdf_base_url) for d in held.digests) if link]
+    links = [
+        (kind, link)
+        for digest, kind in held.cards
+        if (link := _pdf_link(digest, kept, pdf_base_url)) is not None
+    ]
     if links:
-        parts = [f"[pdf]({links[0]})"]
-    elif held.digests:
-        parts = ["pdf"]
+        kind, link = links[0]
+        parts = [f"[{kind}]({link})"]
+    elif held.cards:
+        parts = [held.cards[0][1]]
     elif held.page is not None:
         parts = [_link("page", archive_base_url, held.page)]
     else:
@@ -914,6 +975,8 @@ async def _replay_row(
             return
         if "pdf" in source and (rerender or source.get("readers") != readers):
             continue
+        if "picture" in source and (rerender or source.get("ocr") != ocr_line()):
+            continue
         key = (
             source["url"]
             if source["variant"] == "text"
@@ -921,7 +984,9 @@ async def _replay_row(
         )
         # Seeded, not touched: only what the parse actually reads counts.
         dict.__setitem__(memo, key, read_text(text_path))
-    replay.pdfs = {s["url"]: digest_of(s["pdf"]) for s in row.get("_sources", []) if "pdf" in s}
+    replay.pdfs = {
+        s["url"]: d for s in row.get("_sources", []) if (d := _card_digest(s)) is not None
+    }
     cards.digests.update(replay.pdfs)
     cards.calls.clear()
     try:
@@ -930,7 +995,7 @@ async def _replay_row(
         summary.unreplayable.append(f"{label}: no capture date")
         return
     session: Any = replay
-    with memoise_text_fetches(memo), render_through(cards.render):
+    with _readers(memo, cards, summary):
         try:
             if commune == _DEFAULT:
                 tariff = await extractor.fetch(session)
@@ -1007,7 +1072,9 @@ async def archive(
     registry = tuple(all_extractors() if extractors is None else extractors)
     targets = _targets(registry, only or set(), on_ci)
     async with aiohttp.ClientSession() as session:
-        with memoise_text_fetches(run.memo), render_through(cards.render):
+        if not ocr_available():
+            print("tesseract is not installed: card pictures are taken from the archive's reading")
+        with _readers(run.memo, cards, run.summary):
             await _walk(run, session, targets, defaults_only=defaults_only)
         # A fresh archive holds nothing older than this parser, so the first
         # run only stamps it; from then on a changed digest replays the rows.
@@ -1051,6 +1118,8 @@ async def archive(
         print(f"  gave up on {utility} after {_GIVE_UP_AFTER} network failures in a row")
     for line in summary.unreplayable:
         print(f"  not replayable {line[:300]}")
+    for line in summary.unread_pictures:
+        print(f"  picture not read {line[:300]}")
     return summary
 
 
@@ -1094,6 +1163,13 @@ def main() -> int:
         help="replay every row with its PDFs rendered afresh, as a reader upgrade does",
     )
     parser.add_argument(
+        "--ocr-failures",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="write the card pictures whose reading was refused to FILE, one per line",
+    )
+    parser.add_argument(
         "--index-only",
         action="store_true",
         help="only rewrite the coverage sheets from what is on disk; no fetch",
@@ -1117,6 +1193,10 @@ def main() -> int:
             rerender=args.rerender,
         )
     )
+    if args.ocr_failures is not None:
+        args.ocr_failures.write_text(
+            "".join(f"{line}\n" for line in summary.unread_pictures), encoding="utf-8"
+        )
     return 0 if summary.stored or summary.unchanged else 1
 
 
