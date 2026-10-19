@@ -39,8 +39,7 @@ Two ingestion paths share the same cookie-driven endpoint:
 
   - **Per-commune fetch** GETs the same endpoint with the user-picked
     ``dwg_l=<GUID>`` cookie and returns the integrale waterprijs for
-    that commune, with the standard VMM 50/30/20 + 10/6/4
-    vastrecht/korting structure.
+    that commune, with the vastrecht and korting of each leg.
 
 Commune list discovery: scrape the dropdown on
 ``/nl-be/drinkwater/tarieven`` (700+ ``<option>`` entries with GUID
@@ -132,8 +131,39 @@ _ZUIVERING_UNAVAILABLE_RE = re.compile(
 )
 
 
-def _basis_per_m3_block(text: str) -> str | None:
-    """Return the slice of ``text`` belonging to the Basistarief per m³ table.
+# A leg's row in the vastrecht and korting tables: "Waterverbruik
+# drinkwater € 50 (incl. € 53)", the korting "- € 10 (incl. - € 10,60)".
+_FIXED_LEGS = ("Waterverbruik drinkwater", "Afvoer van afvalwater", "Zuivering van afvalwater")
+_FIXED_ROW_RE_FMT = r"{label}\s*-?\s*€\s*(\d+(?:,\d+)?)\s*\(incl\."
+
+
+def _fixed_terms(text: str, before: int) -> tuple[float, float]:
+    """The household vastrecht and korting per resident, summed over the
+    three legs.
+
+    Read from the last vastrecht table before the household
+    Basistarief block at ``before``: the non-household and IBA tables
+    further down repeat the same labels.
+    """
+    start = text.rfind("Vastrecht (", 0, before)
+    split = text.find("Korting op vastrecht", start, before) if start >= 0 else -1
+    if start < 0 or split < 0:
+        raise ExtractorError("could not locate De Watergroep's vastrecht / korting table")
+    terms: list[float] = []
+    for block, name in ((text[start:split], "vastrecht"), (text[split:before], "korting")):
+        legs: list[float] = []
+        for label in _FIXED_LEGS:
+            pattern = _FIXED_ROW_RE_FMT.format(label=r"\s+".join(label.split()))
+            match = re.search(pattern, block, re.IGNORECASE)
+            if match is None:
+                raise ExtractorError(f"De Watergroep printed no {name} for {label!r}")
+            legs.append(to_float(match.group(1)))
+        terms.append(sum(legs))
+    return terms[0], terms[1]
+
+
+def _basis_per_m3_block(text: str) -> tuple[str, int] | None:
+    """Return the slice of ``text`` belonging to the Basistarief per m³ table, and where it starts.
 
     Bounded on the right by the next section marker (Basistarief per
     liter, Comforttarief, ...) so the row regexes can't reach into the
@@ -158,7 +188,7 @@ def _basis_per_m3_block(text: str) -> str | None:
         end = min((m for m in next_markers if m > 0), default=len(text))
         block = text[start:end]
         if "Waterverbruik drinkwater" in block:
-            return block
+            return block, start
         pos = start + 1
 
 
@@ -188,9 +218,10 @@ def parse_commune_tariff(
     """
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(" ", strip=True)
-    block = _basis_per_m3_block(text)
-    if block is None:
+    found = _basis_per_m3_block(text)
+    if found is None:
         raise ExtractorError("could not locate De Watergroep 'Basistarief per m³' section")
+    block, block_start = found
 
     drinkwater = _DRINKWATER_RE.search(block)
     if drinkwater is None:
@@ -225,6 +256,7 @@ def parse_commune_tariff(
         legs[leg] = to_float(match.group(1))
     san_gem = legs["gemeentelijke"]
     san_bov = legs["bovengemeentelijke"]
+    vastrecht, korting = _fixed_terms(text, block_start)
 
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
@@ -233,6 +265,8 @@ def parse_commune_tariff(
         source_url=COMMUNE_DETAIL_URL_FMT.format(year=year),
         basis=basis,
         comfort=2.0 * basis,  # VMM-mandated 2× rule
+        vastrecht=vastrecht,
+        korting=korting,
         sanering_gemeentelijk=san_gem,
         sanering_bovengemeentelijk=san_bov,
     )

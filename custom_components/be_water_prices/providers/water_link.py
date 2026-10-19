@@ -73,7 +73,7 @@ from urllib.parse import urljoin, urlparse
 import aiohttp
 
 from ..const import REGION_FLANDERS
-from ._flanders import build_flanders_tariff
+from ._flanders import build_flanders_tariff, leg_total
 from ._html import fetch_and_parse
 from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
 from .base import (
@@ -146,6 +146,23 @@ _RATE_ROW_RE_FMT = (
 )
 
 
+# "Vastrecht per wooneenheid 50,0000 30,0000 20,0000 100,0000 106,0000"
+# and "Korting per gedomicilieerde inwoner -10,0000 ... -20,0000 -21,2000":
+# Water, Afvoer, Zuivering, the total ex-VAT and the total with VAT.
+_FIXED_ROW_RE_FMT = r"{label}\s+" + r"\s+".join([r"(-?\d+,\d{{4}})"] * 5)
+
+
+def _fixed_term(text: str, label: str, name: str, year: int) -> float:
+    """A fixed charge summed over its three legs, held to the total the
+    card prints beside them. The korting prints negative; it is returned
+    as the discount it is."""
+    match = re.search(_FIXED_ROW_RE_FMT.format(label=label), text)
+    if match is None:
+        raise ExtractorError(f"could not find Water-link's {name} row")
+    water, afvoer, zuivering, total = (abs(to_float(match.group(i))) for i in range(1, 5))
+    return leg_total(UTILITY_ID, year, name, (water, afvoer, zuivering), total)
+
+
 def _parse_commune_row(
     text: str, commune: str, after_marker: str
 ) -> tuple[float, float, float] | None:
@@ -201,6 +218,8 @@ def parse_tariff(
         raise ExtractorError(f"could not find Water-link comforttarief row for {commune!r}")
 
     water_basis, afvoer_basis, zuivering_basis = basis
+    vastrecht = _fixed_term(text, r"Vastrecht\s+per\s+wooneenheid", "vastrecht", target)
+    korting = _fixed_term(text, r"Korting\s+per\s+gedomicilieerde\s+inwoner", "korting", target)
     water_comfort = comfort[0]
     if abs(water_comfort - 2.0 * water_basis) > 0.01:
         raise ExtractorError(
@@ -214,6 +233,8 @@ def parse_tariff(
         source_url=source_url or SOURCE_URL_FMT.format(year=target),
         basis=water_basis,
         comfort=water_comfort,
+        vastrecht=vastrecht,
+        korting=korting,
         sanering_gemeentelijk=afvoer_basis,
         sanering_bovengemeentelijk=zuivering_basis,
     )

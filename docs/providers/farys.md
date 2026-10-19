@@ -95,8 +95,9 @@ Vlaams-Brabant: 85 communes, about 1.5 M people (about 22 % of Flanders).
 - Sum check: "Integrale waterprijs basistarief (per m³)", printed two rows
   below the legs, must equal the netted basis plus both saneringen within
   0,0001 (6,5842 for Zaventem, not the 6,6649 the gross rows add up to).
-- `yearly_fixed_fee` 100 and per-resident discount 20: the VMM constants
-  in `const.py`.
+- `yearly_fixed_fee` 100 and per-resident discount 20: the "Vastrecht (per
+  jaar)" and "Korting op vastrecht (per jaar)" rows of the three household
+  legs added up, each held to its VAT-inclusive figure like the rates.
 - VAT: `vat_rate` is 6 %. `build_flanders_tariff` refuses a rate of zero or
   less, a rate outside 0.5 to 20 EUR/m³, and a negative sanering.
 - Label: "Farys watertarieven `<year>` (`<commune>`)". The per-commune fetch

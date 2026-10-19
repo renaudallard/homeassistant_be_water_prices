@@ -289,6 +289,8 @@ async def test_a_flemish_household_is_billed_on_its_own_options(
         source_url="https://example.invalid/",
         basis=2.0,
         comfort=4.0,
+        vastrecht=100.0,
+        korting=20.0,
         sanering_gemeentelijk=0.6,
         sanering_bovengemeentelijk=1.0,
     )

@@ -127,6 +127,11 @@ error, or fewer communes than the floor in `MIN_COMMUNES`, fails it,
 since the config flow drops the commune selector when that list fails
 and a new entry is then billed on the operator's default commune.
 
+A row sets the Flemish cards side by side (`_check_flanders_fixed`): each
+card is billed on the vastrecht and korting it prints, so one that misread
+either fails it against the others (by more than a cent), the cards of one
+year compared with each other.
+
 A last row sets the Walloon cards side by side (`_check_spge`): it fails
 while any card is past `WALLONIA_SPGE_YEAR`, the year of the CVA and FSE
 constants in `const.py`, so the release that moves them is prompted, and

@@ -32,7 +32,9 @@ sane (region matches, fee in plausible range, at least one volumetric
 component populated). An extractor that lists communes has its list
 fetched too, and checked against a floor on its length, since the
 config flow quietly drops the commune selector when that list fails.
-Checks every extractor rather than stopping at the first failure,
+The figures a whole region shares, the Flemish vastrecht and korting and
+the Walloon CVA and FSE, are compared across that region's cards, since
+each card is billed on its own reading of them. Checks every extractor rather than stopping at the first failure,
 prints a markdown report to stdout and folds the outcomes into the exit
 code below.
 
@@ -81,6 +83,7 @@ from card_texts import StoredTexts  # noqa: E402
 
 from custom_components.be_water_prices.const import (  # noqa: E402
     FETCH_BUDGET_S,
+    REGION_FLANDERS,
     REGION_WALLONIA,
     WALLONIA_SPGE_YEAR,
 )
@@ -110,6 +113,14 @@ MAX_RATE_EUR_M3 = 20.0
 # How far apart the Walloon cards of one year may put the SPGE figures,
 # the thresholds the extractors hold a page to the constants with.
 SPGE_TOLERANCE = {"CVA": 0.005, "FSE": 0.001}
+
+# The Flemish vastrecht and korting per resident, the same on every card
+# since the decree set them, so one card reading another figure has
+# misread its own. A cent apart is the most rounding can account for.
+FLANDERS_FIXED: dict[str, tuple[Callable[[WaterTariff], float], float]] = {
+    "vastrecht": (lambda t: t.yearly_fixed_fee, 0.01),
+    "korting": (lambda t: t.yearly_fixed_fee_per_resident_discount, 0.01),
+}
 
 # Fewest communes each lister may return before the list is called
 # broken. A restyled dropdown the parser only half matches yields a short
@@ -294,6 +305,39 @@ def _check_spge(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
     return CheckResult("spge", "Walloon SPGE figures", REGION_WALLONIA, status, detail)
 
 
+def _disagreements(
+    cards: dict[str, WaterTariff],
+    figures: dict[str, tuple[Callable[[WaterTariff], float], float]],
+) -> list[str]:
+    """Each figure the cards of one year put further apart than its
+    tolerance, with every card's reading of it. Cards of two years may
+    differ: January has pages on either."""
+    problems: list[str] = []
+    for year in sorted({t.valid_from.year for t in cards.values()}):
+        same = {label: t for label, t in cards.items() if t.valid_from.year == year}
+        for name, (figure, tolerance) in figures.items():
+            values = {label: figure(t) for label, t in same.items()}
+            if max(values.values()) - min(values.values()) > tolerance:
+                listed = ", ".join(f"{label} {value}" for label, value in sorted(values.items()))
+                problems.append(f"{year} cards disagree on the {name}: {listed}")
+    return problems
+
+
+def _check_flanders_fixed(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
+    """The vastrecht and korting each Flemish card was priced on, side by
+    side. Each card's own figures are billed, so a misread one stands out
+    only against the others. None when no Flemish card came back."""
+    flemish = {label: t for label, t in tariffs.items() if t.region == REGION_FLANDERS}
+    if not flemish:
+        return None
+    problems = _disagreements(flemish, FLANDERS_FIXED)
+    if problems:
+        status, detail = "FAIL", "; ".join(problems)
+    else:
+        status, detail = "OK", f"{len(flemish)} Flemish cards agree on the vastrecht and korting"
+    return CheckResult("flanders_fixed", "Flemish vastrecht", REGION_FLANDERS, status, detail)
+
+
 async def _check_communes(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
     """The commune list the config flow offers. When it fails, the flow
     leaves the commune field out and the entry is billed on the
@@ -344,9 +388,9 @@ async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, Store
                 results.append(await _check_one(session, e, seen))
                 if e.supports_communes:
                     results.append(await _check_communes(session, e))
-            spge = _check_spge(seen)
-            if spge is not None:
-                results.append(spge)
+            for agreement in (_check_flanders_fixed(seen), _check_spge(seen)):
+                if agreement is not None:
+                    results.append(agreement)
     return results, _exit_code(results), cache
 
 

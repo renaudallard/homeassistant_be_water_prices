@@ -67,8 +67,8 @@ PDF rows::
     huishoudelijk       4,0924 4,1696 4,2466 4,3238 4,4008 4,478
     (€/m³)
 
-The vastrecht / korting numbers are the standard VMM structure, carried
-as constants; the PDF's own lines for them are not read.
+The vastrecht and korting are read off the "Tarieven Vast recht
+Korting/DOM" rows, one per leg.
 
 Saneringsbijdragen (afvoer + zuivering) come from a separate paragraph
 near the top of the PDF::
@@ -108,7 +108,7 @@ from bs4 import BeautifulSoup, Tag
 
 from .._phantom_blocklists import PIDPA_UNSERVABLE_SLUGS as _UNSERVABLE_COMMUNE_SLUGS
 from ..const import REGION_FLANDERS
-from ._flanders import build_flanders_tariff
+from ._flanders import build_flanders_tariff, leg_total
 from ._html import fetch_and_parse, fetch_html
 from ._pdf import fetch_pdf_text_layout, to_float
 from .base import (
@@ -169,6 +169,12 @@ _COMFORT_RE = re.compile(
     r"comforttarief\s+huishoudelijk\s+([\d.,]+(?:\s+[\d.,]+)+)",
     re.IGNORECASE,
 )
+# "Drinkwater € 50,00 € 10,00": a leg's vastrecht and its korting per
+# resident, under the "Tarieven Vast recht Korting/DOM" heading.
+_FIXED_RE = re.compile(
+    r"^(Drinkwater|Riolering|Zuivering)\s+€\s*([\d.,]+)\s+€\s*([\d.,]+)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
 _HEADER_RE = re.compile(
     r"Drinkwatertarief\s+(?P<years>(?:20\d{2}\s*){2,})",
     re.IGNORECASE,
@@ -211,6 +217,21 @@ def _sanering_for_year(text: str, year: int) -> dict[str, float]:
         elif past:
             chosen[kind] = by_year[max(past)]
     return chosen
+
+
+def _fixed_terms(text: str, year: int) -> tuple[float, float]:
+    """The vastrecht and the korting per resident the PDF prints, summed
+    over its three legs."""
+    cut = text.find("Korting/DOM")
+    rows: dict[str, re.Match[str]] = {}
+    for match in _FIXED_RE.finditer(text, max(cut, 0)):
+        rows.setdefault(match.group(1).lower(), match)
+    if cut < 0 or set(rows) != {"drinkwater", "riolering", "zuivering"}:
+        raise ExtractorError("could not parse the Pidpa PDF's vast recht / korting rows")
+    legs = [rows[leg] for leg in ("drinkwater", "riolering", "zuivering")]
+    vastrecht = leg_total(UTILITY_ID, year, "vastrecht", [to_float(m.group(2)) for m in legs])
+    korting = leg_total(UTILITY_ID, year, "korting", [to_float(m.group(3)) for m in legs])
+    return vastrecht, korting
 
 
 def _column_for_year(years: list[int], values: list[float], year: int) -> float | None:
@@ -279,6 +300,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
         )
     gemeentelijk = sanering["afvoer"]
     bovengemeentelijk = sanering["zuivering"]
+    vastrecht, korting = _fixed_terms(text, target)
 
     tariff = build_flanders_tariff(
         utility_id=UTILITY_ID,
@@ -287,6 +309,8 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
         source_url=SOURCE_URL,
         basis=basis,
         comfort=comfort,
+        vastrecht=vastrecht,
+        korting=korting,
         sanering_gemeentelijk=gemeentelijk,
         sanering_bovengemeentelijk=bovengemeentelijk,
     )
@@ -304,7 +328,8 @@ async def fetch_tariefplan(session: aiohttp.ClientSession) -> WaterTariff:
 # Cell text on the per-commune table looks like
 # "2,1888 euro excl. btw - 2,3201 euro incl. btw" with optional whitespace
 # (incl. NBSP) between the number and the unit; we anchor on the ex-VAT half.
-_EX_VAT_AMOUNT_RE = re.compile(r"(\d+,\d+)\s*euro\s*excl", re.IGNORECASE)
+# The vastrecht and korting rows print whole euros ("50 euro excl. btw").
+_EX_VAT_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*euro\s*excl", re.IGNORECASE)
 # Pidpa publishes its commune slugs in the public sitemap.xml.
 _COMMUNE_SLUG_RE = re.compile(r"https://www\.pidpa\.be/ons-aanbod/je-gemeente/([a-z][a-z0-9-]*)<")
 
@@ -423,11 +448,22 @@ def parse_commune_tariff(
         raise ExtractorError(
             f"Pidpa per-commune table for {commune_slug!r} has {len(rows)} rows; expected 5"
         )
+    vastrecht_cells = rows[1].find_all(["th", "td"])
+    korting_cells = rows[2].find_all(["th", "td"])
     basis_cells = rows[3].find_all(["th", "td"])
     comfort_cells = rows[4].find_all(["th", "td"])
     # 5 columns: label / drinkwater / afvoer / zuivering / integrale.
-    if len(basis_cells) < 4 or len(comfort_cells) < 4:
+    if any(len(cells) < 5 for cells in (vastrecht_cells, korting_cells)) or (
+        len(basis_cells) < 4 or len(comfort_cells) < 4
+    ):
         raise ExtractorError(f"Pidpa per-commune table columns malformed for {commune_slug!r}")
+    fixed: list[float] = []
+    for cells, label in ((vastrecht_cells, "vastrecht"), (korting_cells, "korting")):
+        if label not in cells[0].get_text(" ", strip=True).lower():
+            raise ExtractorError(f"Pidpa {label} row is not where it was for {commune_slug!r}")
+        amounts = [_ex_vat_amount(cell.get_text(" ", strip=True)) for cell in cells[1:5]]
+        fixed.append(leg_total(UTILITY_ID, target, label, amounts[:3], amounts[3]))
+    vastrecht, korting = fixed
 
     drink_basis = _ex_vat_amount(basis_cells[1].get_text(" ", strip=True))
     afvoer_basis = _ex_vat_amount(basis_cells[2].get_text(" ", strip=True))
@@ -459,6 +495,8 @@ def parse_commune_tariff(
         source_url=COMMUNE_URL_FMT.format(slug=commune_slug),
         basis=drink_basis,
         comfort=drink_comfort,
+        vastrecht=vastrecht,
+        korting=korting,
         sanering_gemeentelijk=afvoer_basis,
         sanering_bovengemeentelijk=zuivering_basis,
     )

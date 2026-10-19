@@ -196,12 +196,15 @@ The module is a vendored subset of the electricity integration's reader.
 ### `_flanders.py`: the Flemish builder
 
 `build_flanders_tariff(utility_id=, year=, publication_label=, source_url=,
-basis=, comfort=, sanering_gemeentelijk=0.0, sanering_bovengemeentelijk=0.0)`
-builds every Flemish card. It sets the decreed vastrecht and korting
-(`FLANDERS_VASTRECHT_TOTAL`, 100 EUR, and
-`FLANDERS_KORTING_TOTAL_PER_PERSON`, 20 EUR, from `const.py`), dates the
-card 1 January to 31 December of `year`, and refuses a basis or comfort
-rate of zero or less or outside 0.5 to 20 EUR/m³, and a negative sanering.
+basis=, comfort=, vastrecht=, korting=, sanering_gemeentelijk=0.0,
+sanering_bovengemeentelijk=0.0)` builds every Flemish card. It takes the
+vastrecht and the korting per resident the card prints, the three legs
+added up, dates the card 1 January to 31 December of `year`, and refuses
+a basis or comfort rate of zero or less or outside 0.5 to 20 EUR/m³, a
+vastrecht outside 20 to 500 EUR a year, a korting of zero or less or above
+the vastrecht, and a negative sanering. `leg_total` adds up the legs of a
+fixed charge and holds them to the total where the card prints one
+(Pidpa, Water-link, AGSO Knokke).
 A sanering of zero is allowed: Aquaduin folds its sanering into the basis,
 and a commune can levy none. The check that the comforttarief is twice the
 basistarief is each parser's own, since the builder cannot tell a right

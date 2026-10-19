@@ -25,29 +25,22 @@
 
 """Shared builder for Flemish operators publishing the integrale waterprijs.
 
-Flanders has a uniform tariff layout: VMM-mandated 50/30/20 vastrecht and
-10/6/4 per-resident korting (totals carried as
-:data:`const.FLANDERS_VASTRECHT_TOTAL` /
-:data:`const.FLANDERS_KORTING_TOTAL_PER_PERSON`), a basis + comfort water
-rate, and per-commune saneringsbijdragen (gemeentelijk + bovengemeentelijk).
+Flanders has a uniform tariff layout: a vastrecht per wooneenheid and a
+korting on it per registered resident, each split over the drinkwater,
+gemeentelijke and bovengemeentelijke legs, a basis + comfort water rate,
+and per-commune saneringsbijdragen (gemeentelijk + bovengemeentelijk).
+Every card prints its vastrecht and korting, and each parser reads them.
 
 Operators that publish only an integrated drinkwater rate (Aquaduin)
 leave the sanering arguments at their default of ``0.0``.
-
-De Watergroep's news-article fallback path uses a different vastrecht
-constant (drinkwater-leg only) and is not built through this helper.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    FLANDERS_KORTING_TOTAL_PER_PERSON,
-    FLANDERS_VASTRECHT_TOTAL,
-    REGION_FLANDERS,
-)
+from ..const import DEFAULT_VAT_RATE, REGION_FLANDERS
 from .base import ExtractorError, WaterTariff
 
 # What a Flemish drinkwater rate can plausibly be, in EUR/m3 ex-VAT. The
@@ -61,6 +54,27 @@ from .base import ExtractorError, WaterTariff
 _MIN_PLAUSIBLE_RATE = 0.5
 _MAX_PLAUSIBLE_RATE = 20.0
 
+# What a Flemish vastrecht can plausibly be, in EUR a year ex-VAT: 100 on
+# every card since the decree set it, so a figure a tenth or ten times
+# that is a misread rather than a new tariff.
+_MIN_PLAUSIBLE_VASTRECHT = 20.0
+_MAX_PLAUSIBLE_VASTRECHT = 500.0
+
+
+def leg_total(
+    utility_id: str, year: int, label: str, legs: Sequence[float], printed: float | None = None
+) -> float:
+    """The sum of the three legs of a fixed charge, held to the card's own
+    total where it prints one: a leg read from the wrong cell then no
+    longer adds up."""
+    total = sum(legs)
+    if printed is not None and abs(total - printed) > 0.005:
+        raise ExtractorError(
+            f"{utility_id} {year}: {label} legs {' + '.join(f'{v:g}' for v in legs)} "
+            f"do not add up to the {printed:g} the card prints"
+        )
+    return total
+
 
 def build_flanders_tariff(
     *,
@@ -70,10 +84,12 @@ def build_flanders_tariff(
     source_url: str,
     basis: float,
     comfort: float,
+    vastrecht: float,
+    korting: float,
     sanering_gemeentelijk: float = 0.0,
     sanering_bovengemeentelijk: float = 0.0,
 ) -> WaterTariff:
-    """Build a Flemish :class:`WaterTariff` with the standard VMM totals.
+    """Build a Flemish :class:`WaterTariff` from the figures its card prints.
 
     A rate of zero or less is not a rate: the 2x check passed 0 against
     0 and a card of nothing went to the sensors. Nor is a rate outside
@@ -81,7 +97,9 @@ def build_flanders_tariff(
     basis satisfies the VMM identity whether both are right or both are
     a decimal place out. A sanering component of zero is legitimate
     (Aquaduin folds it into the basis, and a commune can levy none), a
-    negative one is not.
+    negative one is not. The vastrecht has to sit in its own window, and
+    the korting per resident has to be above zero and no more than the
+    vastrecht it is taken off.
     """
     if basis <= 0 or comfort <= 0:
         raise ExtractorError(
@@ -93,6 +111,16 @@ def build_flanders_tariff(
                 f"{utility_id} {year}: {label} rate {rate} is outside "
                 f"[{_MIN_PLAUSIBLE_RATE}, {_MAX_PLAUSIBLE_RATE}] EUR/m3"
             )
+    if not _MIN_PLAUSIBLE_VASTRECHT <= vastrecht <= _MAX_PLAUSIBLE_VASTRECHT:
+        raise ExtractorError(
+            f"{utility_id} {year}: vastrecht {vastrecht} is outside "
+            f"[{_MIN_PLAUSIBLE_VASTRECHT}, {_MAX_PLAUSIBLE_VASTRECHT}] EUR a year"
+        )
+    if not 0 < korting <= vastrecht:
+        raise ExtractorError(
+            f"{utility_id} {year}: korting {korting} per resident is not a discount "
+            f"on a vastrecht of {vastrecht}"
+        )
     if sanering_gemeentelijk < 0 or sanering_bovengemeentelijk < 0:
         raise ExtractorError(
             f"{utility_id} {year}: negative sanering {sanering_gemeentelijk} / "
@@ -105,8 +133,8 @@ def build_flanders_tariff(
         valid_until=date(year, 12, 31),
         publication_label=publication_label,
         source_url=source_url,
-        yearly_fixed_fee=FLANDERS_VASTRECHT_TOTAL,
-        yearly_fixed_fee_per_resident_discount=FLANDERS_KORTING_TOTAL_PER_PERSON,
+        yearly_fixed_fee=vastrecht,
+        yearly_fixed_fee_per_resident_discount=korting,
         basis_eur_per_m3=basis,
         comfort_eur_per_m3=comfort,
         sanering_gemeentelijk_eur_per_m3=sanering_gemeentelijk,

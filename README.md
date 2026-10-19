@@ -38,12 +38,12 @@ Tariffs are fetched **live** from each utility's own published page or
 PDF. **Every per-distributor rate is fetched bar one**: AIEC publishes
 its card only as a picture, so that one rate is transcribed from the
 picture against the date its file name carries, and the card AIEC's page
-is showing decides which transcription applies. The
-components that are uniform by decree are carried as constants and
-reviewed annually: the flat-Wallonia SPGE CVA and FSE, for the year they
-are in force (a later card is priced on the figures its own page
-prints), and the Flemish vastrecht and korting (50+30+20 and 10+6+4
-EUR). Add a utility by
+is showing decides which transcription applies. The Flemish vastrecht
+and korting are read off each card too, and the daily live check holds
+the cards to each other on them. The components that are uniform by
+decree are carried as constants and reviewed annually: the flat-Wallonia
+SPGE CVA and FSE, for the year they are in force (a later card is priced
+on the figures its own page prints). Add a utility by
 writing one Python module that knows where to find that utility's
 publication and how to parse it.
 
@@ -68,7 +68,7 @@ publication and how to parse it.
 - **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it. An operator picked by hand on an older release, before that answer was kept, has none, so the integration cannot tell it from a correction and the Repair appears; picking the same operator again under Reconfigure > Pick the utility directly records the answer and clears it, as the Repair says.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card it fetched, which is kept on disk, or, when it has none, on the last card the project's daily archive captured (see [the card archive](./docs/ci-and-testing.md#the-card-archive)), instead of retrying setup until the utility is back, and an outage that drags on past the staleness window, or a failing refresh on last year's card, picks up whatever the archive has captured since; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to the last hour Home Assistant's recorder has compiled, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
-- **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.).
+- **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.), or if the Flemish cards disagree on the vastrecht or korting they print.
 - **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so a move in the decreed constants above is the live check's to catch: it fails while any Walloon card is past the year the CVA and FSE constants are for, and when the Walloon cards of one year disagree on either figure. A card of a later year is priced on the figures its own page prints, so the Walloon entries keep serving on 1 January instead of stopping until a release ([pricing model](./docs/pricing-model.md#wallonia-the-cwape-tiers)).
 
 ## Supported utilities
@@ -160,7 +160,7 @@ of the corresponding regional bill:
 Brussels  : (consumption × (linear + sanering) + redevance) × (1 + VAT)
 Flanders  : (min(consumption, basis_volume) × (basis + sanering)
              + max(0, consumption - basis_volume) × (comfort + 2·sanering)
-             + max(0, vastrecht - persons·korting)) × (1 + VAT)
+             + max(0, vastrecht - min(persons, 5)·korting)) × (1 + VAT)
 Wallonia  : (min(consumption, 30) × (0.5·CVD + FSE)
              + max(0, min(consumption, 5000) - 30) × (CVD + CVA + FSE)
              + max(0, consumption - 5000) × (0.9·CVD + CVA + FSE)
@@ -208,7 +208,7 @@ with it, again without a restart.
 
 | Entity id suffix (English install) | Description |
 | --- | --- |
-| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, **as the card prints it** — before the per-resident korting and before VAT, which is how the operators publish it too. What a Flemish household is actually charged is `max(0, fee − persons × korting)`: € 80,00 ex-VAT at the default one resident against the € 100,00 shown here, and € 0,00 from five residents up. Parsed from the publication for VIVAQUA only; Flemish entries carry the decreed uniform vastrecht (50+30+20); Walloon entries use the regulator's formula `20·CVD + 30·CVA`, where the CVD is parsed and the CVA is the flat SPGE figure: the constant for a card of its year, the page's own for a later one. |
+| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, **as the card prints it** — before the per-resident korting and before VAT, which is how the operators publish it too. What a Flemish household is actually charged is `max(0, fee − min(persons, 5) × korting)`: € 80,00 ex-VAT at the default one resident against the € 100,00 shown here, and € 0,00 from five residents up. Parsed from the publication for VIVAQUA and the Flemish operators (the vastrecht of the three legs added up, 100 EUR on every 2026 card); Walloon entries use the regulator's formula `20·CVD + 30·CVA`, where the CVD is parsed and the CVA is the flat SPGE figure: the constant for a card of its year, the page's own for a later one. |
 | `basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
 | `comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
 | `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
@@ -307,9 +307,10 @@ auto-resolves cleanly.
    utilities additionally ask:
    - **Gedomicilieerd_persons** *(0-20)* — drives the basisvolume
      (`30 + 30·persons` m³, which the decree does not cap) and the
-     per-resident vastrecht korting (10 EUR for the drinkwater leg,
-     20 EUR for the integrale total). The korting stops mattering past
-     five residents, where it has cancelled the vastrecht outright.
+     per-resident vastrecht korting (20 EUR on the integrale total in
+     2026, as the card prints it). The korting counts at most five
+     residents, where at 2026's figures it has cancelled the vastrecht
+     outright.
      Default 1; 0 is right for a second home or a rental between
      tenants.
    - **Social tariff** — VMM means-tested 80 % reduction on the
@@ -578,7 +579,8 @@ you paid is worth more than a tidy chart.
 
   Registering more residents lowers a Flemish bill: each one adds 30 m³
   to the basisvolume billed at the basis rate, and takes the korting off
-  the vastrecht until five residents have cancelled it. 80 m³ on
+  the vastrecht up to the fifth resident, which at 2026's figures
+  cancels it. 80 m³ on
   Farys/Gent costs € 791,28 at one resident and € 586,38 at four. Past
   five only the basisvolume still grows, which saves money once the
   year's water goes over the 180 m³ that five residents already cover.

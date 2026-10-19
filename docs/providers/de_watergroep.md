@@ -72,8 +72,9 @@ figures.
   (1,9572 for Halle, 1,9114 for Sinaai).
 - `sanering_bovengemeentelijk_eur_per_m3`: "Zuivering van afvalwater €
   N,NNN" (1,7019).
-- `yearly_fixed_fee` 100 and per-resident discount 20: the VMM constants
-  in `const.py`.
+- `yearly_fixed_fee` 100 and per-resident discount 20: the household
+  "Vastrecht" and "Korting op vastrecht" tables above the basistarief, the
+  three legs added up. A missing leg fails the fetch.
 - VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.

@@ -63,10 +63,9 @@ Comforttarief > Basisverbruik (pro rata verrekend) 11,9816 euro/m³ 12
   `basis_eur_per_m3` with both sanering fields at 0, which keeps the bill
   right (basis plus sanering is still 5,9908); the `basis_rate` sensor
   shows the integrated rate as a result.
-- `yearly_fixed_fee` 100 and per-resident discount 20: the VMM constants
-  in `const.py` (`FLANDERS_VASTRECHT_TOTAL`,
-  `FLANDERS_KORTING_TOTAL_PER_PERSON`). The PDF's own "20 %" line is the
-  korting as a percentage of the vastrecht and is not read.
+- `yearly_fixed_fee` 100 and per-resident discount 20: the three "Vast
+  recht" lines added up, and the "Korting op vast recht" line, which the
+  PDF prints as a percentage of that vastrecht (20 %).
 - VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.

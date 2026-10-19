@@ -34,7 +34,13 @@ from custom_components.be_water_prices.providers.base import ExtractorError
 
 
 def _build(**overrides: float) -> None:
-    fields = {"basis": 2.0, "comfort": 4.0, "sanering_gemeentelijk": 1.0}
+    fields = {
+        "basis": 2.0,
+        "comfort": 4.0,
+        "vastrecht": 100.0,
+        "korting": 20.0,
+        "sanering_gemeentelijk": 1.0,
+    }
     fields.update(overrides)
     build_flanders_tariff(
         utility_id="farys",
@@ -74,6 +80,8 @@ def test_a_rate_outside_the_plausibility_window_is_not_a_card() -> None:
             source_url="https://example.invalid/",
             basis=0.29251,
             comfort=0.58502,
+            vastrecht=100.0,
+            korting=20.0,
         )
     # A believable basis with a comfort rate that is not.
     with pytest.raises(ExtractorError, match=r"comfort rate 29\.251 is outside"):
@@ -84,6 +92,8 @@ def test_a_rate_outside_the_plausibility_window_is_not_a_card() -> None:
             source_url="https://example.invalid/",
             basis=2.9251,
             comfort=29.251,
+            vastrecht=100.0,
+            korting=20.0,
         )
 
 
@@ -97,3 +107,46 @@ def test_every_real_flemish_rate_sits_inside_the_window() -> None:
     for basis in (1.6692, 2.1888, 2.3295, 2.9251, 3.0058, 5.9908):
         assert _MIN_PLAUSIBLE_RATE <= basis <= _MAX_PLAUSIBLE_RATE
         assert _MIN_PLAUSIBLE_RATE <= 2.0 * basis <= _MAX_PLAUSIBLE_RATE
+
+
+@pytest.mark.parametrize(
+    ("vastrecht", "korting", "match"),
+    [
+        (10.0, 2.0, r"vastrecht 10\.0 is outside"),
+        (1000.0, 200.0, r"vastrecht 1000\.0 is outside"),
+        (100.0, 0.0, "not a discount"),
+        (100.0, -20.0, "not a discount"),
+        (100.0, 200.0, "not a discount"),
+    ],
+)
+def test_a_vastrecht_or_korting_that_is_not_one_is_refused(
+    vastrecht: float, korting: float, match: str
+) -> None:
+    """Both are read off the card, so a cell read a decimal out or from the
+    wrong column is refused rather than billed."""
+    with pytest.raises(ExtractorError, match=match):
+        _build(vastrecht=vastrecht, korting=korting)
+
+
+def test_the_card_figures_are_what_is_billed() -> None:
+    """Nothing stands in for what the card prints."""
+    t = build_flanders_tariff(
+        utility_id="x",
+        year=2027,
+        publication_label="x",
+        source_url="https://example.invalid/",
+        basis=2.0,
+        comfort=4.0,
+        vastrecht=106.0,
+        korting=21.0,
+    )
+    assert (t.yearly_fixed_fee, t.yearly_fixed_fee_per_resident_discount) == (106.0, 21.0)
+
+
+def test_the_legs_must_add_up_to_the_printed_total() -> None:
+    from custom_components.be_water_prices.providers._flanders import leg_total
+
+    assert leg_total("x", 2026, "vastrecht", (50.0, 30.0, 20.0), 100.0) == 100.0
+    assert leg_total("x", 2026, "vastrecht", (50.0, 30.0, 20.0)) == 100.0
+    with pytest.raises(ExtractorError, match="do not add up to the 106"):
+        leg_total("x", 2026, "vastrecht", (50.0, 30.0, 20.0), 106.0)

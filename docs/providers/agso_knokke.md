@@ -61,8 +61,8 @@ taken.
 - Sum check: the page adds the three legs up itself in the "Integrale" row.
   Drinkwater + afvoer + zuivering must equal it within 0,0001, which
   catches a leg read from the wrong column where the 2x rule does not.
-- `yearly_fixed_fee` 100 and per-resident discount 20: the VMM constants
-  in `const.py`, not the page's Vast recht and Korting columns.
+- `yearly_fixed_fee` 100 and per-resident discount 20: the Vast recht and
+  Korting columns, the three legs added up and held to the integrale row.
 - VAT: ex-BTW figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.

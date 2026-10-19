@@ -37,7 +37,7 @@ basis_volume = 30 + 30 x persons
 sanering = sanering_gemeentelijk + sanering_bovengemeentelijk
 volumetric = min(m3, basis_volume) x (basis + sanering)
     + max(0, m3 - basis_volume) x (comfort + 2 x sanering)
-vastrecht = max(0, yearly_fixed_fee - persons x korting)
+vastrecht = max(0, yearly_fixed_fee - min(persons, 5) x korting)
 bill = (volumetric + fee_factor x vastrecht) x (1 + VAT)
 bill = bill x 0.20 (with the social tariff)
 ```
@@ -51,14 +51,16 @@ bill = bill x 0.20 (with the social tariff)
   uses the card's comforttarief, which every Flemish parser holds to
   twice the basistarief (De Watergroep derives it that way). A card with
   no comfort rate falls back to twice the basis.
-- The vastrecht and the korting are the decreed figures carried in
-  `const.py`, not read off the cards: `FLANDERS_VASTRECHT_TOTAL` is
-  50 + 30 + 20 = 100 EUR a year (drinkwater, gemeentelijk,
-  bovengemeentelijk) and `FLANDERS_KORTING_TOTAL_PER_PERSON` is
-  10 + 6 + 4 = 20 EUR per resident. `build_flanders_tariff` puts them in
-  `yearly_fixed_fee` and `yearly_fixed_fee_per_resident_discount`. The
-  floor at 0 is what caps the korting at five residents: five times 20
-  cancels the 100.
+- The vastrecht and the korting are read off each card, the three legs
+  added up: 50 + 30 + 20 = 100 EUR a year (drinkwater, gemeentelijk,
+  bovengemeentelijk) and 10 + 6 + 4 = 20 EUR per resident on every 2026
+  card. `build_flanders_tariff` puts them in `yearly_fixed_fee` and
+  `yearly_fixed_fee_per_resident_discount`. The korting counts at most
+  `FLANDERS_KORTING_MAX_RESIDENTS` (5) residents, as the cards state, and
+  never takes the vastrecht below 0. At 2026's figures the two rules
+  coincide, five times 20 cancelling the 100; a vastrecht that rose
+  without its korting would leave the difference to pay past the fifth
+  resident.
 - The social tariff takes 80 % off the whole bill, VAT and vastrecht
   included: the engine multiplies the VAT-inclusive total by 0.20.
 - Aquaduin prints one integrated basistarief, drinkwater and sanering

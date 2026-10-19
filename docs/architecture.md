@@ -82,9 +82,10 @@ the card archiver and the postcode map refresher, and `tests/` the suite
 - **No price in the source.** Every per-utility rate is read from the
   utility's publication on each fetch, bar AIEC's, whose card is a picture
   transcribed against the date its file name carries
-  ([providers/aiec.md](providers/aiec.md)). What is uniform by decree
-  (the Flemish vastrecht and korting, the Walloon CVA and FSE for the year
-  they are in force, VAT) is a constant in `const.py`.
+  ([providers/aiec.md](providers/aiec.md)). The Flemish vastrecht and
+  korting are read off each card. What is uniform by decree (the Walloon
+  CVA and FSE for the year they are in force, VAT) is a constant in
+  `const.py`.
 - **Fail closed, keep serving.** A page that changed shape, prints a
   figure off its cross-check or misses a mandatory row fails the fetch,
   and the entry keeps its last good card behind the stale-snapshot

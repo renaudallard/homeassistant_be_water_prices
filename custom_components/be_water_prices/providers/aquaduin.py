@@ -36,9 +36,10 @@ block as::
     Basistarief 30 m³ + 30 m³ per gedomicilieerde persoon  5,9908 euro/m³  6,35
     Comforttarief > Basisverbruik (pro rata verrekend)     11,9816 euro/m³ 12
 
-Plus the standard VMM vastrecht / korting (50/30/20 + 10/6/4 -- the
-``20 %`` line in the PDF is the per-resident korting expressed as a
-percentage of the matching vastrecht component).
+Plus the vastrecht of each leg, read off its "Vast recht ..." line, and
+the korting per resident, which the PDF prints as a percentage of the
+vastrecht ("Korting op vast recht (per jaar en per persoon, max 5)
+20,00%").
 
 The 5.9908 €/m³ is the **integrale waterprijs basistarief** (drinkwater
 + saneringsbijdragen combined into one per-m³ figure -- the highest
@@ -101,6 +102,17 @@ _BASIS_RE = re.compile(
 # the row cannot supply the first match. Tolerant of the ">" being
 # dropped or spaced differently; the space after it belongs to it, for
 # the reason inasep._CVD_RE gives.
+# "Vast recht water (per jaar en per abonnee) 50,00 euro/jaar 53,00", one
+# line per leg.
+_VASTRECHT_RE = re.compile(
+    r"^Vast\s+recht\s+(water|afvoer\s+afvalwater|zuivering\s+afvalwater)\s*"
+    r"\(per\s+jaar\s+en\s+per\s+abonnee\)\s*([\d.,]+)\s*euro/jaar",
+    re.IGNORECASE | re.MULTILINE,
+)
+_KORTING_RE = re.compile(
+    r"Korting\s+op\s+vast\s+recht\s*\([^)]*per\s+persoon[^)]*\)\s*([\d.,]+)\s*%",
+    re.IGNORECASE,
+)
 _COMFORT_RE = re.compile(
     r"comforttarief\s*(?:>\s*)?basisverbruik.*?([\d]+,\d{3,5})\s*euro/m³",
     re.IGNORECASE | re.DOTALL,
@@ -144,6 +156,19 @@ async def _discover_pdf_url(session: aiohttp.ClientSession, year: int) -> str:
     return pdf_url
 
 
+def _fixed_terms(text: str) -> tuple[float, float]:
+    """The vastrecht summed over the three legs, and the korting per
+    resident the card prints as a share of it."""
+    legs: dict[str, float] = {}
+    for match in _VASTRECHT_RE.finditer(text):
+        legs.setdefault(match.group(1).split()[0].lower(), to_float(match.group(2)))
+    korting = _KORTING_RE.search(text)
+    if set(legs) != {"water", "afvoer", "zuivering"} or korting is None:
+        raise ExtractorError("could not parse Aquaduin's vast recht / korting lines")
+    vastrecht = sum(legs.values())
+    return vastrecht, vastrecht * to_float(korting.group(1)) / 100.0
+
+
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     """Parse a captured Aquaduin tariff PDF (extracted via pdfplumber)."""
     target = year or belgian_today().year
@@ -168,6 +193,8 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
             f"Aquaduin comforttarief {comfort} is not 2× basistarief {basis} (VMM 2× rule)"
         )
 
+    vastrecht, korting = _fixed_terms(text)
+
     # basis is integrated drinkwater + sanering, see module docstring; the
     # sanering_* arguments stay at their default of 0.0.
     return build_flanders_tariff(
@@ -177,6 +204,8 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
         source_url=SOURCE_URL_FMT.format(year=target),
         basis=basis,
         comfort=comfort,
+        vastrecht=vastrecht,
+        korting=korting,
     )
 
 

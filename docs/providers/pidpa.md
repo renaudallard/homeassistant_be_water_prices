@@ -83,8 +83,10 @@ Two paths; only the first one serves a card:
   (1,7019).
 - Sum check: the fifth cell of the basistarief row is the page's own sum,
   and the three legs must make it within 0,0001.
-- `yearly_fixed_fee` 100 and per-resident discount 20: the VMM constants
-  in `const.py`; the page's vastrecht and korting rows are not read.
+- `yearly_fixed_fee` 100 and per-resident discount 20: the vastrecht and
+  korting rows, the drinkwater, afvoer and zuivering cells added up and
+  held to the integrale cell. The Tariefplan PDF's "Tarieven Vast recht
+  Korting/DOM" rows give the same on the drift check's path.
 - VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.

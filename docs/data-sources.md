@@ -176,14 +176,12 @@ options, so an addition reaches entries that picked the commune earlier.
 
 `const.py` holds the figures the regulator sets rather than the utility:
 
-- **Flemish vastrecht and korting.** `FLANDERS_VASTRECHT_DRINKWATER`,
-  `FLANDERS_VASTRECHT_GEMEENTELIJK` and
-  `FLANDERS_VASTRECHT_BOVENGEMEENTELIJK` (50, 30, 20 EUR a year, total
-  `FLANDERS_VASTRECHT_TOTAL`), and the per-resident korting on each
-  (`FLANDERS_KORTING_*_PER_PERSON`: 10, 6, 4, total
-  `FLANDERS_KORTING_TOTAL_PER_PERSON`). `build_flanders_tariff` in
-  `providers/_flanders.py` puts the two totals on every Flemish card as
-  `yearly_fixed_fee` and `yearly_fixed_fee_per_resident_discount`.
+- **Flemish korting cap.** `FLANDERS_KORTING_MAX_RESIDENTS` (5), the most
+  residents the korting counts, a rule the De Watergroep, Pidpa, AGSO and
+  Aquaduin cards state. The vastrecht and the korting themselves are not
+  constants: every Flemish parser reads them off its card, and
+  `scripts/live_check.py` fails when the Flemish cards of one year
+  disagree on either (`_check_flanders_fixed`).
 - **Walloon CVA and FSE.** `WALLONIA_CVA_EUR_PER_M3` (2.748) and
   `WALLONIA_FSE_EUR_PER_M3` (0.0339), the figures in force in
   `WALLONIA_SPGE_YEAR` (2026). Every Walloon extractor gets them through

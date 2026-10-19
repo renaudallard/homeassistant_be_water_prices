@@ -96,27 +96,13 @@ WALLONIA_SPGE_YEAR = 2026
 # Standard Belgian residential VAT rate on water.
 DEFAULT_VAT_RATE = 0.06
 
-# Standard VMM "integrale waterprijs" vastrecht structure for Flanders.
-# Mandated by the Vlaamse regering since 2016 and uniform across operators
-# (De Watergroep, Pidpa, Farys, Water-link, Aquaduin, AGSO Knokke). Each
-# component is split into its own line on the bill but the operator-side
-# numbers are identical, so we keep one source of truth here.
-FLANDERS_VASTRECHT_DRINKWATER = 50.0
-FLANDERS_VASTRECHT_GEMEENTELIJK = 30.0
-FLANDERS_VASTRECHT_BOVENGEMEENTELIJK = 20.0
-FLANDERS_VASTRECHT_TOTAL = (
-    FLANDERS_VASTRECHT_DRINKWATER
-    + FLANDERS_VASTRECHT_GEMEENTELIJK
-    + FLANDERS_VASTRECHT_BOVENGEMEENTELIJK
-)
-FLANDERS_KORTING_DRINKWATER_PER_PERSON = 10.0
-FLANDERS_KORTING_GEMEENTELIJK_PER_PERSON = 6.0
-FLANDERS_KORTING_BOVENGEMEENTELIJK_PER_PERSON = 4.0
-FLANDERS_KORTING_TOTAL_PER_PERSON = (
-    FLANDERS_KORTING_DRINKWATER_PER_PERSON
-    + FLANDERS_KORTING_GEMEENTELIJK_PER_PERSON
-    + FLANDERS_KORTING_BOVENGEMEENTELIJK_PER_PERSON
-)
+# The Flemish korting on the vastrecht counts at most this many registered
+# residents per wooneenheid: "De korting geldt voor maximaal 5
+# gedomicilieerde personen per wooneenheid", as the De Watergroep, Pidpa,
+# AGSO and Aquaduin cards print it. A rule of the decree like the 30 m3 per
+# resident of the basisvolume, not a rate. The vastrecht and the korting
+# themselves are read off each card.
+FLANDERS_KORTING_MAX_RESIDENTS = 5
 
 # Config / option keys.
 CONF_UTILITY = "utility"
@@ -144,13 +130,11 @@ DEFAULT_PERSONS = 1
 # is capped. The basisvolume is 30 m3 per wooneenheid plus 30 m3 per
 # gedomicilieerde with no maximum, so a bound of 5 understated the free
 # block for a larger household and overstated its bill. The korting on
-# the vastrecht IS capped at 5, but the decree phrases that cap as "the
-# total korting can never exceed the vastrecht charged", which the
-# max(0.0, ...) in pricing.py already enforces: at the decreed uniform
-# 100 EUR vastrecht and 20 EUR per resident, the fifth person zeroes it.
+# the vastrecht IS capped, at FLANDERS_KORTING_MAX_RESIDENTS, and pricing.py
+# applies the cap.
 #
 # So these two only bound what a person can sensibly type. Zero is a
-# real answer -- a second home, or a rental between tenants.
+# real answer: a second home, or a rental between tenants.
 MIN_PERSONS = 0
 MAX_PERSONS = 20
 

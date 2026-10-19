@@ -47,9 +47,9 @@ up year-on-year.
 
 Stores all three components separately (drinkwater + afvoer +
 zuivering) the way Pidpa does, so the ``basis_rate`` /
-``sewerage_rate`` sensors decompose cleanly. Uses the standard
-VMM vastrecht (50/30/20 + 10/6/4) materialised from
-:mod:`const`.
+``sewerage_rate`` sensors decompose cleanly. The vastrecht and the
+korting per resident come from the last two columns, each leg's
+held to the total the integrale row prints.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ import aiohttp
 from bs4 import BeautifulSoup, Tag
 
 from ..const import REGION_FLANDERS
-from ._flanders import build_flanders_tariff
+from ._flanders import build_flanders_tariff, leg_total
 from ._html import extract_amounts, fetch_and_parse
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
 
@@ -123,6 +123,19 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
             f"AGSO Knokke rows {drinkwater} + {afvoer} + {zuivering} do not add up to the "
             f"integrale waterprijs {integrale} the page prints"
         )
+    # The vastrecht and the korting per resident sit in the last two
+    # columns of each leg's row, the korting signed.
+    fixed: list[float] = []
+    for column, name in ((5, "vastrecht"), (6, "korting")):
+        cells = [
+            _row_first_amount(table, row, column)
+            for row in ("drinkwater", "afvoer", "zuivering", "integrale")
+        ]
+        amounts = [abs(cell) for cell in cells if cell is not None]
+        if len(amounts) != 4:
+            raise ExtractorError(f"AGSO Knokke table carries no {name} column")
+        fixed.append(leg_total(UTILITY_ID, year, name, amounts[:3], amounts[3]))
+    vastrecht, korting = fixed
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=year,
@@ -130,6 +143,8 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
         source_url=SOURCE_URL,
         basis=drinkwater,
         comfort=comfort,
+        vastrecht=vastrecht,
+        korting=korting,
         sanering_gemeentelijk=afvoer,
         sanering_bovengemeentelijk=zuivering,
     )

@@ -465,9 +465,10 @@ async def test_a_broken_commune_list_fails_the_run(monkeypatch: pytest.MonkeyPat
     assert [(r.extractor_id, r.status) for r in results] == [
         ("acme", "OK"),
         ("acme/communes", "FAIL"),
+        ("flanders_fixed", "OK"),
     ]
     assert rc & EXIT_REAL_FAIL
-    assert "**1 of 2 checks failed.**" in live_check._render(results)
+    assert "**1 of 3 checks failed.**" in live_check._render(results)
     fingerprint = [
         line.split("|")[1].strip()
         for line in live_check._render(results).splitlines()
@@ -527,6 +528,49 @@ def test_every_commune_lister_has_a_floor() -> None:
 
     listers = {e.id for e in all_extractors() if e.supports_communes}
     assert set(MIN_COMMUNES) == listers
+
+
+# The Flemish vastrecht and korting.
+
+
+def _flemish(year: int, vastrecht: float, korting: float) -> Any:
+    from custom_components.be_water_prices.providers.base import WaterTariff
+
+    return WaterTariff(
+        utility="x",
+        region="flanders",
+        valid_from=date(year, 1, 1),
+        valid_until=date(year, 12, 31),
+        publication_label="x",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=vastrecht,
+        yearly_fixed_fee_per_resident_discount=korting,
+        basis_eur_per_m3=2.0,
+    )
+
+
+def test_the_flemish_cards_of_a_year_must_agree_on_the_vastrecht() -> None:
+    """Each card is billed on the vastrecht and korting it prints, so one
+    that misread either stands out only against the others."""
+    from scripts.live_check import _check_flanders_fixed
+
+    agreed = _check_flanders_fixed(
+        {"Farys": _flemish(2026, 100.0, 20.0), "Pidpa": _flemish(2026, 100.0, 20.0)}
+    )
+    assert agreed is not None and agreed.status == "OK"
+    apart = _check_flanders_fixed(
+        {"Farys": _flemish(2026, 100.0, 20.0), "Pidpa": _flemish(2026, 100.0, 10.0)}
+    )
+    assert apart is not None and apart.status == "FAIL"
+    assert "2026 cards disagree on the korting: Farys 20.0, Pidpa 10.0" in apart.detail
+    assert "on the vastrecht" not in apart.detail
+    # January has cards of two years beside each other.
+    mixed = _check_flanders_fixed(
+        {"Farys": _flemish(2026, 100.0, 20.0), "Pidpa": _flemish(2027, 110.0, 22.0)}
+    )
+    assert mixed is not None and mixed.status == "OK"
+    # Walloon cards carry no korting and are not compared here.
+    assert _check_flanders_fixed({"SWDE": _walloon(2026, 2.748, 0.0339)}) is None
 
 
 # --- the Walloon SPGE figures ------------------------------------------------

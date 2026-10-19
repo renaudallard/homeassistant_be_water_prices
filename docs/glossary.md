@@ -21,13 +21,13 @@
 | Hydria | The Brussels sanitation body on whose behalf VIVAQUA bills the sanitation part of its rate. |
 | Integrale waterprijs | The Flemish bill structure: drinkwater, gemeentelijke and bovengemeentelijke saneringsbijdrage, each with a vastrecht and a per-m³ rate in basis and comfort blocks. |
 | Intercommunale | A company owned by several communes. Most Walloon distributors are one: CILE, INASEP, IEG, AIEM, AIEC, CIESAC and IDEN carry the word in their names, and `_walloon_simple.py` is the builder for the small ones. |
-| Korting | The Flemish reduction of the vastrecht per registered resident: 10 + 6 + 4 = 20 EUR (`FLANDERS_KORTING_TOTAL_PER_PERSON`), never taking the vastrecht below zero. |
+| Korting | The Flemish reduction of the vastrecht per registered resident, read off the card: 10 + 6 + 4 = 20 EUR in 2026, counting at most five residents (`FLANDERS_KORTING_MAX_RESIDENTS`) and never taking the vastrecht below zero. |
 | Redevance | The Walloon yearly fixed fee, `20 x CVD + 30 x CVA` (`yearly_fixed_fee`, built by `build_tariff`). |
 | Régie communale | A commune that runs its own water distribution. About thirty in Wallonia; none is supported, and their postcodes fall through to the manual picker. |
 | Saneringsbijdrage (gemeentelijk, bovengemeentelijk) | The Flemish sewerage contributions: the gemeentelijke one for the commune's sewers, which differs per commune, and the bovengemeentelijke one for treatment above the municipal level. |
 | Social tariff (sociaal tarief) | The Flemish reduction for eligible households: 80 % off the whole bill (`social_tariff` in the options). |
 | SPGE (Société publique de gestion de l'eau) | The Walloon public water management company. With CWaPE it is the source of the flat CVA and FSE, carried in `const.py` for `WALLONIA_SPGE_YEAR`. |
-| Vastrecht | The Flemish yearly fixed charge: 50 + 30 + 20 = 100 EUR for the three legs (`FLANDERS_VASTRECHT_TOTAL`), before the korting. |
+| Vastrecht | The Flemish yearly fixed charge, read off the card: 50 + 30 + 20 = 100 EUR for the three legs in 2026, before the korting. |
 | VMM (Vlaamse Milieumaatschappij) | The Flanders environment agency. The code cites it for the integrale waterprijs rules: the comfort rate at twice the basis and the 80 % social reduction. |
 | ZDE (zones de distribution d'eau) | The Géoportail Wallonie map of which distributor serves where. `scripts/refresh_postcodes.py` builds the Walloon postcode table from it. |
 

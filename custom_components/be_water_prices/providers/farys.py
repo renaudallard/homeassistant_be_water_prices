@@ -31,8 +31,8 @@ a commune fires a Drupal AJAX form POST to
 `/nl/watertarieven?ajax_form=1`; the response is a JSON envelope
 containing an `insert` command whose `data` field is HTML markup with
 the full per-commune integrale waterprijs structure (drinkwater +
-gemeentelijke + bovengemeentelijke saneringsbijdragen, with the
-standard VMM 50/30/20 + 10/6/4 vastrecht/korting split).
+gemeentelijke + bovengemeentelijke saneringsbijdragen, each leg with
+its own vastrecht and korting).
 
 The extractor calls that endpoint directly with the commune ID baked
 in (Gent-centrum = 25071 by default) and parses the rates out of the
@@ -163,6 +163,12 @@ _TUSSENKOMST_COMFORT_RE = re.compile(
 )
 
 
+# Each leg's block opens with its vastrecht and the korting per resident
+# on it, ex-VAT then with VAT like the rates, the korting signed.
+_VASTRECHT_RE = re.compile(r"Vastrecht\s*\(per\s*jaar\)" + _PAIR, re.IGNORECASE)
+_KORTING_RE = re.compile(r"Korting\s+op\s+vastrecht\s*\(per\s*jaar\)" + _SIGNED_PAIR, re.IGNORECASE)
+
+
 _PERIOD_RE = re.compile(r"(?:[A-Za-z]{3,4}\.?\s*)?(20\d\d)")
 
 
@@ -225,12 +231,36 @@ def _amount(text: str, pattern: re.Pattern[str], label: str) -> float:
     match = pattern.search(text)
     if match is None:
         raise ExtractorError(f"Farys: could not find {label} in the AJAX HTML payload")
+    return _checked(match, label)
+
+
+def _checked(match: re.Match[str], label: str) -> float:
     rate, with_vat = to_float(match.group(1)), to_float(match.group(2))
     if abs(rate * (1.0 + DEFAULT_VAT_RATE) - with_vat) > 0.001:
         raise ExtractorError(
             f"Farys: {label} {rate} and its VAT-inclusive figure {with_vat} do not agree"
         )
     return rate
+
+
+def _fixed_terms(text: str) -> tuple[float, float]:
+    """The household vastrecht and korting per resident, summed over the
+    three legs.
+
+    Only the household card counts: the non-household tab further down
+    repeats the same rows, so the search stops at the household card's
+    integrale waterprijs, which follows its three legs.
+    """
+    end = _INTEGRALE_BASIS_RE.search(text)
+    household = text[: end.start()] if end is not None else ""
+    vastrecht = [_checked(m, "vastrecht") for m in _VASTRECHT_RE.finditer(household)]
+    korting = [-_checked(m, "korting") for m in _KORTING_RE.finditer(household)]
+    if len(vastrecht) != 3 or len(korting) != 3:
+        raise ExtractorError(
+            f"Farys: found {len(vastrecht)} vastrecht and {len(korting)} korting rows "
+            "on the household card, not one per leg"
+        )
+    return sum(vastrecht), sum(korting)
 
 
 def _optional_amount(text: str, pattern: re.Pattern[str], label: str) -> float:
@@ -282,6 +312,8 @@ def parse_tariff(
             f"the integrale waterprijs {integrale} the page prints"
         )
 
+    vastrecht, korting = _fixed_terms(text)
+
     active = _active_period_year(soup)
     clock = belgian_today().year
     if year is None and active is not None and active > clock:
@@ -303,6 +335,8 @@ def parse_tariff(
         source_url=PAGE_URL,
         basis=basis,
         comfort=comfort,
+        vastrecht=vastrecht,
+        korting=korting,
         sanering_gemeentelijk=sanering_gem,
         sanering_bovengemeentelijk=sanering_bov,
     )

@@ -237,6 +237,19 @@ def test_flanders_vastrecht_floors_at_zero_for_huge_household() -> None:
     assert cost_clamped == 0.0
 
 
+def test_the_korting_counts_at_most_five_residents() -> None:
+    """The cards cap the korting at five domiciled residents. At 100 EUR
+    and 20 EUR the floor at zero does the same job, but the two figures
+    are read off the cards: a vastrecht that rises without its korting
+    still leaves something to pay past the fifth resident."""
+    import dataclasses
+
+    dearer = dataclasses.replace(_pidpa_2026(), yearly_fixed_fee=110.0)
+    # 110 - 5 x 20 = 10 EUR ex-VAT, 10.60 with VAT, at no consumption.
+    assert compute_annual_cost(dearer, 0, 5) == 10.6
+    assert compute_annual_cost(dearer, 0, 7) == 10.6
+
+
 def test_returns_none_for_unwired_region() -> None:
     bogus = WaterTariff(
         utility="other",

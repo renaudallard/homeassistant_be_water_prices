@@ -97,8 +97,9 @@ afvoer, zuivering, total ex-VAT and total with VAT.
   (1,3345 for Antwerpen, 1,9572 for the ring).
 - `sanering_bovengemeentelijk_eur_per_m3`: the basis row's zuivering
   column (1,7019).
-- `yearly_fixed_fee` 100 and per-resident discount 20: the VMM constants
-  in `const.py`; the PDF's vastrecht and korting lines are not read.
+- `yearly_fixed_fee` 100 and per-resident discount 20: the vastrecht and
+  korting lines, the Water, Afvoer and Zuivering columns added up and held
+  to the Totaal column.
 - VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.

@@ -40,6 +40,7 @@ the user's stored options:
 
 from __future__ import annotations
 
+from .const import FLANDERS_KORTING_MAX_RESIDENTS
 from .providers.base import WaterTariff
 
 
@@ -76,10 +77,12 @@ def _compute_bill(
     components -- this 2× rule is mandated by VMM and applies
     uniformly, so the calc engine doubles the sanering values rather
     than the extractors carrying duplicate fields. The annual vastrecht
-    is ``max(0, yearly_fixed_fee − persons · korting) · fee_factor``;
-    that floor is also what caps the korting at five residents, since
-    the uniform 20 EUR per resident cancels the uniform 100 EUR
-    vastrecht exactly.
+    is ``max(0, yearly_fixed_fee − min(persons, 5) · korting) · fee_factor``:
+    the korting counts at most five residents and never takes the
+    vastrecht below zero, the two rules the cards state. At the 100 EUR
+    vastrecht and 20 EUR korting of 2026 the two coincide, but both
+    figures are read off the cards, so neither rule stands in for the
+    other.
     ``social_tariff=True`` applies the VMM 80 % reduction on the
     post-calc total.
     """
@@ -129,7 +132,9 @@ def _compute_bill(
         volumetric = consumed_basis * per_m3_basis + consumed_comfort * per_m3_comfort
         vastrecht = max(
             0.0,
-            tariff.yearly_fixed_fee - persons * tariff.yearly_fixed_fee_per_resident_discount,
+            tariff.yearly_fixed_fee
+            - min(persons, FLANDERS_KORTING_MAX_RESIDENTS)
+            * tariff.yearly_fixed_fee_per_resident_discount,
         )
         ex_vat = volumetric + fee_factor * vastrecht
         total = ex_vat * (1.0 + tariff.vat_rate)

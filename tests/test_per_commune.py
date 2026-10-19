@@ -146,8 +146,10 @@ def test_basis_per_m3_block_picks_data_bearing_occurrence() -> None:
         "Zuivering van afvalwater € 1,7019 "
         "Comforttarief per m³"
     )
-    block = _basis_per_m3_block(text)
-    assert block is not None
+    found = _basis_per_m3_block(text)
+    assert found is not None
+    block, start = found
+    assert text[start:].startswith(block)
     assert "Waterverbruik drinkwater € 2,9251" in block
     # The header-only first occurrence must NOT be the chosen block.
     assert "uitleg over de berekening" not in block
