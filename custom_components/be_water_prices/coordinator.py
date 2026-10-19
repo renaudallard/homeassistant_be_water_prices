@@ -1382,6 +1382,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         Saved after the refresh returns rather than awaited: an await here
         is the window a live meter event uses to publish a figure the
         refresh would then overwrite.
+
+        The delay is not zero: a save timed for the loop's present never
+        fires under a frozen test clock, and the loop then spins on it,
+        starving the recorder's thread.
         """
         self._last_good = (tariff, fetched_at)
         if not self._owns_the_entry():
@@ -1391,7 +1395,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             "fetched_at": fetched_at.isoformat(),
             "commune": self._fetched_commune(),
         }
-        self._card_store.async_delay_save(lambda: record, 0)
+        self._card_store.async_delay_save(lambda: record, 1)
 
     async def async_load_last_good(self) -> None:
         """Restore the last good card before the first refresh.

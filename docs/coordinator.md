@@ -74,8 +74,10 @@ archived card that was taken becomes the held card through `_hold`.
 
 `_hold` keeps `(card, fetched_at)` in memory and, while the coordinator
 owns the entry, schedules a save of `card`, `fetched_at` and `commune` to
-the card Store (`_card_store`, `async_delay_save` with no delay, not
-awaited, so a meter event cannot slip in between). `async_load_last_good`
+the card Store (`_card_store`, `async_delay_save` one second out, not
+awaited, so a meter event cannot slip in between; a save due at the
+loop's present never fires under a frozen test clock, which then spins
+on it). `async_load_last_good`
 restores it at setup only when the card's utility and the stored commune
 match the entry as it is now; a record that cannot be read
 (`_held_from_record`, a naive timestamp included) is dropped.
