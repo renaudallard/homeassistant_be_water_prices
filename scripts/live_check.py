@@ -34,7 +34,8 @@ fetched too, and checked against a floor on its length, since the
 config flow quietly drops the commune selector when that list fails.
 The figures a whole region shares, the Flemish vastrecht and korting and
 the Walloon CVA and FSE, are compared across that region's cards, since
-each card is billed on its own reading of them. Checks every extractor rather than stopping at the first failure,
+each card is billed on its own reading of them, and the VAT rate across
+every card. Checks every extractor rather than stopping at the first failure,
 prints a markdown report to stdout and folds the outcomes into the exit
 code below.
 
@@ -123,6 +124,13 @@ SPGE_FIGURES: dict[str, tuple[Callable[[WaterTariff], float], float]] = {
 FLANDERS_FIXED: dict[str, tuple[Callable[[WaterTariff], float], float]] = {
     "vastrecht": (lambda t: t.yearly_fixed_fee, 0.01),
     "korting": (lambda t: t.yearly_fixed_fee_per_resident_discount, 0.01),
+}
+
+# The VAT rate each card gives, by its own statement or its VAT-inclusive
+# figures. Water carries one residential rate across the country, so a
+# card reading another has misread it.
+VAT_FIGURE: dict[str, tuple[Callable[[WaterTariff], float], float]] = {
+    "VAT rate": (lambda t: t.vat_rate, 1e-9),
 }
 
 # Fewest communes each lister may return before the list is called
@@ -322,6 +330,19 @@ def _check_spge(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
     return CheckResult("spge", "Walloon SPGE figures", REGION_WALLONIA, status, detail)
 
 
+def _check_vat(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
+    """The VAT rate every card was billed at, side by side. None when no
+    card came back."""
+    if not tariffs:
+        return None
+    problems = _disagreements(tariffs, VAT_FIGURE)
+    if problems:
+        status, detail = "FAIL", "; ".join(problems)
+    else:
+        status, detail = "OK", f"{len(tariffs)} cards agree on the VAT rate"
+    return CheckResult("vat", "VAT rate", "all", status, detail)
+
+
 async def _check_communes(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:
     """The commune list the config flow offers. When it fails, the flow
     leaves the commune field out and the entry is billed on the
@@ -372,7 +393,7 @@ async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, Store
                 results.append(await _check_one(session, e, seen))
                 if e.supports_communes:
                     results.append(await _check_communes(session, e))
-            for agreement in (_check_flanders_fixed(seen), _check_spge(seen)):
+            for agreement in (_check_flanders_fixed(seen), _check_spge(seen), _check_vat(seen)):
                 if agreement is not None:
                     results.append(agreement)
     return results, _exit_code(results), cache

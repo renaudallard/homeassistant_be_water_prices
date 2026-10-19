@@ -52,7 +52,8 @@ parsed live, the CVA and FSE read off the table.
   raises.
 - `yearly_fixed_fee`: `20 x CVD + 30 x CVA`, computed by `build_tariff`,
   which also holds the CVD to the 1.5 to 6.0 EUR/m³ window.
-- VAT: ex-VAT figures; `vat_rate` is 6 %.
+- VAT: ex-VAT figures; `vat_rate` is the rate the table's "TVA 6%" row
+  states (`stated_vat_rate`).
 
 ### CVA and FSE
 

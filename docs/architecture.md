@@ -84,7 +84,7 @@ the card archiver and the postcode map refresher, and `tests/` the suite
   transcribed against the date its file name carries
   ([providers/aiec.md](providers/aiec.md)). What is uniform by decree,
   the Flemish vastrecht and korting and the Walloon CVA and FSE, is read
-  off each card too. VAT is a constant in `const.py`.
+  off each card too, and so is the VAT rate.
 - **Fail closed, keep serving.** A page that changed shape, prints a
   figure off its cross-check or misses a mandatory row fails the fetch,
   and the entry keeps its last good card behind the stale-snapshot

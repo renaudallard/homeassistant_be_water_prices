@@ -82,7 +82,10 @@ CARD_ARCHIVE_URL = (
 # failure is caught by the daily live_check workflow.
 SNAPSHOT_STALE_AFTER_DAYS = 35
 
-# Standard Belgian residential VAT rate on water.
+# The Belgian residential VAT rate on water, for a card that neither states
+# its rate nor prints VAT-inclusive figures to read it off: IDEN's page
+# and the Pidpa Tariefplan projection. Every other card's rate is read off
+# the card.
 DEFAULT_VAT_RATE = 0.06
 
 # The Flemish korting on the vastrecht counts at most this many registered

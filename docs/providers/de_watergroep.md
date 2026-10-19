@@ -75,7 +75,8 @@ figures.
 - `yearly_fixed_fee` 100 and per-resident discount 20: the household
   "Vastrecht" and "Korting op vastrecht" tables above the basistarief, the
   three legs added up. A missing leg fails the fetch.
-- VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
+- VAT: `vat_rate` is the rate the vastrecht legs and their "(incl. € N)"
+  twins give (100 and 106, so 6 %). `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.
 - Label: "De Watergroep tarieven `<year>` (`<commune>`)". The per-commune

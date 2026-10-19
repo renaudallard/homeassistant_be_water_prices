@@ -68,7 +68,7 @@ divides by `1 + vat_rate` when parsing (VIVAQUA does).
 | `linear_eur_per_m3` | Brussels: VIVAQUA's supply rate. None elsewhere. |
 | `sanering_gemeentelijk_eur_per_m3`, `sanering_bovengemeentelijk_eur_per_m3` | Flanders: the municipal and supra-municipal saneringsbijdrage. VIVAQUA's sanitation rate is carried in the first. 0 where not used. |
 | `cvd_eur_per_m3`, `cva_eur_per_m3`, `fse_eur_per_m3` | Wallonia: the distributor's CVD and the flat CVA and FSE. 0 elsewhere. |
-| `vat_rate` | 0.06 by default (`const.DEFAULT_VAT_RATE`). |
+| `vat_rate` | The rate the card gives; `const.DEFAULT_VAT_RATE` (0.06) for a card that gives none. |
 
 How these become a bill is in [pricing-model.md](pricing-model.md).
 
@@ -83,6 +83,10 @@ Helpers in `base.py`:
   so a utility that publishes late in January does not raise the
   stale-snapshot Repair on day one. A card of `target_year` or later is
   returned as it is.
+- `vat_from_pair(label, ex_vat, with_vat)` / `vat_from_percent(label,
+  percent)`: the VAT rate a card gives, from a figure and its VAT-inclusive
+  twin or from a stated percentage. A rate of zero or less, or above 25 %,
+  is a misread and raises `ExtractorError`.
 - `tariff_to_dict(tariff)` / `tariff_from_dict(data)`: the card as JSON
   values with ISO dates, and back. One codec serves the coordinator's
   stored last good card, the card the running bill is held on, and the
@@ -196,10 +200,10 @@ The module is a vendored subset of the electricity integration's reader.
 ### `_flanders.py`: the Flemish builder
 
 `build_flanders_tariff(utility_id=, year=, publication_label=, source_url=,
-basis=, comfort=, vastrecht=, korting=, sanering_gemeentelijk=0.0,
+basis=, comfort=, vastrecht=, korting=, vat_rate=, sanering_gemeentelijk=0.0,
 sanering_bovengemeentelijk=0.0)` builds every Flemish card. It takes the
 vastrecht and the korting per resident the card prints, the three legs
-added up, dates the card 1 January to 31 December of `year`, and refuses
+added up, and the VAT rate the vastrecht and its VAT-inclusive twin give, dates the card 1 January to 31 December of `year`, and refuses
 a basis or comfort rate of zero or less or outside 0.5 to 20 EUR/m³, a
 vastrecht outside 20 to 500 EUR a year, a korting of zero or less or above
 the vastrecht, and a negative sanering. `leg_total` adds up the legs of a
@@ -236,8 +240,12 @@ publication_label_prefix=)`, which wires `fetch_tariff` and
   label's number read for the other looks like.
 - `read_spge(text, utility_id=)`: reads the CVA and FSE off a prose page
   (`parse_cva`, `parse_fse`) and hands them to `spge_components`.
+- `stated_vat_rate(text, label=)`: the VAT rate a Walloon page states
+  ("TVA : 6 %", "TVA de 6%", "HTVA 6%", "6 % TVA", SWDE's "VAT ... 6 %"),
+  `DEFAULT_VAT_RATE` when it states none, and an `ExtractorError` when it
+  states two.
 - `build_tariff(utility_id=, cvd=, source_url=, publication_label=, year=,
-  cva=, fse=, valid_from=None)`: refuses a CVD outside the window, sets the
+  cva=, fse=, vat_rate=, valid_from=None)`: refuses a CVD outside the window, sets the
   redevance to `20 x CVD + 30 x CVA`, dates the card from `valid_from` or
   1 January to 31 December, and passes it through `carry_prior_year_card`.
 - `effective_date(text, year)`: the "à partir du DD/MM/YYYY" AIEM prints

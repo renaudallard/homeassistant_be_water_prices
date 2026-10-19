@@ -63,7 +63,8 @@ taken.
   catches a leg read from the wrong column where the 2x rule does not.
 - `yearly_fixed_fee` 100 and per-resident discount 20: the Vast recht and
   Korting columns, the three legs added up and held to the integrale row.
-- VAT: ex-BTW figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
+- VAT: `vat_rate` is the rate the integrale vastrecht and the "Incl. BTW"
+  row under it give (100,00 and 106,00, so 6 %). `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.
 

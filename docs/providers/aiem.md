@@ -52,8 +52,8 @@ page is read as flat text.
   `spge_components` (see below).
 - `yearly_fixed_fee`: the redevance, `20 x CVD + 30 x CVA`, computed by
   `build_tariff`. The page does not print it as a figure.
-- VAT: the page prints ex-VAT ("HTVA") figures; `vat_rate` is
-  `DEFAULT_VAT_RATE` (6 %).
+- VAT: the page prints ex-VAT ("HTVA 6%") figures; `vat_rate` is the rate
+  those statements give (`stated_vat_rate`).
 
 ### CVA and FSE
 

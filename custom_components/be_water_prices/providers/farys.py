@@ -62,7 +62,7 @@ from .._phantom_blocklists import (
 from .._phantom_blocklists import (
     FARYS_UNSERVABLE_LABELS as _UNSERVABLE_COMMUNE_LABELS,
 )
-from ..const import DEFAULT_VAT_RATE, REGION_FLANDERS
+from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._pdf import (
     USER_AGENT,
@@ -81,6 +81,7 @@ from .base import (
     WaterTariff,
     belgian_today,
     carry_prior_year_card,
+    vat_from_pair,
 )
 
 # Re-exported so ``async_migrate_entry`` and the test suite can read
@@ -124,9 +125,10 @@ _CURRENT_PAGE_NID = "20471"
 # Match "Basistarief drinkwater (per m³) € N,NNNN" and the matching
 # comforttarief / sanering rows. The HTML has the labels broken across
 # inline tags but the text-collapsed version is stable.
-# Each row prints the rate twice, ex-VAT then with 6 % VAT, and both are
+# Each row prints the rate twice, ex-VAT then with VAT, and both are
 # read: a row that lost its ex-VAT cell would otherwise hand the VAT
-# figure over as the rate, six percent high and shaped like a price.
+# figure over as the rate, a VAT rate high and shaped like a price. The
+# rate itself is the one the first vastrecht and its twin give.
 _PAIR = r"\s*€\s*([\d]+,\d{3,5})\s*€\s*([\d]+,\d{3,5})"
 _BASIS_DRINKWATER_RE = re.compile(r"Basistarief\s+drinkwater\s*\(per\s*m³\)" + _PAIR, re.IGNORECASE)
 _COMFORT_DRINKWATER_RE = re.compile(
@@ -227,23 +229,32 @@ _INTEGRALE_BASIS_RE = re.compile(
 )
 
 
-def _amount(text: str, pattern: re.Pattern[str], label: str) -> float:
+def _vat_rate(text: str) -> float:
+    """The VAT rate the card's first vastrecht and its VAT-inclusive twin
+    give: whole euros, so the rounding of the twin cannot move it."""
+    match = _VASTRECHT_RE.search(text)
+    if match is None:
+        raise ExtractorError("Farys: could not find a vastrecht to read the VAT rate off")
+    return vat_from_pair("Farys", to_float(match.group(1)), to_float(match.group(2)))
+
+
+def _amount(text: str, pattern: re.Pattern[str], label: str, vat: float) -> float:
     match = pattern.search(text)
     if match is None:
         raise ExtractorError(f"Farys: could not find {label} in the AJAX HTML payload")
-    return _checked(match, label)
+    return _checked(match, label, vat)
 
 
-def _checked(match: re.Match[str], label: str) -> float:
+def _checked(match: re.Match[str], label: str, vat: float) -> float:
     rate, with_vat = to_float(match.group(1)), to_float(match.group(2))
-    if abs(rate * (1.0 + DEFAULT_VAT_RATE) - with_vat) > 0.001:
+    if abs(rate * (1.0 + vat) - with_vat) > 0.001:
         raise ExtractorError(
             f"Farys: {label} {rate} and its VAT-inclusive figure {with_vat} do not agree"
         )
     return rate
 
 
-def _fixed_terms(text: str) -> tuple[float, float]:
+def _fixed_terms(text: str, vat: float) -> tuple[float, float]:
     """The household vastrecht and korting per resident, summed over the
     three legs.
 
@@ -253,8 +264,8 @@ def _fixed_terms(text: str) -> tuple[float, float]:
     """
     end = _INTEGRALE_BASIS_RE.search(text)
     household = text[: end.start()] if end is not None else ""
-    vastrecht = [_checked(m, "vastrecht") for m in _VASTRECHT_RE.finditer(household)]
-    korting = [-_checked(m, "korting") for m in _KORTING_RE.finditer(household)]
+    vastrecht = [_checked(m, "vastrecht", vat) for m in _VASTRECHT_RE.finditer(household)]
+    korting = [-_checked(m, "korting", vat) for m in _KORTING_RE.finditer(household)]
     if len(vastrecht) != 3 or len(korting) != 3:
         raise ExtractorError(
             f"Farys: found {len(vastrecht)} vastrecht and {len(korting)} korting rows "
@@ -263,7 +274,7 @@ def _fixed_terms(text: str) -> tuple[float, float]:
     return sum(vastrecht), sum(korting)
 
 
-def _optional_amount(text: str, pattern: re.Pattern[str], label: str) -> float:
+def _optional_amount(text: str, pattern: re.Pattern[str], label: str, vat: float) -> float:
     """Read a row most cards do not print, as zero when it is absent.
 
     Absent means the commune grants nothing, which is the common case. A
@@ -272,7 +283,7 @@ def _optional_amount(text: str, pattern: re.Pattern[str], label: str) -> float:
     """
     if pattern.search(text) is None:
         return 0.0
-    return _amount(text, pattern, label)
+    return _amount(text, pattern, label, vat)
 
 
 def parse_tariff(
@@ -286,33 +297,34 @@ def parse_tariff(
     soup = BeautifulSoup(html_payload, "html.parser")
     text = soup.get_text(" ", strip=True)
 
-    basis = _amount(text, _BASIS_DRINKWATER_RE, "drinkwater basistarief")
-    comfort = _amount(text, _COMFORT_DRINKWATER_RE, "drinkwater comforttarief")
+    vat = _vat_rate(text)
+    basis = _amount(text, _BASIS_DRINKWATER_RE, "drinkwater basistarief", vat)
+    comfort = _amount(text, _COMFORT_DRINKWATER_RE, "drinkwater comforttarief", vat)
     # What the commune covers comes off the leg it names, before the two
     # checks below. Zaventem prints 3,0058 for the drinkwater basistarief
     # and -0,0807 of gemeentelijke tussenkomst under it, and the integrale
     # waterprijs it prints two rows further down is 6,5842, not the 6,6649
     # the gross rows add up to. The rows are already negative, so they are
     # added rather than subtracted.
-    basis += _optional_amount(text, _TUSSENKOMST_BASIS_RE, "tussenkomst basistarief")
-    comfort += _optional_amount(text, _TUSSENKOMST_COMFORT_RE, "tussenkomst comforttarief")
+    basis += _optional_amount(text, _TUSSENKOMST_BASIS_RE, "tussenkomst basistarief", vat)
+    comfort += _optional_amount(text, _TUSSENKOMST_COMFORT_RE, "tussenkomst comforttarief", vat)
     if abs(comfort - 2.0 * basis) > 0.01:
         raise ExtractorError(
             f"Farys comforttarief {comfort} is not 2× basistarief {basis} (VMM 2× rule)"
         )
-    sanering_gem = _amount(text, _BASIS_GEMEENTELIJK_RE, "gemeentelijke saneringsbijdrage")
+    sanering_gem = _amount(text, _BASIS_GEMEENTELIJK_RE, "gemeentelijke saneringsbijdrage", vat)
     sanering_bov = _amount(
-        text, _BASIS_BOVENGEMEENTELIJK_RE, "bovengemeentelijke saneringsbijdrage"
+        text, _BASIS_BOVENGEMEENTELIJK_RE, "bovengemeentelijke saneringsbijdrage", vat
     )
 
-    integrale = _amount(text, _INTEGRALE_BASIS_RE, "integrale waterprijs basistarief")
+    integrale = _amount(text, _INTEGRALE_BASIS_RE, "integrale waterprijs basistarief", vat)
     if abs(basis + sanering_gem + sanering_bov - integrale) > 0.0001:
         raise ExtractorError(
             f"Farys rows {basis} + {sanering_gem} + {sanering_bov} do not add up to "
             f"the integrale waterprijs {integrale} the page prints"
         )
 
-    vastrecht, korting = _fixed_terms(text)
+    vastrecht, korting = _fixed_terms(text, vat)
 
     active = _active_period_year(soup)
     clock = belgian_today().year
@@ -337,6 +349,7 @@ def parse_tariff(
         comfort=comfort,
         vastrecht=vastrecht,
         korting=korting,
+        vat_rate=vat,
         sanering_gemeentelijk=sanering_gem,
         sanering_bovengemeentelijk=sanering_bov,
     )

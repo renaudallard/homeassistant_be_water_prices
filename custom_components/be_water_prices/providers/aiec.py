@@ -112,6 +112,7 @@ class _Card:
     cvd: float
     cva: float
     fse: float
+    vat: float
 
 
 # The figures each card prints, keyed by the day it took effect, which is
@@ -120,11 +121,12 @@ class _Card:
 # card nobody has read, and the aggregator stands in for it.
 _TRANSCRIBED: dict[date, _Card] = {
     # "STRUCTURE TARIFAIRE DE L'EAU AU 01/04/2026": CVD 3,050 EUR, CVA
-    # 2,748 EUR and the "Contribution au Fonds social" 0,0339 EUR HTVA.
+    # 2,748 EUR and the "Contribution au Fonds social" 0,0339 EUR HTVA,
+    # their TVAC column headed "TVAC 6%".
     # The same card's own per-inhabitant table (233 / 449 / 665 / 882 /
     # 1.098 / 1.314 / 1.531 EUR) is reproduced to within rounding by this
     # CVD and by no other.
-    date(2026, 4, 1): _Card(cvd=3.050, cva=2.748, fse=0.0339),
+    date(2026, 4, 1): _Card(cvd=3.050, cva=2.748, fse=0.0339, vat=0.06),
 }
 
 
@@ -149,6 +151,7 @@ def card_from_operator_page(published: date | None) -> WaterTariff | None:
         year=published.year,
         cva=cva,
         fse=fse,
+        vat_rate=card.vat,
         valid_from=published,
     )
 

@@ -243,6 +243,7 @@ def test_the_builder_refuses_a_cvd_outside_the_plausible_window(cvd: float) -> N
             year=2026,
             cva=2.748,
             fse=0.0339,
+            vat_rate=0.06,
         )
 
 
@@ -765,7 +766,7 @@ def test_aiecs_transcribed_card_carries_the_figures_its_picture_prints() -> None
     later = date(2027, 1, 1)
     with (
         patch(_TODAY, return_value=date(2027, 2, 1)),
-        patch.dict(aiec._TRANSCRIBED, {later: aiec._Card(cvd=3.1, cva=2.9, fse=0.04)}),
+        patch.dict(aiec._TRANSCRIBED, {later: aiec._Card(cvd=3.1, cva=2.9, fse=0.04, vat=0.06)}),
     ):
         card = aiec.card_from_operator_page(later)
     assert card is not None

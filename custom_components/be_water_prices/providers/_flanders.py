@@ -29,7 +29,9 @@ Flanders has a uniform tariff layout: a vastrecht per wooneenheid and a
 korting on it per registered resident, each split over the drinkwater,
 gemeentelijke and bovengemeentelijke legs, a basis + comfort water rate,
 and per-commune saneringsbijdragen (gemeentelijk + bovengemeentelijk).
-Every card prints its vastrecht and korting, and each parser reads them.
+Every card prints its vastrecht and korting, and each parser reads them,
+along with the VAT rate its vastrecht and the VAT-inclusive twin printed
+beside it give.
 
 Operators that publish only an integrated drinkwater rate (Aquaduin)
 leave the sanering arguments at their default of ``0.0``.
@@ -40,7 +42,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date
 
-from ..const import DEFAULT_VAT_RATE, REGION_FLANDERS
+from ..const import REGION_FLANDERS
 from .base import ExtractorError, WaterTariff
 
 # What a Flemish drinkwater rate can plausibly be, in EUR/m3 ex-VAT. The
@@ -86,6 +88,7 @@ def build_flanders_tariff(
     comfort: float,
     vastrecht: float,
     korting: float,
+    vat_rate: float,
     sanering_gemeentelijk: float = 0.0,
     sanering_bovengemeentelijk: float = 0.0,
 ) -> WaterTariff:
@@ -139,5 +142,5 @@ def build_flanders_tariff(
         comfort_eur_per_m3=comfort,
         sanering_gemeentelijk_eur_per_m3=sanering_gemeentelijk,
         sanering_bovengemeentelijk_eur_per_m3=sanering_bovengemeentelijk,
-        vat_rate=DEFAULT_VAT_RATE,
+        vat_rate=vat_rate,
     )

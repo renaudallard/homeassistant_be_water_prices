@@ -77,7 +77,8 @@ heading row with no amount falls through to the unlabelled row below it.
 - `yearly_fixed_fee`: `20 x CVD + 30 x CVA`, computed by `build_tariff`
   (134,44 EUR on the fixture), which also holds the CVD to the 1.5 to 6.0
   EUR/m³ window.
-- VAT: the Prix unitaire column is ex-VAT; `vat_rate` is 6 %.
+- VAT: the Prix unitaire column is ex-VAT; `vat_rate` is the rate the page
+  states ("TVA : 6 %", read by `stated_vat_rate`).
 
 ### CVA and FSE
 

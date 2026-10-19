@@ -139,9 +139,13 @@ fixed charge alone, 40,23 EUR.
 
 ## VAT
 
-Every builder sets `vat_rate` to `DEFAULT_VAT_RATE` (0,06), the
-residential rate on water, and the engine applies the card's `vat_rate`
-once to the ex-VAT total. In Flanders the social reduction is applied
+Every builder sets `vat_rate` to the rate its card gives: a Flemish card's
+vastrecht beside the same figure with VAT, the rate a Walloon page states
+in words (`stated_vat_rate`), the rate in VIVAQUA's header, the "TVAC 6%"
+on AIEC's picture. `DEFAULT_VAT_RATE` (0,06), the residential rate on
+water, stands in for IDEN's page and the Pidpa Tariefplan, which give
+none. The engine applies the card's `vat_rate` once to the ex-VAT total,
+and the live check fails when the cards disagree on it. In Flanders the social reduction is applied
 after VAT.
 
 ## The year to date

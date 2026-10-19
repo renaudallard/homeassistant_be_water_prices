@@ -84,6 +84,7 @@ from .base import (
     WaterTariff,
     belgian_today,
     carry_prior_year_card,
+    vat_from_pair,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -152,15 +153,15 @@ _RATE_ROW_RE_FMT = (
 _FIXED_ROW_RE_FMT = r"{label}\s+" + r"\s+".join([r"(-?\d+,\d{{4}})"] * 5)
 
 
-def _fixed_term(text: str, label: str, name: str, year: int) -> float:
+def _fixed_term(text: str, label: str, name: str, year: int) -> tuple[float, float]:
     """A fixed charge summed over its three legs, held to the total the
-    card prints beside them. The korting prints negative; it is returned
-    as the discount it is."""
+    card prints beside them, and the total with VAT printed after it. The
+    korting prints negative; it is returned as the discount it is."""
     match = re.search(_FIXED_ROW_RE_FMT.format(label=label), text)
     if match is None:
         raise ExtractorError(f"could not find Water-link's {name} row")
-    water, afvoer, zuivering, total = (abs(to_float(match.group(i))) for i in range(1, 5))
-    return leg_total(UTILITY_ID, year, name, (water, afvoer, zuivering), total)
+    water, afvoer, zuivering, total, with_vat = (abs(to_float(match.group(i))) for i in range(1, 6))
+    return leg_total(UTILITY_ID, year, name, (water, afvoer, zuivering), total), with_vat
 
 
 def _parse_commune_row(
@@ -218,8 +219,8 @@ def parse_tariff(
         raise ExtractorError(f"could not find Water-link comforttarief row for {commune!r}")
 
     water_basis, afvoer_basis, zuivering_basis = basis
-    vastrecht = _fixed_term(text, r"Vastrecht\s+per\s+wooneenheid", "vastrecht", target)
-    korting = _fixed_term(text, r"Korting\s+per\s+gedomicilieerde\s+inwoner", "korting", target)
+    vastrecht, with_vat = _fixed_term(text, r"Vastrecht\s+per\s+wooneenheid", "vastrecht", target)
+    korting, _ = _fixed_term(text, r"Korting\s+per\s+gedomicilieerde\s+inwoner", "korting", target)
     water_comfort = comfort[0]
     if abs(water_comfort - 2.0 * water_basis) > 0.01:
         raise ExtractorError(
@@ -235,6 +236,7 @@ def parse_tariff(
         comfort=water_comfort,
         vastrecht=vastrecht,
         korting=korting,
+        vat_rate=vat_from_pair("Water-link", vastrecht, with_vat),
         sanering_gemeentelijk=afvoer_basis,
         sanering_bovengemeentelijk=zuivering_basis,
     )

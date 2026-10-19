@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -466,9 +467,10 @@ async def test_a_broken_commune_list_fails_the_run(monkeypatch: pytest.MonkeyPat
         ("acme", "OK"),
         ("acme/communes", "FAIL"),
         ("flanders_fixed", "OK"),
+        ("vat", "OK"),
     ]
     assert rc & EXIT_REAL_FAIL
-    assert "**1 of 3 checks failed.**" in live_check._render(results)
+    assert "**1 of 4 checks failed.**" in live_check._render(results)
     fingerprint = [
         line.split("|")[1].strip()
         for line in live_check._render(results).splitlines()
@@ -528,6 +530,22 @@ def test_every_commune_lister_has_a_floor() -> None:
 
     listers = {e.id for e in all_extractors() if e.supports_communes}
     assert set(MIN_COMMUNES) == listers
+
+
+def test_every_card_must_give_the_same_vat_rate() -> None:
+    """Each card is billed at the rate it gives, so one that misread it
+    stands out only against the others, whatever their region."""
+    from scripts.live_check import _check_vat
+
+    agreed = _check_vat(
+        {"Farys": _flemish(2026, 100.0, 20.0), "SWDE": _walloon(2026, 2.748, 0.0339)}
+    )
+    assert agreed is not None and agreed.status == "OK"
+    odd = _walloon(2026, 2.748, 0.0339)
+    apart = _check_vat({"Farys": _flemish(2026, 100.0, 20.0), "SWDE": replace(odd, vat_rate=0.21)})
+    assert apart is not None and apart.status == "FAIL"
+    assert "disagree on the VAT rate: Farys 0.06, SWDE 0.21" in apart.detail
+    assert _check_vat({}) is None
 
 
 # The Flemish vastrecht and korting.

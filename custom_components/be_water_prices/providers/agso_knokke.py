@@ -63,7 +63,14 @@ from bs4 import BeautifulSoup, Tag
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff, leg_total
 from ._html import extract_amounts, fetch_and_parse
-from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
+from .base import (
+    ExtractorError,
+    WaterExtractor,
+    WaterTariff,
+    belgian_today,
+    carry_prior_year_card,
+    vat_from_pair,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -136,6 +143,11 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
             raise ExtractorError(f"AGSO Knokke table carries no {name} column")
         fixed.append(leg_total(UTILITY_ID, year, name, amounts[:3], amounts[3]))
     vastrecht, korting = fixed
+    # The "Incl. BTW" row under the integrale one prints the vastrecht with
+    # VAT, which gives the rate the card bills.
+    with_vat = _row_first_amount(table, "incl", 5)
+    if with_vat is None:
+        raise ExtractorError("AGSO Knokke table carries no VAT-inclusive vastrecht")
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=year,
@@ -145,6 +157,7 @@ def _parse_one(table: Tag, year: int) -> WaterTariff | None:
         comfort=comfort,
         vastrecht=vastrecht,
         korting=korting,
+        vat_rate=vat_from_pair("AGSO Knokke", vastrecht, with_vat),
         sanering_gemeentelijk=afvoer,
         sanering_bovengemeentelijk=zuivering,
     )

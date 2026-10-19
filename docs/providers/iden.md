@@ -50,7 +50,8 @@ communes (Nandrin, Tinlot, Modave), small population.
   Each takes three to five decimals.
 - `yearly_fixed_fee`: `20 x CVD + 30 x CVA`, computed by `build_tariff`,
   which also holds the CVD to the 1.5 to 6.0 EUR/m³ window.
-- VAT: ex-VAT figures; `vat_rate` is 6 %.
+- VAT: ex-VAT figures. The page states no rate, so `vat_rate` is
+  `DEFAULT_VAT_RATE` (6 %).
 
 ### CVA and FSE
 

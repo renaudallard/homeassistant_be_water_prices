@@ -66,7 +66,8 @@ Comforttarief > Basisverbruik (pro rata verrekend) 11,9816 euro/m³ 12
 - `yearly_fixed_fee` 100 and per-resident discount 20: the three "Vast
   recht" lines added up, and the "Korting op vast recht" line, which the
   PDF prints as a percentage of that vastrecht (20 %).
-- VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
+- VAT: `vat_rate` is the rate the three vast recht lines and their
+  VAT-inclusive twins give (100,00 and 106,00, so 6 %). `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.
 - `valid_from` 1 January, `valid_until` 31 December.

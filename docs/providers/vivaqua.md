@@ -38,11 +38,12 @@ through 2026 with a new one expected for 2027.
 
 `parse_tariff` in the module.
 
-- The table (`_residential_table`): the first `<table>` whose accent-folded
-  text holds the year, "vat" and a 6 % marker (`_RESIDENTIAL_VAT_RE`). The
-  6 % is what pins the residential card; a 21 % card for the same year is
-  not taken. The header wording is not matched, so "6 % VAT included" or
-  "incl. 6% VAT" still finds it.
+- The table (`_residential_table`): a `<table>` whose accent-folded text
+  holds the year, "vat" and a rate in per cent (`_VAT_PERCENT_RE`). Where
+  more than one card of the year does, the one at the lowest rate is the
+  household's, so a 21 % card for the same year is not taken. The header
+  wording is not matched, so "6 % VAT included" or "incl. 6% VAT" still
+  finds it, and the rate is read off it.
 - Rows are matched by label, not position: "fixed charge", "variable
   charge", and rows labelled exactly "supply" or "sanitation". The first
   "supply" and "sanitation" rows belong to the fixed charge, the second to
@@ -56,19 +57,20 @@ through 2026 with a new one expected for 2027.
   variable supply + sanitation must make the variable total, and fixed
   supply + sanitation the fixed total (when both fixed rows are there).
 - VAT: VIVAQUA publishes VAT-inclusive figures, and `WaterTariff` holds
-  ex-VAT ones, so every figure is divided by `1 + DEFAULT_VAT_RATE` (1,06):
+  ex-VAT ones, so every figure is divided by 1 plus the rate the header
+  states (6 %, so 1,06):
   - `yearly_fixed_fee`: the fixed charge total / 1,06.
   - `linear_eur_per_m3`: the variable supply / 1,06.
   - `sanering_gemeentelijk_eur_per_m3`: the variable sanitation / 1,06
     (sanitation is billed on behalf of Hydria).
-  - `vat_rate`: 6 %.
+  - `vat_rate`: the header's rate, 6 %.
 
   The Brussels branch of `pricing.py` bills `linear + sanering` per m³ plus
   the fixed charge, then adds the VAT back (see
   [the pricing model](../pricing-model.md)).
 - Year: the year asked for, or the Belgian clock's year. `valid_from` 1
   January, `valid_until` 31 December, label "Price from January 1st
-  `<year>` (VAT included 6 %)".
+  `<year>` (VAT included `<rate>` %)".
 
 ### When this year's card is not up yet
 

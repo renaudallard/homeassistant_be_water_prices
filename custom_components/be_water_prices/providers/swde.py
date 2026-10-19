@@ -71,7 +71,7 @@ from ..const import (
 )
 from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents
-from ._walloon_simple import build_tariff, spge_components
+from ._walloon_simple import build_tariff, spge_components, stated_vat_rate
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 UTILITY_ID = "swde"
@@ -157,6 +157,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         year=target,
         cva=cva,
         fse=fse,
+        vat_rate=stated_vat_rate(soup.get_text(" ", strip=True), label="SWDE"),
     )
 
 

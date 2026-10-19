@@ -33,11 +33,12 @@ cost. No EUR values live in Python source -- everything in
 :class:`WaterTariff` comes from a live fetch of the utility's own
 publication.
 
-All EUR figures stored in :class:`WaterTariff` are **ex-VAT**. Belgian
-water is residentially taxed at 6 %; ``vat_rate`` carries the rate so
-the cost engine can re-apply it once at the end. Utilities that publish
-VAT-incl numbers (VIVAQUA does) divide by ``1 + vat_rate`` at parse
-time.
+All EUR figures stored in :class:`WaterTariff` are **ex-VAT**.
+``vat_rate`` carries the rate the card states, or that its ex-VAT and
+VAT-inclusive figures give, so the cost engine can re-apply it once at
+the end; ``DEFAULT_VAT_RATE`` stands in only for a card that gives none.
+Utilities that publish VAT-incl numbers (VIVAQUA does) divide by
+``1 + vat_rate`` at parse time.
 """
 
 from __future__ import annotations
@@ -48,6 +49,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Protocol
 from zoneinfo import ZoneInfo
+
+from ..const import DEFAULT_VAT_RATE
 
 if TYPE_CHECKING:
     import aiohttp
@@ -103,7 +106,7 @@ class WaterTariff:
     cva_eur_per_m3: float = 0.0  # Wallonia, flat SPGE figure the page prints
     fse_eur_per_m3: float = 0.0  # Wallonia, national (Fonds Social de l'Eau)
 
-    vat_rate: float = 0.06
+    vat_rate: float = DEFAULT_VAT_RATE
 
 
 if TYPE_CHECKING:
@@ -174,6 +177,30 @@ class TransientFetchError(ExtractorError):
     so existing ``except ExtractorError`` callers keep treating it as a
     fetch failure.
     """
+
+
+# The most a VAT rate a card gives can be. Belgium's standard rate is 21 %;
+# anything above is a misread, and a rate of zero is not a rate.
+_MAX_VAT_RATE = 0.25
+
+
+def vat_from_percent(label: str, percent: float) -> float:
+    """The VAT rate a card states as a percentage, as a fraction."""
+    rate = round(percent / 100.0, 4)
+    if not 0.0 < rate <= _MAX_VAT_RATE:
+        raise ExtractorError(f"{label} states a VAT rate of {percent} %, which is not one")
+    return rate
+
+
+def vat_from_pair(label: str, ex_vat: float, with_vat: float) -> float:
+    """The VAT rate a card's ex-VAT figure and its VAT-inclusive twin give.
+
+    Read off a figure the card prints whole, such as a vastrecht, so the
+    rounding of the VAT-inclusive figure cannot move the rate.
+    """
+    if ex_vat <= 0:
+        raise ExtractorError(f"{label} prints {ex_vat} ex-VAT, which gives no VAT rate")
+    return vat_from_percent(label, (with_vat / ex_vat - 1.0) * 100.0)
 
 
 def tariff_to_dict(tariff: WaterTariff) -> dict[str, Any]:

@@ -107,7 +107,7 @@ import aiohttp
 from bs4 import BeautifulSoup, Tag
 
 from .._phantom_blocklists import PIDPA_UNSERVABLE_SLUGS as _UNSERVABLE_COMMUNE_SLUGS
-from ..const import REGION_FLANDERS
+from ..const import DEFAULT_VAT_RATE, REGION_FLANDERS
 from ._flanders import build_flanders_tariff, leg_total
 from ._html import fetch_and_parse, fetch_html
 from ._pdf import fetch_pdf_text_layout, to_float
@@ -118,6 +118,7 @@ from .base import (
     WaterTariff,
     belgian_today,
     carry_prior_year_card,
+    vat_from_pair,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -302,6 +303,8 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
     bovengemeentelijk = sanering["zuivering"]
     vastrecht, korting = _fixed_terms(text, target)
 
+    # The projection prints its figures ex-VAT only and states no rate, so
+    # the default stands in. Only the drift check reads this card.
     tariff = build_flanders_tariff(
         utility_id=UTILITY_ID,
         year=target,
@@ -311,6 +314,7 @@ def parse_tariff(text: str, year: int | None = None) -> WaterTariff:
         comfort=comfort,
         vastrecht=vastrecht,
         korting=korting,
+        vat_rate=DEFAULT_VAT_RATE,
         sanering_gemeentelijk=gemeentelijk,
         sanering_bovengemeentelijk=bovengemeentelijk,
     )
@@ -330,6 +334,7 @@ async def fetch_tariefplan(session: aiohttp.ClientSession) -> WaterTariff:
 # (incl. NBSP) between the number and the unit; we anchor on the ex-VAT half.
 # The vastrecht and korting rows print whole euros ("50 euro excl. btw").
 _EX_VAT_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*euro\s*excl", re.IGNORECASE)
+_WITH_VAT_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*euro\s*incl", re.IGNORECASE)
 # Pidpa publishes its commune slugs in the public sitemap.xml.
 _COMMUNE_SLUG_RE = re.compile(r"https://www\.pidpa\.be/ons-aanbod/je-gemeente/([a-z][a-z0-9-]*)<")
 
@@ -464,6 +469,14 @@ def parse_commune_tariff(
         amounts = [_ex_vat_amount(cell.get_text(" ", strip=True)) for cell in cells[1:5]]
         fixed.append(leg_total(UTILITY_ID, target, label, amounts[:3], amounts[3]))
     vastrecht, korting = fixed
+    # The integrale vastrecht cell prints its VAT-inclusive twin, whole
+    # euros both, which gives the VAT rate the card bills.
+    twin = _WITH_VAT_AMOUNT_RE.search(vastrecht_cells[4].get_text(" ", strip=True))
+    if twin is None:
+        raise ExtractorError(
+            f"Pidpa vastrecht carries no VAT-inclusive figure for {commune_slug!r}"
+        )
+    vat = vat_from_pair("Pidpa", vastrecht, to_float(twin.group(1)))
 
     drink_basis = _ex_vat_amount(basis_cells[1].get_text(" ", strip=True))
     afvoer_basis = _ex_vat_amount(basis_cells[2].get_text(" ", strip=True))
@@ -497,6 +510,7 @@ def parse_commune_tariff(
         comfort=drink_comfort,
         vastrecht=vastrecht,
         korting=korting,
+        vat_rate=vat,
         sanering_gemeentelijk=afvoer_basis,
         sanering_bovengemeentelijk=zuivering_basis,
     )

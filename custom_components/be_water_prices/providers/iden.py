@@ -50,7 +50,7 @@ from bs4 import BeautifulSoup
 from ..const import REGION_WALLONIA
 from ._html import fetch_and_parse
 from ._pdf import to_float
-from ._walloon_simple import build_tariff, detect_published_year, spge_components
+from ._walloon_simple import build_tariff, detect_published_year, spge_components, stated_vat_rate
 from .base import ExtractorError, WaterExtractor, WaterTariff
 
 UTILITY_ID = "iden"
@@ -114,6 +114,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         year=target,
         cva=cva,
         fse=fse,
+        vat_rate=stated_vat_rate(text, label=UTILITY_ID),
     )
 
 

@@ -182,9 +182,12 @@ options, so an addition reaches entries that picked the commune earlier.
   constants: every Flemish parser reads them off its card, and
   `scripts/live_check.py` fails when the Flemish cards of one year
   disagree on either (`_check_flanders_fixed`).
-- **VAT.** `DEFAULT_VAT_RATE` (6 %) is the `vat_rate` the Flemish, Walloon
-  and VIVAQUA builders set; Farys also checks its printed VAT-inclusive
-  rates against it.
+- **VAT.** `DEFAULT_VAT_RATE` (6 %), the `vat_rate` of a card that gives
+  none: IDEN's page and the Pidpa Tariefplan. Every other card's rate is
+  read off it (`vat_from_pair`, `vat_from_percent` in `providers/base.py`,
+  `stated_vat_rate` in `providers/_walloon_simple.py`), and
+  `scripts/live_check.py` fails when the cards disagree on it
+  (`_check_vat`).
 
 The Walloon CVA and FSE are not constants either. Every Walloon page
 prints both beside its CVD (AIEC's picture too, transcribed with its

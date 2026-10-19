@@ -20,7 +20,8 @@ parts of the Condroz.
 - The figures are therefore transcribed by hand in the module, in
   `_TRANSCRIBED`, keyed by the picture's date. Today it holds one card:
   1 April 2026, CVD 3,050, CVA 2,748 and Fonds social 0,0339 EUR/m³ ex-VAT,
-  read off "STRUCTURE TARIFAIRE DE L'EAU AU 01/04/2026".
+  and the 6 % its "TVAC 6%" column is headed with, read off "STRUCTURE
+  TARIFAIRE DE L'EAU AU 01/04/2026".
 - Fallback: Callmepower's aggregator page,
   https://callmepower.be/fr/eau/distributeurs/aiec (`SOURCE_URL`), parsed by
   the shared prose parser.
@@ -121,7 +122,7 @@ household by 53,16 EUR a year with nothing anywhere to show it.
 
 When AIEC publishes a new picture, read it and add a line to
 `_TRANSCRIBED` keyed by the date in the file name, with the CVD, CVA and
-Fonds social it prints ex-VAT. The existing entry
+Fonds social it prints ex-VAT and the VAT rate it states. The existing entry
 was checked against the per-inhabitant table printed on the same picture;
 a new one should be too.
 

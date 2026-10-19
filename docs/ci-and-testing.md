@@ -132,11 +132,15 @@ card is billed on the vastrecht and korting it prints, so one that misread
 either fails it against the others (by more than a cent), the cards of one
 year compared with each other.
 
-A last row sets the Walloon cards side by side (`_check_spge`): each card
+A row sets the Walloon cards side by side (`_check_spge`): each card
 is priced on the CVA and FSE its page prints, so the row fails when the
 cards of one year disagree on the CVA (by more than 0.005) or the FSE
 (0.001), which is what catches a page that misread or lags on its figure.
 See [pricing-model.md](pricing-model.md).
+
+A last row sets every card side by side on its VAT rate (`_check_vat`):
+water carries one residential rate across the country, so a card billed
+at another has misread it.
 
 The exit code is a bitmask: 1 for a real failure (a parse or shape error,
 an HTTP 4xx, a redirect off the site, a fetch past `FETCH_BUDGET_S`), 2

@@ -43,7 +43,8 @@ Built by `build_extractor` and parsed with `_walloon_simple.parse_tariff`.
   ("fonds social de l'eau : N €"); both bind on the fixture.
 - `yearly_fixed_fee`: `20 x CVD + 30 x CVA`, computed by `build_tariff`.
   The page's own 140,44 € is not read; it agrees (20 x 2,9 + 30 x 2,748).
-- VAT: ex-VAT figures; `vat_rate` is 6 %.
+- VAT: ex-VAT figures; `vat_rate` is the rate the page states ("TVA : 6%",
+  read by `stated_vat_rate`).
 
 ### CVA and FSE
 

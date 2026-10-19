@@ -48,7 +48,8 @@ heading (`_amounts_after`).
 - FSE: "social water fund", "fonds social de l'eau" or "fonds social".
 - `yearly_fixed_fee`: `20 x CVD + 30 x CVA`, computed by `build_tariff`,
   which also holds the CVD to the 1.5 to 6.0 EUR/m³ window.
-- VAT: ex-VAT figures; `vat_rate` is 6 %.
+- VAT: ex-VAT figures; `vat_rate` is the rate the page states ("VAT For
+  water supply, it amounts to 6 %", read by `stated_vat_rate`).
 
 Two choices in the section walk are deliberate:
 

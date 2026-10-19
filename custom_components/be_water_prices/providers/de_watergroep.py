@@ -70,6 +70,7 @@ from .base import (
     WaterTariff,
     belgian_today,
     carry_prior_year_card,
+    vat_from_pair,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -134,12 +135,13 @@ _ZUIVERING_UNAVAILABLE_RE = re.compile(
 # A leg's row in the vastrecht and korting tables: "Waterverbruik
 # drinkwater € 50 (incl. € 53)", the korting "- € 10 (incl. - € 10,60)".
 _FIXED_LEGS = ("Waterverbruik drinkwater", "Afvoer van afvalwater", "Zuivering van afvalwater")
-_FIXED_ROW_RE_FMT = r"{label}\s*-?\s*€\s*(\d+(?:,\d+)?)\s*\(incl\."
+_FIXED_ROW_RE_FMT = r"{label}\s*-?\s*€\s*(\d+(?:,\d+)?)\s*\(incl\.\s*-?\s*€\s*(\d+(?:,\d+)?)\)"
 
 
-def _fixed_terms(text: str, before: int) -> tuple[float, float]:
+def _fixed_terms(text: str, before: int) -> tuple[float, float, float]:
     """The household vastrecht and korting per resident, summed over the
-    three legs.
+    three legs, and the VAT rate the vastrecht and its VAT-inclusive twin
+    give.
 
     Read from the last vastrecht table before the household
     Basistarief block at ``before``: the non-household and IBA tables
@@ -150,6 +152,7 @@ def _fixed_terms(text: str, before: int) -> tuple[float, float]:
     if start < 0 or split < 0:
         raise ExtractorError("could not locate De Watergroep's vastrecht / korting table")
     terms: list[float] = []
+    twins: list[float] = []
     for block, name in ((text[start:split], "vastrecht"), (text[split:before], "korting")):
         legs: list[float] = []
         for label in _FIXED_LEGS:
@@ -158,8 +161,10 @@ def _fixed_terms(text: str, before: int) -> tuple[float, float]:
             if match is None:
                 raise ExtractorError(f"De Watergroep printed no {name} for {label!r}")
             legs.append(to_float(match.group(1)))
+            twins.append(to_float(match.group(2)))
         terms.append(sum(legs))
-    return terms[0], terms[1]
+    vat = vat_from_pair("De Watergroep", terms[0], sum(twins[: len(_FIXED_LEGS)]))
+    return terms[0], terms[1], vat
 
 
 def _basis_per_m3_block(text: str) -> tuple[str, int] | None:
@@ -256,7 +261,7 @@ def parse_commune_tariff(
         legs[leg] = to_float(match.group(1))
     san_gem = legs["gemeentelijke"]
     san_bov = legs["bovengemeentelijke"]
-    vastrecht, korting = _fixed_terms(text, block_start)
+    vastrecht, korting, vat = _fixed_terms(text, block_start)
 
     return build_flanders_tariff(
         utility_id=UTILITY_ID,
@@ -267,6 +272,7 @@ def parse_commune_tariff(
         comfort=2.0 * basis,  # VMM-mandated 2× rule
         vastrecht=vastrecht,
         korting=korting,
+        vat_rate=vat,
         sanering_gemeentelijk=san_gem,
         sanering_bovengemeentelijk=san_bov,
     )

@@ -58,7 +58,7 @@ from bs4 import BeautifulSoup, Tag
 
 from ..const import REGION_WALLONIA
 from ._html import extract_amounts, fetch_html
-from ._walloon_simple import build_tariff, detect_published_year, spge_components
+from ._walloon_simple import build_tariff, detect_published_year, spge_components, stated_vat_rate
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
 _LOGGER = logging.getLogger(__name__)
@@ -166,6 +166,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
         year=target,
         cva=cva,
         fse=fse,
+        vat_rate=stated_vat_rate(soup.get_text(" ", strip=True), label="inBW"),
     )
 
 

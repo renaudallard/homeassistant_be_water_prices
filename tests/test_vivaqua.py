@@ -136,15 +136,31 @@ def test_a_reworded_header_still_finds_the_residential_card() -> None:
 
 
 def test_a_21_percent_card_for_the_same_year_is_not_the_residential_one() -> None:
+    """A non-residential card beside it also names the year and VAT; the
+    household's is the one at the lower rate, wherever it sits."""
     page = fixture_html("vivaqua_linear_2026.html")
     needle = "Price from January 1st 2026 (VAT included 6 %)"
     assert page.count(needle) == 1
-    # Turn the 2026 card into a non-residential one: the parser must not
-    # bind to it and falls back to the 2025 card, as for a missing card.
+    start = page.rfind("<table", 0, page.index(needle))
+    end = page.index("</table>", start) + len("</table>")
+    other = page[start:end].replace("(VAT included 6 %)", "(VAT included 21 %)")
+    t = parse_tariff(page[:start] + other + page[start:], year=2026)
+    assert t.valid_from.year == 2026
+    assert t.vat_rate == 0.06
+
+
+def test_the_rate_the_header_states_is_the_one_billed() -> None:
+    """The figures are printed with VAT; they are taken off at the rate the
+    card states, not a rate kept in the code."""
+    page = fixture_html("vivaqua_linear_2026.html")
+    needle = "Price from January 1st 2026 (VAT included 6 %)"
+    assert page.count(needle) == 1
     t = parse_tariff(
-        page.replace(needle, "Price from January 1st 2026 (VAT included 21 %)"), year=2026
+        page.replace(needle, "Price from January 1st 2026 (VAT included 9 %)"), year=2026
     )
-    assert t.valid_from.year == 2025
+    assert t.vat_rate == 0.09
+    assert t.linear_eur_per_m3 == pytest.approx(2.62 / 1.09)
+    assert t.yearly_fixed_fee == pytest.approx(40.23 / 1.09)
 
 
 def test_a_wider_row_is_refused_rather_than_read_from_its_last_column() -> None:

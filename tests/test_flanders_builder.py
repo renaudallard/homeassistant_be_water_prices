@@ -39,6 +39,7 @@ def _build(**overrides: float) -> None:
         "comfort": 4.0,
         "vastrecht": 100.0,
         "korting": 20.0,
+        "vat_rate": 0.06,
         "sanering_gemeentelijk": 1.0,
     }
     fields.update(overrides)
@@ -82,6 +83,7 @@ def test_a_rate_outside_the_plausibility_window_is_not_a_card() -> None:
             comfort=0.58502,
             vastrecht=100.0,
             korting=20.0,
+            vat_rate=0.06,
         )
     # A believable basis with a comfort rate that is not.
     with pytest.raises(ExtractorError, match=r"comfort rate 29\.251 is outside"):
@@ -94,6 +96,7 @@ def test_a_rate_outside_the_plausibility_window_is_not_a_card() -> None:
             comfort=29.251,
             vastrecht=100.0,
             korting=20.0,
+            vat_rate=0.06,
         )
 
 
@@ -139,6 +142,7 @@ def test_the_card_figures_are_what_is_billed() -> None:
         comfort=4.0,
         vastrecht=106.0,
         korting=21.0,
+        vat_rate=0.06,
     )
     assert (t.yearly_fixed_fee, t.yearly_fixed_fee_per_resident_discount) == (106.0, 21.0)
 

@@ -31,8 +31,9 @@ expected for 2027.
 
 Source: https://www.vivaqua.be/en/the-domestic-linear-rate/
 The page exposes one ``<table>`` per year; the parser picks the table
-whose header includes the current year (matching ``"<year>"`` plus the
-``"VAT"`` keyword to avoid the side "rates 2025" comparison block).
+whose header includes the current year and states a VAT rate (which
+keeps out the side "rates 2025" comparison block), the lowest rate among
+them if more than one does, and reads that rate off the header.
 
 The table uses the layout::
 
@@ -44,8 +45,9 @@ The table uses the layout::
       supply                            € 2,62
       sanitation                        € 2,73
 
-VIVAQUA publishes VAT-incl numbers; this parser divides by ``1 + VAT``
-so :class:`WaterTariff` keeps its ex-VAT convention. The two breakdown
+VIVAQUA publishes VAT-incl numbers; this parser divides by ``1 + VAT``,
+the rate the header states, so :class:`WaterTariff` keeps its ex-VAT
+convention. The two breakdown
 rows ("supply" / "sanitation") are surfaced as ``linear_eur_per_m3``
 (supply) and ``sanering_gemeentelijk_eur_per_m3`` (sanitation, billed
 on behalf of Hydria). Their sum equals the variable-charge total.
@@ -60,10 +62,17 @@ from datetime import date
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
-from ..const import DEFAULT_VAT_RATE, REGION_BRUSSELS
+from ..const import REGION_BRUSSELS
 from ._html import extract_amounts, fetch_and_parse
-from ._pdf import fold_accents
-from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
+from ._pdf import fold_accents, to_float
+from .base import (
+    ExtractorError,
+    WaterExtractor,
+    WaterTariff,
+    belgian_today,
+    carry_prior_year_card,
+    vat_from_percent,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,26 +81,37 @@ LABEL = "VIVAQUA"
 SOURCE_URL = "https://www.vivaqua.be/en/the-domestic-linear-rate/"
 
 
-def _label_for_year(year: int) -> str:
-    return f"Price from January 1st {year} (VAT included 6 %)"
+def _label_for_year(year: int, vat: float) -> str:
+    return f"Price from January 1st {year} (VAT included {vat * 100:g} %)"
 
 
-# The 6 % that marks the residential card, wherever the header puts it.
-# Matching the literal "VAT included 6" meant any rewording of the header
-# ("6 % VAT included", "incl. 6% VAT") read as "card not published yet",
-# and the parser then served last year's rates until 31 March with only a
+# The VAT rate a card's header states, wherever it puts it. Matching the
+# literal "VAT included 6" meant any rewording of the header ("6 % VAT
+# included", "incl. 6% VAT") read as "card not published yet", and the
+# parser then served last year's rates until 31 March with only a
 # warning, which is exactly the outcome the fallback exists to avoid on a
 # card that IS there.
-_RESIDENTIAL_VAT_RE = re.compile(r"\b6\s*%")
+_VAT_PERCENT_RE = re.compile(r"\b(\d{1,2}(?:[.,]\d{1,2})?)\s{0,3}%")
 
 
-def _residential_table(soup: BeautifulSoup, year: int) -> Tag | None:
-    """The ``<table>`` for ``year`` that carries the 6 % VAT marker."""
+def _residential_table(soup: BeautifulSoup, year: int) -> tuple[Tag, float] | None:
+    """The ``<table>`` for ``year`` and the VAT rate its header states.
+
+    Water for a household carries the reduced rate, so where more than one
+    card of the year states a rate, the one with the lowest is the
+    household's: a non-residential 21 % card beside it also names the
+    year and VAT.
+    """
+    cards: list[tuple[float, Tag]] = []
     for table in soup.find_all("table"):
         text = fold_accents(table.get_text(" ", strip=True))
-        if str(year) in text and "vat" in text and _RESIDENTIAL_VAT_RE.search(text):
-            return table
-    return None
+        stated = _VAT_PERCENT_RE.search(text)
+        if str(year) in text and "vat" in text and stated is not None:
+            cards.append((vat_from_percent(LABEL, to_float(stated.group(1))), table))
+    if not cards:
+        return None
+    vat, table = min(cards, key=lambda card: card[0])
+    return table, vat
 
 
 def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
@@ -102,12 +122,10 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
     but whose rows no longer parse raises instead: that is a broken parser,
     and silently serving last year's rates for it would hide the breakage.
     """
-    # Pin to the residential 6 % card. A non-residential 21 % card on
-    # the same page would also contain "vat" + the year and silently
-    # bind to the wrong rate.
-    table = _residential_table(soup, year)
-    if table is None:
+    found = _residential_table(soup, year)
+    if found is None:
         return None
+    table, vat_rate = found
 
     # Walk rows to anchor each amount to its label rather than relying on
     # positional order; the page has occasionally swapped supply/sanitation
@@ -193,18 +211,18 @@ def _parse_year_table(soup: BeautifulSoup, year: int) -> WaterTariff | None:
             f" ({fixed_sanitation}) != total ({fixed_total})"
         )
 
-    vat = 1.0 + DEFAULT_VAT_RATE
+    vat = 1.0 + vat_rate
     return WaterTariff(
         utility=UTILITY_ID,
         region=REGION_BRUSSELS,
         valid_from=date(year, 1, 1),
         valid_until=date(year, 12, 31),
-        publication_label=_label_for_year(year),
+        publication_label=_label_for_year(year, vat_rate),
         source_url=SOURCE_URL,
         yearly_fixed_fee=fixed_total / vat,
         linear_eur_per_m3=var_supply / vat,
         sanering_gemeentelijk_eur_per_m3=var_sanitation / vat,
-        vat_rate=DEFAULT_VAT_RATE,
+        vat_rate=vat_rate,
     )
 
 

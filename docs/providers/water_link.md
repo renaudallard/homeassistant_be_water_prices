@@ -100,7 +100,8 @@ afvoer, zuivering, total ex-VAT and total with VAT.
 - `yearly_fixed_fee` 100 and per-resident discount 20: the vastrecht and
   korting lines, the Water, Afvoer and Zuivering columns added up and held
   to the Totaal column.
-- VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
+- VAT: `vat_rate` is the rate the vastrecht total and the total with VAT
+  beside it give (100,0000 and 106,0000, so 6 %). `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.
 - Label: "Water-link tarieven huishoudelijk `<year>` (`<commune>`)".

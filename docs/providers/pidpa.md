@@ -87,7 +87,9 @@ Two paths; only the first one serves a card:
   korting rows, the drinkwater, afvoer and zuivering cells added up and
   held to the integrale cell. The Tariefplan PDF's "Tarieven Vast recht
   Korting/DOM" rows give the same on the drift check's path.
-- VAT: ex-VAT figures; `vat_rate` is 6 %. `build_flanders_tariff` refuses
+- VAT: `vat_rate` is the rate the integrale vastrecht cell and its
+  VAT-inclusive twin give (100 and 106 euro, so 6 %); the Tariefplan PDF
+  states none and takes `DEFAULT_VAT_RATE`. `build_flanders_tariff` refuses
   a rate of zero or less, a rate outside 0.5 to 20 EUR/m³, and a negative
   sanering.
 - Year: the Belgian clock's year. When the page has no tab for it (the

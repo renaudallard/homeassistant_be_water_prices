@@ -59,7 +59,14 @@ from bs4 import BeautifulSoup
 from ..const import DEFAULT_VAT_RATE, REGION_WALLONIA
 from ._html import fetch_and_parse
 from ._pdf import to_float
-from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
+from .base import (
+    ExtractorError,
+    WaterExtractor,
+    WaterTariff,
+    belgian_today,
+    carry_prior_year_card,
+    vat_from_percent,
+)
 
 # Match "CVD" followed (within ~120 chars, possibly across labels and
 # colons) by the next ``N,NNN €`` amount. Tolerant of the three
@@ -181,6 +188,36 @@ def spge_components(*, cva: float | None, fse: float | None, label: str) -> tupl
         if not low <= value <= high:
             raise ExtractorError(f"{label} {name} {value} is outside [{low}, {high}] EUR/m3")
     return cva, fse
+
+
+# Where the Walloon pages state their VAT rate: "TVA : 6 %", "TVA de 6%",
+# "TVA (6 %", "TVA 6%" in CILE's table, AIEM's "HTVA 6%" after each figure,
+# Callmepower's "6 % TVA" and SWDE's English "VAT For water supply, it
+# amounts to 6 %", the first number after the word. The gaps are bounded,
+# as everywhere here.
+_VAT_RES = (
+    re.compile(
+        r"\bH?TVA\s{0,3}(?:de|:|\()?\s{0,3}(\d{1,2}(?:[.,]\d{1,2})?)\s{0,3}%", re.IGNORECASE
+    ),
+    re.compile(r"(\d{1,2}(?:[.,]\d{1,2})?)\s{0,3}%\s{0,3}TVA\b", re.IGNORECASE),
+    re.compile(r"\bVAT\b[^%\d]{0,40}(\d{1,2}(?:[.,]\d{1,2})?)\s{0,3}%"),
+)
+
+
+def stated_vat_rate(text: str, *, label: str) -> float:
+    """The VAT rate a Walloon page states, or ``DEFAULT_VAT_RATE`` when it
+    states none (IDEN's page does not). A page stating two
+    rates cannot say which its own figures carry, so it fails the fetch."""
+    found = {
+        vat_from_percent(label, to_float(match.group(1)))
+        for pattern in _VAT_RES
+        for match in pattern.finditer(text)
+    }
+    if not found:
+        return DEFAULT_VAT_RATE
+    if len(found) > 1:
+        raise ExtractorError(f"{label} states more than one VAT rate: {sorted(found)}")
+    return found.pop()
 
 
 def read_spge(text: str, *, utility_id: str) -> tuple[float, float]:
@@ -312,12 +349,14 @@ def build_tariff(
     year: int,
     cva: float,
     fse: float,
+    vat_rate: float,
     valid_from: date | None = None,
 ) -> WaterTariff:
     """Build a Walloon :class:`WaterTariff` from the parsed CVD.
 
     Materialises the redevance as ``20·CVD + 30·CVA``, the CVA and FSE
-    being what :func:`spge_components` read off the card. ``valid_from`` dates a
+    being what :func:`spge_components` read off the card and ``vat_rate``
+    what :func:`stated_vat_rate` did. ``valid_from`` dates a
     rate that took effect inside ``year``; it defaults to 1 January,
     which is when the CWaPE cards normally turn over. A card dated last
     year, a page not yet updated in January, stands until 31 March like
@@ -343,7 +382,7 @@ def build_tariff(
         cvd_eur_per_m3=cvd,
         cva_eur_per_m3=cva,
         fse_eur_per_m3=fse,
-        vat_rate=DEFAULT_VAT_RATE,
+        vat_rate=vat_rate,
     )
     return carry_prior_year_card(tariff, belgian_today().year)
 
@@ -372,6 +411,7 @@ def parse_tariff(
         year=target,
         cva=cva,
         fse=fse,
+        vat_rate=stated_vat_rate(text, label=utility_id),
         valid_from=effective_date(text, target),
     )
 

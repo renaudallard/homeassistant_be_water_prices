@@ -73,10 +73,12 @@ Vlaams-Brabant: 85 communes, about 1.5 M people (about 22 % of Flanders).
 
 `parse_tariff`, on the text of the `insert` HTML.
 
-- Every rate row prints the rate twice, ex-VAT then with 6 % VAT, and both
-  are read (`_PAIR`): rate x 1,06 must match the VAT figure within 0,001.
-  A row that lost its ex-VAT cell would otherwise hand over the VAT figure,
-  six percent high and shaped like a price.
+- Every rate row prints the rate twice, ex-VAT then with VAT, and both are
+  read (`_PAIR`): the rate times 1 plus the VAT rate must match the VAT
+  figure within 0,001. The VAT rate is the one the first vastrecht and its
+  twin give (50,0000 and 53,0000, so 6 %). A row that lost its ex-VAT cell
+  would otherwise hand over the VAT figure, a VAT rate high and shaped
+  like a price.
 - `basis_eur_per_m3`: "Basistarief drinkwater (per m³)" (3,0058 for
   Gent-centrum).
 - `comfort_eur_per_m3`: "Comforttarief drinkwater (per m³)" (6,0116).
@@ -98,7 +100,8 @@ Vlaams-Brabant: 85 communes, about 1.5 M people (about 22 % of Flanders).
 - `yearly_fixed_fee` 100 and per-resident discount 20: the "Vastrecht (per
   jaar)" and "Korting op vastrecht (per jaar)" rows of the three household
   legs added up, each held to its VAT-inclusive figure like the rates.
-- VAT: `vat_rate` is 6 %. `build_flanders_tariff` refuses a rate of zero or
+- VAT: `vat_rate` is the rate the vastrecht pair gives, 6 %.
+  `build_flanders_tariff` refuses a rate of zero or
   less, a rate outside 0.5 to 20 EUR/m³, and a negative sanering.
 - Label: "Farys watertarieven `<year>` (`<commune>`)". The per-commune fetch
   puts the numeric id there and the coordinator swaps it for the saved
