@@ -131,6 +131,12 @@ error, or fewer communes than the floor in `MIN_COMMUNES`, fails it,
 since the config flow drops the commune selector when that list fails
 and a new entry is then billed on the operator's default commune.
 
+Before the check, the runner resolves names through nsec.arnor.org over
+DNS-over-TLS, as the electricity and gas checks do: Fluvius's nameservers
+never answer a GitHub runner, whichever resolver asks, and the same from a
+utility would read as a dead host. If nsec.arnor.org cannot resolve Farys
+and SWDE, the runner's own resolver is put back.
+
 A row sets the Flemish cards side by side (`_check_flanders_fixed`): each
 card is billed on the vastrecht and korting it prints, so one that misread
 either fails it against the others (by more than a cent), the cards of one
