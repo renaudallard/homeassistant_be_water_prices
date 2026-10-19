@@ -65,7 +65,7 @@ back.
 
 The integration reads the branch through `CARD_ARCHIVE_URL`
 (`raw.githubusercontent.com`, the `archive` branch) in one place:
-`_archived_row` in `coordinator.py` asks for
+`archived_row` in `providers/_archive.py` asks for
 `<utility>/<commune>/<YYYY-MM>.json`, the commune percent-encoded, with the
 usual User-Agent and nothing else. A transient failure is raised; any
 other HTTP error (a missing month is a 404), a body that is not JSON or a

@@ -65,6 +65,7 @@ registry.
 | `__init__.py` | The registry: `_MODULE_NAMES`, built lazily (`async_load` off the event loop) |
 | `base.py` | `WaterExtractor`, `WaterTariff`, `CommuneOption`, the errors, `belgian_today`, `carry_prior_year_card` |
 | `_html.py`, `_pdf.py` | Fetching and reading pages and PDFs, with their guards |
+| `_archive.py` | Reading a row of the card archive |
 | `_flanders.py` | The Flemish integrale waterprijs builder |
 | `_walloon_simple.py` | The Walloon CWaPE builder, the CVD scan and the SPGE figures |
 | `_postcodes.py` | Postcode to utility |

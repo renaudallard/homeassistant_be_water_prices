@@ -4195,7 +4195,7 @@ async def test_an_archived_row_is_addressed_by_utility_commune_and_month(
     """Where a stored row is read from: the archive branch, the utility,
     the commune id with everything that is not a path percent-encoded so
     De Watergroep's braces reach the file of that name, and the month."""
-    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers import _archive as module
 
     asked: list[str] = []
     session: Any = None
@@ -4220,7 +4220,7 @@ async def test_an_unreadable_archived_row_is_no_row(monkeypatch: pytest.MonkeyPa
     """A month the branch does not hold answers 404, and a truncated or
     rewritten file is not a card. Both leave the caller with nothing to
     serve rather than an exception out of a failing refresh."""
-    from custom_components.be_water_prices import coordinator as module
+    from custom_components.be_water_prices.providers import _archive as module
 
     answers: list[Any] = [ExtractorError("HTTP 404"), "not json", "[]", '"a string"']
     session: Any = None
@@ -4630,7 +4630,9 @@ async def test_an_archive_that_does_not_answer_is_not_walked_past(
             raise TransientFetchError("HTTP 429 fetching the archive")
         return json.dumps(older)
 
-    monkeypatch.setattr(module, "fetch_text", fetch)
+    from custom_components.be_water_prices.providers import _archive
+
+    monkeypatch.setattr(_archive, "fetch_text", fetch)
     # The real reader, which conftest swaps out for the whole suite.
     monkeypatch.setattr(module, "_archived_row", _archived_row)
     entry = await _setup_entry(hass, _down, loads=False)

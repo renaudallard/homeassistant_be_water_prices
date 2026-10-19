@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import asyncio
 import calendar
-import json
 import logging
 import math
 import time
@@ -37,8 +36,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any
-from urllib.parse import quote
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import (
@@ -67,7 +65,6 @@ from homeassistant.util.unit_conversion import VolumeConverter
 
 from ._redact import scrub_tokens, sensitive_tokens, source_url_without_commune
 from .const import (
-    CARD_ARCHIVE_URL,
     CONF_CARD_ARCHIVE,
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
@@ -92,7 +89,8 @@ from .const import (
 )
 from .pricing import compute_annual_cost, compute_ytd_cost
 from .providers import ExtractorError, TransientFetchError, WaterTariff, get
-from .providers._pdf import fetch_text
+from .providers._archive import ARCHIVE_MONTHS_BACK as _ARCHIVE_MONTHS_BACK
+from .providers._archive import archived_row as _archived_row
 from .providers._postcodes import resolve_candidates
 from .providers.base import (
     WaterExtractor,
@@ -102,21 +100,8 @@ from .providers.base import (
     tariff_to_dict,
 )
 
-if TYPE_CHECKING:
-    import aiohttp
-
 _LOGGER = logging.getLogger(__name__)
 
-# How many months back a failed refresh looks for a stored card, newest
-# first and stopping at the first one it finds. The daily run files a row
-# a month, so this month and the one before it cover an outage. The rest
-# is for the utility the runner cannot reach, whose rows reach the branch
-# only when someone runs the archiver from a residential address, and for
-# a month the archiver spent locked out of a publication. A water tariff
-# is annual, so the oldest card this can reach is last year's, the card
-# every extractor already stands on in January, and the staleness clock
-# still runs from the day it was captured.
-_ARCHIVE_MONTHS_BACK = 12
 
 # Bumped only if the persisted YTD cycle dict changes shape incompatibly.
 # The minor version carries shape changes so a rollback degrades to a
@@ -1032,29 +1017,6 @@ class _MeteredDays:
     meter: str
     read_on: date
     days: dict[date, float]
-
-
-async def _archived_row(
-    session: aiohttp.ClientSession, utility: str, commune: str, month: date
-) -> dict[str, Any] | None:
-    """The row the project's card archive holds for that utility, commune
-    and month, or None when it holds none or what it holds is not a row.
-
-    Raises :class:`TransientFetchError` when the archive could not be
-    asked (a network failure, a 5xx, a rate limit): that says nothing
-    about whether the month is held."""
-    url = f"{CARD_ARCHIVE_URL}/{utility}/{quote(commune, safe='')}/{month:%Y-%m}.json"
-    try:
-        body = await fetch_text(session, url)
-    except TransientFetchError:
-        raise
-    except ExtractorError:
-        return None
-    try:
-        row = json.loads(body)
-    except ValueError:
-        return None
-    return row if isinstance(row, dict) else None
 
 
 class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):

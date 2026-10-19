@@ -184,6 +184,14 @@ The module is a vendored subset of the electricity integration's reader.
   by Water-link and Aquaduin to refuse a link pointing at another year's
   card), and `error_text`, an exception message that is never empty.
 
+### `_archive.py`: the card archive
+
+`archived_row(session, utility, commune, month)` reads one row of the
+archive branch (see [data-sources.md](data-sources.md#the-card-archive)),
+raising `TransientFetchError` when the archive could not be asked and
+returning None for a month it does not hold or a body that is not a row.
+`ARCHIVE_MONTHS_BACK` (12) is how far back a read walks.
+
 ### `_html.py`: HTML
 
 - `fetch_html` is `fetch_text` under another name.
