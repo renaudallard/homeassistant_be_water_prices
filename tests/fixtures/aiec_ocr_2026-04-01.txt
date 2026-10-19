@@ -1,0 +1,34 @@
+STRUCTURE TARIFAIRE DE L'EAU AU 01/04/2026 À IE C_
+Coût Vérité Distribution Cv: 3,050 € RÉ a
+Coût Vérité Assainissement CvaA: 2,748 € Ve
+
+HTVA __: TVAC6%
+Redevance annuelle (20xCVD)+(30xCVA)  143,4400€: 152,0464€
+Première tranche (de 0 à 30 m°) 0,5xCVD 1,5250€:  1,6165€
+Deuxième tranche (de 31 à 5000 m°)__ CVD+CVA . 5,7980€.. 6,1459€
+Troisième tranche (plus de 5000 m°) (0,9 xCVD)+CVA 5,4930 € 5,8226 €
+(redevance captage de 0,0992 € incluse)
+HTVA TVAC 6%
+Contribution au Fonds social à ajouter par m° : 0,0339€:  0,0359€
+DETAIL REDEVANCE ANNUELLE
+HTVA : TVAC6%
+redevance AIEC = 20 CVD …61,0000 € : 64,6600 €
+redevance SPGE = 30 CVA 82,4400€: 87,3864€
+TOTAL ANNUEL 143,4400 € E 152,0464 €
+CVA 0,2259€ | 0,2394 €
+DETAIL PRIX D'1 M?
+Tranche de 0 à 30 m° | Tranche de 31 à 5.000 m° | Tranche > 5.000 m°
+HTVA:  TVAC6% HTVA _: TVAC6%
+___ CVA(SPGE) : 0€: O0€| 2,7480€. 2,9129€| 2,7480€: 2,9129€
+Fonds Social : 0,0339€ 0,0359 € 0,0339 € : 0,0359 € 0,0339 € : 0,0359€
+TOTAUX: 1,5589€ 1,6524 € 5,8319 € : 6,1818 € 5,5269€ : 5,8585€
+Estimation du coût de l'eau par nombre d'habitant
+Tarif au 1“ avril 2026
+Nbrhab. Litre/jour m’/an Montant
+1 96 35 233€
+2 192 70 449€
+3 288 105 665€
+4 384 140 882€
+5 479 175 ‘ 1098€
+6 575 210  1314€
+7 671 245 ‘  1.531€

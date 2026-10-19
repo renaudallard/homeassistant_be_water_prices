@@ -192,6 +192,18 @@ raising `TransientFetchError` when the archive could not be asked and
 returning None for a month it does not hold or a body that is not a row.
 `ARCHIVE_MONTHS_BACK` (12) is how far back a read walks.
 
+### `_card_figures.py`: the tariff a card's figures agree on
+
+`read_figures(text, *, label)` finds the one CVD, CVA and Fonds social,
+all among the numbers in `text`, whose ten derived figures (`derived`: the
+redevance and the three tranches, each before and after VAT, and the first
+two totals with the Fonds social after VAT) are all in it at four
+decimals, and raises `ExtractorError` naming the missing figures
+otherwise. It looks for no label and no position, so it reads any layout
+that prints those figures. The texts it is tested on are what Tesseract
+5.5 read off AIEC's pictures of June 2021, January 2023, January 2026 and
+April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`).
+
 ### `_html.py`: HTML
 
 - `fetch_html` is `fetch_text` under another name.

@@ -1,0 +1,30 @@
+Nouveau prix (au 01/06/2021).
+Coût vérité distribution CVD: 2.3400 € |/m°
+Coût vérité assainissement CVA: | 2.3650€ | /m°
+HTVA TV.A. C. 6% BEF
+Redevance —> (20 x C.V.D.}+(30 x C.V.A.) 117.7500 € 124.8150 € 5 035.02 BEF
+Première tranche de O à 30 m° > 0.5 x C.V.D. 1.1700 € 1.2402 € 50.03 BEF
+deuxième tranche de 30 à 5000 m° > C.V.D. + C.V.A. 4.7050 € 4.9873 € 201.19 BEF
+troisième tranche plus de 5000 m° —> (0.9 x C.V.D.) + C.V.A. 4.4710 € 4.7393 € 191.18 BEF
+(redevance captage de 0.0992 € incluse)
+Contrubution au Fonds social à ajouter par m° : 0.0275 €
+Détail redevance:
+redevance AIEC 20CVD 46.80 € 49.6080 € 2 001.18 BEF
+redevance SPGE 30CVA 70.95 € 75.2070 € 3 033.84 BEF
+117.75 € 124.82 € 5 035.02 BEF
+(par jour) 0.1282€ CVD
+0.1944€ CVA
+Détail prix d'un m° (tranche 30 à 5000 m°) (tranche O à 30 m°
+CVD (AIEC) 2.3400 € 46.65% 11700 €
+CVA (SPGE) 2.3650 € 47.14% - €
+Fonds Social 0.0275 € 0.55% 0.0275 €
+TVA 0.2840 € 5.66% 0.0719 €
+4.7325 € <- HTVA > 11975 €
+5.0165 € 202.36 BEF 12694 € 51.21 BEF
+Prix de l'eau
+Fonds Social
+0.5% _—
+\ B CVD (AIEC)
+CVD (AIEC) | m CVA (SPGE)
+| 79% | OFonds Social
+| | O TVA
