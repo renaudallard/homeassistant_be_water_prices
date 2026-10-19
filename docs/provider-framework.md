@@ -222,30 +222,20 @@ publication_label_prefix=)`, which wires `fetch_tariff` and
 - `parse_cvd(html)`: the CVD off a prose page. It tries "actuelle du CVD"
   and then "distribution (CVD)", taking the largest value inside the
   plausibility window (1.5 to 6.0 EUR/m³), then the largest "CVD ... N €"
-  in the window that is not the CVA constant. Largest, because a CVD only
+  in the window that is not the CVA the page prints. Largest, because a CVD only
   indexes up and pages quote an older one beside the current one. Nothing
   plausible is an `ExtractorError`.
 - `detect_published_year(text, today=None)`: the tariff year a page
   states, "Tarifs YYYY" first, then "1er janvier YYYY", then "en YYYY",
   only years within one of today counting, and the current year winning
   over a neighbour the page also names. None when the page states none.
-- `spge_components(cva=, fse=, year=, label=, logger=, cva_required=True)`:
-  the CVA and FSE a card is priced on. A card of `WALLONIA_SPGE_YEAR`
-  (`const.py`, 2026) or earlier is priced on `WALLONIA_CVA_EUR_PER_M3` and
-  `WALLONIA_FSE_EUR_PER_M3`, and what its page prints is held to them. A
-  later card is priced on its page's own figures and fails when the page
-  prints either one not at all.
-- `warn_constant_drift(...)`: raises `ExtractorError` (and logs a warning)
-  when a printed figure is more than the threshold from the constant,
-  0.005 EUR/m³ for the CVA and 0.001 for the FSE. A figure not printed is
-  not checked. Raising rather than logging puts a moved SPGE figure on the
-  watched paths: the stale-snapshot Repair and the live check.
-- `hold_to_constant(...)`: the same, with a figure not printed counting as
-  a failure. `spge_components` uses it for the CVA when `cva_required`;
-  IDEN and AIEC pass `cva_required=False`, and the FSE is never required.
-- `check_spge_constants(text, year=, utility_id=, logger=)`: reads the CVA
-  and FSE off a prose page (`parse_cva`, `parse_fse`) and hands them to
-  `spge_components`.
+- `spge_components(cva=, fse=, label=)`: the CVA and FSE a card is priced
+  on, the ones its page printed. A figure not printed (`None`) fails the
+  fetch, and so does one outside its window, 1 to 10 EUR/m³ for the CVA
+  and 0,01 to 0,2 for the FSE, which is what a decimal place out or one
+  label's number read for the other looks like.
+- `read_spge(text, utility_id=)`: reads the CVA and FSE off a prose page
+  (`parse_cva`, `parse_fse`) and hands them to `spge_components`.
 - `build_tariff(utility_id=, cvd=, source_url=, publication_label=, year=,
   cva=, fse=, valid_from=None)`: refuses a CVD outside the window, sets the
   redevance to `20 x CVD + 30 x CVA`, dates the card from `valid_from` or

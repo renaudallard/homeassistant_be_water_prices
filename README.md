@@ -38,12 +38,10 @@ Tariffs are fetched **live** from each utility's own published page or
 PDF. **Every per-distributor rate is fetched bar one**: AIEC publishes
 its card only as a picture, so that one rate is transcribed from the
 picture against the date its file name carries, and the card AIEC's page
-is showing decides which transcription applies. The Flemish vastrecht
-and korting are read off each card too, and the daily live check holds
-the cards to each other on them. The components that are uniform by
-decree are carried as constants and reviewed annually: the flat-Wallonia
-SPGE CVA and FSE, for the year they are in force (a later card is priced
-on the figures its own page prints). Add a utility by
+is showing decides which transcription applies. The figures that are
+uniform by decree are read off each card too, the Flemish vastrecht and
+korting and the flat-Wallonia SPGE CVA and FSE, and the daily live check
+holds the cards of each region to each other on them. Add a utility by
 writing one Python module that knows where to find that utility's
 publication and how to parse it.
 
@@ -69,7 +67,7 @@ publication and how to parse it.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card it fetched, which is kept on disk, or, when it has none, on the last card the project's daily archive captured (see [the card archive](./docs/ci-and-testing.md#the-card-archive)), instead of retrying setup until the utility is back, and an outage that drags on past the staleness window, or a failing refresh on last year's card, picks up whatever the archive has captured since; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to the last hour Home Assistant's recorder has compiled, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.), or if the Flemish cards disagree on the vastrecht or korting they print.
-- **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. It only sees fields we read off a page, so a move in the decreed constants above is the live check's to catch: it fails while any Walloon card is past the year the CVA and FSE constants are for, and when the Walloon cards of one year disagree on either figure. A card of a later year is priced on the figures its own page prints, so the Walloon entries keep serving on 1 January instead of stopping until a release ([pricing model](./docs/pricing-model.md#wallonia-the-cwape-tiers)).
+- **Weekly fixture drift check** — a second cron parses each utility's live publication and diffs the result against the parser's output on the committed test fixture; if any tariff field drifted by more than the threshold (rates `> 0.001` €/m³, fees `> 0.01` €/year), an issue is opened with the field-by-field deltas so the fixture can be re-captured. A figure every card of a region shares moves on all of them at once, so it shows as drift on each; a card that misread it while the others did not is the live check's to catch, which fails when the cards of one year disagree. Each Walloon card is priced on the CVA and FSE its own page prints, so the Walloon entries keep serving on 1 January without a release ([pricing model](./docs/pricing-model.md#wallonia-the-cwape-tiers)).
 
 ## Supported utilities
 
@@ -208,7 +206,7 @@ with it, again without a restart.
 
 | Entity id suffix (English install) | Description |
 | --- | --- |
-| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, **as the card prints it** — before the per-resident korting and before VAT, which is how the operators publish it too. What a Flemish household is actually charged is `max(0, fee − min(persons, 5) × korting)`: € 80,00 ex-VAT at the default one resident against the € 100,00 shown here, and € 0,00 from five residents up. Parsed from the publication for VIVAQUA and the Flemish operators (the vastrecht of the three legs added up, 100 EUR on every 2026 card); Walloon entries use the regulator's formula `20·CVD + 30·CVA`, where the CVD is parsed and the CVA is the flat SPGE figure: the constant for a card of its year, the page's own for a later one. |
+| `yearly_fixed_fee` | Vastrecht / redevance in EUR/year, ex-VAT, **as the card prints it** — before the per-resident korting and before VAT, which is how the operators publish it too. What a Flemish household is actually charged is `max(0, fee − min(persons, 5) × korting)`: € 80,00 ex-VAT at the default one resident against the € 100,00 shown here, and € 0,00 from five residents up. Parsed from the publication for VIVAQUA and the Flemish operators (the vastrecht of the three legs added up, 100 EUR on every 2026 card); Walloon entries use the regulator's formula `20·CVD + 30·CVA`, where the CVD and the CVA, the flat SPGE figure, are both read off the page. |
 | `basis_rate` | First-block (Flanders) or single-rate (Brussels) or CVD (Wallonia) in EUR/m³, ex-VAT. |
 | `comfort_rate` | Flanders block 2 in EUR/m³, ex-VAT. Not created for Brussels or Wallonia entries (the concept is Flemish-only). |
 | `sewerage_rate` | Sum of every sewerage / CVA / FSE component carried by the tariff in EUR/m³, ex-VAT. |
@@ -920,14 +918,12 @@ asks for both.
   reaches those volumes; a building-wide meter that does is on a
   professional tariff with a different redevance and a meter-diameter
   charge, so the card we hold is the wrong card for it either way.
-- **Past the constants' year, a Walloon card is only as right as its
-  page.** From the first card of a year after `WALLONIA_SPGE_YEAR`, each
-  Walloon entry is billed on the CVA and FSE its own page prints, until a
-  release moves the constants. The operators' pages can lag (INASEP still
-  printed the 2025 CVA on day 117 of 2026), so a page dated to the new
-  year but carrying last year's figure bills on it. The live check is
-  what catches that, by failing when the cards of one year disagree, and
-  it keeps failing until the release moves the constants and the year.
+- **A Walloon card's CVA and FSE are only as right as its page.** Each
+  Walloon entry is billed on the CVA and FSE its own page prints. The
+  operators' pages can lag (INASEP still printed the 2025 CVA on day 117
+  of 2026), so a page dated to the new year but carrying last year's
+  figure bills on it. The live check is what catches that, by failing
+  when the cards of one year disagree.
 - **Wallonia régies communales** (~30 small operators -- Chimay,
   Theux, Libramont, ...) are deferred indefinitely. They have no
   central publication channel and the dev-hours / customer ratio

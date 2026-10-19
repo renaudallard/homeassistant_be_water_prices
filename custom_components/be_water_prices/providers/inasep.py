@@ -36,10 +36,8 @@ e.g.::
     Coût-Vérité Assainissement (CVA) = 2,748 €/m³ depuis le 1er janvier 2026
     Fonds social de l'Eau = 0,0339 €/m³ depuis le 1er janvier 2026
 
-CVA and FSE are the SPGE flat-Wallonia figures, handled as on every
-other Walloon page: the constants for a card of their year, the values
-the page prints held to them and a move failing the fetch, and the
-page's own for a later card. The parser anchors the CVD on the literal phrase
+CVA and FSE are the SPGE flat-Wallonia figures, read off the page as
+on every other Walloon page. The parser anchors the CVD on the literal phrase
 ``Coût-Vérité Distribution (CVD)`` so the unrelated euros amounts
 elsewhere on the page (annual-impact figures, per-glass examples)
 can't win.
@@ -54,7 +52,6 @@ one.
 
 from __future__ import annotations
 
-import logging
 import re
 from datetime import date
 
@@ -64,10 +61,8 @@ from bs4 import BeautifulSoup
 from ..const import REGION_WALLONIA
 from ._html import fetch_and_parse
 from ._pdf import to_float
-from ._walloon_simple import build_tariff, check_spge_constants, detect_published_year
+from ._walloon_simple import build_tariff, detect_published_year, read_spge
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
-
-_LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "inasep"
 LABEL = "INASEP"
@@ -147,7 +142,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     # than the clock, so a page still on last year's card in January
     # looks stale instead of being relabelled as this year's.
     target = year or detect_published_year(text) or belgian_today().year
-    cva, fse = check_spge_constants(text, year=target, utility_id=UTILITY_ID, logger=_LOGGER)
+    cva, fse = read_spge(text, utility_id=UTILITY_ID)
     return build_tariff(
         utility_id=UTILITY_ID,
         cvd=cvd,

@@ -81,15 +81,12 @@ heading row with no amount falls through to the unlabelled row below it.
 
 ### CVA and FSE
 
-`spge_components` in `providers/_walloon_simple.py`, with the label
-"inBW", against `WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The table's values are held to them within 0,005 and 0,001; a move
-  raises `ExtractorError`, and so does a 30 x CVA row that is gone.
-- A card of a later year is priced on the table's own CVA and FSE, and
-  fails if either is missing.
+The CVA is the 30 x CVA row's Prix unitaire divided by 30, rounded to 4
+decimals, and the FSE the Fonds Social row's. Both go to `spge_components`
+in `providers/_walloon_simple.py`, with the label "inBW": the card is
+priced on them as printed, and a row that is gone, or a figure outside
+its window (1 to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the FSE), fails
+the fetch.
 
 ### Dates
 
@@ -103,8 +100,8 @@ heading row with no amount falls through to the unlabelled row below it.
   is not a TLS failure; the unverified retry is not attempted for those.
 - `ExtractorError`: no table, no full-CVD row, a first block that is not
   half the CVD, a redevance that is not 20 x CVD, a CVD outside the
-  window, a CVA or FSE off the constants for a card of their year, a
-  missing CVA row, a later card missing either SPGE figure.
+  window, a missing CVA or Fonds Social row, a CVA or FSE outside its
+  window.
 
 ## Checks
 

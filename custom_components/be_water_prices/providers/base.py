@@ -100,7 +100,7 @@ class WaterTariff:
     sanering_bovengemeentelijk_eur_per_m3: float = 0.0  # Flanders, to Aquafin
     sanering_gemeentelijk_eur_per_m3: float = 0.0  # Flanders, to commune
     cvd_eur_per_m3: float = 0.0  # Wallonia, per-distributor
-    cva_eur_per_m3: float = 0.0  # Wallonia, national (SPGE constant)
+    cva_eur_per_m3: float = 0.0  # Wallonia, flat SPGE figure the page prints
     fse_eur_per_m3: float = 0.0  # Wallonia, national (Fonds Social de l'Eau)
 
     vat_rate: float = 0.06

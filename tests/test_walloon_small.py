@@ -28,18 +28,12 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import date
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from custom_components.be_water_prices.const import (
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-    WALLONIA_SPGE_YEAR,
-)
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers._walloon_simple import parse_cvd
 from custom_components.be_water_prices.providers.aiec import parse_tariff as parse_aiec
@@ -47,7 +41,7 @@ from custom_components.be_water_prices.providers.aiem import parse_tariff as par
 from custom_components.be_water_prices.providers.ciesac import parse_tariff as parse_ciesac
 from custom_components.be_water_prices.providers.iden import parse_tariff as parse_iden
 from custom_components.be_water_prices.providers.ieg import parse_tariff as parse_ieg
-from tests import fixture_html
+from tests import SPGE_CVA_2026, SPGE_FSE_2026, fixture_html
 
 
 def test_each_utility_parses_its_2026_cvd() -> None:
@@ -61,12 +55,10 @@ def test_each_utility_parses_its_2026_cvd() -> None:
     for parse_fn, fixture, expected_cvd in cases:
         t = parse_fn(fixture_html(fixture), year=2026)
         assert t.cvd_eur_per_m3 == expected_cvd, fixture
-        assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
-        assert t.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
+        assert t.cva_eur_per_m3 == SPGE_CVA_2026
+        assert t.fse_eur_per_m3 == SPGE_FSE_2026
         # Redevance materialised from 20·CVD + 30·CVA.
-        assert round(t.yearly_fixed_fee, 2) == round(
-            20 * expected_cvd + 30 * WALLONIA_CVA_EUR_PER_M3, 2
-        )
+        assert round(t.yearly_fixed_fee, 2) == round(20 * expected_cvd + 30 * SPGE_CVA_2026, 2)
         assert t.region == "wallonia"
         assert t.valid_from.year == 2026
 
@@ -111,7 +103,11 @@ def test_the_cva_decoy_cannot_win_the_generic_scan() -> None:
     )
     assert without_anchor != page, "the prose anchor was not neutralised"
     assert parse_cvd(without_anchor) == 2.46
-    assert parse_cvd(without_anchor) != WALLONIA_CVA_EUR_PER_M3
+    # The figure skipped is the CVA the page prints, not a known number:
+    # moved to 2,900 it is still the one left out.
+    moved = without_anchor.replace("2,748", "2,900")
+    assert moved != without_anchor, "the CVA was not moved"
+    assert parse_cvd(moved) == 2.46
 
 
 def test_the_actuelle_anchor_wins_over_a_larger_example() -> None:
@@ -224,7 +220,8 @@ def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.Monkey
     monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     page = (
         "<html><body><p>Tarifs 2025. Coût vérité distribution (CVD) : 2,870 €/m³. "
-        "Coût vérité assainissement (CVA) : 2,748 €/m³.</p></body></html>"
+        "Coût vérité assainissement (CVA) : 2,748 €/m³. "
+        "Fonds social de l'eau : 0,0339 €/m³.</p></body></html>"
     )
     tariff = parse_tariff(
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
@@ -268,7 +265,8 @@ def test_a_page_still_on_last_years_card_stands_until_31_march(
     monkeypatch.setattr(_walloon_simple, "belgian_today", _FakeDate.today)
     page = (
         "<html><body><p>Tarifs 2026. Coût vérité distribution (CVD) : 2,870 €/m³. "
-        "Coût vérité assainissement (CVA) : 2,748 €/m³.</p></body></html>"
+        "Coût vérité assainissement (CVA) : 2,748 €/m³. "
+        "Fonds social de l'eau : 0,0339 €/m³.</p></body></html>"
     )
     tariff = parse_tariff(
         page, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
@@ -286,49 +284,47 @@ def test_a_page_still_on_last_years_card_stands_until_31_march(
         ("ciesac_callmepower_2026.html", "ciesac"),
     ],
 )
-def test_a_moved_cva_on_a_prose_page_fails_the_fetch(fixture: str, utility_id: str) -> None:
-    """Most Walloon pages print the CVA and none of them checked it.
+def test_a_prose_page_is_priced_on_the_cva_it_prints(fixture: str, utility_id: str) -> None:
+    """CWaPE moves the CVA on 1 January and the pages follow at once, so the
+    page is the source rather than a figure kept in the code.
 
-    IDEN is not here: it reads its own card through its own parser, which
-    runs the same check (see test_iden_holds_its_page_to_the_spge_constants).
+    IDEN is not here: it reads its own card through its own parser (see
+    test_iden_is_priced_on_the_spge_figures_its_page_prints).
     """
     from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
 
     page = fixture_html(fixture)
     assert "2,748" in page
-    moved = page.replace("2,748", "2,900").replace("2,7480", "2,9000")
-    with pytest.raises(ExtractorError, match="CVA published value"):
-        parse_tariff(
-            moved, utility_id=utility_id, source_url="https://example.invalid/", label_prefix="X"
-        )
+    moved = page.replace("2,748", "2,900")
+    tariff = parse_tariff(
+        moved, utility_id=utility_id, source_url="https://example.invalid/", label_prefix="X"
+    )
+    assert tariff.cva_eur_per_m3 == 2.9
+    assert tariff.yearly_fixed_fee == pytest.approx(20 * tariff.cvd_eur_per_m3 + 30 * 2.9)
 
 
 @pytest.mark.parametrize(
     "fixture",
     ["ieg_2026.html", "aiem_2026.html", "aiec_callmepower_2026.html"],
 )
-def test_a_moved_fonds_social_on_a_prose_page_fails_the_fetch(fixture: str) -> None:
+def test_a_prose_page_is_priced_on_the_fonds_social_it_prints(fixture: str) -> None:
     from custom_components.be_water_prices.providers._walloon_simple import parse_tariff
 
     page = fixture_html(fixture)
     assert "0,0339" in page
-    with pytest.raises(ExtractorError, match="FSE published value"):
-        parse_tariff(
-            page.replace("0,0339", "0,0400"),
-            utility_id="x",
-            source_url="https://example.invalid/",
-            label_prefix="X",
-        )
+    tariff = parse_tariff(
+        page.replace("0,0339", "0,0400"),
+        utility_id="x",
+        source_url="https://example.invalid/",
+        label_prefix="X",
+    )
+    assert tariff.fse_eur_per_m3 == 0.04
 
 
-def test_the_prose_pages_print_the_constants_the_engine_uses() -> None:
-    """The regexes bind to every real page, so the checks are not vacuous."""
+def test_the_prose_pages_print_the_spge_figures() -> None:
+    """The regexes bind to every real page, so the figures are read."""
     from bs4 import BeautifulSoup
 
-    from custom_components.be_water_prices.const import (
-        WALLONIA_CVA_EUR_PER_M3,
-        WALLONIA_FSE_EUR_PER_M3,
-    )
     from custom_components.be_water_prices.providers._walloon_simple import parse_cva, parse_fse
 
     for name in (
@@ -340,9 +336,9 @@ def test_the_prose_pages_print_the_constants_the_engine_uses() -> None:
     ):
         soup = BeautifulSoup(fixture_html(name), "html.parser")
         text = soup.get_text(" ", strip=True)
-        assert parse_cva(text) == WALLONIA_CVA_EUR_PER_M3, name
+        assert parse_cva(text) == SPGE_CVA_2026, name
         if name != "ciesac_callmepower_2026.html":
-            assert parse_fse(text) == WALLONIA_FSE_EUR_PER_M3, name
+            assert parse_fse(text) == SPGE_FSE_2026, name
 
 
 def test_a_forward_looking_sentence_does_not_date_the_card_ahead() -> None:
@@ -377,14 +373,12 @@ def test_iden_reads_the_operator_s_own_card_not_an_aggregator() -> None:
     assert t.source_url.startswith("https://www.iden-eau.be/")
 
 
-def test_iden_holds_its_page_to_the_spge_constants() -> None:
-    """The two flat-Wallonia rows sit beside the CVD, so they are checked."""
+def test_iden_is_priced_on_the_spge_figures_its_page_prints() -> None:
+    """The two flat-Wallonia rows sit beside the CVD, so they are read."""
     page = fixture_html("iden_2026.html")
     assert "2,7480" in page and "0,0339" in page
-    with pytest.raises(ExtractorError, match="CVA published value"):
-        parse_iden(page.replace("2,7480", "2,8500"), year=2026)
-    with pytest.raises(ExtractorError, match="FSE published value"):
-        parse_iden(page.replace("0,0339", "0,0400"), year=2026)
+    moved = parse_iden(page.replace("2,7480", "2,8500").replace("0,0339", "0,0400"), year=2026)
+    assert (moved.cva_eur_per_m3, moved.fse_eur_per_m3) == (2.85, 0.04)
 
 
 def test_iden_does_not_read_the_rate_out_of_the_explanatory_section() -> None:
@@ -542,7 +536,7 @@ def test_a_page_that_stops_printing_the_cva_fails_rather_than_stops_checking() -
     page = fixture_html("ieg_2026.html")
     without = page.replace("CVA", "C.V.A.")
     assert without != page, "the mutation did not land"
-    with pytest.raises(ExtractorError, match="cannot be checked against it"):
+    with pytest.raises(ExtractorError, match="CVA is not printed on its card"):
         parse_tariff(
             without, utility_id="ieg", source_url="https://example.invalid/", label_prefix="IEG"
         )
@@ -658,10 +652,8 @@ def test_the_three_largest_walloon_pages_also_fail_on_a_missing_cva(
 ) -> None:
     """The rule shipped for the small operators and skipped the big ones.
 
-    SWDE, CILE and inBW passed their parsed CVA straight to the drift
-    warning, which is a documented no-op when the value is absent, so
-    rewording the label they bind to left them shipping on a constant
-    nothing was comparing to anything.
+    SWDE, CILE and inBW are priced on the CVA they print, so a reworded
+    label has to fail the fetch rather than leave a card with no CVA.
     """
     from custom_components.be_water_prices.providers import cile, inbw, swde
 
@@ -669,7 +661,7 @@ def test_the_three_largest_walloon_pages_also_fail_on_a_missing_cva(
     page = fixture_html(fixture)
     without = page.replace(before, after)
     assert without != page, "the mutation did not land"
-    with pytest.raises(ExtractorError, match="cannot be checked against it"):
+    with pytest.raises(ExtractorError, match="CVA is not printed on its card"):
         parsers[parse](without, year=2026)
 
 
@@ -698,11 +690,10 @@ async def test_a_blip_on_the_aiec_page_does_not_serve_the_aggregator() -> None:
     aggregator.assert_not_awaited()
 
 
-# --- the SPGE figures by year ------------------------------------------------
+# The SPGE figures each page prints.
 
-_LATER = WALLONIA_SPGE_YEAR + 1
-_PROSE_LATER = (
-    f"<html><body><p>Tarifs {_LATER}. Coût vérité distribution (CVD) : 2,870 €/m³. "
+_PROSE_2027 = (
+    "<html><body><p>Tarifs 2027. Coût vérité distribution (CVD) : 2,870 €/m³. "
     "Coût vérité assainissement (CVA) : 2,900 €/m³. "
     "Fonds social de l'eau : 0,0400 €/m³.</p></body></html>"
 )
@@ -717,21 +708,12 @@ def _parse_prose(page: str) -> Any:
     )
 
 
-def test_a_card_of_the_constants_year_that_differs_fails() -> None:
-    """Inside the window the page is held to the constant, as before."""
-    page = _PROSE_LATER.replace(str(_LATER), str(WALLONIA_SPGE_YEAR))
-    with (
-        patch(_TODAY, return_value=date(WALLONIA_SPGE_YEAR, 6, 1)),
-        pytest.raises(ExtractorError, match="CVA published value"),
-    ):
-        _parse_prose(page)
-
-
-def test_a_card_past_the_constants_year_is_priced_on_its_own_figures() -> None:
-    """CWaPE moves the CVA on 1 January; a page on the new card keeps serving."""
-    with patch(_TODAY, return_value=date(_LATER, 1, 10)):
-        tariff = _parse_prose(_PROSE_LATER)
-    assert tariff.valid_from == date(_LATER, 1, 1)
+def test_a_new_years_card_is_priced_on_its_own_figures() -> None:
+    """CWaPE moves the CVA on 1 January; a page on the new card keeps serving
+    without a release."""
+    with patch(_TODAY, return_value=date(2027, 1, 10)):
+        tariff = _parse_prose(_PROSE_2027)
+    assert tariff.valid_from == date(2027, 1, 1)
     assert tariff.cva_eur_per_m3 == 2.9
     assert tariff.fse_eur_per_m3 == 0.04
     assert tariff.yearly_fixed_fee == pytest.approx(20 * 2.87 + 30 * 2.9)
@@ -744,46 +726,48 @@ def test_a_card_past_the_constants_year_is_priced_on_its_own_figures() -> None:
         ("Fonds social de l'eau : 0,0400 €/m³. ", "CVA"),
     ],
 )
-def test_a_card_past_the_constants_year_without_a_figure_fails(printed: str, missing: str) -> None:
-    """Outside its year the constant is not known to hold, so it does not stand in."""
-    from custom_components.be_water_prices.providers._walloon_simple import spge_components
-
+def test_a_card_without_a_figure_fails(printed: str, missing: str) -> None:
+    """Nothing stands in for a figure the page does not print."""
     page = (
-        f"<html><body><p>Tarifs {_LATER}. Coût vérité distribution (CVD) : 2,870 €/m³. "
+        "<html><body><p>Tarifs 2027. Coût vérité distribution (CVD) : 2,870 €/m³. "
         f"{printed}</p></body></html>"
     )
     with (
-        patch(_TODAY, return_value=date(_LATER, 1, 10)),
-        pytest.raises(ExtractorError, match=f"{missing} is not printed on its {_LATER} card"),
+        patch(_TODAY, return_value=date(2027, 1, 10)),
+        pytest.raises(ExtractorError, match=f"{missing} is not printed on its card"),
     ):
         _parse_prose(page)
-    # The FSE is optional inside the window only, and so is IDEN's CVA.
-    with pytest.raises(ExtractorError, match="CVA is not printed"):
-        spge_components(
-            cva=None,
-            fse=0.04,
-            year=_LATER,
-            label="iden",
-            logger=logging.getLogger(__name__),
-            cva_required=False,
-        )
 
 
-def test_aiecs_transcribed_card_depends_on_the_constants_year() -> None:
-    """Its picture page prints no CVA: a card of the constants' year is built
-    on them and keeps its 31 March grace, and a later card cannot be built."""
+@pytest.mark.parametrize(
+    ("cva", "fse", "match"),
+    [(27.48, 0.0339, r"CVA 27\.48 is outside"), (2.748, 0.339, r"FSE 0\.339 is outside")],
+)
+def test_a_figure_a_decimal_out_is_refused(cva: float, fse: float, match: str) -> None:
+    from custom_components.be_water_prices.providers._walloon_simple import spge_components
+
+    with pytest.raises(ExtractorError, match=match):
+        spge_components(cva=cva, fse=fse, label="x")
+
+
+def test_aiecs_transcribed_card_carries_the_figures_its_picture_prints() -> None:
+    """The picture prints the CVA and the Fonds social beside the CVD, so
+    they are transcribed with it, and a later card is built on its own."""
     from custom_components.be_water_prices.providers import aiec
 
-    in_force = date(WALLONIA_SPGE_YEAR, 4, 1)
-    later = date(_LATER, 1, 1)
+    card = aiec.card_from_operator_page(date(2026, 4, 1))
+    assert card is not None
+    assert (card.cvd_eur_per_m3, card.cva_eur_per_m3, card.fse_eur_per_m3) == (
+        3.05,
+        SPGE_CVA_2026,
+        SPGE_FSE_2026,
+    )
+    later = date(2027, 1, 1)
     with (
-        patch(_TODAY, return_value=date(_LATER, 2, 1)),
-        patch.dict(aiec._TRANSCRIBED_CVD, {in_force: 3.05, later: 3.1}),
+        patch(_TODAY, return_value=date(2027, 2, 1)),
+        patch.dict(aiec._TRANSCRIBED, {later: aiec._Card(cvd=3.1, cva=2.9, fse=0.04)}),
     ):
-        card = aiec.card_from_operator_page(in_force)
-        assert card is not None
-        assert card.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
-        assert card.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
-        assert card.valid_until == date(_LATER, 3, 31)
-        with pytest.raises(ExtractorError, match=f"CVA is not printed on its {_LATER} card"):
-            aiec.card_from_operator_page(later)
+        card = aiec.card_from_operator_page(later)
+    assert card is not None
+    assert (card.cva_eur_per_m3, card.fse_eur_per_m3) == (2.9, 0.04)
+    assert card.yearly_fixed_fee == pytest.approx(20 * 3.1 + 30 * 2.9)

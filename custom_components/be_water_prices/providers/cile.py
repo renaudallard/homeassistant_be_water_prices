@@ -37,10 +37,8 @@ The page exposes a clean 4-row table::
     Fonds social     | 0,0339 €/m³
     TVA 6%           |
 
-CVA / FSE are the SPGE flat-Wallonia figures, handled by
-:func:`_walloon_simple.spge_components`: the constants for a card of
-their year, cross-checked against the page with a divergence failing
-the fetch, and the page's own for a later card.
+CVA / FSE are the SPGE flat-Wallonia figures, read off their rows and
+checked by :func:`_walloon_simple.spge_components`.
 
 Stores tariff like SWDE / inBW: ``cvd_eur_per_m3`` for the
 distributor's value, ``cva_eur_per_m3`` and ``fse_eur_per_m3`` for
@@ -51,8 +49,6 @@ branch of :func:`pricing.compute_annual_cost` handles the tier math.
 
 from __future__ import annotations
 
-import logging
-
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
@@ -60,8 +56,6 @@ from ..const import REGION_WALLONIA
 from ._html import extract_amounts, fetch_and_parse
 from ._walloon_simple import build_tariff, detect_published_year, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
-
-_LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "cile"
 LABEL = "CILE"
@@ -127,9 +121,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     cva, fse = spge_components(
         cva=_row_amount(table, "c.v.a", column),
         fse=_row_amount(table, "fonds social", column),
-        year=target,
         label="CILE",
-        logger=_LOGGER,
     )
 
     return build_tariff(

@@ -35,8 +35,7 @@ after SWDE.
 ## How each figure is read
 
 `parse_tariff` in the module, the same pattern as SWDE and inBW: the CVD
-parsed live, the CVA and FSE held to the SPGE constants for a card of
-their year and read off the table for a later one.
+parsed live, the CVA and FSE read off the table.
 
 - The first `<table>` on the page is the card; none raises.
 - Year: `detect_published_year` over the page text, which reads "Tarif au
@@ -57,16 +56,11 @@ their year and read off the table for a later one.
 
 ### CVA and FSE
 
+The C.V.A and Fonds social rows are read off the table and checked by
 `spge_components` in `providers/_walloon_simple.py`, with the label
-"CILE", against `WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The C.V.A and Fonds social rows are held to them within 0,005 and 0,001,
-  and a move raises `ExtractorError`. A C.V.A row that is gone raises too
-  ("cannot be checked against it").
-- A card of a later year is priced on the two rows as printed, and fails
-  if either row is missing.
+"CILE": the card is priced on them as printed. A row that is gone fails
+the fetch ("CVA is not printed on its card"), as does a figure outside
+its window (1 to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the FSE).
 
 ### Dates
 
@@ -81,9 +75,8 @@ their year and read off the table for a later one.
   other HTTP errors and a redirect off the site or off https raise
   `ExtractorError`.
 - `ExtractorError`: no table, no C.V.D row, a multi-column table with no
-  column naming the year, a CVD outside the window, a CVA or FSE off the
-  constants for a card of their year, a C.V.A row gone, a later card
-  missing either SPGE row.
+  column naming the year, a CVD outside the window, a C.V.A or Fonds
+  social row gone or outside its window.
 
 ## Checks
 

@@ -27,17 +27,11 @@
 
 from __future__ import annotations
 
-import logging
-
 import pytest
 
-from custom_components.be_water_prices.const import (
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers.swde import parse_tariff
-from tests import fixture_html
+from tests import SPGE_CVA_2026, SPGE_FSE_2026, fixture_html
 
 
 def test_parses_2026_components(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -59,11 +53,11 @@ def test_parses_2026_components(monkeypatch: pytest.MonkeyPatch) -> None:
     # the page hadn't drifted: the parser warns on drift above 0.005 for the
     # CVA and 0.001 for the much smaller FSE, and the constants are the
     # source of truth.
-    assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
-    assert t.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
+    assert t.cva_eur_per_m3 == SPGE_CVA_2026
+    assert t.fse_eur_per_m3 == SPGE_FSE_2026
 
     # Redevance is the regulator-defined 20·CVD + 30·CVA.
-    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.24 + 30 * WALLONIA_CVA_EUR_PER_M3, 2)
+    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.24 + 30 * SPGE_CVA_2026, 2)
 
     assert t.utility == "swde"
     assert t.region == "wallonia"
@@ -83,20 +77,11 @@ def test_raises_when_cvd_missing() -> None:
         parse_tariff("<html><body>nothing here</body></html>")
 
 
-def test_fse_drift_is_reported(caplog: pytest.LogCaptureFixture) -> None:
-    """A moved Fonds Social must stop the parse, not just log about it.
-
-    SWDE is the drift sentinel for the shared SPGE constants, but the FSE
-    is only ~0.03 EUR/m3, so the default 0.005 tolerance would have let a
-    15% move through unreported. A warning was not enough on its own:
-    the extractor still returned a tariff priced on the old constant, so
-    nothing downstream could tell that every Walloon entry had gone
-    wrong.
-    """
+def test_a_moved_fonds_social_is_priced_as_printed() -> None:
+    """The page is the source for the Fonds Social: a move reaches the bill
+    with no release."""
     html = fixture_html("swde_2026.html").replace("€ 0.0339/m³", "€ 0.0375/m³")
-    with caplog.at_level(logging.WARNING), pytest.raises(ExtractorError, match="SWDE FSE"):
-        parse_tariff(html, year=2026)
-    assert "SWDE FSE" in caplog.text
+    assert parse_tariff(html, year=2026).fse_eur_per_m3 == 0.0375
 
 
 def test_the_untouched_page_still_parses() -> None:

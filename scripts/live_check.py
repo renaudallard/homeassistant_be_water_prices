@@ -85,7 +85,6 @@ from custom_components.be_water_prices.const import (  # noqa: E402
     FETCH_BUDGET_S,
     REGION_FLANDERS,
     REGION_WALLONIA,
-    WALLONIA_SPGE_YEAR,
 )
 from custom_components.be_water_prices.providers import (  # noqa: E402
     WaterExtractor,
@@ -111,8 +110,12 @@ MIN_RATE_EUR_M3 = 0.5
 MAX_RATE_EUR_M3 = 20.0
 
 # How far apart the Walloon cards of one year may put the SPGE figures,
-# the thresholds the extractors hold a page to the constants with.
-SPGE_TOLERANCE = {"CVA": 0.005, "FSE": 0.001}
+# flat across Wallonia, so one page reading another figure has misread it
+# or lags on it.
+SPGE_FIGURES: dict[str, tuple[Callable[[WaterTariff], float], float]] = {
+    "CVA": (lambda t: t.cva_eur_per_m3, 0.005),
+    "FSE": (lambda t: t.fse_eur_per_m3, 0.001),
+}
 
 # The Flemish vastrecht and korting per resident, the same on every card
 # since the decree set them, so one card reading another figure has
@@ -268,43 +271,6 @@ async def _check_one(
     )
 
 
-def _check_spge(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
-    """The CVA and FSE the Walloon cards were priced on, side by side.
-
-    A card past WALLONIA_SPGE_YEAR is priced on its own page's figures,
-    so a misread there bills its entries wrong with no constant to catch
-    it, and the constants in const.py are a year behind. Both fail here:
-    a card past the year, until a release moves the constants and the
-    year, and the cards of one year that disagree on either figure.
-    None when no Walloon card came back to compare.
-    """
-    walloon = {label: t for label, t in tariffs.items() if t.region == REGION_WALLONIA}
-    if not walloon:
-        return None
-    problems: list[str] = []
-    later = sorted(label for label, t in walloon.items() if t.valid_from.year > WALLONIA_SPGE_YEAR)
-    if later:
-        problems.append(
-            f"{', '.join(later)} on a card past {WALLONIA_SPGE_YEAR}, the year of the "
-            f"constants in const.py: move WALLONIA_SPGE_YEAR and the figures"
-        )
-    for year in sorted({t.valid_from.year for t in walloon.values()}):
-        cards = {label: t for label, t in walloon.items() if t.valid_from.year == year}
-        for name, tolerance in SPGE_TOLERANCE.items():
-            values = {
-                label: t.cva_eur_per_m3 if name == "CVA" else t.fse_eur_per_m3
-                for label, t in cards.items()
-            }
-            if max(values.values()) - min(values.values()) > tolerance:
-                listed = ", ".join(f"{label} {value}" for label, value in sorted(values.items()))
-                problems.append(f"{year} cards disagree on the {name}: {listed}")
-    if problems:
-        status, detail = "FAIL", "; ".join(problems)
-    else:
-        status, detail = "OK", f"{len(walloon)} Walloon cards agree on the CVA and FSE"
-    return CheckResult("spge", "Walloon SPGE figures", REGION_WALLONIA, status, detail)
-
-
 def _disagreements(
     cards: dict[str, WaterTariff],
     figures: dict[str, tuple[Callable[[WaterTariff], float], float]],
@@ -336,6 +302,24 @@ def _check_flanders_fixed(tariffs: dict[str, WaterTariff]) -> CheckResult | None
     else:
         status, detail = "OK", f"{len(flemish)} Flemish cards agree on the vastrecht and korting"
     return CheckResult("flanders_fixed", "Flemish vastrecht", REGION_FLANDERS, status, detail)
+
+
+def _check_spge(tariffs: dict[str, WaterTariff]) -> CheckResult | None:
+    """The CVA and FSE each Walloon card was priced on, side by side.
+
+    Each card is priced on the figures its own page prints, so a page
+    that misread either, or lags on it, stands out only against the
+    others. None when no Walloon card came back to compare.
+    """
+    walloon = {label: t for label, t in tariffs.items() if t.region == REGION_WALLONIA}
+    if not walloon:
+        return None
+    problems = _disagreements(walloon, SPGE_FIGURES)
+    if problems:
+        status, detail = "FAIL", "; ".join(problems)
+    else:
+        status, detail = "OK", f"{len(walloon)} Walloon cards agree on the CVA and FSE"
+    return CheckResult("spge", "Walloon SPGE figures", REGION_WALLONIA, status, detail)
 
 
 async def _check_communes(session: aiohttp.ClientSession, extractor: WaterExtractor) -> CheckResult:

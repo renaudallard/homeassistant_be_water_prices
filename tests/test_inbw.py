@@ -29,23 +29,19 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.be_water_prices.const import (
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
 from custom_components.be_water_prices.pricing import compute_annual_cost
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers.inbw import parse_tariff
-from tests import fixture_html
+from tests import SPGE_CVA_2026, SPGE_FSE_2026, fixture_html
 
 
 def test_parses_2026_components() -> None:
     t = parse_tariff(fixture_html("inbw_2026.html"), year=2026)
     assert t.cvd_eur_per_m3 == 2.6
-    assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
-    assert t.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
+    assert t.cva_eur_per_m3 == SPGE_CVA_2026
+    assert t.fse_eur_per_m3 == SPGE_FSE_2026
     # Redevance = 20·CVD + 30·CVA = 52 + 82.44 = 134.44
-    assert round(t.yearly_fixed_fee, 2) == round(20 * 2.6 + 30 * WALLONIA_CVA_EUR_PER_M3, 2)
+    assert round(t.yearly_fixed_fee, 2) == round(20 * 2.6 + 30 * SPGE_CVA_2026, 2)
 
 
 def test_matches_published_facture_for_100_m3() -> None:
@@ -81,12 +77,13 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
     assert t.valid_until == date(2027, 3, 31)
 
 
-def test_a_moved_cva_fails_the_fetch_rather_than_logging() -> None:
-    """The 30 x CVA row is the page's own statement of the CVA."""
+def test_the_cva_is_read_off_the_30_x_cva_row() -> None:
+    """The 30 x CVA row is the page's own statement of the CVA, rounded to
+    the decimals it is published to."""
     page = fixture_html("inbw_2026.html")
     assert "82,440 €" in page
-    with pytest.raises(ExtractorError, match="CVA published value"):
-        parse_tariff(page.replace("82,440 €", "87,000 €"), year=2026)
+    assert parse_tariff(page, year=2026).cva_eur_per_m3 == 2.748
+    assert parse_tariff(page.replace("82,440 €", "87,000 €"), year=2026).cva_eur_per_m3 == 2.9
 
 
 async def test_only_a_tls_failure_earns_the_unverified_retry(

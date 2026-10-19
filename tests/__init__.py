@@ -31,6 +31,10 @@ from pathlib import Path
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
+# The SPGE figures every 2026 Walloon page prints, in EUR/m3 ex-VAT.
+SPGE_CVA_2026 = 2.748
+SPGE_FSE_2026 = 0.0339
+
 
 def fixture_html(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8")

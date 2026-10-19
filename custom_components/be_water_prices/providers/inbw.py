@@ -32,9 +32,7 @@ breakdown of an example 100 m³ residential bill. Each row carries the
 unit price ("Prix unitaire" column), so we read CVD straight off the
 "Consommation entre 30 et 5000 m³" row (= full CVD) and cross-check
 against the "Redevance annuelle (20 x CVD)" row. CVA / FSE are the
-SPGE flat-Wallonia figures: the constants (:mod:`const`) for a card of
-their year, cross-checked against their published values with a move
-failing the fetch, and the published values for a later card.
+SPGE flat-Wallonia figures, read off the same table.
 
 inBW's TLS chain is misconfigured -- the server does not send the
 GoDaddy intermediate certificate, so the default Python trust path
@@ -151,14 +149,14 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     target = year or detect_published_year(soup.get_text(" ", strip=True)) or belgian_today().year
     # Both SPGE figures appear in the table (CVA in the "30 x CVA" row's
     # Prix unitaire, FSE in the "Fonds Social" row's Prix unitaire). The
-    # redevance cell shows 30 x CVA, not the CVA itself.
+    # redevance cell shows 30 x CVA, not the CVA itself; dividing it back
+    # is rounded to the 4 decimals the figures are published to, as 82,44
+    # over 30 is 2,7479999 in floating point.
     cva_row = _row_amount_after_label(table, ("redevance", "30", "cva"))
     cva, fse = spge_components(
-        cva=cva_row / 30.0 if cva_row is not None else None,
+        cva=round(cva_row / 30.0, 4) if cva_row is not None else None,
         fse=_row_amount_after_label(table, ("fonds social",)),
-        year=target,
         label="inBW",
-        logger=_LOGGER,
     )
     return build_tariff(
         utility_id=UTILITY_ID,

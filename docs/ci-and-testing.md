@@ -132,13 +132,11 @@ card is billed on the vastrecht and korting it prints, so one that misread
 either fails it against the others (by more than a cent), the cards of one
 year compared with each other.
 
-A last row sets the Walloon cards side by side (`_check_spge`): it fails
-while any card is past `WALLONIA_SPGE_YEAR`, the year of the CVA and FSE
-constants in `const.py`, so the release that moves them is prompted, and
-when the cards of one year disagree on the CVA (by more than 0.005) or the
-FSE (0.001), which is what catches a page that misread or lags on its
-figure. See [pricing-model.md](pricing-model.md) for why a card past that
-year is priced on its page's own figures.
+A last row sets the Walloon cards side by side (`_check_spge`): each card
+is priced on the CVA and FSE its page prints, so the row fails when the
+cards of one year disagree on the CVA (by more than 0.005) or the FSE
+(0.001), which is what catches a page that misread or lags on its figure.
+See [pricing-model.md](pricing-model.md).
 
 The exit code is a bitmask: 1 for a real failure (a parse or shape error,
 an HTTP 4xx, a redirect off the site, a fetch past `FETCH_BUDGET_S`), 2
@@ -167,8 +165,9 @@ the threshold (rates above 0.001 EUR/m³, fees above 0.01 EUR a year) opens
 or updates the issue labelled `fixture-drift` (`[fixture-drift] water
 fixtures need refresh`), the drifted fields being the fingerprint. This
 catches silent rate drift that the live check misses. It only sees the
-fields read off a page, so it cannot notice a move in a decreed constant;
-the live check carries that. A run where a utility was unreachable on a
+fields read off a page, so it cannot notice a move in a constant; the
+figures a whole region shares are read off the pages and show up here
+like any other. A run where a utility was unreachable on a
 blip exits 2: it neither files an issue nor comments "drift cleared" on
 one it did not recheck, and says so in the step summary. A clean run
 comments "drift cleared" on an open issue but never closes it. A live

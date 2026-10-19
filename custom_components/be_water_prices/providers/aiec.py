@@ -39,7 +39,7 @@ year with nothing to show for it.
 
 The picture's contents cannot be read by a machine, but they can be read
 by a person, and its file name carries the day the card took effect. So
-the rate on each card is transcribed here against that date. While
+the figures on each card are transcribed here against that date. While
 AIEC's page still shows the card we transcribed, that is what is served,
 and the aggregator is not consulted at all.
 
@@ -105,16 +105,26 @@ _CARD_IMAGE_RE = re.compile(
 )
 
 
-# The rate each card prints, keyed by the day it took effect, which is
+@dataclasses.dataclass(frozen=True)
+class _Card:
+    """What a card picture prints, in EUR/m3 ex-VAT."""
+
+    cvd: float
+    cva: float
+    fse: float
+
+
+# The figures each card prints, keyed by the day it took effect, which is
 # the day its picture's file name carries. Read off the picture by hand;
 # add a line when AIEC publishes a new one. A date that is not here is a
 # card nobody has read, and the aggregator stands in for it.
-_TRANSCRIBED_CVD: dict[date, float] = {
-    # "STRUCTURE TARIFAIRE DE L'EAU AU 01/04/2026", CVD: 3,050 EUR. The
-    # same card's own per-inhabitant table (233 / 449 / 665 / 882 / 1.098
-    # / 1.314 / 1.531 EUR) is reproduced to within rounding by this
-    # figure and by no other.
-    date(2026, 4, 1): 3.050,
+_TRANSCRIBED: dict[date, _Card] = {
+    # "STRUCTURE TARIFAIRE DE L'EAU AU 01/04/2026": CVD 3,050 EUR, CVA
+    # 2,748 EUR and the "Contribution au Fonds social" 0,0339 EUR HTVA.
+    # The same card's own per-inhabitant table (233 / 449 / 665 / 882 /
+    # 1.098 / 1.314 / 1.531 EUR) is reproduced to within rounding by this
+    # CVD and by no other.
+    date(2026, 4, 1): _Card(cvd=3.050, cva=2.748, fse=0.0339),
 }
 
 
@@ -127,22 +137,13 @@ def card_from_operator_page(published: date | None) -> WaterTariff | None:
     """
     if published is None:
         return None
-    cvd = _TRANSCRIBED_CVD.get(published)
-    if cvd is None:
+    card = _TRANSCRIBED.get(published)
+    if card is None:
         return None
-    # The picture page prints no CVA or FSE, so a card of the constants'
-    # year is built on them and a later one cannot be built at all.
-    cva, fse = spge_components(
-        cva=None,
-        fse=None,
-        year=published.year,
-        label=LABEL,
-        logger=_LOGGER,
-        cva_required=False,
-    )
+    cva, fse = spge_components(cva=card.cva, fse=card.fse, label=LABEL)
     return build_tariff(
         utility_id=UTILITY_ID,
-        cvd=cvd,
+        cvd=card.cvd,
         source_url=OPERATOR_URL,
         publication_label=f"AIEC tarifs au {published.strftime('%d/%m/%Y')}",
         year=published.year,

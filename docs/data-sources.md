@@ -182,22 +182,16 @@ options, so an addition reaches entries that picked the commune earlier.
   constants: every Flemish parser reads them off its card, and
   `scripts/live_check.py` fails when the Flemish cards of one year
   disagree on either (`_check_flanders_fixed`).
-- **Walloon CVA and FSE.** `WALLONIA_CVA_EUR_PER_M3` (2.748) and
-  `WALLONIA_FSE_EUR_PER_M3` (0.0339), the figures in force in
-  `WALLONIA_SPGE_YEAR` (2026). Every Walloon extractor gets them through
-  `spge_components` in `providers/_walloon_simple.py`, directly or through
-  `check_spge_constants` for pages printing them in prose. A card of that
-  year or earlier is priced on the constants, and a figure its page prints
-  that differs from them (by more than 0.005 for the CVA, 0.001 for the
-  FSE) fails the fetch, as does a CVA the page stopped printing unless the
-  extractor passes `cva_required=False`. A card of a later year is priced
-  on its page's own figures and fails if either is missing.
-  `scripts/live_check.py` fails while any card is past
-  `WALLONIA_SPGE_YEAR`, which is the prompt to move the constants and the
-  year together, and when the cards of one year disagree on either figure
-  (`_check_spge`).
 - **VAT.** `DEFAULT_VAT_RATE` (6 %) is the `vat_rate` the Flemish, Walloon
   and VIVAQUA builders set; Farys also checks its printed VAT-inclusive
   rates against it.
+
+The Walloon CVA and FSE are not constants either. Every Walloon page
+prints both beside its CVD (AIEC's picture too, transcribed with its
+CVD), and each extractor reads them and passes them through
+`spge_components` in `providers/_walloon_simple.py`, directly or through
+`read_spge` for pages printing them in prose. A figure the page does not
+print fails the fetch, and `scripts/live_check.py` fails when the cards of
+one year disagree on either (`_check_spge`).
 
 How they enter the bill is in [pricing-model.md](pricing-model.md).

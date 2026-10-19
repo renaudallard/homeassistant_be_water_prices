@@ -46,12 +46,8 @@ the EUR value::
     <h3>4. Social Water Fund</h3>
     <p>The current Social Water Fund amounts to <strong>€ 0.0339/m³</strong>.</p>
 
-CVA and FSE are flat-Wallonia figures set by SPGE / CWaPE. A card of
-the constants' year in :mod:`const` is priced on them, the parsed
-values held to them and a move failing the fetch, so the stale-snapshot
-Repair and the live check carry the news rather than a log line; a
-later card is priced on the values the page prints (see
-:func:`_walloon_simple.spge_components`).
+CVA and FSE are flat-Wallonia figures set by SPGE / CWaPE, priced on
+the values the page prints (see :func:`_walloon_simple.spge_components`).
 
 The redevance (annual fixed fee) is the regulator-defined
 ``20·CVD + 30·CVA`` formula; we materialise it into
@@ -67,8 +63,6 @@ daily live check only validates ranges.
 
 from __future__ import annotations
 
-import logging
-
 import aiohttp
 from bs4 import BeautifulSoup, Tag
 
@@ -79,8 +73,6 @@ from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents
 from ._walloon_simple import build_tariff, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
-
-_LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "swde"
 LABEL = "SWDE"
@@ -151,9 +143,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     cva, fse = spge_components(
         cva=_find_component(soup, _CVA_HEADINGS),
         fse=_find_component(soup, _FSE_HEADINGS),
-        year=target,
         label="SWDE",
-        logger=_LOGGER,
     )
     return build_tariff(
         utility_id=UTILITY_ID,

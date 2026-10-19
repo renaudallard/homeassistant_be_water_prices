@@ -102,16 +102,15 @@ bill = (first + middle + top + fee_factor x redevance) x (1 + VAT)
 - The redevance is `20 x CVD + 30 x CVA` a year, which `build_tariff` in
   `providers/_walloon_simple.py` stores as `yearly_fixed_fee`.
 
-The CVA and FSE are the SPGE figures, flat across Wallonia. `const.py`
-carries the ones in force in `WALLONIA_SPGE_YEAR` (2026):
-`WALLONIA_CVA_EUR_PER_M3` 2,748 and `WALLONIA_FSE_EUR_PER_M3` 0,0339
-EUR/m³. A card of that year or an earlier one is priced on them, its page
-held to them; a card of a later year is priced on the figures its own page
-prints. `spge_components` decides which, see
-[provider-framework.md](provider-framework.md).
+The CVA and FSE are the SPGE figures, flat across Wallonia: 2,748 and
+0,0339 EUR/m³ in 2026. Every Walloon page prints both beside its CVD, and
+each card is priced on the ones its page prints, so CWaPE's move on 1
+January reaches the bill without a release; `spge_components` checks them,
+see [provider-framework.md](provider-framework.md). The daily live check
+holds the pages of one year to each other on both.
 
 Worked examples from `tests/test_pricing.py` (SWDE's 2026 CVD of 3,24
-EUR/m³, from the SWDE fixture, and the constants; redevance
+EUR/m³, from the SWDE fixture, and the 2026 SPGE figures; redevance
 20 x 3,24 + 30 x 2,748 = 147,24 EUR ex-VAT):
 
 | Case | Result |

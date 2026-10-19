@@ -29,21 +29,17 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.be_water_prices.const import (
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers.cile import parse_tariff
-from tests import fixture_html
+from tests import SPGE_CVA_2026, SPGE_FSE_2026, fixture_html
 
 
 def test_parses_2026_components() -> None:
     t = parse_tariff(fixture_html("cile_2026.html"), year=2026)
     assert t.cvd_eur_per_m3 == 3.5552
-    assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
-    assert t.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
-    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.5552 + 30 * WALLONIA_CVA_EUR_PER_M3, 2)
+    assert t.cva_eur_per_m3 == SPGE_CVA_2026
+    assert t.fse_eur_per_m3 == SPGE_FSE_2026
+    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.5552 + 30 * SPGE_CVA_2026, 2)
 
 
 def test_raises_when_table_missing() -> None:

@@ -31,21 +31,17 @@ from datetime import date
 
 import pytest
 
-from custom_components.be_water_prices.const import (
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
 from custom_components.be_water_prices.providers import ExtractorError
 from custom_components.be_water_prices.providers.inasep import parse_tariff
-from tests import fixture_html
+from tests import SPGE_CVA_2026, SPGE_FSE_2026, fixture_html
 
 
 def test_parses_2026_cvd() -> None:
     t = parse_tariff(fixture_html("inasep_2026.html"), year=2026)
     assert t.cvd_eur_per_m3 == 3.6734
-    assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
-    assert t.fse_eur_per_m3 == WALLONIA_FSE_EUR_PER_M3
-    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.6734 + 30 * WALLONIA_CVA_EUR_PER_M3, 2)
+    assert t.cva_eur_per_m3 == SPGE_CVA_2026
+    assert t.fse_eur_per_m3 == SPGE_FSE_2026
+    assert round(t.yearly_fixed_fee, 2) == round(20 * 3.6734 + 30 * SPGE_CVA_2026, 2)
 
 
 def test_raises_when_cvd_missing() -> None:
@@ -77,7 +73,7 @@ def test_the_cva_check_stays_linear_on_a_run_of_whitespace() -> None:
     padded = page.replace("Assainissement (CVA)\n", "Assainissement (CVA)" + " " * 50_000 + "X\n")
     t = parse_tariff(padded, year=2026)
     assert t.cvd_eur_per_m3 == 3.6734
-    assert t.cva_eur_per_m3 == WALLONIA_CVA_EUR_PER_M3
+    assert t.cva_eur_per_m3 == SPGE_CVA_2026
 
 
 def test_dates_the_cvd_from_the_day_the_page_says_it_applies(
@@ -134,14 +130,12 @@ def test_a_page_still_on_last_years_card_is_dated_last_year(
     assert t.valid_until == date(2027, 3, 31)
 
 
-def test_a_moved_cva_or_fonds_social_fails_the_fetch() -> None:
-    """The docstring promised these checks for a long time before they existed."""
+def test_a_moved_cva_or_fonds_social_is_priced_as_printed() -> None:
+    """The page is the source for both SPGE figures."""
     page = fixture_html("inasep_2026.html")
     assert page.count("2,748") == 1 and page.count("0,0339") == 1
-    with pytest.raises(ExtractorError, match="CVA published value"):
-        parse_tariff(page.replace("2,748", "2,900"), year=2026)
-    with pytest.raises(ExtractorError, match="FSE published value"):
-        parse_tariff(page.replace("0,0339", "0,0400"), year=2026)
+    assert parse_tariff(page.replace("2,748", "2,900"), year=2026).cva_eur_per_m3 == 2.9
+    assert parse_tariff(page.replace("0,0339", "0,0400"), year=2026).fse_eur_per_m3 == 0.04
 
 
 def test_a_rate_rounded_to_two_decimals_is_still_a_rate() -> None:

@@ -47,16 +47,11 @@ Built by `build_extractor` and parsed with `_walloon_simple.parse_tariff`.
 
 ### CVA and FSE
 
-`spge_components` in `providers/_walloon_simple.py`, against
-`WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The printed CVA is required and held to the constant within 0,005; the
-  printed FSE is held within 0,001 when it is there. A move raises
-  `ExtractorError`.
-- A card of a later year is priced on the page's own CVA and FSE, and
-  fails if the page does not print one of them.
+`read_spge` reads both off the aggregator's prose and `spge_components`
+in `providers/_walloon_simple.py` checks them: the card is priced on them
+as printed, and a figure the page does not print, or one outside its
+window (1 to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the FSE), fails the
+fetch.
 
 ### Year and dates
 
@@ -73,9 +68,8 @@ Built by `build_extractor` and parsed with `_walloon_simple.parse_tariff`.
 - Network errors, timeouts, HTTP 5xx and 429 raise `TransientFetchError`;
   other HTTP errors and a redirect off the site or off https raise
   `ExtractorError`.
-- `ExtractorError`: no CVD, no CVD inside the window, a CVA no longer
-  printed, a CVA or FSE off the constants for a card of their year, a
-  later card missing either SPGE figure.
+- `ExtractorError`: no CVD, no CVD inside the window, a CVA or FSE not
+  printed or outside its window.
 
 ## Checks
 
@@ -96,9 +90,10 @@ Built by `build_extractor` and parsed with `_walloon_simple.parse_tariff`.
 - The operator's site runs the same WebDev CMS as IDEN's, so
   [`iden.py`](iden.md) is the place to start when it returns.
 - One test in `tests/test_walloon_small.py`
-  (`test_the_prose_pages_print_the_constants_the_engine_uses`) leaves
-  CIESAC out of its FSE check, as a page that prints none; the committed
-  fixture does print it, and `parse_fse` reads 0,0339 off it.
+  (`test_the_prose_pages_print_the_spge_figures`) leaves CIESAC out of its
+  FSE check, as a page that prints none; the committed fixture does print
+  it, and `parse_fse` reads 0,0339 off it once the page's scripts are
+  dropped, which is how the parser reads it.
 
 ## See also
 

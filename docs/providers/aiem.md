@@ -41,7 +41,7 @@ page is read as flat text.
   2. `_LABELED_DIST_CVD_RE`, "distribution (CVD) : N,NNN €" (the
      Callmepower phrasing, not present here).
   3. The generic scan `_CVD_RE`: every "CVD ... N,NNN €", the largest one
-     inside the window, skipping a value equal to the CVA constant.
+     inside the window, skipping a value equal to the CVA the page prints.
 
   The window is `_MIN_PLAUSIBLE_CVD` 1.5 to `_MAX_PLAUSIBLE_CVD` 6.0 EUR/m³.
   The floor is set to exclude the 1,435 example: a page left with only the
@@ -57,19 +57,10 @@ page is read as flat text.
 
 ### CVA and FSE
 
-Both are the SPGE flat-Wallonia figures. `spge_components` in
-`providers/_walloon_simple.py` decides by the card's year against
-`WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The printed figures are held to them: a CVA more than 0,005 away or an
-  FSE more than 0,001 away raises `ExtractorError`, and so does a CVA the
-  page no longer prints (`hold_to_constant`). An FSE the page does not print
-  is not checked.
-- A card of a later year is priced on the page's own CVA and FSE. If the
-  page does not print one of them, the fetch fails, since the constants
-  are not known to hold for that year.
+Both are the SPGE flat-Wallonia figures, read off the page by
+`read_spge` in `providers/_walloon_simple.py`: the card is priced on them
+as printed. A figure the page does not print, or one outside its window
+(1 to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the FSE), fails the fetch.
 
 ### Year and dates
 
@@ -90,15 +81,13 @@ Both are the SPGE flat-Wallonia figures. `spge_components` in
   (`fetch_text` in `providers/_pdf.py`); other HTTP errors and a redirect
   off the site or off https raise `ExtractorError`.
 - `ExtractorError`: no CVD at all, no CVD inside the window, a CVA or FSE
-  off the constants for a card of their year, a CVA no longer printed, a
-  later card that prints no CVA or FSE.
+  not printed or outside its window.
 
 ## Checks
 
 - Live check (`scripts/live_check.py`): the default fetch, no CI skip. It is
-  part of the Walloon SPGE comparison, which fails while any Walloon card is
-  past `WALLONIA_SPGE_YEAR` and when the Walloon cards of one year disagree
-  on the CVA or the FSE.
+  part of the Walloon SPGE comparison, which fails when the Walloon cards
+  of one year disagree on the CVA or the FSE.
 - Drift check (`scripts/fixture_drift.py`, weekly): "AIEM" against
   `aiem_2026.html`.
 
@@ -106,9 +95,7 @@ Both are the SPGE flat-Wallonia figures. `spge_components` in
 
 - Because the page states no year that the parser reads, a page left on
   last year's rates in January is served as this year's card and does not
-  go stale by date. In a new year past `WALLONIA_SPGE_YEAR` it is also
-  priced on its own CVA and FSE, which the page prints, and the live check
-  fails until the constants and the year are moved.
+  go stale by date.
 - `tests/test_walloon_small.py` pins the example trap: with a larger figure
   in an example, only the "actuelle du CVD" anchor still gets the value
   right.

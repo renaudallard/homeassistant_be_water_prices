@@ -1,7 +1,7 @@
 # INASEP
 
 Module: `custom_components/be_water_prices/providers/inasep.py`, using
-`build_tariff`, `check_spge_constants` and `detect_published_year` from
+`build_tariff`, `read_spge` and `detect_published_year` from
 `custom_components/be_water_prices/providers/_walloon_simple.py`.
 Tests: `tests/test_inasep.py`. Fixture: `tests/fixtures/inasep_2026.html`.
 
@@ -53,7 +53,7 @@ style tags dropped.
   "Tarifs" heading wins over the "1er janvier" dates on the SPGE lines
   below it, which can still carry last year's date under a new heading.
   With no year it can read, the clock's year is used.
-- CVA and FSE: `check_spge_constants` reads them with `parse_cva`
+- CVA and FSE: `read_spge` reads them with `parse_cva`
   ("assainissement (CVA) = N €") and `parse_fse` ("fonds social de l'eau =
   N €") and hands them to `spge_components`.
 - `yearly_fixed_fee`: `20 x CVD + 30 x CVA`, computed by `build_tariff`,
@@ -62,15 +62,11 @@ style tags dropped.
 
 ### CVA and FSE
 
-`spge_components` in `providers/_walloon_simple.py`, against
-`WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The printed values are held to them within 0,005 and 0,001; a move
-  raises `ExtractorError`, and so does a CVA the page no longer prints.
-- A card of a later year is priced on the page's own CVA and FSE, and
-  fails if the page does not print one of them.
+`read_spge` reads them with `parse_cva` and `parse_fse` and
+`spge_components` in `providers/_walloon_simple.py` checks them: the card
+is priced on them as printed, and a figure the page does not print, or
+one outside its window (1 to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the
+FSE), fails the fetch.
 
 ### Dates
 
@@ -84,8 +80,7 @@ style tags dropped.
   other HTTP errors and a redirect off the site or off https raise
   `ExtractorError`.
 - `ExtractorError`: no CVD heading, a CVD outside the window, a CVA or FSE
-  off the constants for a card of their year, a CVA no longer printed, a
-  later card missing either SPGE figure.
+  not printed or outside its window.
 
 ## Checks
 

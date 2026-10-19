@@ -63,17 +63,12 @@ Two choices in the section walk are deliberate:
 
 ### CVA and FSE
 
+The CVA and FSE sections are read off the page and checked by
 `spge_components` in `providers/_walloon_simple.py`, with the label
-"SWDE", against `WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The page's figures are held to them, the CVA within 0,005 and the FSE
-  within 0,001, and a move fails the fetch, so the stale-snapshot Repair
-  and the live check carry the news rather than a log line. A CVA section
-  that is gone raises too.
-- A card of a later year is priced on the values the page prints, and
-  fails if either is missing.
+"SWDE": the card is priced on them as printed. A CVA or FSE section that
+is gone fails the fetch, as does a figure outside its window (1 to 10
+EUR/m³ for the CVA, 0,01 to 0,2 for the FSE). The live check holds the
+Walloon pages of one year to each other on both figures.
 
 ### Year and dates
 
@@ -88,8 +83,7 @@ Two choices in the section walk are deliberate:
   other HTTP errors and a redirect off the site or off https raise
   `ExtractorError`.
 - `ExtractorError`: no CVD section with an amount, a CVD outside the
-  window, a CVA or FSE off the constants for a card of their year, a CVA
-  section gone, a later card missing either SPGE figure.
+  window, a CVA or FSE section gone or outside its window.
 
 ## Checks
 
@@ -101,12 +95,9 @@ Two choices in the section walk are deliberate:
 
 - Because the card is dated by the clock, a page left on last year's
   rates in January is served as this year's and is never stale by date.
-  Nothing detects a CVD left on last year's value: the CVA and FSE hold
-  only fails the fetch when those two move, and the live check validates
-  ranges.
-- In a year past `WALLONIA_SPGE_YEAR` the clock dates every SWDE card into
-  that year, so it is priced on the page's CVA and FSE and the live check
-  fails until a release moves the constants and the year.
+  Nothing detects a CVD left on last year's value; the live check
+  validates ranges, and holds the CVA and FSE to the other Walloon pages
+  of the year the clock gives the card.
 - SWDE is the README's reference for a single-page HTML utility.
 
 ## See also

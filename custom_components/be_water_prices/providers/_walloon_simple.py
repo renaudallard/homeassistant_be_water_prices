@@ -34,10 +34,10 @@ in plain prose like::
     Valeur actuelle du CVD : 2,87€ HTVA
     (CVD) : 2,460 €/m³
 
-CVA and FSE are the SPGE flat-Wallonia figures: the constants in
-:mod:`const` for a card of their year, the page's own for a later one
-(see :func:`spge_components`). The redevance is materialised at parse
-time from the regulator-defined ``20·CVD + 30·CVA`` formula.
+CVA and FSE are the SPGE flat-Wallonia figures, which every page prints
+beside its CVD and which are read off it (see :func:`spge_components`).
+The redevance is materialised at parse time from the regulator-defined
+``20·CVD + 30·CVA`` formula.
 
 IEG, AIEM and IDEN expose their CVD on the operator's own site. AIEC
 publishes its card as a picture, so :mod:`aiec` reads the picture's date
@@ -50,26 +50,16 @@ on 2026-09-08.
 
 from __future__ import annotations
 
-import logging
 import re
 from datetime import date
 
 import aiohttp
 from bs4 import BeautifulSoup
 
-from ..const import (
-    DEFAULT_VAT_RATE,
-    REGION_WALLONIA,
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-    WALLONIA_SPGE_YEAR,
-)
+from ..const import DEFAULT_VAT_RATE, REGION_WALLONIA
 from ._html import fetch_and_parse
 from ._pdf import to_float
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today, carry_prior_year_card
-
-_LOGGER = logging.getLogger(__name__)
-
 
 # Match "CVD" followed (within ~120 chars, possibly across labels and
 # colons) by the next ``N,NNN €`` amount. Tolerant of the three
@@ -120,64 +110,6 @@ _MIN_PLAUSIBLE_CVD = 1.5
 _MAX_PLAUSIBLE_CVD = 6.0
 
 
-def warn_constant_drift(
-    *,
-    published: float | None,
-    constant: float,
-    label: str,
-    logger: logging.Logger,
-    threshold: float = 0.005,
-) -> None:
-    """Refuse a CVA / FSE value that has moved away from the SPGE constant.
-
-    The CVA and FSE are flat across Wallonia and carried here as
-    constants, so when a page publishes a different figure every Walloon
-    entry is being priced on a number that is no longer the tariff. A log
-    line was the only signal, and nothing reads the log: the extractor
-    still returned a tariff, so live_check passed, fixture_drift compared
-    only fields we source from the page, and users were quietly
-    mis-billed until somebody noticed.
-
-    Raising instead puts it on the paths that are watched. The
-    coordinator keeps serving the last good snapshot and raises the
-    stale-snapshot Repair, and the daily live check fails and opens an
-    issue -- which is what a regulated price change should look like.
-
-    ``label`` should identify both the utility and the component, e.g.
-    ``"SWDE CVA"`` or ``"CILE FSE"``. No-op when ``published`` is ``None``
-    (the row was not present on the page; :func:`check_spge_constants`
-    decides separately whether that absence is itself a failure).
-
-    Only a card of the constants' own year, or an earlier one, is held
-    to them: see :func:`spge_components`, which is what calls this. A
-    figure that moves inside that year is a regulated change the release
-    has to carry, since the constant is what such a card is billed on.
-
-    Every Walloon page but AIEC's picture prints the CVA and most print
-    the FSE: the table-based extractors read them off their rows, the
-    prose-based ones through :func:`parse_cva` and :func:`parse_fse`. A
-    page that stops printing the FSE simply stops being checked for it.
-    """
-    if published is None:
-        return
-    if abs(published - constant) > threshold:
-        logger.warning(
-            "%s published value %s differs from Wallonia constant %s",
-            label,
-            published,
-            constant,
-        )
-        raise ExtractorError(
-            f"{label} published value {published} differs from the flat-Wallonia "
-            f"constant {constant}; the SPGE component has moved and every Walloon "
-            f"tariff is priced on the old figure until the constant is updated. "
-            f"Set it in const.py (WALLONIA_CVA_EUR_PER_M3 / WALLONIA_FSE_EUR_PER_M3) "
-            f"for WALLONIA_SPGE_YEAR "
-            f"and ship a release: until then every Walloon entry keeps its last good "
-            f"snapshot and raises the stale-snapshot Repair"
-        )
-
-
 # Where the prose pages print the two SPGE components. Each pattern binds
 # the amount to its own label, so Callmepower's summary cards, which put
 # the value before the label and the CVD card right next to the CVA one,
@@ -205,37 +137,6 @@ _FSE_RES = (
 )
 
 
-def hold_to_constant(
-    *,
-    published: float | None,
-    constant: float,
-    label: str,
-    logger: logging.Logger,
-    threshold: float = 0.005,
-) -> None:
-    """:func:`warn_constant_drift`, with an absent value counting as a failure.
-
-    A check that has quietly stopped running is worth nothing. The label
-    it binds to moves, the value reads as absent, and the next SPGE step
-    then rides through unseen on a constant nobody is comparing to
-    anything. Every Walloon page these parsers read prints a CVA, so its
-    absence is the page having changed shape, which is a parser problem
-    and should be visible.
-    """
-    if published is None:
-        raise ExtractorError(
-            f"{label} is no longer printed on the page, so the constant "
-            f"{constant} cannot be checked against it"
-        )
-    warn_constant_drift(
-        published=published,
-        constant=constant,
-        label=label,
-        logger=logger,
-        threshold=threshold,
-    )
-
-
 def _first_amount(text: str, patterns: tuple[re.Pattern[str], ...]) -> float | None:
     for pattern in patterns:
         match = pattern.search(text)
@@ -254,78 +155,38 @@ def parse_fse(text: str) -> float | None:
     return _first_amount(text, _FSE_RES)
 
 
-def spge_components(
-    *,
-    cva: float | None,
-    fse: float | None,
-    year: int,
-    label: str,
-    logger: logging.Logger,
-    cva_required: bool = True,
-) -> tuple[float, float]:
-    """The CVA and FSE a ``year`` card is priced on, given what its page
-    printed (``None`` for a figure it does not print).
+# What the two SPGE figures can plausibly be, in EUR/m3 ex-VAT: 2,748 and
+# 0,0339 in 2026. Wide enough for years of indexation, narrow enough that
+# a figure a decimal place out, or one label's number read for the other,
+# is refused rather than billed.
+_SPGE_WINDOWS = {"CVA": (1.0, 10.0), "FSE": (0.01, 0.2)}
 
-    A card of WALLONIA_SPGE_YEAR, or an earlier one, is priced on the
-    constants, and what the page prints is held to them: a figure that has
-    moved fails the fetch (see :func:`warn_constant_drift`), and so does a
-    CVA the page has stopped printing when ``cva_required``, since a check
-    that has quietly stopped running is worth nothing. The FSE is never
-    required there: a page that stops printing it is no longer checked
-    for it.
 
-    A card of a later year is priced on the page's own figures. CWaPE moves
-    the CVA on 1 January and every Walloon page picks the new figure up at
-    once; held to last year's constant, eight of the nine Walloon
-    extractors stopped together until a release carried it. A page that
-    prints no figure for a later card fails instead, as the constant is not
-    known to hold for that year. The daily live check still prompts the
-    release: it fails while any card is past WALLONIA_SPGE_YEAR, and when
-    the pages of one year disagree on either figure.
+def spge_components(*, cva: float | None, fse: float | None, label: str) -> tuple[float, float]:
+    """The CVA and FSE a card is priced on: the ones its page printed.
+
+    CWaPE moves both on 1 January and every Walloon page picks the new
+    figures up at once, so the page is the source. A page that prints
+    neither, or one outside its window, fails the fetch: the entry keeps
+    its last good card behind the stale-snapshot Repair, and the daily
+    live check, which also holds the pages of one year to each other on
+    both figures, opens an issue.
     """
-    if year <= WALLONIA_SPGE_YEAR:
-        (hold_to_constant if cva_required else warn_constant_drift)(
-            published=cva,
-            constant=WALLONIA_CVA_EUR_PER_M3,
-            label=f"{label} CVA",
-            logger=logger,
-        )
-        warn_constant_drift(
-            published=fse,
-            constant=WALLONIA_FSE_EUR_PER_M3,
-            label=f"{label} FSE",
-            logger=logger,
-            threshold=0.001,
-        )
-        return WALLONIA_CVA_EUR_PER_M3, WALLONIA_FSE_EUR_PER_M3
     if cva is None or fse is None:
-        missing = "CVA" if cva is None else "FSE"
         raise ExtractorError(
-            f"{label} {missing} is not printed on its {year} card, and the constant "
-            f"in const.py is the one in force in {WALLONIA_SPGE_YEAR}"
+            f"{label} {'CVA' if cva is None else 'FSE'} is not printed on its card"
         )
+    for name, value in (("CVA", cva), ("FSE", fse)):
+        low, high = _SPGE_WINDOWS[name]
+        if not low <= value <= high:
+            raise ExtractorError(f"{label} {name} {value} is outside [{low}, {high}] EUR/m3")
     return cva, fse
 
 
-def check_spge_constants(
-    text: str, *, year: int, utility_id: str, logger: logging.Logger
-) -> tuple[float, float]:
-    """The CVA and FSE a prose page's ``year`` card is priced on.
-
-    Reads the two figures off the page with :func:`parse_cva` and
-    :func:`parse_fse` and hands them to :func:`spge_components`: held to
-    the SPGE constants for a card of their year or earlier, the CVA
-    required, and the page's own for a later card. Every Walloon page
-    these parsers read prints a CVA, so its absence is the label having
-    moved.
-    """
-    return spge_components(
-        cva=parse_cva(text),
-        fse=parse_fse(text),
-        year=year,
-        label=utility_id,
-        logger=logger,
-    )
+def read_spge(text: str, *, utility_id: str) -> tuple[float, float]:
+    """The CVA and FSE a prose page prints, read with :func:`parse_cva` and
+    :func:`parse_fse` and checked by :func:`spge_components`."""
+    return spge_components(cva=parse_cva(text), fse=parse_fse(text), label=utility_id)
 
 
 def parse_cvd(html: str) -> float:
@@ -376,14 +237,16 @@ def parse_cvd(html: str) -> float:
         raise ExtractorError("could not find CVD on the published page")
     # Callmepower renders the CVA card right next to the CVD one, and the
     # CVA is flat across Wallonia and larger than several distributors'
-    # CVD -- so it sits in the window and wins a max() every time. It is
-    # a known number, so drop it rather than let it stand in for a rate
-    # it is not. A distributor whose real CVD lands on the same figure
-    # loses the fallback and raises, which is the visible failure.
+    # CVD, so it sits in the window and wins a max() every time. The page
+    # prints it under its own label too, so drop that figure rather than
+    # let it stand in for a rate it is not. A distributor whose real CVD
+    # lands on the same figure loses the fallback and raises, which is the
+    # visible failure.
+    cva = parse_cva(text)
     plausible = [
         v
         for v in matches
-        if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD and abs(v - WALLONIA_CVA_EUR_PER_M3) > 1e-9
+        if _MIN_PLAUSIBLE_CVD <= v <= _MAX_PLAUSIBLE_CVD and (cva is None or abs(v - cva) > 1e-9)
     ]
     if plausible:
         return max(plausible)
@@ -454,7 +317,7 @@ def build_tariff(
     """Build a Walloon :class:`WaterTariff` from the parsed CVD.
 
     Materialises the redevance as ``20·CVD + 30·CVA``, the CVA and FSE
-    being what :func:`spge_components` gave for the card. ``valid_from`` dates a
+    being what :func:`spge_components` read off the card. ``valid_from`` dates a
     rate that took effect inside ``year``; it defaults to 1 January,
     which is when the CWaPE cards normally turn over. A card dated last
     year, a page not yet updated in January, stands until 31 March like
@@ -500,7 +363,7 @@ def parse_tariff(
         tag.decompose()
     text = soup.get_text(" ", strip=True)
     target = year or detect_published_year(text) or belgian_today().year
-    cva, fse = check_spge_constants(text, year=target, utility_id=utility_id, logger=_LOGGER)
+    cva, fse = read_spge(text, utility_id=utility_id)
     return build_tariff(
         utility_id=utility_id,
         cvd=cvd,

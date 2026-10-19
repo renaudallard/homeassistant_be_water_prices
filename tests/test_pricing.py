@@ -29,12 +29,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from custom_components.be_water_prices.const import (
-    WALLONIA_CVA_EUR_PER_M3,
-    WALLONIA_FSE_EUR_PER_M3,
-)
 from custom_components.be_water_prices.pricing import compute_annual_cost, compute_ytd_cost
 from custom_components.be_water_prices.providers.base import WaterTariff
+from tests import SPGE_CVA_2026, SPGE_FSE_2026
 
 
 def _vivaqua_2026() -> WaterTariff:
@@ -61,10 +58,10 @@ def _swde_2026() -> WaterTariff:
         valid_until=date(2026, 12, 31),
         publication_label="2026",
         source_url="https://example.invalid/",
-        yearly_fixed_fee=20 * cvd + 30 * WALLONIA_CVA_EUR_PER_M3,
+        yearly_fixed_fee=20 * cvd + 30 * SPGE_CVA_2026,
         cvd_eur_per_m3=cvd,
-        cva_eur_per_m3=WALLONIA_CVA_EUR_PER_M3,
-        fse_eur_per_m3=WALLONIA_FSE_EUR_PER_M3,
+        cva_eur_per_m3=SPGE_CVA_2026,
+        fse_eur_per_m3=SPGE_FSE_2026,
         vat_rate=0.06,
     )
 
@@ -342,12 +339,12 @@ def test_wallonia_above_5000_m3_pays_ninety_percent_of_the_cvd() -> None:
         **{
             **t.__dict__,
             "cvd_eur_per_m3": cvd,
-            "yearly_fixed_fee": 20 * cvd + 30 * WALLONIA_CVA_EUR_PER_M3,
+            "yearly_fixed_fee": 20 * cvd + 30 * SPGE_CVA_2026,
         }
     )
-    fee = 20 * cvd + 30 * WALLONIA_CVA_EUR_PER_M3
-    fse = WALLONIA_FSE_EUR_PER_M3
-    cva = WALLONIA_CVA_EUR_PER_M3
+    fee = 20 * cvd + 30 * SPGE_CVA_2026
+    fse = SPGE_FSE_2026
+    cva = SPGE_CVA_2026
     expected = round(
         (30 * (0.5 * cvd + fse) + 4970 * (cvd + cva + fse) + 1000 * (0.9 * cvd + cva + fse) + fee)
         * 1.06,

@@ -38,7 +38,7 @@ on the page's flat text with script and style tags dropped.
   two anchors ("actuelle du CVD", "distribution (CVD) :"), so the value
   comes from the generic scan: every "CVD ... N,NNN €" on the page, the
   largest inside the 1.5 to 6.0 EUR/m³ window, a value equal to the CVA
-  constant skipped. The fixture reads 2,38.
+  the page prints skipped. The fixture reads 2,38.
 - CVA: `parse_cva`, the IEG pattern "CVA : Coût Vérité d'Assainissement :
   N €".
 - FSE: `parse_fse`, the IEG pattern "fonds social de l'eau de N €".
@@ -48,17 +48,12 @@ on the page's flat text with script and style tags dropped.
 
 ### CVA and FSE
 
-Both are the SPGE flat-Wallonia figures, handled by `spge_components` in
-`providers/_walloon_simple.py` against `WALLONIA_SPGE_YEAR` in `const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339).
-  The printed figures are held to them (0,005 for the CVA, 0,001 for the
-  FSE) and a move raises `ExtractorError`. A CVA the page no longer prints
-  raises too: `tests/test_walloon_small.py` rewrites "CVA" to "C.V.A." on
-  this fixture and expects "cannot be checked against it".
-- A card of a later year is priced on the page's own CVA and FSE, and
-  fails if the page does not print one of them.
+Both are the SPGE flat-Wallonia figures, read off the page by
+`read_spge` in `providers/_walloon_simple.py`: the card is priced on them
+as printed. A figure the page no longer prints fails the fetch:
+`tests/test_walloon_small.py` rewrites "CVA" to "C.V.A." on this fixture
+and expects "CVA is not printed on its card". So does one outside its
+window (1 to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the FSE).
 
 ### Year and dates
 
@@ -75,15 +70,14 @@ Both are the SPGE flat-Wallonia figures, handled by `spge_components` in
 - Network errors, timeouts, HTTP 5xx and 429 raise `TransientFetchError`;
   other HTTP errors and a redirect off the site or off https raise
   `ExtractorError` (`fetch_text` in `providers/_pdf.py`).
-- `ExtractorError`: no CVD, no CVD inside the window, a CVA or FSE off the
-  constants for a card of their year, a CVA no longer printed, a later card
-  missing either SPGE figure.
+- `ExtractorError`: no CVD, no CVD inside the window, a CVA or FSE not
+  printed or outside its window.
 
 ## Checks
 
 - Live check: the default fetch, no CI skip, and part of the Walloon SPGE
-  comparison (fails while any Walloon card is past `WALLONIA_SPGE_YEAR`, and
-  when the cards of one year disagree on the CVA or FSE).
+  comparison (fails when the cards of one year disagree on the CVA or
+  FSE).
 - Drift check (weekly): "IEG" against `ieg_2026.html`.
 
 ## Quirks

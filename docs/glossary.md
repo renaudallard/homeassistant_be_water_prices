@@ -12,11 +12,11 @@
 | Card, tariff card | One utility's published tariff for a year: a page, a PDF or, for AIEC, a picture. Parsed into a `WaterTariff`. |
 | Comforttarief | The Flemish rate above the basisvolume, twice the basistarief on every leg (`comfort_eur_per_m3` for the drinkwater). |
 | Comfortvolume (comfortverbruik) | What a household draws above its basisvolume, billed at the comforttarief (`consumed_comfort` in `pricing.py`). |
-| CVA (coût-vérité à l'assainissement) | The Walloon true cost of sanitation, per m³, flat across Wallonia and coming from SPGE / CWaPE: 2,748 EUR/m³ in 2026 (`WALLONIA_CVA_EUR_PER_M3`). Not charged on a household's first 30 m³. |
+| CVA (coût-vérité à l'assainissement) | The Walloon true cost of sanitation, per m³, flat across Wallonia and coming from SPGE / CWaPE: 2,748 EUR/m³ in 2026, read off each page (`cva_eur_per_m3`). Not charged on a household's first 30 m³. |
 | CVD (coût-vérité à la distribution) | The Walloon true cost of distribution, per m³, each distributor's own (`cvd_eur_per_m3`). The one figure every Walloon parser reads. |
 | CWaPE | The Walloon regulator. The residential tier structure (half the CVD and no CVA on the first 30 m³, the full rate to 5 000 m³, 90 % of the CVD above) is called the CWaPE structure in the code. |
 | Drinkwater | The drinking-water leg of the Flemish bill, the operator's own: basistarief, comforttarief and 50 EUR of the vastrecht. |
-| FSE (Fonds social de l'eau) | The Walloon social water fund contribution per m³, flat across Wallonia: 0,0339 EUR/m³ in 2026 (`WALLONIA_FSE_EUR_PER_M3`). |
+| FSE (Fonds social de l'eau) | The Walloon social water fund contribution per m³, flat across Wallonia: 0,0339 EUR/m³ in 2026, read off each page (`fse_eur_per_m3`). |
 | Gedomicilieerd | Officially registered as living at the address. The number of such residents sets the Flemish basisvolume and korting (`gedomicilieerd_persons` in the options, `CONF_PERSONS`). |
 | Hydria | The Brussels sanitation body on whose behalf VIVAQUA bills the sanitation part of its rate. |
 | Integrale waterprijs | The Flemish bill structure: drinkwater, gemeentelijke and bovengemeentelijke saneringsbijdrage, each with a vastrecht and a per-m³ rate in basis and comfort blocks. |
@@ -26,7 +26,7 @@
 | Régie communale | A commune that runs its own water distribution. About thirty in Wallonia; none is supported, and their postcodes fall through to the manual picker. |
 | Saneringsbijdrage (gemeentelijk, bovengemeentelijk) | The Flemish sewerage contributions: the gemeentelijke one for the commune's sewers, which differs per commune, and the bovengemeentelijke one for treatment above the municipal level. |
 | Social tariff (sociaal tarief) | The Flemish reduction for eligible households: 80 % off the whole bill (`social_tariff` in the options). |
-| SPGE (Société publique de gestion de l'eau) | The Walloon public water management company. With CWaPE it is the source of the flat CVA and FSE, carried in `const.py` for `WALLONIA_SPGE_YEAR`. |
+| SPGE (Société publique de gestion de l'eau) | The Walloon public water management company. With CWaPE it is the source of the flat CVA and FSE, which every Walloon page prints. |
 | Vastrecht | The Flemish yearly fixed charge, read off the card: 50 + 30 + 20 = 100 EUR for the three legs in 2026, before the korting. |
 | VMM (Vlaamse Milieumaatschappij) | The Flanders environment agency. The code cites it for the integrale waterprijs rules: the comfort rate at twice the basis and the 80 % social reduction. |
 | ZDE (zones de distribution d'eau) | The Géoportail Wallonie map of which distributor serves where. `scripts/refresh_postcodes.py` builds the Walloon postcode table from it. |

@@ -42,7 +42,6 @@ Source: https://www.iden-eau.be/iden_web/fr/Tarification.awp
 
 from __future__ import annotations
 
-import logging
 import re
 
 import aiohttp
@@ -53,8 +52,6 @@ from ._html import fetch_and_parse
 from ._pdf import to_float
 from ._walloon_simple import build_tariff, detect_published_year, spge_components
 from .base import ExtractorError, WaterExtractor, WaterTariff
-
-_LOGGER = logging.getLogger(__name__)
 
 UTILITY_ID = "iden"
 LABEL = "IDEN"
@@ -107,10 +104,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     cva, fse = spge_components(
         cva=_amount(text, _CVA_RE, "CVA"),
         fse=_amount(text, _FSE_RE, "FSE"),
-        year=target,
         label=UTILITY_ID,
-        logger=_LOGGER,
-        cva_required=False,
     )
     return build_tariff(
         utility_id=UTILITY_ID,

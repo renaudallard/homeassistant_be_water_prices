@@ -55,17 +55,10 @@ communes (Nandrin, Tinlot, Modave), small population.
 ### CVA and FSE
 
 All three fields are required by the parser itself: a missing one raises
-"could not locate IDEN's ..." before the SPGE rule runs. The two SPGE
-figures then go to `spge_components` in `providers/_walloon_simple.py`
-(called with `cva_required=False`, which changes nothing here since the
-CVA is always present by then), against `WALLONIA_SPGE_YEAR` in
-`const.py`:
-
-- A card of `WALLONIA_SPGE_YEAR` or earlier is priced on
-  `WALLONIA_CVA_EUR_PER_M3` (2,748) and `WALLONIA_FSE_EUR_PER_M3` (0,0339),
-  the printed values held to them within 0,005 and 0,001. A move raises
-  `ExtractorError`.
-- A card of a later year is priced on the two figures the page prints.
+"could not locate IDEN's ..." before the SPGE check runs. The two SPGE
+figures then go to `spge_components` in `providers/_walloon_simple.py`,
+and the card is priced on them as printed; a figure outside its window (1
+to 10 EUR/m³ for the CVA, 0,01 to 0,2 for the FSE) fails the fetch.
 
 ### Year and dates
 
@@ -81,7 +74,7 @@ CVA is always present by then), against `WALLONIA_SPGE_YEAR` in
   other HTTP errors and a redirect off the site or off https raise
   `ExtractorError`.
 - `ExtractorError`: a missing CVD, CVA or FSE field, no year, a CVD outside
-  the window, a CVA or FSE off the constants for a card of their year.
+  the window, a CVA or FSE outside its window.
 
 ## Checks
 
