@@ -201,6 +201,36 @@ def test_the_page_dates_the_tariff_when_it_says_so() -> None:
     assert detect_published_year("nothing dated here", today=today) is None
 
 
+def test_aiem_dates_its_card_from_the_1st_of_january_it_prints() -> None:
+    """AIEM states no "Tarifs YYYY": its rates read "à partir du 01/01/2026"
+    and "depuis le 01 janvier 2026", while its CVD line names the day the
+    CVD last moved, 01/02/2025, which dates no tariff year. Read from the
+    page, a card still showing 2026 in January 2027 is dated 2026."""
+    from bs4 import BeautifulSoup
+
+    from custom_components.be_water_prices.providers._walloon_simple import (
+        detect_published_year,
+    )
+
+    later = date(2027, 1, 15)
+    assert detect_published_year("CVA : 2,748€ (à partir du 01/01/2026)", today=later) == 2026
+    assert detect_published_year("FSE (depuis le 01 janvier 2026)", today=later) == 2026
+    assert detect_published_year("CVD : 2,87€ (à partir du 01/02/2025)", today=later) is None
+    text = BeautifulSoup(fixture_html("aiem_2026.html"), "html.parser").get_text(" ", strip=True)
+    assert detect_published_year(text, today=later) == 2026
+
+
+def test_a_page_dated_by_the_clock_says_so() -> None:
+    """Only the clock dated it: the label says the page states no year, as
+    SWDE's does, rather than passing for a page that named it."""
+    html = fixture_html("aiem_2026.html")
+    for dated in ("01/01/2026", "01 janvier 2026"):
+        html = html.replace(dated, "")
+    tariff = parse_aiem(html)
+    assert tariff.publication_label.endswith("(page states no year)")
+    assert parse_aiem(fixture_html("aiem_2026.html")).publication_label == "AIEM prix de l'eau 2026"
+
+
 def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.MonkeyPatch) -> None:
     """End to end: the parsed tariff carries the page's year, not today's.
 

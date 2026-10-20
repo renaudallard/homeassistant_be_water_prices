@@ -65,9 +65,13 @@ as printed. A figure the page does not print, or one outside its window
 ### Year and dates
 
 - The year comes from `detect_published_year`, which looks for "Tarifs
-  YYYY", then "1er janvier YYYY", then "en YYYY", within a year of today.
-  AIEM's page matches none of them (it writes "01/01/2026" and "01 janvier
-  2026"), so the card is dated by the Belgian clock (`belgian_today`).
+  YYYY", then the 1st of January ("1er janvier YYYY", "01 janvier YYYY",
+  "01/01/YYYY"), then "en YYYY", within a year of today. AIEM's page writes
+  "à partir du 01/01/2026" and "depuis le 01 janvier 2026", so the card is
+  dated 2026 by the page. Only the 1st of January counts: the CVD line's
+  "01/02/2025" is the day the CVD last moved. A page that states no year
+  is dated by the Belgian clock (`belgian_today`) and labelled "(page
+  states no year)".
 - `valid_from`: `effective_date` reads the "(à partir du DD/MM/YYYY)" next
   to "Valeur actuelle du CVD". It moves `valid_from` only when that day is
   in the card's own year. The fixture's 01/02/2025 is the previous change,

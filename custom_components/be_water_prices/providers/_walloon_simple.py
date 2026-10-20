@@ -299,10 +299,12 @@ def parse_cvd(html: str) -> float:
 
 # The phrasings these pages date themselves with. CILE heads its table
 # "au 1er janvier YYYY", INASEP and the Callmepower pages use "Tarifs
-# YYYY" / "en YYYY".
+# YYYY" / "en YYYY", and AIEM dates its rates "à partir du 01/01/YYYY" or
+# "depuis le 01 janvier YYYY". Only the 1st of January dates a tariff year:
+# AIEM's CVD line reads "à partir du 01/02/2025", the day it last moved.
 _PUBLISHED_YEAR_RES = (
     re.compile(r"tarifs?\s+(20\d\d)", re.IGNORECASE),
-    re.compile(r"1\s*er\s+janvier\s+(20\d\d)", re.IGNORECASE),
+    re.compile(r"(?:\b1\s*er\s+janvier\s+|\b0?1\s+janvier\s+|\b0?1/0?1/)(20\d\d)", re.IGNORECASE),
     re.compile(r"\ben\s+(20\d\d)", re.IGNORECASE),
 )
 
@@ -401,13 +403,19 @@ def parse_tariff(
     for tag in soup(["script", "style"]):
         tag.decompose()
     text = soup.get_text(" ", strip=True)
-    target = year or detect_published_year(text) or belgian_today().year
+    stated = year or detect_published_year(text)
+    # Dated by the clock only as a last resort, and said so, as SWDE's is.
+    target = stated or belgian_today().year
     cva, fse = read_spge(text, utility_id=utility_id)
     return build_tariff(
         utility_id=utility_id,
         cvd=cvd,
         source_url=source_url,
-        publication_label=f"{label_prefix} {target}",
+        publication_label=(
+            f"{label_prefix} {target}"
+            if stated
+            else f"{label_prefix} {target} (page states no year)"
+        ),
         year=target,
         cva=cva,
         fse=fse,

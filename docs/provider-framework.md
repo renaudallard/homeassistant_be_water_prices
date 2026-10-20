@@ -270,7 +270,8 @@ publication_label_prefix=)`, which wires `fetch_tariff` and
   indexes up and pages quote an older one beside the current one. Nothing
   plausible is an `ExtractorError`.
 - `detect_published_year(text, today=None)`: the tariff year a page
-  states, "Tarifs YYYY" first, then "1er janvier YYYY", then "en YYYY",
+  states, "Tarifs YYYY" first, then the 1st of January ("1er janvier
+  YYYY", "01 janvier YYYY", "01/01/YYYY"), then "en YYYY",
   only years within one of today counting, and the current year winning
   over a neighbour the page also names. None when the page states none.
 - `spge_components(cva=, fse=, label=)`: the CVA and FSE a card is priced
