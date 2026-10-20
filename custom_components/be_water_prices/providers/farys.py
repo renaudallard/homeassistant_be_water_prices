@@ -397,8 +397,30 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
 
 
 async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> WaterTariff:
-    text = await _post_for_commune(session, commune)
+    try:
+        text = await _post_for_commune(session, commune)
+    except TransientFetchError:
+        # Farys answers a commune id it does not know with the 503 of an
+        # outage, so a renumbered or removed commune would read as Farys
+        # being down for good. The dropdown tells the two apart; one that
+        # cannot be read tells nothing, and the outage stands.
+        if await _commune_listed(session, commune):
+            raise
+        # The commune is not named: the message reaches the diagnostics.
+        raise ExtractorError(
+            "Farys no longer lists the saved commune; choose it again in the entry's settings"
+        ) from None
     return await asyncio.to_thread(parse_tariff, text, municipality_label=commune)
+
+
+async def _commune_listed(session: aiohttp.ClientSession, commune: str) -> bool:
+    """Whether Farys's dropdown still offers ``commune``, True when it
+    cannot be read."""
+    try:
+        communes = await list_communes(session)
+    except ExtractorError:
+        return True
+    return any(option.id == commune for option in communes)
 
 
 # Each <option> is "<postcode> - <commune> (<gemeente>)" with value =

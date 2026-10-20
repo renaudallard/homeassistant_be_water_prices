@@ -123,7 +123,10 @@ Vlaams-Brabant: 85 communes, about 1.5 M people (about 22 % of Flanders).
 ## Failures
 
 - `TransientFetchError`: network error, timeout, HTTP 5xx or 429 on the
-  POST.
+  POST. Farys answers a commune id it does not know with 503 too, so a
+  failed commune fetch (`fetch_for_commune`) reads the dropdown: a commune
+  no longer listed is an `ExtractorError` asking to choose it again, which
+  does not name it, and a dropdown that cannot be read leaves the outage.
 - `ExtractorError`: a 3xx or 4xx answer, a body that is not JSON or not a
   command list, no `insert` command with tariff data (what a phantom
   commune answers), a missing row, an ex-VAT and VAT figure that disagree,

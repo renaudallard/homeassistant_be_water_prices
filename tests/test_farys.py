@@ -27,9 +27,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError
+from custom_components.be_water_prices.providers.base import CommuneOption, TransientFetchError
 from custom_components.be_water_prices.providers.farys import parse_tariff
 from tests import fixture_html
 
@@ -208,6 +212,43 @@ async def test_post_for_commune_3xx_is_a_moved_endpoint() -> None:
     with pytest.raises(ExtractorError, match="HTTP 302") as exc:
         await farys._post_for_commune(_FakePostSession(status=302), "x")  # type: ignore[arg-type]
     assert not isinstance(exc.value, TransientFetchError)
+
+
+@pytest.mark.parametrize(
+    ("listed", "raised"),
+    [
+        ((CommuneOption(id="12345", label="9000 - Gent"),), TransientFetchError),
+        ((CommuneOption(id="25071", label="9000 - Gent-centrum"),), ExtractorError),
+        (ExtractorError("dropdown down"), TransientFetchError),
+    ],
+)
+async def test_a_503_for_a_commune_farys_no_longer_lists_is_permanent(
+    listed: Any, raised: type[Exception]
+) -> None:
+    """Farys answers an unknown commune id with 503, as it does an outage.
+    A commune its dropdown still offers keeps the outage reading, as does a
+    dropdown that cannot be read; one it dropped asks to choose again."""
+    from custom_components.be_water_prices.providers import farys
+
+    lister = (
+        AsyncMock(side_effect=listed)
+        if isinstance(listed, Exception)
+        else AsyncMock(return_value=listed)
+    )
+    with (
+        patch.object(
+            farys,
+            "_post_for_commune",
+            AsyncMock(side_effect=TransientFetchError("HTTP 503 fetching x")),
+        ),
+        patch.object(farys, "list_communes", lister),
+        pytest.raises(raised) as err,
+    ):
+        await farys.fetch_for_commune(AsyncMock(), "12345")
+    if raised is ExtractorError:
+        assert not isinstance(err.value, TransientFetchError)
+        assert "choose it again" in str(err.value)
+        assert "12345" not in str(err.value)
 
 
 async def test_post_for_commune_4xx_stays_permanent() -> None:
