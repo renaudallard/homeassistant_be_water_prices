@@ -1,10 +1,17 @@
 {
- "_seen_on": "2026-10-06",
+ "_seen_on": "2026-10-20",
  "_sources": [
   {
    "text": "texts/fe22be9aa648dea40bf6a805903be078f0f61f786520a1781c795d69ff2e649e.txt",
    "url": "https://www.eauxducondroz.be/Prix.htm",
    "variant": "text"
+  },
+  {
+   "ocr": "tesseract==5.3.4 -l fra --psm 6 prep=dfda6ec380d46329",
+   "picture": "647cb69dcd012d1538a99e16e576baaab7070ce26881a4f1a05db80983c4be71",
+   "text": "texts/7af6186403e7bb93c671eda6504da0eec50059d203d32a43b0728bebcc9aa788.txt",
+   "url": "https://www.eauxducondroz.be/WEFiles/Image/WEImage/Tarif-2026-04-1-WEaf268c1c2a.jpg",
+   "variant": "ocr"
   }
  ],
  "basis_eur_per_m3": null,

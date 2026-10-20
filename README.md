@@ -8,10 +8,12 @@ Written daily by `.github/workflows/archive_cards.yml` running
   or for one commune of a per-commune utility, named by the commune id the
   integration uses (`_commune_label` in the file says which commune that
   is).
-- `texts/<sha256>.txt`: every page and rendered PDF a parse read, stored
-  once and shared between the rows that read it. Each row lists its own
-  under `_sources`, and names a PDF it read by SHA-256.
-- `pdfs.json`: where each PDF is kept, as `<release tag>/<sha256>.pdf` in
+- `texts/<sha256>.txt`: every page, rendered PDF and picture read by OCR
+  that a parse read, stored once and shared between the rows that read
+  it. Each row lists its own under `_sources`, and names a PDF or a
+  picture it read by SHA-256; a picture's source is marked `ocr`.
+- `pdfs.json`: where each PDF or picture is kept, as
+  `<release tag>/<sha256>.pdf` (`.jpg`, `.png`) in
   the releases of the cards repository (`be_price_cards`, shared with the
   electricity and gas integrations; this integration's releases are
   `water-<YYYY-MM>`).
@@ -21,7 +23,7 @@ Written daily by `.github/workflows/archive_cards.yml` running
   index naming them.
 
 To get the original card of a utility, commune and month: open
-`coverage.md`, open the utility's sheet, find the row, click `pdf` or
-`page`; `json` is what the integration parsed out of it. Months more than
-twelve before the running one are removed; a PDF stays as long as a
-remaining month names it.
+`coverage.md`, open the utility's sheet, find the row, click `pdf`,
+`picture` or `page`; `json` is what the integration parsed out of it.
+Months more than thirty-six before the running one are removed; a PDF or a
+picture stays as long as a remaining month names it.
