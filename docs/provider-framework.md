@@ -140,7 +140,12 @@ The module is a vendored subset of the electricity integration's reader.
 - Redirect guard: a redirected answer is refused when it left https or
   left the requested site (the last two labels of the host), and the
   target is logged at debug level only, since it can be an address only
-  the Home Assistant host can see. The two AJAX fetchers that send a
+  the Home Assistant host can see. One that stayed on the site but landed
+  on its home page (the bare language root included) from a deeper page,
+  or on a not-found page, is refused as a page that moved or was removed:
+  VIVAQUA sends a removed page to "/" and AGSO Knokke-Heist to
+  "/pagenotfound", both answering 200, which the parser would otherwise
+  have failed on as a layout change. The two AJAX fetchers that send a
   commune (De Watergroep's cookie, Farys's form field) do their own request
   with `allow_redirects=False`, so the commune never travels to wherever a
   redirect points, and a redirect fails them (`tests/test_ajax_redirects.py`).

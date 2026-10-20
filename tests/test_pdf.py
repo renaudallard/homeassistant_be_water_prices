@@ -249,6 +249,33 @@ async def test_a_redirect_that_drops_https_is_refused() -> None:
         await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    ("asked", "landed"),
+    [
+        ("https://www.vivaqua.be/en/the-domestic-linear-rate/", "https://www.vivaqua.be/"),
+        ("https://www.vivaqua.be/en/the-domestic-linear-rate/", "https://www.vivaqua.be/fr/"),
+        (
+            "https://www.agsoknokke-heist.be/waterbedrijf/tarieven",
+            "https://www.agsoknokke-heist.be/pagenotfound?page=tarieven.aspx",
+        ),
+    ],
+)
+async def test_a_redirect_to_the_home_or_a_not_found_page_is_a_moved_page(
+    asked: str, landed: str
+) -> None:
+    """VIVAQUA sends a removed page to its home page and AGSO Knokke-Heist
+    to "/pagenotfound", both with a 200. Parsed, that page failed as a
+    layout change; it is a page that moved."""
+    session = _FakeSession(_RedirectedResp(landed))
+    with pytest.raises(ExtractorError, match="the page moved or was removed"):
+        await _pdf.fetch_text(session, asked)  # type: ignore[arg-type]
+
+
+async def test_a_redirect_from_the_home_page_to_its_language_root_is_followed() -> None:
+    session = _FakeSession(_RedirectedResp("https://www.vivaqua.be/fr/"))
+    assert await _pdf.fetch_text(session, "https://www.vivaqua.be/") == "hello"  # type: ignore[arg-type]
+
+
 async def test_a_redirect_within_the_site_is_followed() -> None:
     session = _FakeSession(_RedirectedResp("https://www.water-link.be/x"))
     assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]

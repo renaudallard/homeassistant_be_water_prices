@@ -153,7 +153,7 @@ water carries one residential rate across the country, so a card billed
 at another has misread it.
 
 The exit code is a bitmask: 1 for a real failure (a parse or shape error,
-an HTTP 4xx, a redirect off the site, a fetch past `FETCH_BUDGET_S`), 2
+an HTTP 4xx, a redirect off the site or to a moved page, a fetch past `FETCH_BUDGET_S`), 2
 for a transient one (a timeout, a reset connection, HTTP 5xx or 429). A
 fetch that takes longer than the 180 second budget, parse included, is a
 real failure rather than a transient one, since that is exactly the

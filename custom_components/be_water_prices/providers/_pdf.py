@@ -120,6 +120,14 @@ def _site(host: str) -> str:
     return ".".join(host.lower().rstrip(".").split(".")[-2:])
 
 
+# Where a site sends a page it no longer has: its home page, the bare
+# language root included ("/fr/"), or a page saying so. VIVAQUA answers a
+# removed page with a redirect to "/", AGSO Knokke-Heist with one to
+# "/pagenotfound"; both then answer 200.
+_HOME_PATH = re.compile(r"^/(?:[a-z]{2}/?)?$")
+_NOT_FOUND_PATH = re.compile(r"page-?not-?found|/404(?:\.|/|$)", re.IGNORECASE)
+
+
 def _guard_redirect(url: str, resp: aiohttp.ClientResponse) -> None:
     """Refuse a response that a redirect carried off the requested site.
 
@@ -144,6 +152,13 @@ def _guard_redirect(url: str, resp: aiohttp.ClientResponse) -> None:
     if _site(final.host or "") != _site(requested.hostname or ""):
         _LOGGER.debug("%s redirected to %s", url, final)
         raise ExtractorError(f"{url} redirected off-site; refusing to read the answer")
+    # Same site from here on, so the path is safe to name. Read as a card,
+    # the page landed on failed the parser, which then took the blame for
+    # a page the utility had moved.
+    if _NOT_FOUND_PATH.search(final.path) or (
+        _HOME_PATH.match(final.path) and not _HOME_PATH.match(requested.path or "/")
+    ):
+        raise ExtractorError(f"{url} redirected to {final.path}: the page moved or was removed")
 
 
 async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
