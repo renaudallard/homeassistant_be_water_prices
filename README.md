@@ -275,6 +275,11 @@ Prices** (it ships in the HACS default store, so no custom repository is
 needed), download it, restart, then **Settings → Devices & services → Add
 integration → Belgian Water Prices**.
 
+If the search does not find it, add it as a custom repository instead:
+HACS three-dot menu → **Custom repositories**, then
+`https://github.com/renaudallard/homeassistant_be_water_prices` as type
+**Integration**.
+
 ### Manual
 
 Download the latest [release zip](https://github.com/renaudallard/homeassistant_be_water_prices/releases),
