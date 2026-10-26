@@ -110,8 +110,8 @@ local days. Three windows are asked for:
 `change` is what is summed; `sum` only shows whether the first bucket's
 change is the meter's whole running total, and `state` is the register a
 day's change is checked against. `state` is only asked for a statistic
-Home Assistant compiles from a sensor: an external one, a `domain:object`
-id as `valid_statistic_id` defines it, carries whatever state the
+Home Assistant compiles from a sensor: an external one, filed under a
+`domain:object` id (`_is_external_statistic`), carries whatever state the
 integration that writes it chose, so it is read from `change` and `sum`
 alone. So is a meter that goes back to zero on a schedule
 (`_resets_on_a_cycle`: a `next_reset` attribute, or the `total` state

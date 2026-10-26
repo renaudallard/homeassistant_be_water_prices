@@ -149,7 +149,8 @@ spot-style hourly fetch, no separate probe path, and no shared cache
 across entries: an entry's unique id is its utility, so a single HA
 instance has at most one entry per utility. This daily cadence governs only the
 network fetch; the meter-derived running-cost and YTD-consumption
-sensors update live from your local water meter (see
+sensors update live from your local water meter, or hourly from the
+recorder for a meter there is no live register to follow (see
 [Refresh cadence](#refresh-cadence)).
 
 ## What the integration computes
@@ -386,7 +387,7 @@ auto-resolves cleanly.
      [`watermeter`](https://github.com/Olen/homeassistant-watermeter)
      custom component, a P1 reader integration, or a Pulse counter).
      A meter that goes back to zero on a schedule, such as a daily
-     utility meter, works too, but is read less often; see
+     utility meter, works too, but is read hourly rather than live; see
      [Refresh cadence](#refresh-cadence).
      Meters reporting litres, gallons or ft³ are converted to m³, so
      the unit your meter uses does not matter.
@@ -495,11 +496,14 @@ you paid is worth more than a tidy chart.
   A live update never defers the 24 h tariff refresh above, however often
   the meter reports. An external statistic picked from the Energy
   dashboard has no sensor to follow, so it is read from the recorder
-  instead and both figures move on the daily refresh or the **Refresh
-  tariff** button, as far as that integration has imported its data.
-  A meter that goes back to zero on a schedule, a daily utility meter
-  for one, is read the same way: its reading is what was used since its
-  last reset, not a register the year can be measured against. Point the
+  instead, every hour at five past, without fetching the tariff again.
+  Home Assistant compiles an hour's statistics just after it ends and
+  the year is read from those hourly figures alone, so reading more
+  often would find nothing new; the figures lag the meter by up to an
+  hour, plus however late that integration imports its data. A meter
+  that goes back to zero on a schedule, a daily utility meter for one,
+  is read the same way: its reading is what was used since its last
+  reset, not a register the year can be measured against. Point the
   integration at the meter the utility meter counts from to keep the
   figures live.
   The January 1 meter reading is anchored once from the recorder and

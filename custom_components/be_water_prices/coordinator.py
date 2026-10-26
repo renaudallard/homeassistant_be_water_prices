@@ -62,7 +62,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -1048,6 +1048,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # resolves a different meter can re-point it; the entry unload calls
         # async_unsub_live_tracking to tear the current one down.
         self._meter_unsub: CALLBACK_TYPE | None = None
+        # Unsub for the hourly read of a meter with no register to follow,
+        # torn down with the live subscription.
+        self._hourly_unsub: CALLBACK_TYPE | None = None
+        # Held while the year is computed. The hourly read and a refresh
+        # running at once would interleave their recorder queries and folds.
+        self._ytd_lock = asyncio.Lock()
         # The year-to-date cycle, persisted across restarts via _store. It
         # holds the year's consumption, its cost floor and the meter offset
         # that produces them; see :class:`_YtdCycle`. Restoring it means an
@@ -2041,7 +2047,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         return out.m3, out.cost
 
     async def _compute_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
-        """Compute YTD m³ and cost for the daily tick.
+        """Compute YTD m³ and cost, one caller at a time: see :meth:`_read_ytd`."""
+        async with self._ytd_lock:
+            return await self._read_ytd(tariff)
+
+    async def _read_ytd(self, tariff: WaterTariff) -> tuple[float | None, float | None]:
+        """Compute YTD m³ and cost for the daily tick and the hourly read.
 
         The recorder is consulted only when the cycle cannot answer on its
         own: no frame for this year, or no reading to put through it. From
@@ -2199,8 +2210,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         The verdict needs the attributes of a reading, which Home Assistant
         drops while an entity is unavailable, so the last one is kept until
-        the meter reports again.
+        the meter reports again. An external statistic has no entity, so
+        no register either.
         """
+        if _is_external_statistic(meter):
+            return False
         if _numeric_state(state) is not None:
             self._resetting_meter = meter if _resets_on_a_cycle(state) else None
         return self._resetting_meter != meter
@@ -2211,6 +2225,26 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             return None
         return _state_volume_m3(state)
 
+    async def _async_hourly_read(self, _now: datetime) -> None:
+        """Read the year again for a meter with no register to follow.
+
+        Such a meter's water reaches the year only through the recorder,
+        and the daily tick left it up to a day behind. Home Assistant
+        compiles an hour's statistics just after it ends, and an
+        integration importing its own does so soon after (Niko Home Control
+        at two past), which is why this runs at five past. Nothing changes
+        in between: the daily buckets are built from the hourly rows alone.
+        A refresh already reading the year is left to it.
+        """
+        meter = self._meter_entity_id
+        if self.data is None or meter is None or self._ytd_lock.locked():
+            return
+        if self._sees_a_register(meter, self.hass.states.get(meter)):
+            return
+        ytd_m3, ytd_cost = await self._compute_ytd(self.data.tariff)
+        if self._owns_the_entry():
+            self._publish_ytd(ytd_m3, ytd_cost)
+
     @callback
     def async_setup_live_tracking(self) -> None:
         """Subscribe to the resolved meter so YTD sensors update on each draw.
@@ -2220,7 +2254,8 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         reloads the entry, but the Energy-dashboard source behind
         auto-discovery can change with no reload at all, so the
         subscription has to follow the meter rather than stay pinned to
-        whichever entity was resolved at setup.
+        whichever entity was resolved at setup. The hourly read for a
+        meter with no register is set up and torn down with it.
         """
         self.async_unsub_live_tracking()
         if self._meter_entity_id is None or not self._owns_the_entry():
@@ -2231,13 +2266,19 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._meter_unsub = async_track_state_change_event(
             self.hass, [self._meter_entity_id], self._async_meter_state_event
         )
+        self._hourly_unsub = async_track_time_change(
+            self.hass, self._async_hourly_read, minute=5, second=0
+        )
 
     @callback
     def async_unsub_live_tracking(self) -> None:
-        """Tear down the live meter subscription, if any."""
+        """Tear down the live meter subscription and the hourly read, if any."""
         if self._meter_unsub is not None:
             self._meter_unsub()
             self._meter_unsub = None
+        if self._hourly_unsub is not None:
+            self._hourly_unsub()
+            self._hourly_unsub = None
 
     @callback
     def _async_meter_state_event(self, event: Event[EventStateChangedData]) -> None:
@@ -2276,6 +2317,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             recorder_taken_back=0.0,
             recorder_has_statistic=False,
         )
+        self._publish_ytd(ytd_m3, ytd_cost)
+
+    @callback
+    def _publish_ytd(self, ytd_m3: float | None, ytd_cost: float | None) -> None:
+        """Publish a year-to-date figure folded outside the daily tick."""
+        if self.data is None:
+            return
         if ytd_m3 is None:
             # Nothing is known about this year yet. The fold has still kept
             # whatever the reading proved, so the sensors hold rather than
@@ -2537,6 +2585,15 @@ def _numeric_state(state: State | None) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _is_external_statistic(statistic_id: str) -> bool:
+    """Whether ``statistic_id`` names a statistic another integration writes.
+
+    Home Assistant files those under "domain:object", and an entity id
+    never holds a colon.
+    """
+    return ":" in statistic_id
+
+
 def _resets_on_a_cycle(state: State | None) -> bool:
     """Whether ``state`` is a meter that goes back to zero on a schedule.
 
@@ -2743,7 +2800,6 @@ async def _recorder_daily_rows(
         )
         from homeassistant.components.recorder.statistics import (
             statistics_during_period,
-            valid_statistic_id,
         )
     except ImportError:
         # No recorder component at all: there are no statistics to read and
@@ -2779,7 +2835,7 @@ async def _recorder_daily_rows(
     # register guards undo, so it is read from sum and change alone. So is a
     # meter that resets on a schedule: each day's state is that day's water,
     # and the compiler's sum already runs through every reset.
-    if register and not valid_statistic_id(entity_id):
+    if register and not _is_external_statistic(entity_id):
         types = {"change", "sum", "state"}
     else:
         types = {"change", "sum"}

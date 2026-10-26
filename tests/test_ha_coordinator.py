@@ -46,7 +46,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import storage
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.be_water_prices.const import (
     CONF_CARD_ARCHIVE,
@@ -615,6 +618,97 @@ async def test_a_meter_that_resets_daily_is_read_from_the_recorder(hass: HomeAss
         await coordinator.async_refresh()
         assert recorder.await_args.kwargs["register"] is False
         assert coordinator.data.ytd_consumption_m3 == 0.6
+
+
+async def _setup_on_meter(hass: HomeAssistant, meter: str, fetches: list[int]) -> MockConfigEntry:
+    """Set up an entry on ``meter``, counting tariff fetches in ``fetches``."""
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        fetches.append(1)
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_WATER_METER_SENSOR: meter},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with patch("custom_components.be_water_prices.coordinator.get", return_value=fake):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    return entry
+
+
+@pytest.mark.asyncio
+async def test_an_external_statistic_is_read_again_every_hour(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """The year follows the hourly statistics without fetching the tariff.
+
+    With no entity to follow, the daily tick was the only read, and the
+    figures stood up to a day behind what the Energy dashboard showed.
+    """
+    freezer.move_to("2026-06-01 10:30:00+00:00")
+    recorder = AsyncMock(return_value=(1.0, 0.0))
+    fetches: list[int] = []
+    with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
+        entry = await _setup_on_meter(hass, "nhc2:water_meter", fetches)
+        coordinator = entry.runtime_data
+        assert coordinator.data.ytd_consumption_m3 == 1.0
+        assert recorder.await_args.kwargs["register"] is False
+
+        recorder.return_value = (1.3, 0.0)
+        freezer.move_to("2026-06-01 11:04:00+00:00")
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 1.0
+
+        freezer.move_to("2026-06-01 11:05:00+00:00")
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 1.3
+        assert len(fetches) == 1
+
+        # A refresh reading the year already has it in hand. Waiting on it
+        # instead would fold a second round straight after it.
+        recorder.return_value = (1.6, 0.0)
+        async with coordinator._ytd_lock:
+            freezer.move_to("2026-06-01 12:05:00+00:00")
+            async_fire_time_changed(hass)
+            for _ in range(5):
+                await asyncio.sleep(0)
+        await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 1.3
+
+        # An entry that is gone reads nothing.
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        calls = recorder.await_count
+        freezer.move_to("2026-06-01 13:05:00+00:00")
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        assert recorder.await_count == calls
+
+
+@pytest.mark.asyncio
+async def test_a_meter_with_a_register_is_not_read_every_hour(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """A meter followed live needs no hourly read of the recorder."""
+    freezer.move_to("2026-06-01 10:30:00+00:00")
+    hass.states.async_set("sensor.water_meter", "100")
+    recorder = AsyncMock(return_value=(20.0, 0.0))
+    fetches: list[int] = []
+    with patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder):
+        await _setup_on_meter(hass, "sensor.water_meter", fetches)
+        calls = recorder.await_count
+
+        freezer.move_to("2026-06-01 11:05:00+00:00")
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+        assert recorder.await_count == calls
 
 
 @pytest.mark.parametrize(

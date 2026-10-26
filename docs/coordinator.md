@@ -200,7 +200,17 @@ and only while the coordinator owns the entry.
 folds it with no recorder answer and, when the figure or the cost moved,
 replaces `self.data` and calls `async_update_listeners`. It does not use
 `async_set_updated_data`, which would re-arm the daily timer on every
-draw, and leaves `snapshot_age_hours` alone.
+draw, and leaves `snapshot_age_hours` alone. `_publish_ytd` is that
+publishing step, shared with the hourly read.
+
+A meter with no register to follow, an external statistic or one that
+resets on a schedule, is read by `_async_hourly_read` instead, set up
+alongside the subscription with `async_track_time_change` at five past
+each hour and torn down with it. It runs `_compute_ytd` against the card
+already held, with no fetch, and publishes through `_publish_ytd`.
+`_compute_ytd` takes `_ytd_lock` around `_read_ytd`, the body of the
+year's computation, so a refresh and the hourly read never interleave;
+the hourly read skips a round the lock is already held for.
 
 ### The recorder reads
 
