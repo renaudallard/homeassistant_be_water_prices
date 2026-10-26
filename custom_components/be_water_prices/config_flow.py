@@ -313,6 +313,9 @@ def _warn_stale_commune(utility_id: str) -> None:
 
 class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg, unused-ignore]
     VERSION = 2
+    # 2: the household a move out of Flanders left on a Brussels or
+    # Walloon entry is cleared (see async_migrate_entry).
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         self._utility: str | None = None

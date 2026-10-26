@@ -1,7 +1,7 @@
 # The setup wizard and the options
 
 Everything here is in `config_flow.py` (`BeWaterPricesConfigFlow`, version
-2, and `BeWaterPricesOptionsFlow`), with the setup-time sweeps in
+2.2, and `BeWaterPricesOptionsFlow`), with the setup-time sweeps in
 `__init__.py`. The user-facing walk-through is in the project
 [README](../README.md#configuration).
 
@@ -117,3 +117,18 @@ stripped of its commune.
 changing its data (a v1 entry stores no postcode and keeps none until it
 is reconfigured). An entry written by a newer release is refused with a
 log line naming both versions.
+
+Minor version 2 (`MINOR_VERSION` on the flow) runs
+`_drop_leftover_household` once on every older entry. From 0.5.2 to
+0.5.6 a reconfigure onto another operator kept every option but the
+commune, so a Flemish household that moved to Brussels or Wallonia kept
+its residents and social tariff. Since 0.11.2 the social tariff on a
+Brussels entry stands for BIM status, and that leftover took the
+intervention sociale off a bill whose household never said it had it.
+The migration clears both keys on a Walloon entry, which has no use for
+them, and on a Brussels entry without the `card_archive` key: every
+options form since 0.7.19 writes that key, and a Brussels options save
+before 0.11.2 dropped the two. A Brussels household that ticked BIM
+status in the 0.11.2 household step on an entry no form had saved since
+0.7.19 loses it too, and is told so in the log; Flemish entries are not
+touched. Once stamped 2.2, an entry is not looked at again.

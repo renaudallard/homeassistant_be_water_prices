@@ -49,6 +49,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
+    CONF_CARD_ARCHIVE,
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
     CONF_CONSUMPTION_M3_PER_YEAR,
@@ -158,7 +159,13 @@ async def test_a_brussels_bim_household_is_projected_net_of_the_intervention(
             social_intervention_per_extra_person=53.36,
         )
 
-    entry = await _setup_entry(hass, _fetch, options={CONF_PERSONS: 4, CONF_SOCIAL_TARIFF: True})
+    # The archive switch is what every options form since 0.7.19 writes;
+    # without it the entry would read as one an old move left BIM status on.
+    entry = await _setup_entry(
+        hass,
+        _fetch,
+        options={CONF_PERSONS: 4, CONF_SOCIAL_TARIFF: True, CONF_CARD_ARCHIVE: True},
+    )
     assert entry.runtime_data.data.projected_annual_cost_eur == 249.45
 
 

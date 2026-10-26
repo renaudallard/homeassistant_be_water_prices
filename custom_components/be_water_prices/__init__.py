@@ -352,12 +352,64 @@ def _adopt_commune_for_postcode(hass: HomeAssistant, entry: ConfigEntry) -> None
     )
 
 
+async def _drop_leftover_household(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clear the residents and social tariff a move out of Flanders left.
+
+    From 0.5.2 to 0.5.6 a reconfigure onto another operator kept every
+    option but the commune, so a Flemish household that moved to Brussels
+    or Wallonia kept its social tariff and residents. Nothing read them
+    there until 0.11.2 made the social tariff stand for BIM status in
+    Brussels, which took the intervention sociale off the bill of a
+    household that never said it had that status.
+
+    A Walloon entry has no use for either, so both go. A Brussels entry
+    keeps them only when the 0.11.2 form wrote them: every options form
+    since 0.7.19 writes the card archive switch, and a Brussels options
+    save before 0.11.2 dropped the two keys.
+    """
+    from .const import (
+        CONF_CARD_ARCHIVE,
+        CONF_PERSONS,
+        CONF_SOCIAL_TARIFF,
+        CONF_UTILITY,
+        REGION_BRUSSELS,
+        REGION_WALLONIA,
+    )
+    from .providers import async_load, get
+    from .providers.base import ExtractorError
+
+    if CONF_SOCIAL_TARIFF not in entry.options and CONF_PERSONS not in entry.options:
+        return
+    await async_load(hass)
+    try:
+        extractor = get(entry.data.get(CONF_UTILITY, ""))
+    except ExtractorError:
+        return
+    if extractor.region == REGION_BRUSSELS and CONF_CARD_ARCHIVE in entry.options:
+        return
+    if extractor.region not in (REGION_BRUSSELS, REGION_WALLONIA):
+        return
+    new_options = dict(entry.options)
+    new_options.pop(CONF_SOCIAL_TARIFF, None)
+    new_options.pop(CONF_PERSONS, None)
+    hass.config_entries.async_update_entry(entry, options=new_options)
+    _LOGGER.info(
+        "%s: cleared the residents and social tariff left over from a Flemish operator; "
+        "set them again in the options if they apply",
+        extractor.label,
+    )
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Migrate v1 entries to v2.
+    """Migrate v1 entries to v2, and v2.1 to v2.2.
 
     v2 entries store the user-entered postcode in ``CONF_POSTCODE`` so
     future resolver-coverage changes can be auto-applied. v1 entries
     don't carry one and stay as-is until the user reconfigures.
+
+    v2.2 clears what an old move out of Flanders left on a Brussels or
+    Walloon entry (:func:`_drop_leftover_household`). It runs once: an
+    entry stamped 2.2 is not looked at again.
 
     Phantom-commune dropping is deliberately NOT gated on the v1
     schema check; it lives in :func:`_drop_phantom_commune_if_blocked`
@@ -377,4 +429,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
     if entry.version == 1:
         hass.config_entries.async_update_entry(entry, version=2)
+    if entry.minor_version < 2:
+        await _drop_leftover_household(hass, entry)
+        hass.config_entries.async_update_entry(entry, minor_version=2)
     return True

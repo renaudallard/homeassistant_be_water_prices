@@ -449,7 +449,11 @@ Flemish operator, are dropped on a move to Wallonia, since the options
 step stops offering them, and are asked for again on a move into
 Flanders or Brussels from another region, since the Flemish social
 tariff and the Brussels BIM status are not the same entitlement. The
-residents saved are offered back. The saved commune is cleared when the
+residents saved are offered back. Releases 0.5.2 to 0.5.6 kept both on a
+move out of Flanders, which 0.11.2 then read as BIM status on a Brussels
+entry; upgrading clears what such a move left on a Brussels or Walloon
+entry once, says so in the log, and leaves a Brussels entry whose
+options were saved since 0.7.19 alone. The saved commune is cleared when the
 utility changes (the new operator uses different commune IDs, so a stale
 value would silently fail at fetch time). It is also cleared on a new
 postcode when the operator's commune list cannot be loaded and the
