@@ -2,8 +2,9 @@
 
 Module: `custom_components/be_water_prices/providers/vivaqua.py`.
 Tests: `tests/test_vivaqua.py`, plus the VIVAQUA cases in
-`tests/test_parser_cross_checks.py`. Fixture:
-`tests/fixtures/vivaqua_linear_2026.html`.
+`tests/test_parser_cross_checks.py`. Fixtures:
+`tests/fixtures/vivaqua_linear_2026.html` and
+`tests/fixtures/vivaqua_intervention_2026.html`.
 
 VIVAQUA is the water utility for the whole Brussels-Capital Region. Its
 domestic tariff has been linear since 2022 (no consumption blocks); Brugel
@@ -26,6 +27,16 @@ through 2026 with a new one expected for 2027.
 | sanitation | € 2,73 |
 
 - The fixture also carries the 2025 card below it.
+- The Region's intervention sociale for households with BIM status is on
+  a second page, https://www.vivaqua.be/fr/intervention-sociale/
+  (`INTERVENTION_URL`). In 2026 it reads:
+
+  > En 2026, l'intervention sociale s'élève à
+  > - 58,70 € pour un ménage d'1 personne
+  > - 53,36 € par personne supplémentaire composant le ménage
+
+  The French page is read because the English one has lagged behind it
+  (its FAQ still worked the 2026 example on the 2025 figures).
 - There is no other source.
 
 ## Region and communes
@@ -72,6 +83,26 @@ through 2026 with a new one expected for 2027.
   January, `valid_until` 31 December, label "Price from January 1st
   `<year>` (VAT included `<rate>` %)".
 
+### The intervention sociale
+
+`parse_intervention` in the module, called by `fetch` after the tariff,
+whose card it completes.
+
+- The page's text is accent-folded and searched for the sentence "En
+  `<year>`, l'intervention sociale s'élève à" (`_INTERVENTION_YEAR_RE`).
+  The first person's amount is the one followed by "pour un ménage d'1
+  personne", the further persons' the one followed by "par personne
+  supplémentaire". Both are looked for in the 200 characters after the
+  sentence only: the worked example below them and the FAQ further down
+  repeat the figures, and a FAQ left on last year's would otherwise stand
+  in for a block the parser no longer matches.
+- The amounts go on the card as `social_intervention_first_person` and
+  `social_intervention_per_extra_person`, as printed: the payment carries
+  no VAT.
+- Year: the page's own. A year either side of the Belgian clock's is
+  taken with a warning, since the page turns over on its own schedule
+  and the amounts move by indexation only; anything further off raises.
+
 ### When this year's card is not up yet
 
 If no residential table for the current year is found, the previous
@@ -87,12 +118,17 @@ last year's rates under the grace period would hide it.
   `ExtractorError`.
 - `ExtractorError`: no table for this year or last, a table found whose
   rows cannot be parsed, a matched row wider than two cells, a supply plus
-  sanitation sum more than a cent off its total.
+  sanitation sum more than a cent off its total; an intervention page
+  with no year sentence, one stating a year more than one off, or one
+  whose two amounts cannot be read. Either page failing fails the fetch,
+  and the last good snapshot keeps serving.
 
 ## Checks
 
 - Live check: the default fetch, no CI skip.
-- Drift check (weekly): "VIVAQUA" against `vivaqua_linear_2026.html`.
+- Drift check (weekly): "VIVAQUA" against `vivaqua_linear_2026.html`
+  and `vivaqua_intervention_2026.html` together, the intervention's two
+  figures compared like the fixed fee.
 
 ## See also
 

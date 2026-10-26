@@ -11,9 +11,10 @@ Everything here is in `config_flow.py` (`BeWaterPricesConfigFlow`, version
   `statistics.py` stamps once the price history is written (see
   [entities.md](entities.md)).
 - `entry.options`: the annual consumption (`consumption_m3_per_year`, 1 to
-  2000 m³, default 80), for a Flemish utility the registered residents
-  (`gedomicilieerd_persons`, 0 to 20, default 1) and the social tariff
-  (`social_tariff`), for a per-commune utility the commune id and its
+  2000 m³, default 80), for a Flemish or Brussels utility the registered
+  residents (`gedomicilieerd_persons`, 0 to 20, default 1) and the social
+  tariff (`social_tariff`, which on a Brussels entry stands for BIM
+  status), for a per-commune utility the commune id and its
   label (`commune`, `commune_label`), the water meter (`water_meter_sensor`,
   optional), the card archive switch (`card_archive`, default on), the
   postcode typed at setup (`postcode`) and, after an operator picked by
@@ -34,7 +35,8 @@ utility. The title is the utility's label.
 2. **`choose`**: a dropdown limited to the candidates.
 3. **`manual`**: a dropdown of every registered utility, in registry order.
 4. **`options`**: the household form (`_options_schema`). The residents and
-   the social tariff only appear for a Flemish utility (`_is_flanders`).
+   the social tariff only appear for a Flemish or Brussels utility
+   (`_prices_household`).
    A per-commune utility (one whose extractor `supports_communes`) gets a
    commune dropdown filled from its live list (`_async_communes`); a list
    that cannot be fetched leaves the field out rather than blocking the
@@ -75,15 +77,17 @@ dropdown is pre-filled with the saved commune when the utility and the
 postcode are unchanged; after a new postcode, with the commune the
 operator bills that postcode on, if any (`_moved_from` decides what
 counts as a move: an entry's first postcode is not one). A list that
-cannot be fetched skips the step. A move into Flanders from Brussels or
-Wallonia, with no residents saved, asks for the household in
-`reconfigure_household`.
+cannot be fetched skips the step. A move into Flanders or Brussels from
+another region asks for the household in `reconfigure_household`, the
+residents saved offered back and the social tariff unticked: the Flemish
+social tariff and the Brussels BIM status are not the same entitlement.
 
 `_async_finish_reconfigure` writes the result. A utility already
 configured in another entry aborts (`already_configured`). The commune is
 dropped on a change of utility, on a new postcode and when it left the
 operator's list; the residents and social tariff are dropped on a move
-out of Flanders. A postcode typed here replaces the saved one and clears
+to Wallonia, and replaced by the household step's answer on a move into
+Flanders or Brussels. A postcode typed here replaces the saved one and clears
 `postcode_resolved`; the manual path keeps the postcode and records what
 it resolved to when the chosen utility is not among the candidates, so
 the `operator_moved` Repairs card stays quiet unless a later release

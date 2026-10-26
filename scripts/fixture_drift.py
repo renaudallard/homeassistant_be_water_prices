@@ -60,7 +60,7 @@ import sys
 import traceback
 from collections.abc import Awaitable, Callable
 from contextlib import ExitStack
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
 import aiohttp
@@ -126,6 +126,8 @@ _RATE_FIELDS = {
 _FEE_FIELDS = {
     "yearly_fixed_fee",
     "yearly_fixed_fee_per_resident_discount",
+    "social_intervention_first_person",
+    "social_intervention_per_extra_person",
 }
 
 
@@ -156,6 +158,19 @@ def _aiec_card(text: str) -> WaterTariff:
     return card
 
 
+def _vivaqua_card(b: bytes) -> WaterTariff:
+    """The tariff page and the intervention sociale page, as the fetch
+    puts them together."""
+    first, extra = vivaqua.parse_intervention(
+        (FIXTURES / "vivaqua_intervention_2026.html").read_text(encoding="utf-8"), year=2026
+    )
+    return replace(
+        vivaqua.parse_tariff(_t(b), year=2026),
+        social_intervention_first_person=first,
+        social_intervention_per_extra_person=extra,
+    )
+
+
 # A De Watergroep commune whose gemeentelijke leg differs from the Halle
 # default, so a move in either is visible.
 _SINAAI_GUID = "{C1F2FD07-A370-4AB2-86C8-8CA9B236DFB3}"
@@ -165,7 +180,7 @@ CHECKS: list[FixtureCheck] = [
     FixtureCheck(
         "VIVAQUA",
         "vivaqua_linear_2026.html",
-        lambda b: vivaqua.parse_tariff(_t(b), year=2026),
+        _vivaqua_card,
         lambda s: get("vivaqua").fetch(s),
     ),
     FixtureCheck(

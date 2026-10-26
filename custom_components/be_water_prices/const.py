@@ -123,7 +123,8 @@ DEFAULT_PERSONS = 1
 # gedomicilieerde with no maximum, so a bound of 5 understated the free
 # block for a larger household and overstated its bill. The korting on
 # the vastrecht IS capped, at FLANDERS_KORTING_MAX_RESIDENTS, and pricing.py
-# applies the cap.
+# applies the cap. In Brussels they size the intervention sociale, a
+# figure per person with no cap either.
 #
 # So these two only bound what a person can sensibly type. Zero is a
 # real answer: a second home, or a rental between tenants.

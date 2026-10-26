@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 from custom_components.be_water_prices.pricing import compute_annual_cost, compute_ytd_cost
@@ -45,6 +46,8 @@ def _vivaqua_2026() -> WaterTariff:
         yearly_fixed_fee=40.23 / 1.06,
         linear_eur_per_m3=2.62 / 1.06,
         sanering_gemeentelijk_eur_per_m3=2.73 / 1.06,
+        social_intervention_first_person=58.70,
+        social_intervention_per_extra_person=53.36,
         vat_rate=0.06,
     )
 
@@ -289,6 +292,46 @@ def test_ytd_brussels_pro_rates_redevance_at_half_year() -> None:
     # ex-VAT = 40·(5.35/1.06) + 0.5·(40.23/1.06) = 220.8632...
     # ×1.06 = 234.115; banker's rounding → 234.12.
     assert compute_ytd_cost(_vivaqua_2026(), 40, 1, 0.5) == 234.12
+
+
+def test_brussels_bim_household_gets_the_intervention_off() -> None:
+    # A family of four: 58,70 + 3 x 53,36 = 218,78 EUR off 468,23.
+    assert compute_annual_cost(_vivaqua_2026(), 80, 4, social_tariff=True) == 249.45
+    assert compute_annual_cost(_vivaqua_2026(), 80, 4) == 468.23
+
+
+def test_brussels_intervention_needs_a_household() -> None:
+    assert compute_annual_cost(_vivaqua_2026(), 80, 0, social_tariff=True) == 468.23
+
+
+def test_brussels_intervention_never_takes_the_bill_below_zero() -> None:
+    # 40,23 EUR of fixed charge against 58,70 + 53,36 for two people.
+    assert compute_annual_cost(_vivaqua_2026(), 0, 2, social_tariff=True) == 0.0
+
+
+def test_a_card_without_the_intervention_cannot_price_a_bim_household() -> None:
+    """A card saved before the figures were read would bill high, and the
+    cost floor would then hold that figure until January."""
+    old = replace(
+        _vivaqua_2026(),
+        social_intervention_first_person=0.0,
+        social_intervention_per_extra_person=0.0,
+    )
+    assert compute_annual_cost(old, 80, 4, social_tariff=True) is None
+    assert compute_ytd_cost(old, 40, 1, 0.25, social_tariff=True) is None
+    assert compute_annual_cost(old, 80, 4) == 468.23
+
+
+def test_ytd_brussels_pro_rates_the_intervention() -> None:
+    # A quarter of the year: 40 x 5,35 + 0,25 x 40,23 = 224,0575 billed,
+    # less 0,25 x 58,70 = 14,675 for one person.
+    assert compute_ytd_cost(_vivaqua_2026(), 40, 1, 0.25, social_tariff=True) == 209.38
+
+
+def test_the_social_option_does_not_touch_a_walloon_bill() -> None:
+    assert compute_annual_cost(_swde_2026(), 80, 4, social_tariff=True) == compute_annual_cost(
+        _swde_2026(), 80, 4
+    )
 
 
 def test_ytd_wallonia_pro_rates_redevance_only() -> None:

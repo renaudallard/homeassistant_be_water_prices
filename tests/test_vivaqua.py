@@ -27,12 +27,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from datetime import date
 
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError, _html, vivaqua
-from custom_components.be_water_prices.providers.vivaqua import parse_tariff
+from custom_components.be_water_prices.providers.vivaqua import parse_intervention, parse_tariff
 from tests import fixture_html
 
 
@@ -89,11 +89,54 @@ async def test_fetch_parses_off_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     Patches the network read and checks the tariff still parses, covering
     the fetch_and_parse wiring shared by every HTML extractor.
     """
-    html = fixture_html("vivaqua_linear_2026.html")
-    monkeypatch.setattr(_html, "fetch_html", AsyncMock(return_value=html))
+    pages = {
+        vivaqua.SOURCE_URL: fixture_html("vivaqua_linear_2026.html"),
+        vivaqua.INTERVENTION_URL: fixture_html("vivaqua_intervention_2026.html"),
+    }
+
+    async def _read(_session: object, url: str, **_kwargs: object) -> str:
+        return pages[url]
+
+    monkeypatch.setattr(_html, "fetch_html", _read)
+    monkeypatch.setattr(vivaqua, "belgian_today", lambda: date(2026, 6, 1))
     tariff = await vivaqua.fetch(session=None)  # type: ignore[arg-type]
     assert tariff.utility == "vivaqua"
     assert round(tariff.linear_eur_per_m3 * 1.06, 2) == 2.62
+    assert tariff.social_intervention_first_person == 58.70
+    assert tariff.social_intervention_per_extra_person == 53.36
+
+
+def test_parses_2026_intervention() -> None:
+    page = fixture_html("vivaqua_intervention_2026.html")
+    assert parse_intervention(page, year=2026) == (58.70, 53.36)
+
+
+@pytest.mark.parametrize("year", [2025, 2027])
+def test_intervention_of_a_year_either_side_is_taken(year: int) -> None:
+    page = fixture_html("vivaqua_intervention_2026.html")
+    assert parse_intervention(page, year=year) == (58.70, 53.36)
+
+
+def test_intervention_two_years_off_is_refused() -> None:
+    page = fixture_html("vivaqua_intervention_2026.html")
+    with pytest.raises(ExtractorError, match="states 2026, not 2028"):
+        parse_intervention(page, year=2028)
+
+
+def test_intervention_is_read_off_the_years_own_lines() -> None:
+    """The example below the amounts and the FAQ further down both repeat
+    them. With the first person's line gone from the block the year's
+    sentence opens, the parse fails rather than read on into either."""
+    page = fixture_html("vivaqua_intervention_2026.html")
+    line = "<li>58,70 € pour un ménage d&#8217;1 personne</li>"
+    assert page.count(line) == 2
+    with pytest.raises(ExtractorError, match="could not be parsed"):
+        parse_intervention(page.replace(line, "", 1), year=2026)
+
+
+def test_intervention_page_without_the_year_sentence_is_refused() -> None:
+    with pytest.raises(ExtractorError, match="states no year"):
+        parse_intervention("<html><body>58,70 € pour un ménage d'1 personne</body></html>")
 
 
 @pytest.mark.parametrize(

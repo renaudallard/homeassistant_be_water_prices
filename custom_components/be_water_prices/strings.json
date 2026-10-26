@@ -32,31 +32,34 @@
       },
       "reconfigure_postcode": {
         "title": "Update your postcode",
-        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs) or the postcode differs from the saved one, unless you pick a commune on the next step (where the operator bills the new postcode on a commune of its own, that commune is pre-selected).",
+        "description": "Enter the new postcode for this entry. We'll re-resolve the utility and reload the integration. Annual consumption and the water meter sensor are kept. Registered residents and the social option are used in Flanders and Brussels: they survive a change of operator within Flanders, are dropped on a move to Wallonia, and are asked for again on a move into Flanders or Brussels; the saved commune is cleared if the resolved utility changes (the new utility uses different commune IDs) or the postcode differs from the saved one, unless you pick a commune on the next step (where the operator bills the new postcode on a commune of its own, that commune is pre-selected).",
         "data": {
           "postcode": "Postcode"
         }
       },
       "reconfigure_manual": {
         "title": "Pick your water utility",
-        "description": "Pick the utility that serves you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if you pick a different operator (their commune IDs are not interchangeable). Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) ask for the commune next.",
+        "description": "Pick the utility that serves you. Annual consumption and the water meter sensor are kept. Registered residents and the social option are used in Flanders and Brussels: they survive a change of operator within Flanders, are dropped on a move to Wallonia, and are asked for again on a move into Flanders or Brussels; the saved commune is cleared if you pick a different operator (their commune IDs are not interchangeable). Per-commune operators (De Watergroep / Farys / Pidpa / Water-link) ask for the commune next.",
         "data": {
           "utility": "Utility"
         }
       },
       "reconfigure_choose": {
         "title": "Pick your water utility",
-        "description": "Your postcode is shared by more than one utility -- they each serve different streets in your area. Pick the one that bills you. Annual consumption and the water meter sensor are kept. Registered residents and the social tariff are Flemish-only settings: they survive a move to another Flemish operator, are dropped when the new operator is not Flemish, and are asked for on a move into Flanders; the saved commune is cleared if you pick a different operator or the postcode differs from the saved one, unless you pick a commune on the next step.",
+        "description": "Your postcode is shared by more than one utility -- they each serve different streets in your area. Pick the one that bills you. Annual consumption and the water meter sensor are kept. Registered residents and the social option are used in Flanders and Brussels: they survive a change of operator within Flanders, are dropped on a move to Wallonia, and are asked for again on a move into Flanders or Brussels; the saved commune is cleared if you pick a different operator or the postcode differs from the saved one, unless you pick a commune on the next step.",
         "data": {
           "utility": "Utility"
         }
       },
       "reconfigure_household": {
-        "title": "Household for the Flemish tariff",
-        "description": "The new operator is Flemish, and the Flemish tariff depends on the number of registered residents at the address and on the social tariff. Enter them here; both can be changed later in the entry's options.",
+        "title": "Your household",
+        "description": "The new operator is in Flanders or Brussels, where the bill depends on the number of registered residents at the address and on a social option: the Flemish social tariff, or in Brussels the Region's intervention sociale for a household with BIM status on 1 January. Enter them here; both can be changed later in the entry's options.",
         "data": {
           "gedomicilieerd_persons": "Registered residents",
-          "social_tariff": "Social tariff (80% reduction)"
+          "social_tariff": "Social tariff (Flanders) / BIM status (Brussels)"
+        },
+        "data_description": {
+          "social_tariff": "Flanders: the VMM social tariff, 80% off the whole bill. Brussels: someone in the household had BIM status on 1 January; the Region's yearly intervention sociale, which VIVAQUA pays into your bank account, is taken off the cost sensors."
         }
       },
       "reconfigure_commune": {
@@ -71,17 +74,18 @@
       },
       "options": {
         "title": "Annual consumption",
-        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year. Flemish utilities also need the number of registered residents (drives the basis volume) and an opt-in for the VMM social tariff. Optionally point at a water meter sensor (cumulative m³, device_class=water) so the year-to-date cost sensor can read consumption since 1 January from Home Assistant's recorder.",
+        "description": "Your annual water consumption in cubic metres. Used by the projected-cost sensor; defaults to 80 m³/year. Flemish and Brussels utilities also need the number of registered residents (in Flanders it drives the basis volume, in Brussels the intervention sociale) and an opt-in for the social option: the VMM social tariff in Flanders, BIM status on 1 January in Brussels. Optionally point at a water meter sensor (cumulative m³, device_class=water) so the year-to-date cost sensor can read consumption since 1 January from Home Assistant's recorder.",
         "data": {
           "consumption_m3_per_year": "Consumption (m³ / year)",
-          "gedomicilieerd_persons": "Registered residents (Flanders only)",
-          "social_tariff": "Social tariff (Flanders, 80% reduction)",
+          "gedomicilieerd_persons": "Registered residents (Flanders and Brussels)",
+          "social_tariff": "Social tariff (Flanders, 80% reduction) / BIM status on 1 January (Brussels, intervention sociale)",
           "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Pidpa / Water-link)",
           "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)",
           "card_archive": "Read the project's card archive when the utility is unreachable and the cached card is missing, stale or last year's (the request names your utility and commune)"
         },
         "data_description": {
-          "commune": "Where the operator bills your postcode on a commune of its own, that commune is pre-selected, and clearing it does not stick: it comes back on the next reload. Pick another commune to be priced on another card."
+          "commune": "Where the operator bills your postcode on a commune of its own, that commune is pre-selected, and clearing it does not stick: it comes back on the next reload. Pick another commune to be priced on another card.",
+          "social_tariff": "Flanders: the VMM social tariff, 80% off the whole bill. Brussels: someone in the household had BIM status on 1 January; the Region's yearly intervention sociale, which VIVAQUA pays into your bank account, is taken off the cost sensors."
         }
       }
     },
@@ -99,14 +103,15 @@
         "title": "Annual consumption",
         "data": {
           "consumption_m3_per_year": "Consumption (m³ / year)",
-          "gedomicilieerd_persons": "Registered residents (Flanders only)",
-          "social_tariff": "Social tariff (Flanders, 80% reduction)",
+          "gedomicilieerd_persons": "Registered residents (Flanders and Brussels)",
+          "social_tariff": "Social tariff (Flanders, 80% reduction) / BIM status on 1 January (Brussels, intervention sociale)",
           "commune": "Commune (per-commune utilities only: De Watergroep / Farys / Pidpa / Water-link)",
           "water_meter_sensor": "Water meter sensor (optional override; auto-detected from the Energy dashboard if blank)",
           "card_archive": "Read the project's card archive when the utility is unreachable and the cached card is missing, stale or last year's (the request names your utility and commune)"
         },
         "data_description": {
-          "commune": "Where the operator bills your postcode on a commune of its own, that commune is pre-selected, and clearing it does not stick: it comes back on the next reload. Pick another commune to be priced on another card."
+          "commune": "Where the operator bills your postcode on a commune of its own, that commune is pre-selected, and clearing it does not stick: it comes back on the next reload. Pick another commune to be priced on another card.",
+          "social_tariff": "Flanders: the VMM social tariff, 80% off the whole bill. Brussels: someone in the household had BIM status on 1 January; the Region's yearly intervention sociale, which VIVAQUA pays into your bank account, is taken off the cost sensors."
         }
       }
     }
@@ -163,7 +168,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility}: your postcode now points to a different operator",
-      "description": "The postcode saved on this entry resolves to {resolved}, not {utility}. Either the resolver was corrected after this entry was set up, or {utility} was picked by hand on an older release, which did not remember that choice. Either way it is still fetching {utility}'s tariff and your bill is computed from it.\n\nCheck it and switch if it is right: Settings > Devices & services > {utility} > the three dots > Reconfigure. Nothing is changed for you, because changing operator also clears the commune and the Flemish household settings.\n\nIf {utility} is right, choose Reconfigure > Pick the utility directly and pick {utility} again: that keeps it and stops this notice."
+      "description": "The postcode saved on this entry resolves to {resolved}, not {utility}. Either the resolver was corrected after this entry was set up, or {utility} was picked by hand on an older release, which did not remember that choice. Either way it is still fetching {utility}'s tariff and your bill is computed from it.\n\nCheck it and switch if it is right: Settings > Devices & services > {utility} > the three dots > Reconfigure. Nothing is changed for you, because changing operator also clears the commune, and on a move to another region the household settings.\n\nIf {utility} is right, choose Reconfigure > Pick the utility directly and pick {utility} again: that keeps it and stops this notice."
     },
     "several_water_meters": {
       "title": "{utility}: more than one water meter on the Energy dashboard",

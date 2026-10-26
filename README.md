@@ -60,14 +60,14 @@ publication and how to parse it.
 - **Whole-bill view** — drinkwater + sanering + redevance + VAT all add up to a single EUR/year sensor that mirrors what you actually pay.
 - **Flemish integrale waterprijs** — VMM block structure (basis up to `30 + 30·persons` m³, comfort = 2× basis above), per-resident vastrecht korting, and the 80 % social-tariff reduction.
 - **Walloon CWaPE tiers** — first 30 m³ at `0.5·CVD + FSE` (CVA exempt on the residential first block), 31 to 5 000 m³ at full `CVD + CVA + FSE`, above 5 000 m³ at `0.9·CVD + CVA + FSE`, plus the regulator-defined `20·CVD + 30·CVA` redevance. Verified to the cent against inBW's published facture and AIEC's own worked table.
-- **Brussels linear** — VIVAQUA's single-rate domestic tariff plus the annual fixed fee.
+- **Brussels linear** — VIVAQUA's single-rate domestic tariff plus the annual fixed fee, less the Region's yearly intervention sociale for a household with BIM status.
 - **Postcode auto-resolution** — enter your postcode and the right utility is picked automatically. Fall through to a manual picker for the long tail.
-- **Projected annual cost** — every entry has a `projected_annual_cost` sensor wired to your configured consumption (and household size + social-tariff opt-in for Flemish customers).
+- **Projected annual cost** — every entry has a `projected_annual_cost` sensor wired to your configured consumption (and household size + social opt-in for Flemish and Brussels customers).
 - **Year-to-date cost** — auto-detects your water meter from HA's Energy dashboard (Settings → Dashboards → Energy → Water consumption) and surfaces a `current_year_cost` sensor that reports your running bill since 1 January, computed from the recorder. Annual fees are pro-rated to the elapsed fraction of the year so the figure grows day by day instead of jumping to the full annual on Jan 1; the volumetric branch reuses the same regional bill math as the projected-cost sensor. The OptionsFlow exposes an explicit-override field for users who want to point at a different sensor than the Energy dashboard's choice. Only one meter is billed: if the dashboard lists several water sources the first is used, a warning says how many are being ignored, and the override field is how you pick.
 - **Rolling year and year-end projection** — what your meter recorded over the last 365 days and what a year like that costs at today's tariff, and where this year's consumption and bill will stand on 31 December, the rest of the year taken from your meter's same days last year.
 - **Translated UI** — English, Dutch, French and German.
 - **Projection kept honest** — once your meter has measured a whole calendar year, a Repair offers that real figure in place of the consumption you typed at setup, with both numbers shown. It never overwrites the setting on its own, and a year holding a bucket that claims more than the days behind it could hold is not offered at all: that is a re-based or reset counter rather than water, and it would otherwise be proposed as your yearly consumption. The days behind it count because a meter that was away comes back with the whole absence in one bucket, and a year that really did have an outage is still a year worth offering.
-- **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune and the Flemish household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it. An operator picked by hand on an older release, before that answer was kept, has none, so the integration cannot tell it from a correction and the Repair appears; picking the same operator again under Reconfigure > Pick the utility directly records the answer and clears it, as the Repair says.
+- **Postcode kept honest** — v2 entries store the postcode you typed, and the resolver is re-run on every refresh. If a later release corrects the operator your postcode resolves to, a Repair says so and names both operators rather than the correction only reaching new installs. It does not switch for you: changing operator also clears the commune, and a move to another region the household settings, so that stays a Reconfigure you drive. An operator you picked by hand against your postcode (Reconfigure > Pick the utility directly) is not questioned: the resolver's answer at that moment is kept with the entry, and the Repair only appears if a later release changes it. An operator picked by hand on an older release, before that answer was kept, has none, so the integration cannot tell it from a correction and the Repair appears; picking the same operator again under Reconfigure > Pick the utility directly records the answer and clears it, as the Repair says.
 - **Self-healing** — last-known prices keep serving on outage; `snapshot_age_hours`, `snapshot_stale` and `last_error` are surfaced as attributes, and a stale snapshot (>35 days or past the published `valid_until`) raises a Repair issue you'll see under **Settings → Repairs**. The card carries a **Retry** button that triggers an immediate refresh, and auto-clears on the next successful, fresh fetch. When a utility has not published its new card by 1 January, last year's card is served until 31 March before the snapshot counts as stale. The year turns on the Belgian calendar, whatever timezone the host's clock runs in. A restart while the utility is down loads the entry on the last card it fetched, which is kept on disk, or, when it has none, on the last card the project's daily archive captured (see [the card archive](./docs/ci-and-testing.md#the-card-archive)), instead of retrying setup until the utility is back, and an outage that drags on past the staleness window, or a failing refresh on last year's card, picks up whatever the archive has captured since; a box in the options switches that off.
 - **Price-history backfill** — on the first setup of each entry, a flat-line of hourly long-term-statistics rows is imported from 1 January of the current year up to the last hour Home Assistant's recorder has compiled, so the History dashboard and Energy dashboard tariff overlays show a price line going back further than the install moment. It runs again by itself when anything the line is drawn from moves: the calendar year, the operator, the year of the card the rates came off, or the commune, since the gemeentelijke saneringsbijdrage is a commune's own number. Re-run on demand via the `be_water_prices.backfill_prices` service (start date and clear-first toggle).
 - **Daily live check** — a cron-driven workflow probes every utility, along with the commune list of each one that has a commune selector, and opens a GitHub issue if any extractor breaks (page restyled, wrong year, commune list empty or too short, etc.), or if the Flemish cards disagree on the vastrecht or korting they print, the Walloon cards on the CVA or FSE, or any two cards on the VAT rate.
@@ -91,7 +91,7 @@ publication and how to parse it.
 | **inBW** | Wallonia (Brabant Wallon) | 27 communes | [`providers/inbw.py`](./custom_components/be_water_prices/providers/inbw.py), [notes](./docs/providers/inbw.md): per-tier facture table on eau.inbw.be with internal cross-checks; TLS is verified first, and retried unverified only after a TLS failure |
 | **Pidpa** | Flanders | Antwerp province (~1.2 M) | [`providers/pidpa.py`](./custom_components/be_water_prices/providers/pidpa.py), [notes](./docs/providers/pidpa.md): per-commune page, Geel by default, three communes pre-selected by postcode; the 2024 projection PDF is no longer served |
 | **SWDE** | Wallonia | ~200 communes (~2.4 M, dominant Walloon distributor) | [`providers/swde.py`](./custom_components/be_water_prices/providers/swde.py), [notes](./docs/providers/swde.md): the `<h3>` sections of swde.be's English page; the page states no year, so the card is dated by the clock |
-| **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py), [notes](./docs/providers/vivaqua.md): the current year's linear-rate table on vivaqua.be, its VAT-inclusive figures divided by 1.06 |
+| **VIVAQUA** | Brussels | All 19 communes (~1.2 M) | [`providers/vivaqua.py`](./custom_components/be_water_prices/providers/vivaqua.py), [notes](./docs/providers/vivaqua.md): the current year's linear-rate table on vivaqua.be, its VAT-inclusive figures divided by 1.06, and the intervention sociale page |
 | **Water-link** | Flanders (all of Antwerp city + Hove, Mortsel, Edegem, Beveren-Kruibeke-Zwijndrecht) | ~200 k | [`providers/water_link.py`](./custom_components/be_water_prices/providers/water_link.py), [notes](./docs/providers/water_link.md): household PDF linked from the Antwerpen page, Antwerpen by default, four postcodes pre-selected; GitHub's runners cannot reach it |
 
 **Still deferred:**
@@ -159,7 +159,8 @@ the per-m³ rates that feed it. Each branch matches the actual structure
 of the corresponding regional bill:
 
 ```
-Brussels  : (consumption × (linear + sanering) + redevance) × (1 + VAT)
+Brussels  : max(0, (consumption × (linear + sanering) + redevance) × (1 + VAT)
+                   - intervention)
 Flanders  : (min(consumption, basis_volume) × (basis + sanering)
              + max(0, consumption - basis_volume) × (comfort + 2·sanering)
              + max(0, vastrecht - min(persons, 5)·korting)) × (1 + VAT)
@@ -169,7 +170,9 @@ Wallonia  : (min(consumption, 30) × (0.5·CVD + FSE)
              + 20·CVD + 30·CVA) × (1 + VAT)
 ```
 
-with `basis_volume = 30 + 30·persons` for Flanders. The math lives in
+with `basis_volume = 30 + 30·persons` for Flanders, and in Brussels
+`intervention = first + (persons - 1) · extra` for a household with BIM
+status, 0 otherwise (see [Social tariffs](#social-tariffs)). The math lives in
 [`pricing.compute_annual_cost`](./custom_components/be_water_prices/pricing.py)
 as a pure function so it stays unit-testable without a Home Assistant
 install.
@@ -177,9 +180,38 @@ install.
 The all-in basis rate sensor reports the first-block tariff per m³
 (basis or linear plus sanering, VAT-incl) so a dashboard can surface
 what a cubic metre costs at a glance. It is the published rate: the
-social tariff and the vastrecht korting only enter the four cost
-sensors (`projected_annual_cost`, `current_year_cost`,
+social tariff, the Brussels intervention sociale and the vastrecht
+korting only enter the four cost sensors (`projected_annual_cost`, `current_year_cost`,
 `rolling_year_cost` and `projected_year_end_cost`).
+
+### Social tariffs
+
+Each region has its own help for households who struggle with the water
+bill, and only two of them follow a rule the integration can price.
+
+- **Flanders: the sociaal tarief.** A household entitled to it, on the
+  VMM's criteria, pays a fifth of the whole bill. Tick **Social tariff**
+  in the options.
+- **Brussels: the intervention sociale.** The Region pays a household
+  whose member had BIM status (bénéficiaire de l'intervention majorée)
+  at their mutual insurer on 1 January a yearly sum: 58,70 EUR for the
+  first person and 53,36 EUR for each further one in 2026, indexed every
+  year. VIVAQUA pays it into the household's bank account, so it does
+  not appear on the water bill, but the integration takes it off the
+  cost sensors, as it is money the household gets back for its water.
+  Tick **Social tariff** in the options and set the registered residents
+  to the household's size. Both figures are read each day off
+  [VIVAQUA's page](https://www.vivaqua.be/fr/intervention-sociale/). The
+  year to date takes it pro rata, like the fixed charge, and no cost
+  sensor goes below 0 for it. A card saved by an earlier release has no
+  such figures, so a refresh that has to fall back on one leaves the
+  cost sensors unknown until the next fetch, rather than billing without
+  the intervention.
+- **Wallonia: none.** The Fonds social de l'eau is help the commune's
+  CPAS grants case by case to a household that cannot pay, up to 649 EUR
+  per request in 2026. It is not a tariff and nothing predicts it, so it
+  is not modelled. Every Walloon bill pays into it, the FSE per m³, and
+  that is priced.
 
 ## Sensors
 
@@ -233,11 +265,11 @@ high-water mark and the rolling and year-end figures stay on the card in
 force until 1 January, across a restart too, and the new card prices the
 new year from its first day.
 
-All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting or the social tariff, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe; `rolling_year_cost` and `projected_year_end_cost` are priced for your household the same way.
+All five of the rows above are **tariff-card figures**: they are what your operator publishes, not what your household is charged. None of them applies the per-resident korting, the social tariff or the Brussels intervention sociale, and for Wallonia `basis_rate` / `sewerage_rate` / `all_in_basis_rate` describe the above-30 m³ tranche. On a Flemish social-tariff entry the charged figures are a fifth of these. Use `projected_annual_cost` and `current_year_cost` for what you owe; `rolling_year_cost` and `projected_year_end_cost` are priced for your household the same way.
 
 | Entity id suffix (English install) | Description |
 | --- | --- |
-| `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish entries. Updates immediately when you change options. |
+| `projected_annual_cost` | Projected VAT-incl annual bill in EUR for your configured consumption. Wired to your `consumption_m3_per_year`, plus `gedomicilieerd_persons` and `social_tariff` for Flemish and Brussels entries. Updates immediately when you change options. |
 | `current_year_cost` | Running VAT-incl bill in EUR **since 1 January** of the current year. Anchors the January 1 meter reading once from HA's recorder daily statistics and **persists it across restarts**, then tracks the configured water meter sensor **live** as `live − baseline` — recomputing on each meter reading — applies the same regional bill math as the projected-cost sensor, and pro-rates annual fees by elapsed-fraction-of-year. The figure only goes **down for a reason**: the EUR cost carries its own year-to-date high-water mark on top of the consumption clamp, so neither a momentary low meter reading nor a transiently lower tariff fetch is ever published as a decrease. Apart from the cost mark being rebuilt, which lowers it straight away and is described under [Refresh cadence](#refresh-cadence), the one thing that can lower it is the recorder, and only when it holds statistics for the meter, it has already reported for this year, its latest answer is at or above every earlier one once a misread it has taken back out of its day is counted back in, so its history is intact, and the same refresh has a meter reading above 0 inside the year's frame rather than none or a dropout value. That is what takes back a meter spike small enough to have been admitted, which used to stand until January, and one corrected only after midnight is taken back too, since the recorder's own days no longer carry it — the bill only drops to ~0 when the cycle restarts, which is the 1 January rollover or pointing the integration at a different meter the recorder holds no statistics for. A different meter it does hold them for, such as the same meter picked again after a rename, takes that meter's own year since 1 January instead. A confirmed meter swap drops it to ~0 as well, but only until the next daily tick: the recorder's statistics for the meter run through the replacement, so its answer brings back the year's water, the old meter's included, and the new meter is tracked live on top of that figure. A restart before that tick still brings the year back on the first tick after it, and live tracking then resumes on the daily tick after that, once the new meter has been seen climbing again. Only the 1 January rollover, a confirmed swap and a meter the recorder holds no statistics for starting its year at 0 move the `last_reset` of both year-to-date sensors, so only they open a new cycle in Home Assistant's long-term statistics; any other fall, and whatever a different meter with statistics brings, is booked as a change in the same cycle, and the statistics sum lands on the figure instead of adding it to the old one. A swap on a meter the recorder holds statistics for still adds the year once more: the tick that brings back the year's water lands in the cycle the swap opened, so the sum counts the water up to the swap twice, and only Developer Tools > Statistics takes the extra amount back out. Returns `unknown` until a water meter is configured in the options step. The meter's unit must be one Home Assistant can convert to m³ (`m³`, `L`, `gal`, `ft³`, `CCF`, …), or one that needs no converting because it already is cubic metres: no unit at all, or the ASCII spelling `m3`. A sensor labelled with anything else is refused rather than read as cubic metres, which is what a lowercase `l` used to do at 1000× the bill. |
 | `year_to_date_consumption` | Cumulative m³ consumed since 1 January. Tracks the configured water meter sensor live (recorder-anchored baseline plus the live reading), clamped to the year's high-water mark, so the only thing that lowers it mid-year is a recorder answer with the year's own statistics behind it. Companion to `current_year_cost`. A daily statistics bucket claiming more than 100 m³ is ignored: no household draws that in a day, so it reads as a counter re-based onto the real meter reading or a register reset rather than water. That bound grows with the days behind the bucket, by the same cubic metre a day, because a bucket is not always one day of water: Home Assistant compiles nothing while a meter is away and puts the whole absence in the bucket it comes back in, so read as one day a real catch-up looked like a re-based register and was thrown away. A meter that briefly reads 0, or anything else more than a tenth below its register, starts a new cycle as far as Home Assistant is concerned, and it then adds the whole recovered register to that day; only the register's climb from the end of the day before is counted as the day's water, under the same bound. The day is still dropped when the register at the end of the day before was 0, is not known, or was higher than the one after, since there is then no climb to measure. A misread high just before midnight that is corrected just after it leaves the spike in one day and the correction in the next, either as a fall or, past a tenth of the register, as a new cycle. When the register comes back between where it stood before the spike's day and the spike itself, the high reading was the outlier, so that day keeps only the climb to where the register came back and the next day's fall is not carried any further. A register that comes back lower still is a dip or a swap, and the day before it is left alone. The live meter is bounded too, and more tightly: one report may advance the year by 30 m³ before it is held for confirmation and put to the recorder, since an hour of a domestic connection at full bore is about 20 m³ and a household uses 80-100 m³ in a year. A meter that has been out of sight gets more room, in proportion to how long it was away: it comes back showing everything drawn while it was down, and the allowance grows by a cubic metre for each day of the gap, which is several times what any household draws in one. That gap is measured across restarts, since Home Assistant being down is the longest a meter goes unseen. The recorder is not short of that water, whatever the gap: Home Assistant carries the running total forward and attributes the whole increase to the moment the meter comes back, so the two agree again as soon as it does. A recorder answer read in the same round still settles a step that goes beyond what the gap allows. And a recorder answer that still has the year behind it settles the round outright: it reads the same meter's own statistics for the whole year, so water it has no record of did not flow. A meter the recorder holds no statistics for gets none of this: a sensor without a state class never has any, and renaming the meter moves them to the new id while the integration keeps reading the old one, so pick the meter again after a rename, in the options or in the Energy dashboard, whichever named it. The zero the recorder answers for it may start an empty year, and still settles a step beyond what the gap allows, but it never lowers the year or refuses a reading below that. The figure resumes as soon as a reading and the recorder agree. |
 | `rolling_year_consumption` | m³ the meter recorded over the 365 days before today. See [Rolling year and year-end projection](#rolling-year-and-year-end-projection). |
@@ -311,17 +343,21 @@ auto-resolves cleanly.
    to just the candidate operators so you only see the choices that
    actually serve your address.
 3. **Options** — annual consumption (m³/yr, default 80). Flemish
-   utilities additionally ask:
-   - **Gedomicilieerd_persons** *(0-20)* — drives the basisvolume
+   and Brussels utilities additionally ask:
+   - **Gedomicilieerd_persons** *(0-20)* — in Flanders, drives the basisvolume
      (`30 + 30·persons` m³, which the decree does not cap) and the
      per-resident vastrecht korting (20 EUR on the integrale total in
      2026, as the card prints it). The korting counts at most five
      residents, where at 2026's figures it has cancelled the vastrecht
      outright.
      Default 1; 0 is right for a second home or a rental between
-     tenants.
-   - **Social tariff** — VMM means-tested 80 % reduction on the
-     post-calc bill. Off by default.
+     tenants. In Brussels, the household's size, which sets the
+     intervention sociale; with 0 there is no household to pay it to.
+   - **Social tariff** — in Flanders, the VMM means-tested 80 %
+     reduction on the post-calc bill; in Brussels, a household member
+     had BIM status on 1 January, and the Region's intervention sociale
+     is taken off the cost sensors. Off by default. See
+     [Social tariffs](#social-tariffs).
 
    Per-commune utilities (De Watergroep, Farys, Pidpa, Water-link)
    also show:
@@ -408,11 +444,12 @@ skipped.
 
 Either path reloads the integration in place. Annual consumption and the
 water-meter sensor carry over. Registered residents and the social
-tariff are Flemish-only settings: they survive a move to another Flemish
-operator, are dropped when the new one is not Flemish, since the
-options step stops offering them, and are asked for on a move into
-Flanders from Brussels or Wallonia, since the Flemish tariff prices on
-them. The saved commune is cleared when the
+tariff are used in Flanders and Brussels: they survive a move to another
+Flemish operator, are dropped on a move to Wallonia, since the options
+step stops offering them, and are asked for again on a move into
+Flanders or Brussels from another region, since the Flemish social
+tariff and the Brussels BIM status are not the same entitlement. The
+residents saved are offered back. The saved commune is cleared when the
 utility changes (the new operator uses different commune IDs, so a stale
 value would silently fail at fetch time). It is also cleared on a new
 postcode when the operator's commune list cannot be loaded and the
@@ -910,6 +947,13 @@ asks for both.
   publish a lower gemeentelijke saneringsbijdrage than the other 60
   communes, and their postcodes are pre-selected for you. Anywhere else
   in the province the Geel default is the rate you pay.
+- **The Brussels intervention sociale is not on VIVAQUA's invoice.** The
+  Region pays it into the household's bank account once a year, so with
+  the social tariff ticked the cost sensors sit below the invoices by
+  that sum, and the year to date reaches the whole of it on 31 December
+  whatever day the transfer arrives. Whether a household qualifies, BIM
+  status on 1 January, is for the household to say: nothing the
+  integration reads can tell.
 - **Mid-year tariff revisions are billed for the whole year.** A
   snapshot carries one rate and the previous one is not published, so
   when a utility changes a rate mid-year the year-to-date cost bills

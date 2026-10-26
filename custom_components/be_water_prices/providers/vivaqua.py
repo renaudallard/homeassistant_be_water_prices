@@ -51,10 +51,22 @@ convention. The two breakdown
 rows ("supply" / "sanitation") are surfaced as ``linear_eur_per_m3``
 (supply) and ``sanering_gemeentelijk_eur_per_m3`` (sanitation, billed
 on behalf of Hydria). Their sum equals the variable-charge total.
+
+The Region's intervention sociale for households with BIM status is on
+a second page, https://www.vivaqua.be/fr/intervention-sociale/, which
+states the year and two amounts::
+
+    En 2026, l'intervention sociale s'élève à
+      58,70 € pour un ménage d'1 personne
+      53,36 € par personne supplémentaire composant le ménage
+
+Both are read onto the card. The French page is read because the
+English one has lagged behind it.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 from datetime import date
@@ -79,6 +91,7 @@ _LOGGER = logging.getLogger(__name__)
 UTILITY_ID = "vivaqua"
 LABEL = "VIVAQUA"
 SOURCE_URL = "https://www.vivaqua.be/en/the-domestic-linear-rate/"
+INTERVENTION_URL = "https://www.vivaqua.be/fr/intervention-sociale/"
 
 
 def _label_for_year(year: int, vat: float) -> str:
@@ -254,8 +267,54 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     raise ExtractorError(f"could not locate a VIVAQUA tariff table for {target} or {target - 1}")
 
 
+# Read off accent-folded text, so "s'élève à" is "s'eleve a" and either
+# apostrophe the page uses matches the dot.
+_INTERVENTION_YEAR_RE = re.compile(r"\ben (20\d\d), l.intervention sociale s.eleve a\b")
+_FIRST_PERSON_RE = re.compile(r"(\d{1,3},\d{2})\s{0,3}€\s{0,3}pour un menage d.1 personne\b")
+_EXTRA_PERSON_RE = re.compile(r"(\d{1,3},\d{2})\s{0,3}€\s{0,3}par personne supplementaire\b")
+# The two amounts follow the year's sentence directly. Reading further
+# would take a figure out of the example or the FAQ below it.
+_INTERVENTION_SPAN = 200
+
+
+def parse_intervention(html: str, year: int | None = None) -> tuple[float, float]:
+    """The intervention sociale for the first person and for each further one.
+
+    ``year`` defaults to the Belgian clock's. The page names the year its
+    amounts are for; one a year either side is taken with a warning, as
+    the page turns over some days after the tariff card does, and the
+    amounts are indexed by a few percent a year. Anything else raises.
+    """
+    text = fold_accents(BeautifulSoup(html, "html.parser").get_text(" ", strip=True))
+    target = year or belgian_today().year
+    anchor = _INTERVENTION_YEAR_RE.search(text)
+    if anchor is None:
+        raise ExtractorError("VIVAQUA intervention sociale page states no year's amounts")
+    stated = int(anchor.group(1))
+    if abs(stated - target) > 1:
+        raise ExtractorError(f"VIVAQUA intervention sociale page states {stated}, not {target}")
+    span = text[anchor.end() : anchor.end() + _INTERVENTION_SPAN]
+    first = _FIRST_PERSON_RE.search(span)
+    extra = _EXTRA_PERSON_RE.search(span)
+    if first is None or extra is None:
+        raise ExtractorError(f"VIVAQUA intervention sociale {stated} amounts could not be parsed")
+    if stated != target:
+        _LOGGER.warning(
+            "VIVAQUA intervention sociale page states %d amounts, using them for %d",
+            stated,
+            target,
+        )
+    return to_float(first.group(1)), to_float(extra.group(1))
+
+
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    return await fetch_and_parse(session, SOURCE_URL, parse_tariff)
+    tariff = await fetch_and_parse(session, SOURCE_URL, parse_tariff)
+    first, extra = await fetch_and_parse(session, INTERVENTION_URL, parse_intervention)
+    return dataclasses.replace(
+        tariff,
+        social_intervention_first_person=first,
+        social_intervention_per_extra_person=extra,
+    )
 
 
 EXTRACTOR = WaterExtractor(

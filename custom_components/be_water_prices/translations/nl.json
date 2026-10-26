@@ -32,31 +32,34 @@
       },
       "reconfigure_postcode": {
         "title": "Postcode bijwerken",
-        "description": "Voer de nieuwe postcode in voor deze invoer. We koppelen opnieuw aan een maatschappij en herladen de integratie. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als de gekoppelde maatschappij verandert (de nieuwe maatschappij gebruikt andere gemeente-IDs) of de postcode verschilt van de opgeslagen, tenzij je bij de volgende stap een gemeente kiest (factureert de maatschappij de nieuwe postcode op een eigen gemeente, dan is die daar vooraf gekozen).",
+        "description": "Voer de nieuwe postcode in voor deze invoer. We koppelen opnieuw aan een maatschappij en herladen de integratie. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en de sociale optie gelden in Vlaanderen en Brussel: ze blijven behouden bij een overstap binnen Vlaanderen, vervallen bij een overstap naar Wallonië, en worden opnieuw gevraagd bij een overstap naar Vlaanderen of Brussel; de opgeslagen gemeente wordt gewist als de gekoppelde maatschappij verandert (de nieuwe maatschappij gebruikt andere gemeente-IDs) of de postcode verschilt van de opgeslagen, tenzij je bij de volgende stap een gemeente kiest (factureert de maatschappij de nieuwe postcode op een eigen gemeente, dan is die daar vooraf gekozen).",
         "data": {
           "postcode": "Postcode"
         }
       },
       "reconfigure_manual": {
         "title": "Kies je watermaatschappij",
-        "description": "Kies de maatschappij die jou bedient. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest (gemeente-IDs zijn niet uitwisselbaar tussen maatschappijen). Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) vragen daarna nog je gemeente.",
+        "description": "Kies de maatschappij die jou bedient. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en de sociale optie gelden in Vlaanderen en Brussel: ze blijven behouden bij een overstap binnen Vlaanderen, vervallen bij een overstap naar Wallonië, en worden opnieuw gevraagd bij een overstap naar Vlaanderen of Brussel; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest (gemeente-IDs zijn niet uitwisselbaar tussen maatschappijen). Maatschappijen die per gemeente factureren (De Watergroep / Farys / Pidpa / Water-link) vragen daarna nog je gemeente.",
         "data": {
           "utility": "Maatschappij"
         }
       },
       "reconfigure_choose": {
         "title": "Kies je watermaatschappij",
-        "description": "Je postcode wordt door meerdere maatschappijen bediend -- elk verzorgt andere straten in je buurt. Kies wie jou factureert. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en het sociaal tarief gelden alleen in Vlaanderen: ze blijven behouden bij een overstap naar een andere Vlaamse maatschappij, vervallen als de nieuwe maatschappij dat niet is, en worden gevraagd bij een overstap naar Vlaanderen; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest of de postcode verschilt van de opgeslagen, tenzij je bij de volgende stap een gemeente kiest.",
+        "description": "Je postcode wordt door meerdere maatschappijen bediend -- elk verzorgt andere straten in je buurt. Kies wie jou factureert. Jaarverbruik en de watermetersensor blijven behouden. Gedomicilieerde personen en de sociale optie gelden in Vlaanderen en Brussel: ze blijven behouden bij een overstap binnen Vlaanderen, vervallen bij een overstap naar Wallonië, en worden opnieuw gevraagd bij een overstap naar Vlaanderen of Brussel; de opgeslagen gemeente wordt gewist als je een andere maatschappij kiest of de postcode verschilt van de opgeslagen, tenzij je bij de volgende stap een gemeente kiest.",
         "data": {
           "utility": "Maatschappij"
         }
       },
       "reconfigure_household": {
-        "title": "Huishouden voor het Vlaamse tarief",
-        "description": "De nieuwe maatschappij is Vlaams, en het Vlaamse tarief hangt af van het aantal gedomicilieerde personen op het adres en van het sociaal tarief. Vul ze hier in; beide kun je later wijzigen in de opties van de invoer.",
+        "title": "Je huishouden",
+        "description": "De nieuwe maatschappij ligt in Vlaanderen of Brussel, waar de factuur afhangt van het aantal gedomicilieerde personen op het adres en van een sociale optie: het Vlaamse sociaal tarief, of in Brussel de sociale tussenkomst van het Gewest voor een huishouden met het statuut verhoogde tegemoetkoming op 1 januari. Vul ze hier in; beide kun je later wijzigen in de opties van de invoer.",
         "data": {
           "gedomicilieerd_persons": "Gedomicilieerde personen",
-          "social_tariff": "Sociaal tarief (80% korting)"
+          "social_tariff": "Sociaal tarief (Vlaanderen) / verhoogde tegemoetkoming (Brussel)"
+        },
+        "data_description": {
+          "social_tariff": "Vlaanderen: het VMM-sociaal tarief, 80% korting op de hele factuur. Brussel: iemand in het huishouden had op 1 januari het statuut verhoogde tegemoetkoming; de jaarlijkse sociale tussenkomst van het Gewest, die VIVAQUA op je rekening stort, wordt van de kostsensoren afgetrokken."
         }
       },
       "reconfigure_commune": {
@@ -71,17 +74,18 @@
       },
       "options": {
         "title": "Jaarverbruik",
-        "description": "Je jaarlijks waterverbruik in kubieke meter. Gebruikt door de sensor Geschatte jaarkost; standaard 80 m³/jaar. Vlaamse maatschappijen vragen ook het aantal gedomicilieerde personen (bepaalt het basisvolume) en een keuze voor het VMM-sociaal tarief. Optioneel: koppel een watermetersensor (cumulatief m³, device_class=water) zodat de YTD-kostsensor het verbruik sinds 1 januari uit de recorder kan lezen.",
+        "description": "Je jaarlijks waterverbruik in kubieke meter. Gebruikt door de sensor Geschatte jaarkost; standaard 80 m³/jaar. Vlaamse en Brusselse maatschappijen vragen ook het aantal gedomicilieerde personen (in Vlaanderen bepaalt dat het basisvolume, in Brussel de sociale tussenkomst) en een keuze voor de sociale optie: het VMM-sociaal tarief in Vlaanderen, het statuut verhoogde tegemoetkoming op 1 januari in Brussel. Optioneel: koppel een watermetersensor (cumulatief m³, device_class=water) zodat de YTD-kostsensor het verbruik sinds 1 januari uit de recorder kan lezen.",
         "data": {
           "consumption_m3_per_year": "Verbruik (m³ / jaar)",
-          "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
-          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
+          "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen en Brussel)",
+          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting) / verhoogde tegemoetkoming op 1 januari (Brussel, sociale tussenkomst)",
           "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)",
           "card_archive": "Het kaartarchief van het project lezen wanneer de maatschappij onbereikbaar is en de gecachete kaart ontbreekt, verouderd is of die van vorig jaar is (de aanvraag noemt uw maatschappij en gemeente)",
           "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Pidpa / Water-link)"
         },
         "data_description": {
-          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend."
+          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend.",
+          "social_tariff": "Vlaanderen: het VMM-sociaal tarief, 80% korting op de hele factuur. Brussel: iemand in het huishouden had op 1 januari het statuut verhoogde tegemoetkoming; de jaarlijkse sociale tussenkomst van het Gewest, die VIVAQUA op je rekening stort, wordt van de kostsensoren afgetrokken."
         }
       }
     },
@@ -99,14 +103,15 @@
         "title": "Jaarverbruik",
         "data": {
           "consumption_m3_per_year": "Verbruik (m³ / jaar)",
-          "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen)",
-          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting)",
+          "gedomicilieerd_persons": "Gedomicilieerde personen (Vlaanderen en Brussel)",
+          "social_tariff": "Sociaal tarief (Vlaanderen, 80% korting) / verhoogde tegemoetkoming op 1 januari (Brussel, sociale tussenkomst)",
           "water_meter_sensor": "Watermetersensor (optioneel; automatisch gedetecteerd vanuit het Energy-dashboard indien leeg)",
           "card_archive": "Het kaartarchief van het project lezen wanneer de maatschappij onbereikbaar is en de gecachete kaart ontbreekt, verouderd is of die van vorig jaar is (de aanvraag noemt uw maatschappij en gemeente)",
           "commune": "Gemeente (alleen voor per-gemeente maatschappijen: De Watergroep / Farys / Pidpa / Water-link)"
         },
         "data_description": {
-          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend."
+          "commune": "Waar de maatschappij uw postcode op een eigen gemeente factureert, is die gemeente vooraf gekozen, en ze leegmaken blijft niet: ze komt terug bij de volgende herlading. Kies een andere gemeente om op een andere kaart te worden berekend.",
+          "social_tariff": "Vlaanderen: het VMM-sociaal tarief, 80% korting op de hele factuur. Brussel: iemand in het huishouden had op 1 januari het statuut verhoogde tegemoetkoming; de jaarlijkse sociale tussenkomst van het Gewest, die VIVAQUA op je rekening stort, wordt van de kostsensoren afgetrokken."
         }
       }
     }
@@ -189,7 +194,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility}: je postcode wijst nu naar een andere maatschappij",
-      "description": "De postcode van deze entry verwijst naar {resolved}, niet naar {utility}. Ofwel is de postcodetabel gecorrigeerd nadat deze entry is aangemaakt, ofwel is {utility} met de hand gekozen in een oudere versie, die die keuze niet onthield. In beide gevallen wordt nog altijd het tarief van {utility} opgehaald en je factuur daarop berekend.\n\nControleer het en pas het aan als het klopt: Instellingen > Apparaten en diensten > {utility} > de drie puntjes > Herconfigureren. Er wordt niets voor je gewijzigd, want van maatschappij veranderen wist ook de gemeente en de Vlaamse gezinsinstellingen.\n\nKlopt {utility}, kies dan Herconfigureren > Maatschappij rechtstreeks kiezen en kies opnieuw {utility}: dan blijft die behouden en verdwijnt deze melding."
+      "description": "De postcode van deze entry verwijst naar {resolved}, niet naar {utility}. Ofwel is de postcodetabel gecorrigeerd nadat deze entry is aangemaakt, ofwel is {utility} met de hand gekozen in een oudere versie, die die keuze niet onthield. In beide gevallen wordt nog altijd het tarief van {utility} opgehaald en je factuur daarop berekend.\n\nControleer het en pas het aan als het klopt: Instellingen > Apparaten en diensten > {utility} > de drie puntjes > Herconfigureren. Er wordt niets voor je gewijzigd, want van maatschappij veranderen wist ook de gemeente, en bij een overstap naar een ander gewest de gezinsinstellingen.\n\nKlopt {utility}, kies dan Herconfigureren > Maatschappij rechtstreeks kiezen en kies opnieuw {utility}: dan blijft die behouden en verdwijnt deze melding."
     },
     "several_water_meters": {
       "title": "{utility}: meer dan \u00e9\u00e9n watermeter op het energiedashboard",

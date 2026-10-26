@@ -106,6 +106,12 @@ class WaterTariff:
     cva_eur_per_m3: float = 0.0  # Wallonia, flat SPGE figure the page prints
     fse_eur_per_m3: float = 0.0  # Wallonia, national (Fonds Social de l'Eau)
 
+    # Brussels pays a household with BIM status a yearly intervention
+    # sociale: one figure for the first person and one for each further
+    # person (EUR/year, not subject to VAT). Other regions leave at 0.
+    social_intervention_first_person: float = 0.0
+    social_intervention_per_extra_person: float = 0.0
+
     vat_rate: float = DEFAULT_VAT_RATE
 
 

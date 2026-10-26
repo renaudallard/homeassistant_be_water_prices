@@ -32,31 +32,34 @@
       },
       "reconfigure_postcode": {
         "title": "Postleitzahl aktualisieren",
-        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs) oder die Postleitzahl von der gespeicherten abweicht, es sei denn, Sie wählen im nächsten Schritt eine Gemeinde (rechnet der Versorger die neue Postleitzahl über eine eigene Gemeinde ab, ist diese dort vorausgewählt).",
+        "description": "Geben Sie die neue Postleitzahl für diesen Eintrag ein. Wir ermitteln den Versorger erneut und laden die Integration neu. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und die Sozialoption gelten in Flandern und Brüssel: Sie bleiben beim Wechsel innerhalb Flanderns erhalten, werden beim Wechsel in die Wallonie verworfen und beim Wechsel nach Flandern oder Brüssel erneut abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn sich der ermittelte Versorger ändert (der neue Versorger verwendet andere Gemeinde-IDs) oder die Postleitzahl von der gespeicherten abweicht, es sei denn, Sie wählen im nächsten Schritt eine Gemeinde (rechnet der Versorger die neue Postleitzahl über eine eigene Gemeinde ab, ist diese dort vorausgewählt).",
         "data": {
           "postcode": "Postleitzahl"
         }
       },
       "reconfigure_manual": {
         "title": "Wasserversorger wählen",
-        "description": "Wählen Sie den Versorger, der Sie beliefert. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen (Gemeinde-IDs sind zwischen Versorgern nicht austauschbar). Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) fragen anschließend die Gemeinde ab.",
+        "description": "Wählen Sie den Versorger, der Sie beliefert. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und die Sozialoption gelten in Flandern und Brüssel: Sie bleiben beim Wechsel innerhalb Flanderns erhalten, werden beim Wechsel in die Wallonie verworfen und beim Wechsel nach Flandern oder Brüssel erneut abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen (Gemeinde-IDs sind zwischen Versorgern nicht austauschbar). Versorger mit gemeindeabhängigem Tarif (De Watergroep / Farys / Pidpa / Water-link) fragen anschließend die Gemeinde ab.",
         "data": {
           "utility": "Versorger"
         }
       },
       "reconfigure_choose": {
         "title": "Wasserversorger wählen",
-        "description": "Ihre Postleitzahl wird von mehreren Versorgern bedient -- jeder beliefert andere Straßen. Wählen Sie den Versorger, der Sie abrechnet. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und der Sozialtarif gelten nur in Flandern: Sie bleiben beim Wechsel zu einem anderen flämischen Versorger erhalten, werden verworfen, wenn der neue Versorger nicht flämisch ist, und beim Wechsel nach Flandern abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen oder die Postleitzahl von der gespeicherten abweicht, es sei denn, Sie wählen im nächsten Schritt eine Gemeinde.",
+        "description": "Ihre Postleitzahl wird von mehreren Versorgern bedient -- jeder beliefert andere Straßen. Wählen Sie den Versorger, der Sie abrechnet. Jahresverbrauch und der Wasserzähler-Sensor bleiben erhalten. Gemeldete Bewohner und die Sozialoption gelten in Flandern und Brüssel: Sie bleiben beim Wechsel innerhalb Flanderns erhalten, werden beim Wechsel in die Wallonie verworfen und beim Wechsel nach Flandern oder Brüssel erneut abgefragt; die gespeicherte Gemeinde wird gelöscht, wenn Sie einen anderen Versorger wählen oder die Postleitzahl von der gespeicherten abweicht, es sei denn, Sie wählen im nächsten Schritt eine Gemeinde.",
         "data": {
           "utility": "Versorger"
         }
       },
       "reconfigure_household": {
-        "title": "Haushalt für den flämischen Tarif",
-        "description": "Der neue Versorger ist flämisch, und der flämische Tarif hängt von der Zahl der gemeldeten Bewohner an der Adresse und vom Sozialtarif ab. Geben Sie beide hier an; sie lassen sich später in den Optionen des Eintrags ändern.",
+        "title": "Ihr Haushalt",
+        "description": "Der neue Versorger liegt in Flandern oder Brüssel, wo die Rechnung von der Zahl der gemeldeten Bewohner an der Adresse und von einer Sozialoption abhängt: dem flämischen Sozialtarif oder in Brüssel der Sozialbeihilfe der Region für einen Haushalt mit BIM-Status am 1. Januar. Geben Sie beide hier an; sie lassen sich später in den Optionen des Eintrags ändern.",
         "data": {
           "gedomicilieerd_persons": "Gemeldete Bewohner",
-          "social_tariff": "Sozialtarif (80% Ermäßigung)"
+          "social_tariff": "Sozialtarif (Flandern) / BIM-Status (Brüssel)"
+        },
+        "data_description": {
+          "social_tariff": "Flandern: der VMM-Sozialtarif, 80% Ermäßigung auf die gesamte Rechnung. Brüssel: jemand im Haushalt hatte am 1. Januar den BIM-Status; die jährliche Sozialbeihilfe der Region, die VIVAQUA auf Ihr Konto überweist, wird von den Kostensensoren abgezogen."
         }
       },
       "reconfigure_commune": {
@@ -71,17 +74,18 @@
       },
       "options": {
         "title": "Jahresverbrauch",
-        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Wird vom Sensor Geschätzte Jahreskosten verwendet; Standard 80 m³/Jahr. Flämische Versorger benötigen außerdem die Zahl der gemeldeten Bewohner (bestimmt das Basisvolumen) und eine Option für den VMM-Sozialtarif. Optional: ein Wasserzähler-Sensor (kumulative m³, device_class=water) für den Jahres-Sensor, der den Verbrauch ab 1. Januar aus dem HA-Recorder liest.",
+        "description": "Ihr jährlicher Wasserverbrauch in Kubikmeter. Wird vom Sensor Geschätzte Jahreskosten verwendet; Standard 80 m³/Jahr. Flämische und Brüsseler Versorger benötigen außerdem die Zahl der gemeldeten Bewohner (in Flandern bestimmt sie das Basisvolumen, in Brüssel die Sozialbeihilfe) und die Sozialoption: den VMM-Sozialtarif in Flandern, den BIM-Status am 1. Januar in Brüssel. Optional: ein Wasserzähler-Sensor (kumulative m³, device_class=water) für den Jahres-Sensor, der den Verbrauch ab 1. Januar aus dem HA-Recorder liest.",
         "data": {
           "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
-          "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
-          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
+          "gedomicilieerd_persons": "Gemeldete Bewohner (Flandern und Brüssel)",
+          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung) / BIM-Status am 1. Januar (Brüssel, Sozialbeihilfe)",
           "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)",
           "card_archive": "Das Kartenarchiv des Projekts lesen, wenn der Versorger nicht erreichbar ist und die zwischengespeicherte Karte fehlt, veraltet ist oder die des Vorjahres ist (die Anfrage nennt Ihren Versorger und Ihre Gemeinde)",
           "commune": "Gemeinde (nur für Per-Gemeinde-Versorger: De Watergroep / Farys / Pidpa / Water-link)"
         },
         "data_description": {
-          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden."
+          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden.",
+          "social_tariff": "Flandern: der VMM-Sozialtarif, 80% Ermäßigung auf die gesamte Rechnung. Brüssel: jemand im Haushalt hatte am 1. Januar den BIM-Status; die jährliche Sozialbeihilfe der Region, die VIVAQUA auf Ihr Konto überweist, wird von den Kostensensoren abgezogen."
         }
       }
     },
@@ -99,14 +103,15 @@
         "title": "Jahresverbrauch",
         "data": {
           "consumption_m3_per_year": "Verbrauch (m³ / Jahr)",
-          "gedomicilieerd_persons": "Gemeldete Bewohner (nur Flandern)",
-          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung)",
+          "gedomicilieerd_persons": "Gemeldete Bewohner (Flandern und Brüssel)",
+          "social_tariff": "Sozialtarif (Flandern, 80% Ermäßigung) / BIM-Status am 1. Januar (Brüssel, Sozialbeihilfe)",
           "water_meter_sensor": "Wasserzähler-Sensor (optional; vom Energy-Dashboard automatisch erkannt, wenn leer)",
           "card_archive": "Das Kartenarchiv des Projekts lesen, wenn der Versorger nicht erreichbar ist und die zwischengespeicherte Karte fehlt, veraltet ist oder die des Vorjahres ist (die Anfrage nennt Ihren Versorger und Ihre Gemeinde)",
           "commune": "Gemeinde (nur für Per-Gemeinde-Versorger: De Watergroep / Farys / Pidpa / Water-link)"
         },
         "data_description": {
-          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden."
+          "commune": "Wo der Versorger Ihre Postleitzahl über eine eigene Gemeinde abrechnet, ist diese Gemeinde vorausgewählt, und das Leeren bleibt nicht bestehen: Sie kehrt beim nächsten Neuladen zurück. Wählen Sie eine andere Gemeinde, um nach einer anderen Karte berechnet zu werden.",
+          "social_tariff": "Flandern: der VMM-Sozialtarif, 80% Ermäßigung auf die gesamte Rechnung. Brüssel: jemand im Haushalt hatte am 1. Januar den BIM-Status; die jährliche Sozialbeihilfe der Region, die VIVAQUA auf Ihr Konto überweist, wird von den Kostensensoren abgezogen."
         }
       }
     }
@@ -189,7 +194,7 @@
   "issues": {
     "operator_moved": {
       "title": "{utility}: Ihre Postleitzahl verweist jetzt auf einen anderen Versorger",
-      "description": "Die in diesem Eintrag gespeicherte Postleitzahl verweist auf {resolved} und nicht auf {utility}. Entweder wurde die Postleitzahlentabelle nach dem Anlegen dieses Eintrags korrigiert, oder {utility} wurde in einer älteren Version von Hand gewählt, die diese Wahl nicht speicherte. In beiden Fällen wird weiterhin der Tarif von {utility} abgerufen und Ihre Rechnung daraus berechnet.\n\nPrüfen Sie es und wechseln Sie, wenn es zutrifft: Einstellungen > Geräte und Dienste > {utility} > die drei Punkte > Neu konfigurieren. Es wird nichts für Sie geändert, denn ein Wechsel des Versorgers löscht auch die Gemeinde und die flämischen Haushaltseinstellungen.\n\nWenn {utility} zutrifft, wählen Sie Neu konfigurieren > Versorger direkt auswählen und wählen Sie erneut {utility}: Er bleibt erhalten und dieser Hinweis verschwindet."
+      "description": "Die in diesem Eintrag gespeicherte Postleitzahl verweist auf {resolved} und nicht auf {utility}. Entweder wurde die Postleitzahlentabelle nach dem Anlegen dieses Eintrags korrigiert, oder {utility} wurde in einer älteren Version von Hand gewählt, die diese Wahl nicht speicherte. In beiden Fällen wird weiterhin der Tarif von {utility} abgerufen und Ihre Rechnung daraus berechnet.\n\nPrüfen Sie es und wechseln Sie, wenn es zutrifft: Einstellungen > Geräte und Dienste > {utility} > die drei Punkte > Neu konfigurieren. Es wird nichts für Sie geändert, denn ein Wechsel des Versorgers löscht auch die Gemeinde und beim Wechsel in eine andere Region die Haushaltseinstellungen.\n\nWenn {utility} zutrifft, wählen Sie Neu konfigurieren > Versorger direkt auswählen und wählen Sie erneut {utility}: Er bleibt erhalten und dieser Hinweis verschwindet."
     },
     "several_water_meters": {
       "title": "{utility}: mehr als ein Wasserz\u00e4hler im Energie-Dashboard",

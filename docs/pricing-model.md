@@ -20,9 +20,12 @@ is the bill so far, the fee scaled by the fraction of the year elapsed
 - rounds to the cent;
 - returns None for a tariff it cannot price: a Brussels card without a
   linear rate, a Walloon card with no CVD, a Flemish card with no basis
-  rate, or a region it does not know. The cost sensors are then unknown.
+  rate, or a region it does not know. With the social tariff ticked, a
+  Brussels card without the intervention sociale figures is one too: a
+  card saved, or archived, before they were read. The cost sensors are then unknown.
 
-`persons` and `social_tariff` only change a Flemish bill.
+`persons` and `social_tariff` change a Flemish or a Brussels bill, never a
+Walloon one.
 
 ## Flanders: the integrale waterprijs
 
@@ -123,6 +126,8 @@ EUR/m³, from the SWDE fixture, and the 2026 SPGE figures; redevance
 
 ```
 bill = (m3 x (linear + sanering) + fee_factor x yearly_fixed_fee) x (1 + VAT)
+intervention = first + (persons - 1) x extra (with the social tariff and persons > 0)
+bill = max(0, bill - fee_factor x intervention)
 ```
 
 One rate for every cubic metre and a fixed charge. VIVAQUA prints its
@@ -137,6 +142,24 @@ Worked example from `tests/test_pricing.py`, on VIVAQUA's 2026 figures
 inclusive): 80 m³ cost 80 x 5,35 + 40,23 = 468,23 EUR, and 0 m³ cost the
 fixed charge alone, 40,23 EUR.
 
+With the social tariff ticked, the option standing for BIM status on 1
+January, the Region's intervention sociale comes off: `first` and
+`extra` are the card's `social_intervention_first_person` and
+`social_intervention_per_extra_person`, 58,70 and 53,36 EUR in 2026,
+read off VIVAQUA's page. It is a payment into the household's bank
+account and carries no VAT, so it comes off after VAT. Like the fixed
+charge it is a yearly sum, so the year to date takes it pro rata. With
+no residents there is no household to pay it to, and the bill never
+goes below 0 for it: a large household that draws little would
+otherwise be shown a negative cost.
+
+| Case | Result |
+| --- | --- |
+| 80 m³, 4 residents, BIM | 468,23 - (58,70 + 3 x 53,36) = 249,45 EUR |
+| 80 m³, 0 residents, BIM | 468,23 EUR |
+| 0 m³, 2 residents, BIM | 40,23 - 112,06, floored: 0,00 EUR |
+| 40 m³, 1 resident, BIM, a quarter of the year | 214 + 10,0575 - 14,675 = 209,38 EUR |
+
 ## VAT
 
 Every builder sets `vat_rate` to the rate its card gives: a Flemish card's
@@ -146,7 +169,7 @@ on AIEC's picture. `DEFAULT_VAT_RATE` (0,06), the residential rate on
 water, stands in for IDEN's page and the Pidpa Tariefplan, which give
 none. The engine applies the card's `vat_rate` once to the ex-VAT total,
 and the live check fails when the cards disagree on it. In Flanders the social reduction is applied
-after VAT.
+after VAT, and so is the Brussels intervention sociale, which carries none.
 
 ## The year to date
 
@@ -251,9 +274,10 @@ The suffixes are an English install's; see [entities.md](entities.md).
 | `projected_year_end_cost` | the running bill on 31 December | `_year_figures` |
 
 The five rate sensors are what the card publishes: none applies the
-korting or the social tariff. In Wallonia `basis_rate` is the CVD and
-`all_in_basis_rate` is `(CVD + CVA + FSE) x 1,06`, the rate of the tranche
-from 31 to 5 000 m³; the first 30 m³ cost less. The four cost sensors are
-what the household is billed, korting, social tariff, tiers and VAT
-included. The price backfill writes only the five rate sensors' history
-(`_BACKFILL_KEYS` in `statistics.py`).
+korting, the social tariff or the intervention sociale. In Wallonia
+`basis_rate` is the CVD and `all_in_basis_rate` is `(CVD + CVA + FSE) x
+1,06`, the rate of the tranche from 31 to 5 000 m³; the first 30 m³ cost
+less. The four cost sensors are what the household is billed, korting,
+social tariff, intervention sociale, tiers and VAT included. The price
+backfill writes only the five rate sensors' history (`_BACKFILL_KEYS` in
+`statistics.py`).

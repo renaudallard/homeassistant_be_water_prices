@@ -78,11 +78,14 @@ async def test_postcode_resolves_to_vivaqua_for_brussels(hass: HomeAssistant) ->
     assert result["data"] == {CONF_UTILITY: "vivaqua"}
     # Postcode is persisted into options so future resolver-coverage
     # migrations can auto-correct the utility (v2 schema); the card
-    # archive box is on unless unticked.
+    # archive box is on unless unticked. Brussels prices the intervention
+    # sociale on the household, so the form asks for it.
     assert result["options"] == {
         CONF_CARD_ARCHIVE: True,
         CONF_CONSUMPTION_M3_PER_YEAR: 100,
+        CONF_PERSONS: 1,
         CONF_POSTCODE: "1000",
+        CONF_SOCIAL_TARIFF: False,
     }
 
 
@@ -355,15 +358,13 @@ async def test_options_flow_clears_commune_when_user_explicitly_deselects(
 
 
 @pytest.mark.asyncio
-async def test_reconfigure_drops_social_tariff_on_flemish_to_brussels_swap(
+async def test_a_move_from_flanders_to_brussels_asks_the_household_again(
     hass: HomeAssistant,
 ) -> None:
-    """social_tariff is a Flanders-only 80% reduction; the OptionsFlow
-    hides the field for Brussels / Wallonia entries. A stale True
-    carried over from a previous Flemish operator would be silently
-    ignored by pricing.py while still appearing in entry.options --
-    misleading users into believing the discount is applied. The
-    reconfigure must strip it when the new utility isn't Flemish.
+    """The Flemish social tariff and the Brussels BIM status are not the
+    same entitlement, so a True carried over from a Flemish operator
+    would price an intervention nobody asked for. The household step
+    asks again, offering the residents saved.
     """
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -385,11 +386,17 @@ async def test_reconfigure_drops_social_tariff_on_flemish_to_brussels_swap(
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_POSTCODE: "1000"}
     )  # Brussels -> VIVAQUA
+    assert result["step_id"] == "reconfigure_household"
+    defaults = {str(k): k.default() for k in result["data_schema"].schema}
+    assert defaults == {CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False}
+    )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "vivaqua"
-    # social_tariff is gone (silently ignored on Brussels anyway).
-    assert CONF_SOCIAL_TARIFF not in entry.options
+    assert entry.options[CONF_SOCIAL_TARIFF] is False
+    assert entry.options[CONF_PERSONS] == 2
     assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
 
 
@@ -431,6 +438,11 @@ async def test_reconfigure_flow_swaps_utility_and_clears_commune(
         result["flow_id"],
         {CONF_POSTCODE: "1000"},  # Brussels → VIVAQUA
     )
+    # A move into another region asks for the household.
+    assert result["step_id"] == "reconfigure_household"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False}
+    )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
 
@@ -439,14 +451,9 @@ async def test_reconfigure_flow_swaps_utility_and_clears_commune(
     assert entry.title == "VIVAQUA"
     assert CONF_COMMUNE not in entry.options
     assert CONF_COMMUNE_LABEL not in entry.options
-    # social_tariff is Flemish-only; pricing.py drops it on Brussels
-    # entries, so the reconfigure scrubs it too rather than persist a
-    # silently-ignored option.
-    assert CONF_SOCIAL_TARIFF not in entry.options
-    # Non-commune, non-Flemish-only options preserved verbatim; the
-    # household size is Flemish-only and goes the way of the social tariff.
+    # Non-commune options preserved verbatim.
     assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 90
-    assert CONF_PERSONS not in entry.options
+    assert entry.options[CONF_PERSONS] == 2
 
 
 @pytest.mark.asyncio
@@ -1506,6 +1513,11 @@ async def test_reconfigure_flow_manual_picker_non_per_commune_skips_commune_step
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_UTILITY: "vivaqua"}
     )
+    # A move to Brussels asks for the household, not for a commune.
+    assert result["step_id"] == "reconfigure_household"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_PERSONS: 1, CONF_SOCIAL_TARIFF: False}
+    )
     assert result["type"] == data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "vivaqua"
@@ -1912,6 +1924,9 @@ async def test_reconfiguring_an_entry_whose_setup_failed_reloads_it(hass: HomeAs
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_POSTCODE: "1000"}
         )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PERSONS: 1, CONF_SOCIAL_TARIFF: False}
+        )
         assert result["reason"] == "reconfigure_successful"
         await hass.async_block_till_done()
         assert entry.data[CONF_UTILITY] == "vivaqua"
@@ -1997,6 +2012,53 @@ async def test_a_move_into_flanders_asks_for_the_household(hass: HomeAssistant) 
     assert entry.options[CONF_PERSONS] == 3
     assert entry.options[CONF_SOCIAL_TARIFF] is True
     assert entry.options[CONF_COMMUNE] == "25071"
+
+
+@pytest.mark.asyncio
+async def test_a_move_to_wallonia_drops_the_household(hass: HomeAssistant) -> None:
+    """Nothing in a Walloon bill reads the residents or the social option."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 120, CONF_PERSONS: 3, CONF_SOCIAL_TARIFF: True},
+        unique_id=f"{DOMAIN}_vivaqua",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_UTILITY: "swde"}
+    )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_UTILITY] == "swde"
+    assert CONF_PERSONS not in entry.options
+    assert CONF_SOCIAL_TARIFF not in entry.options
+    assert entry.options[CONF_CONSUMPTION_M3_PER_YEAR] == 120
+
+
+@pytest.mark.asyncio
+async def test_the_brussels_options_ask_for_the_household(hass: HomeAssistant) -> None:
+    """The intervention sociale is priced on the residents and BIM status."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 120, CONF_PERSONS: 3, CONF_SOCIAL_TARIFF: True},
+        unique_id=f"{DOMAIN}_vivaqua",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    defaults = {
+        str(k): k.default()
+        for k in result["data_schema"].schema
+        if str(k) in (CONF_PERSONS, CONF_SOCIAL_TARIFF)
+    }
+    assert defaults == {CONF_PERSONS: 3, CONF_SOCIAL_TARIFF: True}
 
 
 @pytest.mark.asyncio
@@ -2110,6 +2172,9 @@ async def test_reconfiguring_an_entry_that_never_loaded_schedules_no_reload(
         )
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_POSTCODE: "1000"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PERSONS: 1, CONF_SOCIAL_TARIFF: False}
         )
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_UTILITY] == "vivaqua"

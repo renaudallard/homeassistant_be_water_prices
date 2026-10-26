@@ -55,6 +55,7 @@ from custom_components.be_water_prices.const import (
     CONF_PERSONS,
     CONF_POSTCODE,
     CONF_POSTCODE_RESOLVED,
+    CONF_SOCIAL_TARIFF,
     CONF_UTILITY,
     CONF_WATER_METER_SENSOR,
     DOMAIN,
@@ -142,6 +143,23 @@ async def test_successful_fetch_does_not_raise_repair_issue(hass: HomeAssistant)
 
     issue_reg = ir.async_get(hass)
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
+
+
+@pytest.mark.asyncio
+async def test_a_brussels_bim_household_is_projected_net_of_the_intervention(
+    hass: HomeAssistant,
+) -> None:
+    """80 m3 for four people, 468,23 EUR billed, less 58,70 + 3 x 53,36."""
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return replace(
+            _fresh_tariff(),
+            social_intervention_first_person=58.70,
+            social_intervention_per_extra_person=53.36,
+        )
+
+    entry = await _setup_entry(hass, _fetch, options={CONF_PERSONS: 4, CONF_SOCIAL_TARIFF: True})
+    assert entry.runtime_data.data.projected_annual_cost_eur == 249.45
 
 
 @pytest.mark.asyncio

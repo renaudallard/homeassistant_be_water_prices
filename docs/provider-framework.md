@@ -13,7 +13,7 @@ which also declares the shape as `WaterExtractorProtocol`):
 | Field | What it is |
 | --- | --- |
 | `id`, `label` | The registry id (also the `utility` key stored in the entry) and the name the setup flow shows. |
-| `region` | `flanders`, `wallonia` or `brussels` (`const.REGIONS`). It decides which Flemish options the flow asks for and whether the comfort rate sensor is created. |
+| `region` | `flanders`, `wallonia` or `brussels` (`const.REGIONS`). It decides whether the flow asks for the residents and the social option (Flanders and Brussels) and whether the comfort rate sensor is created. |
 | `fetch(session)` | The utility's current card as a `WaterTariff`, for its default commune where it has communes. Raises `ExtractorError` on anything it cannot read; never defaults a missing figure to zero. |
 | `fetch_for_commune(session, commune)` | Optional. The card of one commune, by the opaque id a `CommuneOption` carries. |
 | `list_communes(session)` | Optional. The communes the user can pick, as a tuple of `CommuneOption(id, label)`, the label typically `"<postcode> - <commune>"`. |
@@ -68,6 +68,7 @@ divides by `1 + vat_rate` when parsing (VIVAQUA does).
 | `linear_eur_per_m3` | Brussels: VIVAQUA's supply rate. None elsewhere. |
 | `sanering_gemeentelijk_eur_per_m3`, `sanering_bovengemeentelijk_eur_per_m3` | Flanders: the municipal and supra-municipal saneringsbijdrage. VIVAQUA's sanitation rate is carried in the first. 0 where not used. |
 | `cvd_eur_per_m3`, `cva_eur_per_m3`, `fse_eur_per_m3` | Wallonia: the distributor's CVD and the flat CVA and FSE. 0 elsewhere. |
+| `social_intervention_first_person`, `social_intervention_per_extra_person` | Brussels: the Region's yearly intervention sociale for a household with BIM status, EUR/year for the first person and for each further one, no VAT. 0 elsewhere. |
 | `vat_rate` | The rate the card gives; `const.DEFAULT_VAT_RATE` (0.06) for a card that gives none. |
 
 How these become a bill is in [pricing-model.md](pricing-model.md).

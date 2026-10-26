@@ -59,15 +59,19 @@ def _compute_bill(
     is not yet wired in.
 
     **Brussels** (linear): ``consumption × (linear + sanering) +
-    fee_factor · redevance``, then VAT. ``persons`` unused.
+    fee_factor · redevance``, then VAT. ``social_tariff=True`` takes
+    ``fee_factor`` of the Region's intervention sociale off, the first
+    person's figure plus one per further person, and never takes the
+    bill below zero. With no ``persons`` there is no household to pay it
+    to. A card without the figures cannot price it and returns None.
 
     **Wallonia** (tier): the first 30 m³ pay ``0.5·CVD + 0·CVA + FSE``
     per m³ (CVA is exempt on the residential first block by CWaPE
     rule), 31 to 5000 m³ pay the full ``CVD + CVA + FSE``, and above
     5000 m³ the CVD falls to 90 %, plus ``fee_factor · redevance``.
-    ``persons`` unused. The block allowances are annual (reset on
-    Jan 1), so YTD consumption fills them up the same way an annual
-    projection does. CILE publishes four further tranches above
+    ``persons`` and ``social_tariff`` unused. The block allowances are
+    annual (reset on Jan 1), so YTD consumption fills them up the same
+    way an annual projection does. CILE publishes four further tranches above
     50 000 m³; nothing this integration meters comes near them.
 
     **Flanders** (block): basis volume = ``30 + 30·persons`` m³, which
@@ -95,6 +99,19 @@ def _compute_bill(
         )
         ex_vat = consumption_m3 * per_m3 + fee_factor * tariff.yearly_fixed_fee
         total = ex_vat * (1.0 + tariff.vat_rate)
+        if social_tariff and persons > 0:
+            if tariff.social_intervention_first_person <= 0:
+                # A card stored before the figures were read. Priced
+                # without them, the bill would publish high and the cost
+                # floor would hold it there until January.
+                return None
+            # Paid once a year, so the year to date takes it pro rata
+            # like the fixed charge. It carries no VAT.
+            intervention = (
+                tariff.social_intervention_first_person
+                + (persons - 1) * tariff.social_intervention_per_extra_person
+            )
+            total = max(0.0, total - fee_factor * intervention)
         return round(total, 2)
 
     if tariff.region == "wallonia":

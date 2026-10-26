@@ -36,11 +36,13 @@ Initial setup walks three steps:
                      picks a utility from the dropdown built from the
                      registry.
   3. ``options``  -- annual consumption (m³/yr) for everyone, plus
-                     Flanders-only ``gedomicilieerd_persons`` (0-20)
-                     and ``social_tariff`` (boolean) when the chosen
-                     utility is Flemish. Block-tariff math relies on
-                     persons; social tariff applies the VMM 80 %
-                     reduction post-calc.
+                     ``gedomicilieerd_persons`` (0-20) and
+                     ``social_tariff`` (boolean) when the chosen utility
+                     is Flemish or Brussels. Flemish block-tariff math
+                     relies on persons and the social tariff applies the
+                     VMM 80 % reduction post-calc; in Brussels the two
+                     price the Region's intervention sociale for a
+                     household with BIM status.
 
 A ``reconfigure`` flow (Settings → Devices & services → entry → ⋯ →
 Reconfigure) opens a menu offering two paths: re-prompt the postcode
@@ -60,7 +62,7 @@ rewrites the entry in place; commune-tied options are dropped on a
 utility change because operator A's commune IDs mean nothing to
 operator B, and on a postcode change unless a commune is picked,
 since the saved one belongs to the old address. Annual consumption /
-persons / social tariff / meter carry over.
+meter carry over, and so do persons / social option within a region.
 """
 
 from __future__ import annotations
@@ -114,6 +116,7 @@ from .const import (
     MAX_PERSONS,
     MIN_CONSUMPTION_M3,
     MIN_PERSONS,
+    REGION_BRUSSELS,
     REGION_FLANDERS,
 )
 from .providers import all_extractors, async_load, get
@@ -185,7 +188,7 @@ def _commune_for_postcode(utility_id: str, postcode: str | None) -> str | None:
 def _options_schema(
     current: dict[str, Any],
     *,
-    flanders: bool,
+    household: bool,
     communes: tuple[CommuneOption, ...] = (),
     suggested_commune: str | None = None,
 ) -> vol.Schema:
@@ -202,7 +205,7 @@ def _options_schema(
             )
         ),
     }
-    if flanders:
+    if household:
         fields[
             vol.Required(
                 CONF_PERSONS,
@@ -268,8 +271,9 @@ def _options_schema(
     return vol.Schema(fields)
 
 
-def _is_flanders(utility_id: str) -> bool:
-    return get(utility_id).region == REGION_FLANDERS
+def _prices_household(utility_id: str) -> bool:
+    """Whether the bill depends on the residents and the social option."""
+    return get(utility_id).region in (REGION_FLANDERS, REGION_BRUSSELS)
 
 
 async def _async_communes(hass: HomeAssistant, utility_id: str) -> tuple[CommuneOption, ...]:
@@ -439,7 +443,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             step_id="options",
             data_schema=_options_schema(
                 {},
-                flanders=_is_flanders(self._utility),
+                household=_prices_household(self._utility),
                 communes=communes,
                 suggested_commune=_commune_for_postcode(self._utility, self._postcode),
             ),
@@ -639,12 +643,15 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
     async def async_step_reconfigure_household(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask for the Flemish household settings on a move into Flanders.
+        """Ask for the household on a move into Flanders or Brussels.
 
-        The Flemish tariff prices on the number of registered residents
-        and the social tariff, which an entry moving in from Brussels or
-        Wallonia has never been asked for. Left unasked, the projection
-        priced on a household of one with nothing saying so.
+        Both price on the number of registered residents and on a social
+        option, the Flemish social tariff or the Brussels intervention
+        sociale for BIM status. An entry moving in from Wallonia has never
+        been asked for either, and one moving between the two regions was
+        asked about the other region's social option. Left unasked, the
+        projection priced on a household of one with nothing saying so.
+        The residents saved, if any, are offered back.
         """
         if user_input is not None:
             self._household = {
@@ -654,7 +661,7 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return await self._async_finish_reconfigure()
         schema = vol.Schema(
             {
-                vol.Required(CONF_PERSONS, default=DEFAULT_PERSONS): NumberSelector(
+                vol.Required(CONF_PERSONS, default=self._saved_persons()): NumberSelector(
                     NumberSelectorConfig(
                         min=MIN_PERSONS, max=MAX_PERSONS, step=1, mode=NumberSelectorMode.BOX
                     )
@@ -663,6 +670,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             }
         )
         return self.async_show_form(step_id="reconfigure_household", data_schema=schema)
+
+    def _saved_persons(self) -> int:
+        entry = self._entry_under_reconfigure()
+        if entry is None:
+            return DEFAULT_PERSONS
+        return int(entry.options.get(CONF_PERSONS, DEFAULT_PERSONS))
 
     def _moved_from(self, saved_postcode: str | None) -> bool:
         """Whether this reconfigure gives a postcode other than the saved one.
@@ -696,7 +709,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
         different operator. They are dropped as well when the postcode
         changed, since a commune saved for the old address no longer
         applies; an entry's first postcode is not a change. The other
-        options (consumption, persons, social tariff, meter) carry over.
+        options (consumption, meter, and within a region persons and the
+        social option) carry over.
         If the user picked a commune in the manual flow
         (``async_step_reconfigure_commune``), layer it on top.
         """
@@ -714,12 +728,9 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return self.async_abort(reason="already_configured")
         # After the check above: a household form is not asked of a
         # move that is about to be refused.
-        if (
-            _is_flanders(new_utility)
-            and not _is_flanders(old_utility)
-            and CONF_PERSONS not in entry.options
-            and self._household is None
-        ):
+        new_region = get(new_utility).region
+        region_changed = new_region != get(old_utility).region
+        if _prices_household(new_utility) and region_changed and self._household is None:
             return await self.async_step_reconfigure_household()
 
         new_options = dict(entry.options)
@@ -743,14 +754,15 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # rendered, opening and cancelling the dialog logged a drop
             # that never took place.
             _warn_stale_commune(new_utility)
-        if new_utility != old_utility and not _is_flanders(new_utility):
+        if region_changed and not _prices_household(new_utility):
             # ``social_tariff`` and ``gedomicilieerd_persons`` only enter
-            # the Flanders pricing branch. The OptionsFlow hides both for
-            # Brussels / Wallonia entries, so a stale value would linger
-            # unseen: the user would believe the discount is honoured
-            # while pricing.py drops it, and an old household size would
-            # come back as the default on a later move to a Flemish
-            # operator. Strip both, as the reconfigure text promises.
+            # the Flanders and Brussels pricing branches. The OptionsFlow
+            # hides both for Walloon entries, so a stale value would
+            # linger unseen: the user would believe the discount is
+            # honoured while pricing.py drops it, and an old household
+            # size would come back as the default on a later move.
+            # Strip both, as the reconfigure text promises. A move into
+            # Flanders or Brussels asked for both again above.
             new_options.pop(CONF_SOCIAL_TARIFF, None)
             new_options.pop(CONF_PERSONS, None)
         if self._household is not None:
@@ -845,7 +857,7 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
         return fresh
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        # Warm the extractor registry off-loop before _is_flanders() /
+        # Warm the extractor registry off-loop before _prices_household() /
         # get() run; importing the provider modules is blocking work HA
         # forbids on the loop.
         await async_load(self.hass)
@@ -906,7 +918,7 @@ class BeWaterPricesOptionsFlow(OptionsFlow):
             step_id="init",
             data_schema=_options_schema(
                 current,
-                flanders=_is_flanders(utility_id),
+                household=_prices_household(utility_id),
                 communes=communes,
                 suggested_commune=_commune_for_postcode(utility_id, current.get(CONF_POSTCODE)),
             ),
