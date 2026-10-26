@@ -109,7 +109,11 @@ local days. Three windows are asked for:
 
 `change` is what is summed; `sum` only shows whether the first bucket's
 change is the meter's whole running total, and `state` is the register a
-day's change is checked against. How the buckets are filtered is in
+day's change is checked against. `state` is only asked for a statistic
+Home Assistant compiles from a sensor: an external one, a `domain:object`
+id as `valid_statistic_id` defines it, carries whatever state the
+integration that writes it chose, so it is read from `change` and `sum`
+alone. How the buckets are filtered is in
 [coordinator.md](coordinator.md). `statistics.py` also reads the recorder
 for its own writes (the newest compiled statistics run, and whether a
 price sensor has rows before a date); see [entities.md](entities.md).

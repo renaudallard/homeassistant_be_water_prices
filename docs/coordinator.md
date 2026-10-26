@@ -205,7 +205,9 @@ draw, and leaves `snapshot_age_hours` alone.
 ### The recorder reads
 
 `_recorder_daily_rows` asks `statistics_during_period` for daily buckets
-of `change`, `sum` and `state` in m³, through the recorder's executor. It
+of `change`, `sum` and `state` in m³, through the recorder's executor,
+leaving `state` out for an external statistic, whose state is not a
+register. It
 returns `None` when there is no recorder, no running instance, or no
 statistic for the meter, and raises `RecorderUnavailable` when a running
 recorder failed to answer. `_admitted_changes` then decides which buckets

@@ -2673,6 +2673,7 @@ async def _recorder_daily_rows(
         )
         from homeassistant.components.recorder.statistics import (
             statistics_during_period,
+            valid_statistic_id,
         )
     except ImportError:
         # No recorder component at all: there are no statistics to read and
@@ -2696,6 +2697,17 @@ async def _recorder_daily_rows(
     if not await _refuse_an_unconvertible_unit(hass, instance, entity_id):
         return None
 
+    # ``state`` is the register at the end of the bucket, which is what a
+    # day's change is measured against: see :func:`_change_exceeds_the_register`.
+    # That holds for a statistic Home Assistant compiles from a sensor, and
+    # only for that one. An external statistic, written by an integration
+    # under a "domain:object" id, carries whatever state its writer chose,
+    # and Niko Home Control and suez_water put each hour's own volume there.
+    # Measured against that, nearly every day claimed more than its register
+    # and was refused, and a year of 22 m3 read 0.085. Its sum is written
+    # directly rather than by the compiler whose reset arithmetic the
+    # register guards undo, so it is read from sum and change alone.
+    types = {"change", "sum"} if valid_statistic_id(entity_id) else {"change", "sum", "state"}
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
     try:
@@ -2715,10 +2727,7 @@ async def _recorder_daily_rows(
             # whatever it cannot convert, unconverted and unremarked, which
             # is why the unit is checked above before the query runs.
             {VolumeConverter.UNIT_CLASS: UnitOfVolume.CUBIC_METERS},
-            # ``state`` is the register at the end of the bucket, which is
-            # what a day's change is measured against: see
-            # :func:`_change_exceeds_the_register`.
-            {"change", "sum", "state"},
+            types,
         )
     except Exception as err:
         _LOGGER.debug("recorder query for %s failed: %s", entity_id, err)
