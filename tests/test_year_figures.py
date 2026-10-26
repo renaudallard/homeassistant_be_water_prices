@@ -422,7 +422,7 @@ async def test_a_draw_during_the_read_is_not_overwritten(hass: HomeAssistant, fr
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
-    async def _draw_while_reading(*_args: Any) -> list[dict[str, Any]]:
+    async def _draw_while_reading(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
         hass.states.async_set("sensor.water_meter", "130")
         await asyncio.sleep(0)
         return _a_year_of_water()
@@ -488,7 +488,7 @@ async def test_a_tick_that_returns_after_midnight_projects_the_year_it_folded(
     freezer.move_to("2026-12-31 22:59:50+00:00")  # 23:59:50 in Brussels
     rows = AsyncMock(return_value=_buckets(_span(date(2025, 11, 1), date(2026, 12, 30))))
 
-    async def _past_midnight(*_args: Any) -> tuple[float, float]:
+    async def _past_midnight(*_args: Any, **_kwargs: Any) -> tuple[float, float]:
         freezer.tick(timedelta(seconds=20))
         return 90.0, 0.0
 
@@ -575,7 +575,7 @@ async def test_setup_does_not_wait_on_the_meters_year(hass: HomeAssistant, freez
     freezer.move_to(_NOW)
     release = asyncio.Event()
 
-    async def _full_year(*_args: Any) -> None:
+    async def _full_year(*_args: Any, **_kwargs: Any) -> None:
         await release.wait()
 
     full_year = AsyncMock(side_effect=_full_year)
@@ -628,7 +628,7 @@ async def test_a_restart_publishes_the_last_read_until_the_next_one_lands(
     release = asyncio.Event()
     wetter = _buckets(_span(_TODAY - timedelta(days=395), _TODAY, 0.5))
 
-    async def _rows(*_args: Any) -> list[dict[str, Any]]:
+    async def _rows(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
         await release.wait()
         return wetter
 
@@ -650,7 +650,7 @@ async def test_a_read_older_than_the_hold_is_not_restored(
     freezer.tick(timedelta(days=8))
     release = asyncio.Event()
 
-    async def _rows(*_args: Any) -> list[dict[str, Any]]:
+    async def _rows(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
         await release.wait()
         return []
 

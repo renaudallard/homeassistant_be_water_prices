@@ -113,7 +113,9 @@ day's change is checked against. `state` is only asked for a statistic
 Home Assistant compiles from a sensor: an external one, a `domain:object`
 id as `valid_statistic_id` defines it, carries whatever state the
 integration that writes it chose, so it is read from `change` and `sum`
-alone. How the buckets are filtered is in
+alone. So is a meter that goes back to zero on a schedule
+(`_resets_on_a_cycle`: a `next_reset` attribute, or the `total` state
+class with a `last_reset`), whose live state is not used either. How the buckets are filtered is in
 [coordinator.md](coordinator.md). `statistics.py` also reads the recorder
 for its own writes (the newest compiled statistics run, and whether a
 price sensor has rows before a date); see [entities.md](entities.md).

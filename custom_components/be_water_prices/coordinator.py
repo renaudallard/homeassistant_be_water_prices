@@ -38,6 +38,11 @@ from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from typing import Any
 
+from homeassistant.components.sensor import (
+    ATTR_LAST_RESET,
+    ATTR_STATE_CLASS,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import (
     ATTR_UNIT_OF_MEASUREMENT,
@@ -1036,6 +1041,9 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # captured on each daily tick so meter state-change events can
         # recompute YTD live without re-querying the recorder.
         self._meter_entity_id: str | None = None
+        # The meter last seen going back to zero on a schedule, see
+        # :meth:`_sees_a_register`.
+        self._resetting_meter: str | None = None
         # Unsub for the live meter subscription. Kept so a later tick that
         # resolves a different meter can re-point it; the entry unload calls
         # async_unsub_live_tracking to tear the current one down.
@@ -1539,7 +1547,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         if self._projection_checked == (meter, year, configured):
             return
         try:
-            metered = await _recorder_full_year_m3(self.hass, meter, year)
+            metered = await _recorder_full_year_m3(
+                self.hass,
+                meter,
+                year,
+                register=self._sees_a_register(meter, self.hass.states.get(meter)),
+            )
         except RecorderUnavailable as err:
             # Leave the pair unrecorded so the next tick asks again rather
             # than treating an unreadable database as a settled answer.
@@ -1606,7 +1619,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         start = today - timedelta(days=_METERED_DAYS)
         end = today - timedelta(days=1)
         try:
-            rows = await _recorder_daily_rows(self.hass, meter, start, end)
+            rows = await _recorder_daily_rows(
+                self.hass,
+                meter,
+                start,
+                end,
+                register=self._sees_a_register(meter, self.hass.states.get(meter)),
+            )
         except RecorderUnavailable as err:
             _LOGGER.debug("could not read the last year of %s: %s", meter, err)
             if held is not None and (held.meter != meter or today - held.read_on > _METERED_HOLD):
@@ -2054,7 +2073,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         else:
             await self._read_meter_history(meter)
         now_year = dt_util.now().year
-        live = _state_volume_m3(self.hass.states.get(meter))
+        live = self._live_reading(meter, self.hass.states.get(meter))
         recorder_m3: float | None = None
         recorder_taken_back = 0.0
         recorder_has_statistic = False
@@ -2089,7 +2108,13 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             today = dt_util.now().date()
             jan1 = date(now_year, 1, 1)
             try:
-                answer = await _recorder_ytd_m3(self.hass, meter, jan1, today)
+                answer = await _recorder_ytd_m3(
+                    self.hass,
+                    meter,
+                    jan1,
+                    today,
+                    register=self._sees_a_register(meter, self.hass.states.get(meter)),
+                )
                 self._recorder_ok = True
                 # A meter with no statistic still starts an empty year at
                 # zero, or one Home Assistant keeps no statistics for could
@@ -2104,7 +2129,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # the meter again: this is the tick that decides how the year is
             # framed, and framing it on a reading the meter has already moved
             # past is wrong for the rest of the year, not just for this tick.
-            live = _state_volume_m3(self.hass.states.get(meter))
+            live = self._live_reading(meter, self.hass.states.get(meter))
         else:
             # The cycle answered on its own, so nothing asked the recorder and
             # there is no pending doubt about it. Forget the last answer rather
@@ -2163,6 +2188,29 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         social = bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False))
         return compute_ytd_cost(tariff, ytd_m3, persons, fraction, social_tariff=social)
 
+    def _sees_a_register(self, meter: str, state: State | None) -> bool:
+        """Whether ``meter`` reads as a register that only ever climbs.
+
+        One that goes back to zero on a schedule, a daily utility meter for
+        one, cannot be framed as a register: each reset looked like a dip
+        and the year only moved on a day that used more than every day
+        before it. Its water is in the recorder's running sum, so such a
+        meter is read from there alone.
+
+        The verdict needs the attributes of a reading, which Home Assistant
+        drops while an entity is unavailable, so the last one is kept until
+        the meter reports again.
+        """
+        if _numeric_state(state) is not None:
+            self._resetting_meter = meter if _resets_on_a_cycle(state) else None
+        return self._resetting_meter != meter
+
+    def _live_reading(self, meter: str, state: State | None) -> float | None:
+        """The meter's reading in m³, or ``None`` when it is not a register."""
+        if not self._sees_a_register(meter, state):
+            return None
+        return _state_volume_m3(state)
+
     @callback
     def async_setup_live_tracking(self) -> None:
         """Subscribe to the resolved meter so YTD sensors update on each draw.
@@ -2216,7 +2264,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         meter = self._meter_entity_id
         if meter is None:
             return
-        live = _state_volume_m3(state)
+        live = self._live_reading(meter, state)
         if live is None:
             return
         ytd_m3, ytd_cost = self._fold_cycle(
@@ -2489,6 +2537,25 @@ def _numeric_state(state: State | None) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _resets_on_a_cycle(state: State | None) -> bool:
+    """Whether ``state`` is a meter that goes back to zero on a schedule.
+
+    A utility meter with a cycle says when its next reset is due, and a
+    ``total`` sensor names its last one. Either way its state is what was
+    used since then, not a register.
+    """
+    if state is None:
+        return False
+    # utility_meter's ATTR_NEXT_RESET, spelt out rather than imported so
+    # reading it does not load that integration.
+    if state.attributes.get("next_reset") is not None:
+        return True
+    return (
+        state.attributes.get(ATTR_STATE_CLASS) == SensorStateClass.TOTAL
+        and state.attributes.get(ATTR_LAST_RESET) is not None
+    )
+
+
 def _state_volume_m3(state: State | None) -> float | None:
     """Return ``state``'s reading converted to cubic metres, or ``None``.
 
@@ -2639,7 +2706,7 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
 
 
 async def _recorder_daily_rows(
-    hass: HomeAssistant, entity_id: str, start: date, end: date
+    hass: HomeAssistant, entity_id: str, start: date, end: date, *, register: bool = True
 ) -> list[Any] | None:
     """Return the daily statistics buckets for ``entity_id`` over ``[start, end]``.
 
@@ -2662,6 +2729,9 @@ async def _recorder_daily_rows(
     many years of meter history exist. ``sum`` comes along anyway
     because the first bucket's ``change`` is only meaningful next to
     it: see :func:`_recorder_ytd_m3`.
+
+    ``register`` is ``False`` for a meter whose state is not a register,
+    one that goes back to zero on a schedule.
     """
     try:
         # mypy --strict flags both names because the recorder module
@@ -2706,8 +2776,13 @@ async def _recorder_daily_rows(
     # Measured against that, nearly every day claimed more than its register
     # and was refused, and a year of 22 m3 read 0.085. Its sum is written
     # directly rather than by the compiler whose reset arithmetic the
-    # register guards undo, so it is read from sum and change alone.
-    types = {"change", "sum"} if valid_statistic_id(entity_id) else {"change", "sum", "state"}
+    # register guards undo, so it is read from sum and change alone. So is a
+    # meter that resets on a schedule: each day's state is that day's water,
+    # and the compiler's sum already runs through every reset.
+    if register and not valid_statistic_id(entity_id):
+        types = {"change", "sum", "state"}
+    else:
+        types = {"change", "sum"}
     start_dt = dt_util.start_of_local_day(start).astimezone(UTC)
     end_dt = dt_util.start_of_local_day(end).astimezone(UTC) + timedelta(days=1)
     try:
@@ -2738,7 +2813,7 @@ async def _recorder_daily_rows(
 
 
 async def _recorder_ytd_m3(
-    hass: HomeAssistant, entity_id: str, start: date, end: date
+    hass: HomeAssistant, entity_id: str, start: date, end: date, *, register: bool = True
 ) -> tuple[float, float] | None:
     """Sum daily ``change`` deltas for ``entity_id`` over ``[start, end]``.
 
@@ -2761,7 +2836,7 @@ async def _recorder_ytd_m3(
     statistic may anchor an empty year too, but a zero from it is no
     evidence against a year that already has a figure.
     """
-    rows = await _recorder_daily_rows(hass, entity_id, start, end)
+    rows = await _recorder_daily_rows(hass, entity_id, start, end, register=register)
     if rows is None:
         return None
     admitted, refused, taken_back = _admitted_changes(
@@ -3058,7 +3133,9 @@ def _change_is_the_whole_register(row: Any) -> bool:
     return bool(total) and abs(float(change) - float(total)) < 1e-9
 
 
-async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int) -> float | None:
+async def _recorder_full_year_m3(
+    hass: HomeAssistant, entity_id: str, year: int, *, register: bool = True
+) -> float | None:
     """Return ``year``'s metered consumption, or ``None`` if it is not a whole year.
 
     Only a year the meter has statistics on both sides of can be read as a
@@ -3088,7 +3165,9 @@ async def _recorder_full_year_m3(hass: HomeAssistant, entity_id: str, year: int)
     cycle and its running sum climbs straight through, which already gives
     this the figure it wants.
     """
-    rows = await _recorder_daily_rows(hass, entity_id, date(year - 1, 12, 1), date(year, 12, 31))
+    rows = await _recorder_daily_rows(
+        hass, entity_id, date(year - 1, 12, 1), date(year, 12, 31), register=register
+    )
     if rows is None:
         return None
     # Daily buckets start at local midnight, so each of these lands exactly

@@ -463,7 +463,7 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
-    async def _draw_while_querying(*_args: Any) -> float | None:
+    async def _draw_while_querying(*_args: Any, **_kwargs: Any) -> float | None:
         hass.states.async_set("sensor.water_meter", "130")
         await asyncio.sleep(0)
         return None

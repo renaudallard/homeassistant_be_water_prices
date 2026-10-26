@@ -173,7 +173,7 @@ async def test_a_late_refresh_does_not_raise_the_projection_card_after_unload(
     release = asyncio.Event()
     calls = 0
 
-    async def _full_year(_hass: Any, _meter: str, _year: int) -> float | None:
+    async def _full_year(_hass: Any, _meter: str, _year: int, **_kwargs: Any) -> float | None:
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -422,7 +422,7 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
 
     entry = _metered_entry(hass)
 
-    async def _recorder(*_args: Any) -> tuple[float, float]:
+    async def _recorder(*_args: Any, **_kwargs: Any) -> tuple[float, float]:
         # The recorder keeps up with the meter, which sits 80 m3 above
         # its 1 January reading: setup frames the year on this answer and
         # asks it again on the late refresh below.

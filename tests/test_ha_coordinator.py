@@ -560,6 +560,86 @@ async def test_meter_state_change_updates_ytd_live(hass: HomeAssistant) -> None:
         assert coordinator.data.ytd_consumption_m3 == 25.0
 
 
+@pytest.mark.asyncio
+async def test_a_meter_that_resets_daily_is_read_from_the_recorder(hass: HomeAssistant) -> None:
+    """A daily utility meter's reading is not framed as a register.
+
+    Each midnight reset looked like a dip, so the year only moved on a day
+    that used more than any before it. Its water comes from the recorder's
+    sum instead, and a reading the meter reports in between moves nothing.
+    """
+    daily = {"next_reset": "2026-06-02T00:00:00+02:00", "state_class": "total_increasing"}
+    hass.states.async_set("sensor.water_meter", "0.3", daily)
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _fresh_tariff()
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_WATER_METER_SENSOR: "sensor.water_meter",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    recorder = AsyncMock(return_value=(0.2, 0.0))
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch("custom_components.be_water_prices.coordinator._recorder_ytd_m3", new=recorder),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        coordinator = entry.runtime_data
+        assert recorder.await_args.kwargs["register"] is False
+        assert coordinator.data.ytd_consumption_m3 == 0.2
+        assert coordinator._ytd.offset_m3 is None
+
+        # Early in January a day's reading stands above the year. Framed as
+        # a register, the first reading builds a frame on the recorder's
+        # figure and the second climbs the year by 0.3 m3.
+        for reading in ("0.5", "0.8"):
+            hass.states.async_set("sensor.water_meter", reading, daily)
+            await hass.async_block_till_done()
+        assert coordinator.data.ytd_consumption_m3 == 0.2
+        assert coordinator._ytd.offset_m3 is None
+
+        # An unavailable meter loses the attribute that says it resets, and
+        # the verdict must outlast it or the next tick reads it as a register.
+        hass.states.async_set("sensor.water_meter", "unavailable", {})
+        recorder.return_value = (0.6, 0.0)
+        await coordinator.async_refresh()
+        assert recorder.await_args.kwargs["register"] is False
+        assert coordinator.data.ytd_consumption_m3 == 0.6
+
+
+@pytest.mark.parametrize(
+    ("attributes", "resets"),
+    [
+        ({"next_reset": "2026-06-02T00:00:00+02:00"}, True),
+        ({"state_class": "total", "last_reset": "2026-06-01T00:00:00+02:00"}, True),
+        # A utility meter with no cycle names when it started, but never resets.
+        ({"state_class": "total_increasing", "last_reset": "2026-06-01T00:00:00+02:00"}, False),
+        ({"state_class": "total"}, False),
+        ({"state_class": "total_increasing"}, False),
+    ],
+)
+def test_a_meter_that_resets_on_a_cycle_is_recognised(
+    attributes: dict[str, str], resets: bool
+) -> None:
+    """Only a meter that says it goes back to zero is taken off the register path."""
+    from homeassistant.core import State
+
+    from custom_components.be_water_prices.coordinator import _resets_on_a_cycle
+
+    assert _resets_on_a_cycle(State("sensor.water_meter", "0.3", attributes)) is resets
+    assert _resets_on_a_cycle(None) is False
+
+
 async def test_meter_events_do_not_starve_the_daily_refresh(hass: HomeAssistant) -> None:
     """A water draw must not push the daily tariff refresh out of reach.
 
@@ -1972,7 +2052,7 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
         return discovered, 1 if discovered else 0
 
     async def _recorder(
-        _hass: HomeAssistant, meter: str, _s: date, _e: date
+        _hass: HomeAssistant, meter: str, _s: date, _e: date, **_kwargs: Any
     ) -> tuple[float, float]:
         if meter == "sensor.meter_b":
             # The new meter reports while its recorder query is in flight,
@@ -2047,7 +2127,7 @@ async def test_a_reading_that_lands_during_the_recorder_query_is_used(
         return _fresh_tariff()
 
     async def _recorder(
-        _hass: HomeAssistant, _meter: str, _s: date, _e: date
+        _hass: HomeAssistant, _meter: str, _s: date, _e: date, **_kwargs: Any
     ) -> tuple[float, float]:
         # The meter comes back while the query is in flight, and the loop
         # gets a turn to deliver that event before the tick resumes.
