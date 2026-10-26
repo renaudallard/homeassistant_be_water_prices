@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-20",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/406a912e8900eb547d3a3ffdea48a91cc1ddd0f7d463c333c50a38523e30ebfd.txt",
+   "text": "texts/58dcf25350b943d0c9e1dd86fb320efadb004a92e5e71b3193dbbd44c7d24da3.txt",
    "url": "https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026",
    "variant": "text"
   },
@@ -24,6 +24,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 0.0,
  "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026",
  "utility": "aquaduin",
  "valid_from": "2026-01-01",

@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/06a94a07241a1417017263921f9910136c7df255e2ffbf8756f564a885e1a68d.txt",
+   "text": "texts/847e461ecc69e7aeb770e2053134bb67ac0091ec2296651e3aef2f25e5728427.txt",
    "url": "https://www.farys.be/nl/watertarieven?ajax_form=1#municipality=25071",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
  "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.farys.be/nl/watertarieven",
  "utility": "farys",
  "valid_from": "2026-01-01",

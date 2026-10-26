@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/a53311dfb067c4d553947cde9074657722c4654a3f8861961dfc28da3f363b1f.txt",
+   "text": "texts/ef86c550c4fa852a5ee55dfe72dff71fc69dd4bff48a2afbc96453fc0c5fbc07.txt",
    "url": "https://www.iden-eau.be/iden_web/fr/Tarification.awp",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "wallonia",
  "sanering_bovengemeentelijk_eur_per_m3": 0.0,
  "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.iden-eau.be/iden_web/fr/Tarification.awp",
  "utility": "iden",
  "valid_from": "2026-01-01",

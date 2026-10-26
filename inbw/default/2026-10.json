@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/f8392b0a6db609b1fd8dd630b55809e7cdd942fc45b5b3b78f821a57639058f3.txt",
+   "text": "texts/11e59c13bc15740981a9211c2425f616387548bf3e0d316cadd320db38a04202.txt",
    "url": "https://eau.inbw.be/prix-de-leau",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "wallonia",
  "sanering_bovengemeentelijk_eur_per_m3": 0.0,
  "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://eau.inbw.be/prix-de-leau",
  "utility": "inbw",
  "valid_from": "2026-01-01",

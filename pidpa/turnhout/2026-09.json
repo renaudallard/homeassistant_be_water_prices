@@ -19,6 +19,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
  "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/turnhout",
  "utility": "pidpa",
  "valid_from": "2026-01-01",

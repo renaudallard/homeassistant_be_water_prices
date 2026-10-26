@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/8eb8bec2f4837f7fb7fba56260a549451a4a6c01b0a026178006c5b5ddd8d4b4.txt",
+   "text": "texts/19db4f8fb9454a039e5e3fb15161ac270a8d992e2f77c9355f9abb6d60be2a6f.txt",
    "url": "https://www.pidpa.be/ons-aanbod/je-gemeente/geel",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
  "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.pidpa.be/ons-aanbod/je-gemeente/geel",
  "utility": "pidpa",
  "valid_from": "2026-01-01",

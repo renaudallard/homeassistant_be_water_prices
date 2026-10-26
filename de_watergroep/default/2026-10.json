@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/2aace278030f8f56fa78d48c25da2f5b99b9d4baf72abce1b2c005f8fe4510e4.txt",
+   "text": "texts/ee690fd2449e6d43b411792204f54d4eb967bcb9270e46283ea4b3a5faf1f8bd.txt",
    "url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026#dwg_l={B16A143A-49E6-4CE5-A241-1AA09BFC406A}",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
  "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
  "utility": "de_watergroep",
  "valid_from": "2026-01-01",

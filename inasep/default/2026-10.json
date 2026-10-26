@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/e0af9866c10991722d7796167967dfb393e6f83723b02aaf2b1d78573fd7b199.txt",
+   "text": "texts/a9ca4c8317c9bbac0085825cdc134a342d2eee06b4013959507b09349b6393a1.txt",
    "url": "https://www.inasep.be/prix-de-leau-et-evolution",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "wallonia",
  "sanering_bovengemeentelijk_eur_per_m3": 0.0,
  "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.inasep.be/prix-de-leau-et-evolution",
  "utility": "inasep",
  "valid_from": "2026-04-27",

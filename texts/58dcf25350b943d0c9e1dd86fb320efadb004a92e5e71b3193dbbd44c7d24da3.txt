@@ -35,9 +35,9 @@
         <script type="module">!function(){const e=document.createElement("link").relList;if(!(e&&e.supports&&e.supports("modulepreload"))){for(const e of document.querySelectorAll('link[rel="modulepreload"]'))r(e);new MutationObserver((e=>{for(const o of e)if("childList"===o.type)for(const e of o.addedNodes)if("LINK"===e.tagName&&"modulepreload"===e.rel)r(e);else if(e.querySelectorAll)for(const o of e.querySelectorAll("link[rel=modulepreload]"))r(o)})).observe(document,{childList:!0,subtree:!0})}function r(e){if(e.ep)return;e.ep=!0;const r=function(e){const r={};return e.integrity&&(r.integrity=e.integrity),e.referrerpolicy&&(r.referrerPolicy=e.referrerpolicy),"use-credentials"===e.crossorigin?r.credentials="include":"anonymous"===e.crossorigin?r.credentials="omit":r.credentials="same-origin",r}(e);fetch(e.href,r)}}();</script>
 <script type="module" src="/dist/head.U5IhYnfi.js" crossorigin onload="e=new CustomEvent(&#039;vite-script-loaded&#039;, {detail:{path: &#039;resources/js/head.js&#039;}});document.dispatchEvent(e);"></script>
 <link href="/dist/_commonjsHelpers.Cpj98o6Y.js" rel="modulepreload" crossorigin>
-        <script type="module" src="/dist/app.B646tn7M.js" crossorigin onload="e=new CustomEvent(&#039;vite-script-loaded&#039;, {detail:{path: &#039;resources/js/app.js&#039;}});document.dispatchEvent(e);"></script>
+        <script type="module" src="/dist/app.BZPIhaMz.js" crossorigin onload="e=new CustomEvent(&#039;vite-script-loaded&#039;, {detail:{path: &#039;resources/js/app.js&#039;}});document.dispatchEvent(e);"></script>
 <link href="/dist/_commonjsHelpers.Cpj98o6Y.js" rel="modulepreload" crossorigin>
-<link href="/dist/app.D8FGGVKQ.css" rel="stylesheet">
+<link href="/dist/app.DpA942kv.css" rel="stylesheet">
             <title>Tarieven 2026 | Aquaduin</title>
 <script>dataLayer = [];
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -55,7 +55,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta content="https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026" property="og:url">
 <meta content="Tarieven 2026" property="og:title">
 <meta content="Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening." property="og:description">
-<meta content="https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1792403257" property="og:image">
+<meta content="https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1792738349" property="og:image">
 <meta content="1200" property="og:image:width">
 <meta content="630" property="og:image:height">
 <meta content="Tarieven 2026" property="og:image:alt">
@@ -66,13 +66,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta name="twitter:creator" content="@">
 <meta name="twitter:title" content="Tarieven 2026">
 <meta name="twitter:description" content="Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening.">
-<meta name="twitter:image" content="https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1792403257">
+<meta name="twitter:image" content="https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1792738349">
 <meta name="twitter:image:width" content="1200">
 <meta name="twitter:image:height" content="630">
 <meta name="twitter:image:alt" content="Tarieven 2026">
 <link href="https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026" rel="canonical">
 <link href="https://www.aquaduin.be/nl" rel="home">
-<link href="https://www.aquaduin.be/cpresources/1252870/css/user_tools.css?v=1792403319" rel="stylesheet"></head>
+<link href="https://www.aquaduin.be/cpresources/4f5c251d/css/user_tools.css?v=1792738400" rel="stylesheet"></head>
     <body><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NQ5QC37R"
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
@@ -123,7 +123,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                                         
     <svg  width="241" height="42" class="w-[150px] min-[360px]:w-[185px] h-auto xl:w-[241px]" role="img" aria-label="logo">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#logo"/>
     </svg>
 
             </a>
@@ -140,7 +140,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                 
                                                     
     <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow-down"/>
     </svg>
 
                                     </a>
@@ -152,7 +152,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                             class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors "
                                         >
                                                                                             <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
-                                                    <svg id="dnvlhumyjq-a" class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.dnvlhumyjq-c{fill:#114997}</style></defs><path d="M18.01 23.6c.53-1.81 3.2-6.34 9.6-8.64V8.88h.96v-4.8h7.36v4.8h.96v6.08c1.49.21 5.38 1.98 8.96 7.36 1.6 2.4 2.82 8.51 1.28 15.68-.85 3.09-4.1 9.28-10.24 10.56v6.08h-.96v5.44h-7.36v-5.44h-.96v-6.08c-2.67-1.07-8.38-4.16-9.92-9.28-.75-2.45-2.56-9.28.32-15.68Z" style="fill:#fff"/><path d="M28.52 60.84c-.39 0-.71-.32-.71-.71v-2.02h-.2c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h.2v-1.32h-.2c-.39 0-.71-.32-.71-.71v-5.65l-.13-.05C20.33 46.67 16 40.54 16 33.73v-3.64c0-6.81 4.33-12.94 10.77-15.23l.13-.05V9.16c0-.38.31-.7.7-.71h.2V7.14h-.2c-.39 0-.7-.32-.7-.71s.32-.71.71-.71h.2V3.7c0-.04.01-.08.03-.12l.03-.13c.01-.05.04-.08.06-.12l.08-.11.08-.07.12-.08c.13-.07.22-.08.32-.08h7.28c.39 0 .71.32.71.71v2.02h.2c.39 0 .71.32.71.71s-.32.71-.71.71h-.2v1.31h.2c.39 0 .71.32.71.71v5.64l.13.05c6.46 2.29 10.8 8.41 10.8 15.24v3.64c0 6.83-4.34 12.95-10.8 15.24l-.13.05v5.64c0 .39-.31.7-.7.71h-.2v1.32h.2c.39 0 .7.33.7.71s-.32.71-.71.71h-.2v2.02c0 .03 0 .07-.02.11l-.03.14-.07.12c-.14.22-.35.35-.59.35h-7.28Zm.71-1.42h5.86v-1.31h-5.86v1.31Zm0-2.73h5.87v-1.32h-5.87v1.32Zm-.91-2.74H36v-4.5l-.24.05c-1.21.27-2.41.41-3.58.41s-2.4-.14-3.61-.42l-.25-.06v4.51Zm-9.65-14.28c2.37 5.36 7.67 8.83 13.51 8.83s11.14-3.46 13.51-8.83l-.35-.2c-3.04 4.26-7.96 6.8-13.16 6.8s-10.12-2.54-13.16-6.8l-.35.2Zm13.51-24.33c-8.14 0-14.76 6.62-14.76 14.76s6.62 14.76 14.76 14.76 14.76-6.62 14.76-14.76-6.62-14.76-14.76-14.76Zm-3.86-.94.25-.06c1.22-.28 2.43-.42 3.61-.42s2.38.14 3.58.41l.24.06V9.88h-7.68v4.51Zm.9-5.94h5.87V7.15h-5.87v1.31Zm.01-2.73h5.87V4.42h-5.86v1.31Z" class="dnvlhumyjq-c"/><path d="M22.61 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM28.07 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM33.53 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM38.99 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30H39.7v2.22ZM29.43 25.45c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h5.46c.39 0 .71.32.71.71s-.32.71-.71.71h-5.46ZM26.69 22.72c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h10.95c.39 0 .71.32.71.71s-.32.71-.71.71H26.69Z" class="dnvlhumyjq-c"/></svg>
+                                                    <svg id="xqwlocvavx-a" class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.xqwlocvavx-c{fill:#114997}</style></defs><path d="M18.01 23.6c.53-1.81 3.2-6.34 9.6-8.64V8.88h.96v-4.8h7.36v4.8h.96v6.08c1.49.21 5.38 1.98 8.96 7.36 1.6 2.4 2.82 8.51 1.28 15.68-.85 3.09-4.1 9.28-10.24 10.56v6.08h-.96v5.44h-7.36v-5.44h-.96v-6.08c-2.67-1.07-8.38-4.16-9.92-9.28-.75-2.45-2.56-9.28.32-15.68Z" style="fill:#fff"/><path d="M28.52 60.84c-.39 0-.71-.32-.71-.71v-2.02h-.2c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h.2v-1.32h-.2c-.39 0-.71-.32-.71-.71v-5.65l-.13-.05C20.33 46.67 16 40.54 16 33.73v-3.64c0-6.81 4.33-12.94 10.77-15.23l.13-.05V9.16c0-.38.31-.7.7-.71h.2V7.14h-.2c-.39 0-.7-.32-.7-.71s.32-.71.71-.71h.2V3.7c0-.04.01-.08.03-.12l.03-.13c.01-.05.04-.08.06-.12l.08-.11.08-.07.12-.08c.13-.07.22-.08.32-.08h7.28c.39 0 .71.32.71.71v2.02h.2c.39 0 .71.32.71.71s-.32.71-.71.71h-.2v1.31h.2c.39 0 .71.32.71.71v5.64l.13.05c6.46 2.29 10.8 8.41 10.8 15.24v3.64c0 6.83-4.34 12.95-10.8 15.24l-.13.05v5.64c0 .39-.31.7-.7.71h-.2v1.32h.2c.39 0 .7.33.7.71s-.32.71-.71.71h-.2v2.02c0 .03 0 .07-.02.11l-.03.14-.07.12c-.14.22-.35.35-.59.35h-7.28Zm.71-1.42h5.86v-1.31h-5.86v1.31Zm0-2.73h5.87v-1.32h-5.87v1.32Zm-.91-2.74H36v-4.5l-.24.05c-1.21.27-2.41.41-3.58.41s-2.4-.14-3.61-.42l-.25-.06v4.51Zm-9.65-14.28c2.37 5.36 7.67 8.83 13.51 8.83s11.14-3.46 13.51-8.83l-.35-.2c-3.04 4.26-7.96 6.8-13.16 6.8s-10.12-2.54-13.16-6.8l-.35.2Zm13.51-24.33c-8.14 0-14.76 6.62-14.76 14.76s6.62 14.76 14.76 14.76 14.76-6.62 14.76-14.76-6.62-14.76-14.76-14.76Zm-3.86-.94.25-.06c1.22-.28 2.43-.42 3.61-.42s2.38.14 3.58.41l.24.06V9.88h-7.68v4.51Zm.9-5.94h5.87V7.15h-5.87v1.31Zm.01-2.73h5.87V4.42h-5.86v1.31Z" class="xqwlocvavx-c"/><path d="M22.61 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM28.07 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM33.53 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM38.99 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30H39.7v2.22ZM29.43 25.45c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h5.46c.39 0 .71.32.71.71s-.32.71-.71.71h-5.46ZM26.69 22.72c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h10.95c.39 0 .71.32.71.71s-.32.71-.71.71H26.69Z" class="xqwlocvavx-c"/></svg>
                                                     <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
                                                 </div>
                                                                                         Meterstand doorgeven
@@ -227,7 +227,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                 
                                                     
     <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow-down"/>
     </svg>
 
                                     </a>
@@ -308,7 +308,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                 
                                                     
     <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow-down"/>
     </svg>
 
                                     </a>
@@ -320,14 +320,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                             class="group/tasks flex items-center gap-3 pl-2 py-2 pr-6 bg-blue-300 text-blue-500 hover:bg-theme-accent hover:text-white t-small leading-tight font-extrabold rounded-full usp-hover transition-colors "
                                         >
                                                                                             <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full p-2 transition-colors">
-                                                    <svg id="lsowtrrtym-a" class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.lsowtrrtym-d{fill:#114997}</style></defs><path d="M17.22 57.71V18.54c0-1.9 1.24-4.96 3.47-6.2L40.28 1.18c.33-.25 1.29-.6 2.48 0l2.48 1.49c.99.5 2.23.99 2.23 3.22v38.18c.25 1.74-.25 5.45-3.47 7.69L24.41 62.92c-.5.25-1.83.5-3.22-.5l-2.98-1.74c-.5-.25-.99-.79-.99-2.98Z" style="fill:#fff"/><path d="M37.34 39.36c-.15 0-.29-.02-.43-.07-1-.35-3.02-1.32-5.28-3.85-2.26-2.54-3.13-4.8-3.44-5.91a1.76 1.76 0 0 1 .37-1.64l1.87-2.09c.21-.23.5-.34.78-.3.29.04.55.22.7.5l1.49 2.71c.23.42.17.96-.14 1.31l-.79.89c.34.78.79 1.49 1.32 2.12.56.6 1.19 1.1 1.89 1.48l.79-.89c.31-.35.8-.41 1.17-.15l2.42 1.67c.25.17.41.46.44.78.03.32-.07.65-.27.88l-1.87 2.09c-.27.31-.65.48-1.04.48ZM31.1 26.41s-.06.01-.08.04l-1.87 2.09c-.17.18-.23.45-.16.7.86 3.48 5.08 8.2 8.17 9.16.22.08.46 0 .62-.18l1.87-2.09s.04-.07.04-.11c0-.04-.03-.08-.06-.1l-2.42-1.67s-.11-.02-.14.02l-1 1.12c-.12.13-.3.17-.45.1-.9-.44-1.72-1.05-2.42-1.82a9.2 9.2 0 0 1-1.62-2.7.524.524 0 0 1 .09-.51l1-1.12s.04-.11.02-.16l-1.49-2.71s-.06-.06-.1-.06Z" class="lsowtrrtym-d"/><path d="M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29Z" class="lsowtrrtym-d"/><path d="M46.64 3.11s-.07-.09-.12-.12L42.73.81c-.84-.49-1.95-.39-3.12.27L20.88 11.82c-.97.56-1.88 1.47-2.64 2.63-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11.7-1.08 1.53-1.91 2.41-2.41L43.73 3.84c.94-.54 1.81-.64 2.45-.27.16.09.37.03.46-.13.06-.11.06-.23 0-.33ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Z" class="lsowtrrtym-d"/><path d="M22.6 16.64a.345.345 0 0 0-.12-.12l-3.79-2.17a.338.338 0 0 0-.45.11c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16.05-.08.07-.17.04-.26 0-.03-.02-.06-.04-.09Zm-3.97-1.55 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" class="lsowtrrtym-d"/><path d="M18.24 14.46c.76-1.17 1.67-2.08 2.64-2.63L39.61 1.08c1.17-.66 2.27-.76 3.12-.27l3.79 2.18c.05.03.09.07.12.12.06.1.06.23 0 .33-.09.16-.3.22-.46.13-.65-.37-1.52-.27-2.45.27L24.99 14.58c-.87.5-1.71 1.33-2.41 2.41m-4.34-2.53c-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11m-4.35-2.53c.1-.15.29-.2.45-.11l3.79 2.17c.05.03.09.07.12.12.02.03.03.06.04.09.02.09 0 .18-.04.26m-4.36-2.53c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Zm-.37.56 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" style="fill:none;stroke:#114997;stroke-width:.5px"/></svg>
+                                                    <svg id="stdwhzynpa-a" class="text-blue-500 group-hover/tasks:animate-bounce z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.stdwhzynpa-d{fill:#114997}</style></defs><path d="M17.22 57.71V18.54c0-1.9 1.24-4.96 3.47-6.2L40.28 1.18c.33-.25 1.29-.6 2.48 0l2.48 1.49c.99.5 2.23.99 2.23 3.22v38.18c.25 1.74-.25 5.45-3.47 7.69L24.41 62.92c-.5.25-1.83.5-3.22-.5l-2.98-1.74c-.5-.25-.99-.79-.99-2.98Z" style="fill:#fff"/><path d="M37.34 39.36c-.15 0-.29-.02-.43-.07-1-.35-3.02-1.32-5.28-3.85-2.26-2.54-3.13-4.8-3.44-5.91a1.76 1.76 0 0 1 .37-1.64l1.87-2.09c.21-.23.5-.34.78-.3.29.04.55.22.7.5l1.49 2.71c.23.42.17.96-.14 1.31l-.79.89c.34.78.79 1.49 1.32 2.12.56.6 1.19 1.1 1.89 1.48l.79-.89c.31-.35.8-.41 1.17-.15l2.42 1.67c.25.17.41.46.44.78.03.32-.07.65-.27.88l-1.87 2.09c-.27.31-.65.48-1.04.48ZM31.1 26.41s-.06.01-.08.04l-1.87 2.09c-.17.18-.23.45-.16.7.86 3.48 5.08 8.2 8.17 9.16.22.08.46 0 .62-.18l1.87-2.09s.04-.07.04-.11c0-.04-.03-.08-.06-.1l-2.42-1.67s-.11-.02-.14.02l-1 1.12c-.12.13-.3.17-.45.1-.9-.44-1.72-1.05-2.42-1.82a9.2 9.2 0 0 1-1.62-2.7.524.524 0 0 1 .09-.51l1-1.12s.04-.11.02-.16l-1.49-2.71s-.06-.06-.1-.06Z" class="stdwhzynpa-d"/><path d="M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29Z" class="stdwhzynpa-d"/><path d="M46.64 3.11s-.07-.09-.12-.12L42.73.81c-.84-.49-1.95-.39-3.12.27L20.88 11.82c-.97.56-1.88 1.47-2.64 2.63-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11.7-1.08 1.53-1.91 2.41-2.41L43.73 3.84c.94-.54 1.81-.64 2.45-.27.16.09.37.03.46-.13.06-.11.06-.23 0-.33ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Z" class="stdwhzynpa-d"/><path d="M22.6 16.64a.345.345 0 0 0-.12-.12l-3.79-2.17a.338.338 0 0 0-.45.11c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16.05-.08.07-.17.04-.26 0-.03-.02-.06-.04-.09Zm-3.97-1.55 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" class="stdwhzynpa-d"/><path d="M18.24 14.46c.76-1.17 1.67-2.08 2.64-2.63L39.61 1.08c1.17-.66 2.27-.76 3.12-.27l3.79 2.18c.05.03.09.07.12.12.06.1.06.23 0 .33-.09.16-.3.22-.46.13-.65-.37-1.52-.27-2.45.27L24.99 14.58c-.87.5-1.71 1.33-2.41 2.41m-4.34-2.53c-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11m-4.35-2.53c.1-.15.29-.2.45-.11l3.79 2.17c.05.03.09.07.12.12.02.03.03.06.04.09.02.09 0 .18-.04.26m-4.36-2.53c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Zm-.37.56 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" style="fill:none;stroke:#114997;stroke-width:.5px"/></svg>
                                                     <div class="rounded-full size-[54px] scale-0 bg-white absolute transition-transform duration-300 group-hover/tasks:scale-100 z-0"></div>
                                                 </div>
                                                                                         Interesse in een job?
                                         </a>
                                                                     </div>
                                                         <div class="grid grid-cols-2 gap-6 md:gap-10 ">
-                                                                                                    
+                                                                                                                                        
                                                                     <ul>
                                                                                     <li>
                                                 <a
@@ -359,14 +359,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                                                                                                                                                                                 class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
                                                 >Publicaties</a>
                                             </li>
-                                                                            </ul>
-                                                                    <ul>
                                                                                     <li>
                                                 <a
                                                                                                             href="https://www.aquaduin.be/nl/over-ons/geschiedenis"
                                                                                                                                                                                                                 class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
                                                 >Geschiedenis</a>
                                             </li>
+                                                                            </ul>
+                                                                    <ul>
                                                                                     <li>
                                                 <a
                                                                                                             href="https://www.aquaduin.be/nl/over-ons/kantoren"
@@ -392,6 +392,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                                                                                                                             class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
                                                 >Bezoek Aquaduin</a>
                                             </li>
+                                                                                    <li>
+                                                <a
+                                                                                                            href="https://www.aquaduin.be/nl/over-ons/bedrijfsfilm"
+                                                                                                                                                                                                                class="block py-3 font-bold border-b transition-colors border-blue-300 hover:border-blue-500  "
+                                                >Bedrijfsfilm</a>
+                                            </li>
                                                                             </ul>
                                                             </div>
                                                             <a href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne"
@@ -406,7 +412,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                             
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="flex-shrink-0" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
 
                                     </div>
@@ -423,7 +429,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                 
                                                     
     <svg  width="11" height="8" aria-hidden="true" class="flex-shrink-0 group-hover:rotate-180 group-focus-within:rotate-180" role="img" aria-label="arrow-down">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow-down"/>
     </svg>
 
                                     </a>
@@ -496,7 +502,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                 
                             
     <svg  width="16" height="16" role="img" aria-label="user">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#user"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#user"/>
     </svg>
 
                             <span class="hidden md:block lg:hidden xl:block">
@@ -519,7 +525,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                 
                                                     
     <svg  width="11" height="8" class="hidden md:block lg:hidden xl:block transition-transform" :class="open && 'rotate-180'" role="img" aria-label="arrow-down">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow-down"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow-down"/>
     </svg>
 
                         </button>
@@ -574,7 +580,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                         
                             
     <svg  width="18" height="18" role="img" aria-label="search">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#search"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#search"/>
     </svg>
 
                 </button>
@@ -588,7 +594,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                         
                             
     <svg  width="18" height="14" role="img" aria-label="hamburger">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#hamburger"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#hamburger"/>
     </svg>
 
                 </button>
@@ -606,7 +612,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             
                                         
     <svg  width="241" height="42" class="w-[185px] h-auto xl:w-[241px]" role="img" aria-label="logo">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#logo"/>
     </svg>
 
         <button
@@ -617,7 +623,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 
                                         
     <svg  width="21" height="21" class="w-[14px] h-auto lg:w-[21px] pointer-events-none" role="img" aria-label="close">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#close"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#close"/>
     </svg>
 
         </button>
@@ -637,7 +643,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="18" height="18" role="img" aria-label="search">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#search"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#search"/>
     </svg>
 
             </button>
@@ -676,7 +682,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             
                                         
     <svg  width="241" height="42" class="w-[150px] min-[360px]:w-[185px] h-auto" role="img" aria-label="logo">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#logo"/>
     </svg>
 
     </a>
@@ -690,7 +696,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             
                             
     <svg  width="14" height="14" role="img" aria-label="close">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#close"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#close"/>
     </svg>
 
     </button>
@@ -704,7 +710,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                 
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
 
                         </a>
@@ -716,7 +722,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                         
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
  Terug
                                 </button>
@@ -735,7 +741,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                             class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
                                         >
                                                                                             <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
-                                                    <svg id="kkiaqnwebx-a" class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.kkiaqnwebx-c{fill:#114997}</style></defs><path d="M18.01 23.6c.53-1.81 3.2-6.34 9.6-8.64V8.88h.96v-4.8h7.36v4.8h.96v6.08c1.49.21 5.38 1.98 8.96 7.36 1.6 2.4 2.82 8.51 1.28 15.68-.85 3.09-4.1 9.28-10.24 10.56v6.08h-.96v5.44h-7.36v-5.44h-.96v-6.08c-2.67-1.07-8.38-4.16-9.92-9.28-.75-2.45-2.56-9.28.32-15.68Z" style="fill:#fff"/><path d="M28.52 60.84c-.39 0-.71-.32-.71-.71v-2.02h-.2c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h.2v-1.32h-.2c-.39 0-.71-.32-.71-.71v-5.65l-.13-.05C20.33 46.67 16 40.54 16 33.73v-3.64c0-6.81 4.33-12.94 10.77-15.23l.13-.05V9.16c0-.38.31-.7.7-.71h.2V7.14h-.2c-.39 0-.7-.32-.7-.71s.32-.71.71-.71h.2V3.7c0-.04.01-.08.03-.12l.03-.13c.01-.05.04-.08.06-.12l.08-.11.08-.07.12-.08c.13-.07.22-.08.32-.08h7.28c.39 0 .71.32.71.71v2.02h.2c.39 0 .71.32.71.71s-.32.71-.71.71h-.2v1.31h.2c.39 0 .71.32.71.71v5.64l.13.05c6.46 2.29 10.8 8.41 10.8 15.24v3.64c0 6.83-4.34 12.95-10.8 15.24l-.13.05v5.64c0 .39-.31.7-.7.71h-.2v1.32h.2c.39 0 .7.33.7.71s-.32.71-.71.71h-.2v2.02c0 .03 0 .07-.02.11l-.03.14-.07.12c-.14.22-.35.35-.59.35h-7.28Zm.71-1.42h5.86v-1.31h-5.86v1.31Zm0-2.73h5.87v-1.32h-5.87v1.32Zm-.91-2.74H36v-4.5l-.24.05c-1.21.27-2.41.41-3.58.41s-2.4-.14-3.61-.42l-.25-.06v4.51Zm-9.65-14.28c2.37 5.36 7.67 8.83 13.51 8.83s11.14-3.46 13.51-8.83l-.35-.2c-3.04 4.26-7.96 6.8-13.16 6.8s-10.12-2.54-13.16-6.8l-.35.2Zm13.51-24.33c-8.14 0-14.76 6.62-14.76 14.76s6.62 14.76 14.76 14.76 14.76-6.62 14.76-14.76-6.62-14.76-14.76-14.76Zm-3.86-.94.25-.06c1.22-.28 2.43-.42 3.61-.42s2.38.14 3.58.41l.24.06V9.88h-7.68v4.51Zm.9-5.94h5.87V7.15h-5.87v1.31Zm.01-2.73h5.87V4.42h-5.86v1.31Z" class="kkiaqnwebx-c"/><path d="M22.61 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM28.07 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM33.53 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM38.99 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30H39.7v2.22ZM29.43 25.45c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h5.46c.39 0 .71.32.71.71s-.32.71-.71.71h-5.46ZM26.69 22.72c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h10.95c.39 0 .71.32.71.71s-.32.71-.71.71H26.69Z" class="kkiaqnwebx-c"/></svg>
+                                                    <svg id="kchetpypvj-a" class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.kchetpypvj-c{fill:#114997}</style></defs><path d="M18.01 23.6c.53-1.81 3.2-6.34 9.6-8.64V8.88h.96v-4.8h7.36v4.8h.96v6.08c1.49.21 5.38 1.98 8.96 7.36 1.6 2.4 2.82 8.51 1.28 15.68-.85 3.09-4.1 9.28-10.24 10.56v6.08h-.96v5.44h-7.36v-5.44h-.96v-6.08c-2.67-1.07-8.38-4.16-9.92-9.28-.75-2.45-2.56-9.28.32-15.68Z" style="fill:#fff"/><path d="M28.52 60.84c-.39 0-.71-.32-.71-.71v-2.02h-.2c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h.2v-1.32h-.2c-.39 0-.71-.32-.71-.71v-5.65l-.13-.05C20.33 46.67 16 40.54 16 33.73v-3.64c0-6.81 4.33-12.94 10.77-15.23l.13-.05V9.16c0-.38.31-.7.7-.71h.2V7.14h-.2c-.39 0-.7-.32-.7-.71s.32-.71.71-.71h.2V3.7c0-.04.01-.08.03-.12l.03-.13c.01-.05.04-.08.06-.12l.08-.11.08-.07.12-.08c.13-.07.22-.08.32-.08h7.28c.39 0 .71.32.71.71v2.02h.2c.39 0 .71.32.71.71s-.32.71-.71.71h-.2v1.31h.2c.39 0 .71.32.71.71v5.64l.13.05c6.46 2.29 10.8 8.41 10.8 15.24v3.64c0 6.83-4.34 12.95-10.8 15.24l-.13.05v5.64c0 .39-.31.7-.7.71h-.2v1.32h.2c.39 0 .7.33.7.71s-.32.71-.71.71h-.2v2.02c0 .03 0 .07-.02.11l-.03.14-.07.12c-.14.22-.35.35-.59.35h-7.28Zm.71-1.42h5.86v-1.31h-5.86v1.31Zm0-2.73h5.87v-1.32h-5.87v1.32Zm-.91-2.74H36v-4.5l-.24.05c-1.21.27-2.41.41-3.58.41s-2.4-.14-3.61-.42l-.25-.06v4.51Zm-9.65-14.28c2.37 5.36 7.67 8.83 13.51 8.83s11.14-3.46 13.51-8.83l-.35-.2c-3.04 4.26-7.96 6.8-13.16 6.8s-10.12-2.54-13.16-6.8l-.35.2Zm13.51-24.33c-8.14 0-14.76 6.62-14.76 14.76s6.62 14.76 14.76 14.76 14.76-6.62 14.76-14.76-6.62-14.76-14.76-14.76Zm-3.86-.94.25-.06c1.22-.28 2.43-.42 3.61-.42s2.38.14 3.58.41l.24.06V9.88h-7.68v4.51Zm.9-5.94h5.87V7.15h-5.87v1.31Zm.01-2.73h5.87V4.42h-5.86v1.31Z" class="kchetpypvj-c"/><path d="M22.61 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM28.07 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM33.53 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30h-1.31v2.22ZM38.99 33.64c-.39 0-.71-.32-.71-.71v-3.64c0-.39.32-.71.71-.71h2.73c.39 0 .71.32.71.71v3.64c0 .39-.32.71-.71.71h-2.73Zm.71-1.42h1.31V30H39.7v2.22ZM29.43 25.45c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h5.46c.39 0 .71.32.71.71s-.32.71-.71.71h-5.46ZM26.69 22.72c-.39 0-.71-.32-.71-.71s.32-.71.71-.71h10.95c.39 0 .71.32.71.71s-.32.71-.71.71H26.69Z" class="kchetpypvj-c"/></svg>
                                                 </div>
                                                                                         Meterstand doorgeven
                                         </a>
@@ -800,7 +806,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                 
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
 
                         </a>
@@ -812,7 +818,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                         
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
  Terug
                                 </button>
@@ -888,7 +894,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                 
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
 
                         </a>
@@ -900,7 +906,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                         
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
  Terug
                                 </button>
@@ -919,7 +925,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                             class="flex items-center gap-3 bg-white text-blue-500 text-xs leading-[1.1875rem] font-extrabold rounded-full pl-2 py-2 pr-6"
                                         >
                                                                                             <div class="size-[54px] flex-shrink-0 flex items-center justify-center rounded-full bg-blue-200 p-2">
-                                                    <svg id="itcjvtmgfr-a" class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.itcjvtmgfr-d{fill:#114997}</style></defs><path d="M17.22 57.71V18.54c0-1.9 1.24-4.96 3.47-6.2L40.28 1.18c.33-.25 1.29-.6 2.48 0l2.48 1.49c.99.5 2.23.99 2.23 3.22v38.18c.25 1.74-.25 5.45-3.47 7.69L24.41 62.92c-.5.25-1.83.5-3.22-.5l-2.98-1.74c-.5-.25-.99-.79-.99-2.98Z" style="fill:#fff"/><path d="M37.34 39.36c-.15 0-.29-.02-.43-.07-1-.35-3.02-1.32-5.28-3.85-2.26-2.54-3.13-4.8-3.44-5.91a1.76 1.76 0 0 1 .37-1.64l1.87-2.09c.21-.23.5-.34.78-.3.29.04.55.22.7.5l1.49 2.71c.23.42.17.96-.14 1.31l-.79.89c.34.78.79 1.49 1.32 2.12.56.6 1.19 1.1 1.89 1.48l.79-.89c.31-.35.8-.41 1.17-.15l2.42 1.67c.25.17.41.46.44.78.03.32-.07.65-.27.88l-1.87 2.09c-.27.31-.65.48-1.04.48ZM31.1 26.41s-.06.01-.08.04l-1.87 2.09c-.17.18-.23.45-.16.7.86 3.48 5.08 8.2 8.17 9.16.22.08.46 0 .62-.18l1.87-2.09s.04-.07.04-.11c0-.04-.03-.08-.06-.1l-2.42-1.67s-.11-.02-.14.02l-1 1.12c-.12.13-.3.17-.45.1-.9-.44-1.72-1.05-2.42-1.82a9.2 9.2 0 0 1-1.62-2.7.524.524 0 0 1 .09-.51l1-1.12s.04-.11.02-.16l-1.49-2.71s-.06-.06-.1-.06Z" class="itcjvtmgfr-d"/><path d="M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29Z" class="itcjvtmgfr-d"/><path d="M46.64 3.11s-.07-.09-.12-.12L42.73.81c-.84-.49-1.95-.39-3.12.27L20.88 11.82c-.97.56-1.88 1.47-2.64 2.63-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11.7-1.08 1.53-1.91 2.41-2.41L43.73 3.84c.94-.54 1.81-.64 2.45-.27.16.09.37.03.46-.13.06-.11.06-.23 0-.33ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Z" class="itcjvtmgfr-d"/><path d="M22.6 16.64a.345.345 0 0 0-.12-.12l-3.79-2.17a.338.338 0 0 0-.45.11c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16.05-.08.07-.17.04-.26 0-.03-.02-.06-.04-.09Zm-3.97-1.55 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" class="itcjvtmgfr-d"/><path d="M18.24 14.46c.76-1.17 1.67-2.08 2.64-2.63L39.61 1.08c1.17-.66 2.27-.76 3.12-.27l3.79 2.18c.05.03.09.07.12.12.06.1.06.23 0 .33-.09.16-.3.22-.46.13-.65-.37-1.52-.27-2.45.27L24.99 14.58c-.87.5-1.71 1.33-2.41 2.41m-4.34-2.53c-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11m-4.35-2.53c.1-.15.29-.2.45-.11l3.79 2.17c.05.03.09.07.12.12.02.03.03.06.04.09.02.09 0 .18-.04.26m-4.36-2.53c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Zm-.37.56 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" style="fill:none;stroke:#114997;stroke-width:.5px"/></svg>
+                                                    <svg id="mzywvagfrn-a" class="text-blue-500 z-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.mzywvagfrn-d{fill:#114997}</style></defs><path d="M17.22 57.71V18.54c0-1.9 1.24-4.96 3.47-6.2L40.28 1.18c.33-.25 1.29-.6 2.48 0l2.48 1.49c.99.5 2.23.99 2.23 3.22v38.18c.25 1.74-.25 5.45-3.47 7.69L24.41 62.92c-.5.25-1.83.5-3.22-.5l-2.98-1.74c-.5-.25-.99-.79-.99-2.98Z" style="fill:#fff"/><path d="M37.34 39.36c-.15 0-.29-.02-.43-.07-1-.35-3.02-1.32-5.28-3.85-2.26-2.54-3.13-4.8-3.44-5.91a1.76 1.76 0 0 1 .37-1.64l1.87-2.09c.21-.23.5-.34.78-.3.29.04.55.22.7.5l1.49 2.71c.23.42.17.96-.14 1.31l-.79.89c.34.78.79 1.49 1.32 2.12.56.6 1.19 1.1 1.89 1.48l.79-.89c.31-.35.8-.41 1.17-.15l2.42 1.67c.25.17.41.46.44.78.03.32-.07.65-.27.88l-1.87 2.09c-.27.31-.65.48-1.04.48ZM31.1 26.41s-.06.01-.08.04l-1.87 2.09c-.17.18-.23.45-.16.7.86 3.48 5.08 8.2 8.17 9.16.22.08.46 0 .62-.18l1.87-2.09s.04-.07.04-.11c0-.04-.03-.08-.06-.1l-2.42-1.67s-.11-.02-.14.02l-1 1.12c-.12.13-.3.17-.45.1-.9-.44-1.72-1.05-2.42-1.82a9.2 9.2 0 0 1-1.62-2.7.524.524 0 0 1 .09-.51l1-1.12s.04-.11.02-.16l-1.49-2.71s-.06-.06-.1-.06Z" class="mzywvagfrn-d"/><path d="M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29Z" class="mzywvagfrn-d"/><path d="M46.64 3.11s-.07-.09-.12-.12L42.73.81c-.84-.49-1.95-.39-3.12.27L20.88 11.82c-.97.56-1.88 1.47-2.64 2.63-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11.7-1.08 1.53-1.91 2.41-2.41L43.73 3.84c.94-.54 1.81-.64 2.45-.27.16.09.37.03.46-.13.06-.11.06-.23 0-.33ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Z" class="mzywvagfrn-d"/><path d="M22.6 16.64a.345.345 0 0 0-.12-.12l-3.79-2.17a.338.338 0 0 0-.45.11c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16.05-.08.07-.17.04-.26 0-.03-.02-.06-.04-.09Zm-3.97-1.55 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" class="mzywvagfrn-d"/><path d="M18.24 14.46c.76-1.17 1.67-2.08 2.64-2.63L39.61 1.08c1.17-.66 2.27-.76 3.12-.27l3.79 2.18c.05.03.09.07.12.12.06.1.06.23 0 .33-.09.16-.3.22-.46.13-.65-.37-1.52-.27-2.45.27L24.99 14.58c-.87.5-1.71 1.33-2.41 2.41m-4.34-2.53c-.05.08-.07.17-.05.26.02.09.08.17.16.21l3.79 2.17c.15.09.35.04.45-.11m-4.35-2.53c.1-.15.29-.2.45-.11l3.79 2.17c.05.03.09.07.12.12.02.03.03.06.04.09.02.09 0 .18-.04.26m-4.36-2.53c-.95 1.46-1.49 3.11-1.49 4.53v39.24c0 1.36.48 2.39 1.35 2.88l3.76 2.15s.02.01.03.02c.16.09.36.03.46-.13.09-.16.04-.36-.12-.46h-.03c-.63-.39-.98-1.19-.98-2.3V21.15c0-1.29.5-2.8 1.39-4.16M47.4 3.87c-.22-.38-.51-.68-.87-.89-.85-.49-1.96-.4-3.13.27L24.67 13.99c-2.28 1.31-4.13 4.52-4.13 7.16v39.24c0 1.36.47 2.38 1.34 2.88.86.5 1.97.4 3.13-.27l18.73-10.74c2.28-1.31 4.13-4.51 4.13-7.15V5.86c0-.79-.16-1.47-.46-1.99ZM21.2 60.4V21.15c0-2.43 1.7-5.38 3.8-6.58L43.73 3.83c.95-.54 1.82-.64 2.46-.27.65.37 1 1.19 1 2.3V45.1c0 2.43-1.7 5.37-3.79 6.57L24.67 62.41c-.95.54-1.82.64-2.46.27-.65-.37-1-1.19-1-2.29ZM19 14.53c.66-.94 1.42-1.67 2.22-2.12L39.94 1.66c.95-.54 1.82-.64 2.45-.27l2.35 1.35c-.43.08-.88.26-1.34.52L24.66 14c-.89.51-1.74 1.33-2.46 2.37L19 14.54Zm-.37.56 3.21 1.84c-.83 1.39-1.31 2.91-1.31 4.23V60.4c0 .55.08 1.04.23 1.47l-2.33-1.34c-.65-.37-1.01-1.19-1.01-2.3V18.98c0-1.21.44-2.61 1.22-3.89ZM44.25 8.9c-.17-.29-.42-.54-.72-.72-.62-.36-1.36-.36-1.97 0l-15.21 8.73c-1.26.72-2.45 2.79-2.45 4.25v32.18c0 .71.37 1.35.99 1.71.62.36 1.35.36 1.97 0l15.22-8.73c1.26-.72 2.44-2.78 2.44-4.25V9.89c0-.36-.09-.7-.26-.99ZM24.73 53.99c-.11-.19-.17-.42-.17-.65V21.15c0-1.22 1.07-3.07 2.11-3.67l15.21-8.73c.41-.23.9-.23 1.3 0 .41.24.65.66.65 1.13v32.19c0 1.22-1.06 3.07-2.11 3.66L26.5 54.46a1.3 1.3 0 0 1-1.78-.48ZM37 52.04a.327.327 0 0 0-.45-.12l-4.01 2.26c-.16.09-.22.3-.13.46.09.15.3.22.46.13l4.01-2.26c.16-.09.22-.3.13-.46Z" style="fill:none;stroke:#114997;stroke-width:.5px"/></svg>
                                                 </div>
                                                                                         Interesse in een job?
                                         </a>
@@ -978,12 +984,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                                                                                                                                                 class="font-bold block  "
                                     >Watertoren</a>
                                 </li>
-                                                            <li class="mmmenu__item py-3   pb-8">
+                                                            <li class="mmmenu__item py-3 border-b border-blue-300  ">
                                     <a
                                                                                     href="https://www.aquaduin.be/nl/bezoekerscentrum-de-doornpanne/educatief-aanbod/begeleide-activiteiten/bedrijfsbezoek"
                                                                                                                             target="_blank" 
                                                                                                                         class="font-bold block  "
                                     >Bezoek Aquaduin</a>
+                                </li>
+                                                            <li class="mmmenu__item py-3   pb-8">
+                                    <a
+                                                                                    href="https://www.aquaduin.be/nl/over-ons/bedrijfsfilm"
+                                                                                                                                                                class="font-bold block  "
+                                    >Bedrijfsfilm</a>
                                 </li>
                                                     </ul>
                                     </li>
@@ -993,7 +1005,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                 
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 ml-1 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
 
                         </a>
@@ -1005,7 +1017,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                                         
                                                     
     <svg  width="18" height="16" aria-hidden="true" class="inline-block flex-shrink-0 transform rotate-180 text-theme-accent-dark" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
  Terug
                                 </button>
@@ -1134,7 +1146,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="16" height="16" role="img" aria-label="user">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#user"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#user"/>
     </svg>
 
                 Mijn Aquaduin
@@ -1148,7 +1160,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="24" height="24" role="img" aria-label="facebook">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#facebook"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#facebook"/>
     </svg>
 
             </a>
@@ -1158,7 +1170,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="24" height="24" role="img" aria-label="instagram">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#instagram"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#instagram"/>
     </svg>
 
             </a>
@@ -1168,7 +1180,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="24" height="24" role="img" aria-label="youtube">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#youtube"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#youtube"/>
     </svg>
 
             </a>
@@ -1212,7 +1224,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                             
                             
     <svg  width="14" height="15" role="img" aria-label="tap">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#tap"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#tap"/>
     </svg>
 
                     </a>
@@ -1220,7 +1232,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                             
                                         
     <svg  width="6" height="9" class="mt-[2px]" role="img" aria-label="caret">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#caret"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#caret"/>
     </svg>
 
                     </span>
@@ -1233,7 +1245,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                             
                                         
     <svg  width="6" height="9" class="mt-[2px]" role="img" aria-label="caret">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#caret"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#caret"/>
     </svg>
 
                     </span>
@@ -1246,7 +1258,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                             
                                         
     <svg  width="6" height="9" class="mt-[2px]" role="img" aria-label="caret">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#caret"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#caret"/>
     </svg>
 
                     </span>
@@ -1680,14 +1692,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 
                                         
     <svg  width="18" height="16" class="-rotate-90" role="img" aria-label="arrow">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#arrow"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#arrow"/>
     </svg>
 
         </button>
             
                                         
     <svg  width="1512" height="97" class="w-screen max-w-full h-auto text-theme-secondary" role="img" aria-label="footer-top">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#footer-top"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#footer-top"/>
     </svg>
 
     </div>
@@ -1697,7 +1709,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="228" height="61" role="img" aria-label="logo-baseline">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#logo-baseline"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#logo-baseline"/>
     </svg>
 
                 
@@ -1805,7 +1817,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="24" height="24" role="img" aria-label="facebook">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#facebook"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#facebook"/>
     </svg>
 
             </a>
@@ -1815,7 +1827,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="24" height="24" role="img" aria-label="instagram">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#instagram"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#instagram"/>
     </svg>
 
             </a>
@@ -1825,7 +1837,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                     
                             
     <svg  width="24" height="24" role="img" aria-label="youtube">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#youtube"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#youtube"/>
     </svg>
 
             </a>
@@ -1862,7 +1874,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                         
                                         
     <svg  width="65" height="20" class="ml-2 text-green-600" role="img" aria-label="glue">
-                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.BA2k_XBB.svg#glue"/>
+                <use xlink:href="https://www.aquaduin.be/dist/symbol-sprite.Didaq-Bz.svg#glue"/>
     </svg>
 
                 </a>
@@ -1871,12 +1883,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
 </footer>
 
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","author":{"@id":"https://www.aquaduin.be#identity"},"copyrightHolder":{"@id":"https://www.aquaduin.be#identity"},"copyrightYear":"2026","creator":{"@id":"https://glue.be/#creator"},"dateCreated":"2026-03-20T16:13:54+01:00","dateModified":"2026-07-06T09:32:34+02:00","datePublished":"2026-03-20T16:24:00+01:00","description":"Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening.","headline":"Tarieven 2026","image":{"@type":"ImageObject","url":"https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1792403257"},"inLanguage":"nl","mainEntityOfPage":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026","name":"Tarieven 2026","publisher":{"@id":"https://glue.be/#creator"},"url":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026"},{"@id":"https://www.aquaduin.be#identity","@type":"LocalBusiness","address":{"@type":"PostalAddress","addressCountry":"België","addressLocality":"Koksijde","postalCode":"8670","streetAddress":"Doornpannestraat 1"},"description":"Aquaduin is een waterbedrijf dat drinkwater levert aan de regio rond Koksijde, België. Het beheert zowel de productie als de distributie van drinkwater en staat ook in voor de afvoer en zuivering van afvalwater.","email":"info@aquaduin.be","image":{"@type":"ImageObject","height":"214","url":"https://www.aquaduin.be/volumes/general/logo_aquaduin.jpg?v=1779270861","width":"800"},"logo":{"@type":"ImageObject","height":"60","url":"https://www.aquaduin.be/volumes/general/_600x60_fit_center-center_82_none/17293/logo_aquaduin.png?v=1792403259","width":"224"},"name":"Aquaduin / IWVA OV","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Monday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Tuesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Wednesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Thursday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Friday"],"opens":"08:00:00"}],"priceRange":"$","sameAs":["https://www.facebook.com/aquaduin/?locale=nl_NL","https://www.instagram.com/aquaduin/","https://www.youtube.com/channel/UCStEEfn3QTyfLeD7D3-HuOQ"],"telephone":"058 53 38 33","url":"https://www.aquaduin.be"},{"@id":"https://glue.be/#creator","@type":"LocalBusiness","address":{"@type":"PostalAddress","addressCountry":"België","addressLocality":"Gent","postalCode":"9000","streetAddress":"Dok Noord 4E"},"description":"We zijn online whizzkids, digitale strategen, maar ook communicatiespecialisten, online marketeers, designers, developers, UI/UX experten, … met een hart voor ‘all things digital’. Samen schrijven we jouw digitaal verhaal.","email":"hello@glue.be","name":"Glue","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Monday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Tuesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Wednesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Thursday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Friday"],"opens":"08:00:00"}],"priceRange":"$","telephone":"+32 9 336 78 08","url":"https://glue.be/"},{"@type":"BreadcrumbList","description":"Breadcrumbs list","itemListElement":[{"@type":"ListItem","item":"https://www.aquaduin.be/nl","name":"Home","position":1},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen","name":"Zelf regelen","position":2},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen/tarieven","name":"Tarieven","position":3},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026","name":"Tarieven 2026","position":4}],"name":"Breadcrumbs"}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","author":{"@id":"https://www.aquaduin.be#identity"},"copyrightHolder":{"@id":"https://www.aquaduin.be#identity"},"copyrightYear":"2026","creator":{"@id":"https://glue.be/#creator"},"dateCreated":"2026-03-20T16:13:54+01:00","dateModified":"2026-07-06T09:32:34+02:00","datePublished":"2026-03-20T16:24:00+01:00","description":"Officiële website van Aquaduin, de Westvlaamse intercommunale voor drinkwatervoorziening.","headline":"Tarieven 2026","image":{"@type":"ImageObject","url":"https://www.aquaduin.be/volumes/general/Open-Graph/_1200x630_crop_center-center_82_none/aquaduin-og.png?v=1792738349"},"inLanguage":"nl","mainEntityOfPage":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026","name":"Tarieven 2026","publisher":{"@id":"https://glue.be/#creator"},"url":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026"},{"@id":"https://www.aquaduin.be#identity","@type":"LocalBusiness","address":{"@type":"PostalAddress","addressCountry":"België","addressLocality":"Koksijde","postalCode":"8670","streetAddress":"Doornpannestraat 1"},"description":"Aquaduin is een waterbedrijf dat drinkwater levert aan de regio rond Koksijde, België. Het beheert zowel de productie als de distributie van drinkwater en staat ook in voor de afvoer en zuivering van afvalwater.","email":"info@aquaduin.be","image":{"@type":"ImageObject","height":"214","url":"https://www.aquaduin.be/volumes/general/logo_aquaduin.jpg?v=1779270861","width":"800"},"logo":{"@type":"ImageObject","height":"60","url":"https://www.aquaduin.be/volumes/general/_600x60_fit_center-center_82_none/17293/logo_aquaduin.png?v=1792738351","width":"224"},"name":"Aquaduin / IWVA OV","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Monday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Tuesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Wednesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Thursday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"16:30:00","dayOfWeek":["Friday"],"opens":"08:00:00"}],"priceRange":"$","sameAs":["https://www.facebook.com/aquaduin/?locale=nl_NL","https://www.instagram.com/aquaduin/","https://www.youtube.com/channel/UCStEEfn3QTyfLeD7D3-HuOQ"],"telephone":"058 53 38 33","url":"https://www.aquaduin.be"},{"@id":"https://glue.be/#creator","@type":"LocalBusiness","address":{"@type":"PostalAddress","addressCountry":"België","addressLocality":"Gent","postalCode":"9000","streetAddress":"Dok Noord 4E"},"description":"We zijn online whizzkids, digitale strategen, maar ook communicatiespecialisten, online marketeers, designers, developers, UI/UX experten, … met een hart voor ‘all things digital’. Samen schrijven we jouw digitaal verhaal.","email":"hello@glue.be","name":"Glue","openingHoursSpecification":[{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Monday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Tuesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Wednesday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Thursday"],"opens":"08:00:00"},{"@type":"OpeningHoursSpecification","closes":"17:00:00","dayOfWeek":["Friday"],"opens":"08:00:00"}],"priceRange":"$","telephone":"+32 9 336 78 08","url":"https://glue.be/"},{"@type":"BreadcrumbList","description":"Breadcrumbs list","itemListElement":[{"@type":"ListItem","item":"https://www.aquaduin.be/nl","name":"Home","position":1},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen","name":"Zelf regelen","position":2},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen/tarieven","name":"Tarieven","position":3},{"@type":"ListItem","item":"https://www.aquaduin.be/nl/zelf-regelen/tarieven/tarieven-2026","name":"Tarieven 2026","position":4}],"name":"Breadcrumbs"}]}</script>
 <script>
     var user_tools = {
         elementId: 5305,
         siteId: 3,
     };
 </script>
-<script src="https://www.aquaduin.be/cpresources/1252870/js/user_tools.js?v=1792403319"></script></body>
+<script src="https://www.aquaduin.be/cpresources/4f5c251d/js/user_tools.js?v=1792738400"></script></body>
     </html>

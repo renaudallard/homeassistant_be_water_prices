@@ -19,6 +19,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
  "sanering_gemeentelijk_eur_per_m3": 1.7615,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.dewatergroep.be/Tarief/UpdateDetailTariefJaar/2026",
  "utility": "de_watergroep",
  "valid_from": "2026-01-01",

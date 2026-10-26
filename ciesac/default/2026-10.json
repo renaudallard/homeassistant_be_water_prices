@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/c274fcb08b93951be2f92040eadc79d94156482cf55e58929d0cbac67920c455.txt",
+   "text": "texts/38858a0507b0a4160053869a4b594a76273f6738a3508e61e6f7a2354b5f73a0.txt",
    "url": "https://callmepower.be/fr/eau/distributeurs/ciesac",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "wallonia",
  "sanering_bovengemeentelijk_eur_per_m3": 0.0,
  "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://callmepower.be/fr/eau/distributeurs/ciesac",
  "utility": "ciesac",
  "valid_from": "2026-01-01",

@@ -1,8 +1,8 @@
 {
- "_seen_on": "2026-10-01",
+ "_seen_on": "2026-10-26",
  "_sources": [
   {
-   "text": "texts/fa994112058e07e064d76201ff1d78206758a10b3e138ed892a6d0d5dc381fdd.txt",
+   "text": "texts/5f07d4369ebf527dcb5da82ed72ba55e445339e0b8e5c3ce7301c3e9e0882104.txt",
    "url": "https://www.agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers",
    "variant": "text"
   }
@@ -17,6 +17,8 @@
  "region": "flanders",
  "sanering_bovengemeentelijk_eur_per_m3": 1.7019,
  "sanering_gemeentelijk_eur_per_m3": 1.9572,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
  "source_url": "https://www.agsoknokke-heist.be/waterbedrijf/tarieven/tarieven-kleinverbruikers",
  "utility": "agso_knokke",
  "valid_from": "2026-01-01",
