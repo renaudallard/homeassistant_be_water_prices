@@ -12,9 +12,10 @@ on:
     - cron: "11 6 * * *"
   workflow_dispatch:
 
+# Read only, unless a job says otherwise: only the job that files the
+# issue writes one.
 permissions:
   contents: read
-  issues: write
 
 # A run still going when the next is triggered would otherwise file the
 # same issue twice. The newer run wins.
@@ -24,6 +25,10 @@ concurrency:
 
 jobs:
   check:
+    # Runs the extractors, the PDF reader among them, on whatever the
+    # utilities serve, so it holds no token that writes anything: a process
+    # it leaves behind dies with its runner. The issue is filed by the job
+    # below, from the report this one hands over.
     runs-on: ubuntu-latest
     # A run takes minutes. Each fetch is held to the integration's budget.
     # A PDF render runs in a child process that is killed at its own time
@@ -32,12 +37,13 @@ jobs:
     # the backstop for one that never returns, and leaves room for five
     # attempts and their backoff.
     timeout-minutes: 60
+    outputs:
+      real_fail: ${{ steps.check.outputs.real_fail }}
     steps:
       - uses: actions/checkout@v7
         with:
-          # github.token can write issues; the extractors run third-party
-          # code, which must not find it on disk. The archive branch fetch
-          # below needs none, the repository is public.
+          # Nothing here needs the token, the repository being public, and
+          # the extractors run third-party code.
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
@@ -169,8 +175,38 @@ jobs:
           # Exit 0 here so subsequent issue-creation steps run regardless.
           exit 0
 
-      - name: Open or update extractor-broken issue
+      - name: Hand the report over
         if: steps.check.outputs.real_fail == '1'
+        uses: actions/upload-artifact@v7
+        with:
+          name: live-check-report
+          path: fail_report.md
+          if-no-files-found: error
+          retention-days: 3
+
+  file:
+    # Holds github.token, which writes issues, and runs only the issue
+    # script, on the report the check handed over.
+    needs: check
+    if: needs.check.outputs.real_fail == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # A folder of its own, so nothing handed over lands on the script
+      # that files the issue.
+      - uses: actions/download-artifact@v8
+        with:
+          name: live-check-report
+          path: tmp/report
+
+      - name: Open or update extractor-broken issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -183,13 +219,13 @@ jobs:
             echo
             echo "## Report of the failing attempt"
             echo
-            cat fail_report.md
+            cat tmp/report/fail_report.md
           } > issue_body.md
           # One issue per problem, found by its label; the failing
           # utilities are the fingerprint, so a utility that stays broken
           # gets one comment a week rather than one a day, and a failure
           # that changes shape is posted at once.
-          grep '| FAIL |' fail_report.md | cut -d'|' -f2 | sed 's/^ *//;s/ *$//' | sort > failed.txt
+          grep '| FAIL |' tmp/report/fail_report.md | cut -d'|' -f2 | sed 's/^ *//;s/ *$//' | sort > failed.txt
           bash scripts/file_ci_issue.sh \
             --label live-check \
             --title "$title_prefix" \

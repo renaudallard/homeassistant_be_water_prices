@@ -7,12 +7,17 @@ on:
     - cron: "30 6 * * 0"
   workflow_dispatch:
 
+# Read only, unless a job says otherwise: only the job that files the
+# issue writes one.
 permissions:
   contents: read
-  issues: write
 
 jobs:
   check:
+    # Runs the extractors, the PDF reader among them, on whatever the
+    # utilities serve, so it holds no token that writes anything: a process
+    # it leaves behind dies with its runner. Issues are filed by the job
+    # below, from the report this one hands over.
     runs-on: ubuntu-latest
     # A run takes about a minute. Each fetch is held to the integration's
     # budget. A PDF render runs in a child process that is killed at its
@@ -20,12 +25,13 @@ jobs:
     # thread the script gives up on still has to end before the script
     # can. This is the backstop for one that never returns.
     timeout-minutes: 30
+    outputs:
+      rc: ${{ steps.check.outputs.rc }}
     steps:
       - uses: actions/checkout@v7
         with:
-          # github.token can write issues; the extractors run third-party
-          # code, which must not find it on disk. The archive branch fetch
-          # below needs none, the repository is public.
+          # Nothing here needs the token, the repository being public, and
+          # the extractors run third-party code.
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
@@ -74,38 +80,19 @@ jobs:
           # Exit 0 here so the issue-management step always runs.
           exit 0
 
-      - name: Open or update fixture-drift issue
+      - name: Hand the report over
         if: steps.check.outputs.rc == '1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          title_prefix='[fixture-drift] water fixtures need refresh'
-          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          {
-            echo "## Run"
-            echo
-            echo "$run_url"
-            echo
-            echo "## Latest report"
-            echo
-            cat report.md
-          } > issue_body.md
-          # One issue per problem, found by its label; the drifted fields
-          # and the errors are the fingerprint, so a drift that stays as it
-          # is gets one comment a week rather than one a day, and a new
-          # drift is posted at once.
-          grep -E '^\| |^- \*\*' report.md > drifted.txt || true
-          bash scripts/file_ci_issue.sh \
-            --label fixture-drift \
-            --title "$title_prefix" \
-            --body issue_body.md \
-            --fingerprint drifted.txt \
-            --workflow .github/workflows/fixture_drift.yml
+        uses: actions/upload-artifact@v7
+        with:
+          name: fixture-drift-report
+          path: report.md
+          if-no-files-found: error
+          retention-days: 3
 
       # rc 2 means nothing drifted but a utility was unreachable on a blip,
       # so this run did not actually check everything: neither file an issue
       # nor tell the maintainer an open one is safe to close. It still has
-      # to be visible -- a host that is permanently 5xx or rate-limited
+      # to be visible: a host that is permanently 5xx or rate-limited
       # lands here every week and would otherwise leave no trace at all.
       - name: Record the incomplete run
         if: steps.check.outputs.rc == '2'
@@ -119,8 +106,59 @@ jobs:
             cat report.md
           } >> "$GITHUB_STEP_SUMMARY"
 
+  file:
+    # Holds github.token, which writes issues, and runs only the issue
+    # script and gh, on the report the check handed over.
+    needs: check
+    if: needs.check.outputs.rc == '1' || needs.check.outputs.rc == '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # A folder of its own, so nothing handed over lands on the script
+      # that files the issue.
+      - uses: actions/download-artifact@v8
+        if: needs.check.outputs.rc == '1'
+        with:
+          name: fixture-drift-report
+          path: tmp/report
+
+      - name: Open or update fixture-drift issue
+        if: needs.check.outputs.rc == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title_prefix='[fixture-drift] water fixtures need refresh'
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          {
+            echo "## Run"
+            echo
+            echo "$run_url"
+            echo
+            echo "## Latest report"
+            echo
+            cat tmp/report/report.md
+          } > issue_body.md
+          # One issue per problem, found by its label; the drifted fields
+          # and the errors are the fingerprint, so a drift that stays as it
+          # is gets one comment a week rather than one a day, and a new
+          # drift is posted at once.
+          grep -E '^\| |^- \*\*' tmp/report/report.md > drifted.txt || true
+          bash scripts/file_ci_issue.sh \
+            --label fixture-drift \
+            --title "$title_prefix" \
+            --body issue_body.md \
+            --fingerprint drifted.txt \
+            --workflow .github/workflows/fixture_drift.yml
+
       - name: Note drift cleared on existing issue
-        if: steps.check.outputs.rc == '0'
+        if: needs.check.outputs.rc == '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

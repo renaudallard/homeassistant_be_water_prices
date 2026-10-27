@@ -167,10 +167,13 @@ issue labelled `live-check` (`[live-check] water extractor broken`); a
 report that never got written (the script crashed) becomes an issue that
 says so, with the traceback left in the run log.
 
-The checkout keeps no credentials (`persist-credentials: false`): the job
-can write issues and runs the extractors' parsers, and neither needs the
-token on disk. The concurrency group lets a newer run replace one still
-going, so the same issue is not filed twice.
+The check runs in a job with a read-only token and no credentials in its
+checkout (`persist-credentials: false`), since it runs the extractors'
+parsers on whatever the utilities serve; it hands the failing report over
+as an artifact to a second job, `file`, which alone can write issues and
+runs only `file_ci_issue.sh`, on a report downloaded into a folder of its
+own. The concurrency group lets a newer run replace one still going, so
+the same issue is not filed twice.
 
 ### fixture_drift.yml
 
@@ -187,7 +190,9 @@ like any other. A run where a utility was unreachable on a
 blip exits 2: it neither files an issue nor comments "drift cleared" on
 one it did not recheck, and says so in the step summary. A clean run
 comments "drift cleared" on an open issue but never closes it. A live
-fetch past the 180 second budget is an error, as in the live check.
+fetch past the 180 second budget is an error, as in the live check. As
+there, the check runs without a token that can write, and a second job,
+`file`, files the issue or the comment from the report it hands over.
 
 ### archive_cards.yml
 
