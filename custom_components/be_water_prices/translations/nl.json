@@ -174,7 +174,7 @@
     },
     "backfill_prices": {
       "name": "Prijsgeschiedenis aanvullen",
-      "description": "Importeert vlakke uurlijkse long-term-statistics rijen voor de prijssensoren van deze integratie, zodat de History- en Energy-dashboards een tarieflijn tonen die verder teruggaat dan de installatiedatum.",
+      "description": "Importeert vlakke uurlijkse long-term-statistics rijen voor de prijssensoren van deze integratie, zodat de History- en Energy-dashboards een tarieflijn tonen die verder teruggaat dan de installatiedatum. Alleen een beheerder kan deze uitvoeren.",
       "fields": {
         "entry_id": {
           "name": "Configuratie-invoer",

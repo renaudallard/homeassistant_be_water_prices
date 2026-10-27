@@ -49,6 +49,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
@@ -478,7 +479,13 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: WaterConfigEntry
 
 @callback
 def async_register_services(hass: HomeAssistant) -> None:
-    """Register the ``backfill_prices`` service, once for the integration."""
+    """Register the ``backfill_prices`` service, once for the integration.
+
+    For administrators only, as Home Assistant registers its own statistics
+    services: ``clear`` deletes a statistic's whole history, which nothing
+    gives back, and any other user could call it. A call with no user, as
+    an automation's is, still goes through.
+    """
 
     async def _handle_backfill(call: ServiceCall) -> None:
         target_id = call.data.get(ATTR_ENTRY_ID)
@@ -509,7 +516,8 @@ def async_register_services(hass: HomeAssistant) -> None:
         for entry in targets:
             await async_backfill_prices(hass, entry, start=start_dt, clear=clear)
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_BACKFILL_PRICES,
         _handle_backfill,

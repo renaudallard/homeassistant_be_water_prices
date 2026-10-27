@@ -148,7 +148,7 @@
     },
     "backfill_prices": {
       "name": "Backfill price history",
-      "description": "Import flat-line hourly long-term-statistics rows for this integration's price sensors so the History and Energy dashboards show a tariff line going back further than the install date.",
+      "description": "Import flat-line hourly long-term-statistics rows for this integration's price sensors so the History and Energy dashboards show a tariff line going back further than the install date. Only an administrator can run it.",
       "fields": {
         "entry_id": {
           "name": "Config entry",

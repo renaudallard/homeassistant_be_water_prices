@@ -92,7 +92,9 @@ loaded entry raises a translated `ServiceValidationError`
   card's year and the commune, and a stale snapshot defers it
   (`async_maybe_backfill_once`). On a change of utility the rows of keys
   the new utility does not produce are cleared, unless they hold history
-  from before this year (`_async_clear_orphan_backfill_keys`).
+  from before this year (`_async_clear_orphan_backfill_keys`). It is
+  registered with `async_register_admin_service`, so a user who is not an
+  administrator is refused; an automation, which has no user, is not.
 
 The service fields and descriptions are in `services.yaml`, with
 translations under `services` in `strings.json` and `translations/`.

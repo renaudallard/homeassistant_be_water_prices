@@ -864,6 +864,11 @@ reported as done. Both services are registered with the integration, so
 a call naming an entry that is retrying setup gets that error instead of
 an unknown service.
 
+Only an administrator can call `backfill_prices`, as with Home
+Assistant's own statistics services, since `clear` cannot be undone: a
+call by another user is refused, and one from an automation, which runs
+with no user, goes through.
+
 You rarely need it: the default gap-fill upserts on
 `(statistic_id, start)`, so re-running without `clear` overwrites the
 window in place and is safely idempotent. Reach for `clear` only when

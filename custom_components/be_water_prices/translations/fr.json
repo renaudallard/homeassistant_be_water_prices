@@ -174,7 +174,7 @@
     },
     "backfill_prices": {
       "name": "Backfill de l'historique des prix",
-      "description": "Importe des lignes long-term-statistics horaires pour les capteurs de prix de cette intégration, afin que les tableaux de bord History et Energy affichent une courbe de tarif remontant avant la date d'installation.",
+      "description": "Importe des lignes long-term-statistics horaires pour les capteurs de prix de cette intégration, afin que les tableaux de bord History et Energy affichent une courbe de tarif remontant avant la date d'installation. Réservé aux administrateurs.",
       "fields": {
         "entry_id": {
           "name": "Entrée de configuration",

@@ -36,8 +36,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.core import Context, HomeAssistant
+from homeassistant.exceptions import ServiceValidationError, Unauthorized
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -96,6 +96,38 @@ async def test_clear_with_an_entry_id_is_allowed(hass: HomeAssistant) -> None:
         {"clear": True, "entry_id": entry.entry_id},
         blocking=True,
     )
+
+
+async def test_only_an_administrator_can_backfill(
+    hass: HomeAssistant, hass_read_only_user: MagicMock, hass_admin_user: MagicMock
+) -> None:
+    """clear deletes a statistic's whole history, so a user who is not an
+    administrator is refused, as on Home Assistant's own statistics
+    services; an administrator and an automation, which has no user, are not."""
+    entry = _entry(hass)
+    entry.mock_state(hass, ConfigEntryState.LOADED)
+    async_register_services(hass)
+    data = {"clear": True, "entry_id": entry.entry_id}
+    backfill = AsyncMock(return_value=0)
+    with patch("custom_components.be_water_prices.statistics.async_backfill_prices", backfill):
+        with pytest.raises(Unauthorized):
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_BACKFILL_PRICES,
+                data,
+                blocking=True,
+                context=Context(user_id=hass_read_only_user.id),
+            )
+        assert backfill.await_count == 0
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_BACKFILL_PRICES,
+            data,
+            blocking=True,
+            context=Context(user_id=hass_admin_user.id),
+        )
+        await hass.services.async_call(DOMAIN, SERVICE_BACKFILL_PRICES, data, blocking=True)
+    assert backfill.await_count == 2
 
 
 async def test_the_service_belongs_to_the_integration(hass: HomeAssistant) -> None:

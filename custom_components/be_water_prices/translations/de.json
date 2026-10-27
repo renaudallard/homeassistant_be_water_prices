@@ -174,7 +174,7 @@
     },
     "backfill_prices": {
       "name": "Preisverlauf nachladen",
-      "description": "Importiert flache stündliche Long-Term-Statistics-Zeilen für die Preissensoren dieser Integration, sodass die History- und Energy-Dashboards eine Tariflinie vor dem Installationszeitpunkt anzeigen.",
+      "description": "Importiert flache stündliche Long-Term-Statistics-Zeilen für die Preissensoren dieser Integration, sodass die History- und Energy-Dashboards eine Tariflinie vor dem Installationszeitpunkt anzeigen. Nur Administratoren können ihn ausführen.",
       "fields": {
         "entry_id": {
           "name": "Konfigurationseintrag",

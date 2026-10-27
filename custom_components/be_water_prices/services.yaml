@@ -23,7 +23,8 @@ backfill_prices:
     run is automatic on the entry's first setup, and again whenever the
     calendar year, the operator, the year of the card the rates came off
     or the commune changes; this service lets you re-trigger it on demand
-    or extend it to an earlier start date.
+    or extend it to an earlier start date. Only an administrator can run
+    it.
   fields:
     entry_id:
       name: Config entry
