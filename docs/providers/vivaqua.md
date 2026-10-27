@@ -102,6 +102,12 @@ whose card it completes.
 - Year: the page's own. A year either side of the Belgian clock's is
   taken with a warning, since the page turns over on its own schedule
   and the amounts move by indexation only; anything further off raises.
+- A page that raises does not fail the fetch: `fetch` serves the tariff
+  without the two figures and logs a warning, since only a household with
+  BIM status is priced on them and pricing leaves its cost unknown
+  without them. A network failure, a timeout or a 5xx still fails it, as
+  on the tariff page, so the refresh serves the card it holds. The live
+  check fails a Brussels card without the figures.
 
 ### When this year's card is not up yet
 

@@ -61,7 +61,9 @@ states the year and two amounts::
       53,36 € par personne supplémentaire composant le ménage
 
 Both are read onto the card. The French page is read because the
-English one has lagged behind it.
+English one has lagged behind it. A page that cannot be read leaves them
+off rather than failing the card: only a household with BIM status is
+priced on them, and pricing leaves its cost unknown without them.
 """
 
 from __future__ import annotations
@@ -79,6 +81,7 @@ from ._html import extract_amounts, fetch_and_parse
 from ._pdf import fold_accents, to_float
 from .base import (
     ExtractorError,
+    TransientFetchError,
     WaterExtractor,
     WaterTariff,
     belgian_today,
@@ -309,7 +312,24 @@ def parse_intervention(html: str, year: int | None = None) -> tuple[float, float
 
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
     tariff = await fetch_and_parse(session, SOURCE_URL, parse_tariff)
-    first, extra = await fetch_and_parse(session, INTERVENTION_URL, parse_intervention)
+    try:
+        first, extra = await fetch_and_parse(session, INTERVENTION_URL, parse_intervention)
+    except TransientFetchError:
+        # A blip, as on the tariff page: the refresh keeps the card it
+        # holds, intervention included, and asks again on the next one.
+        raise
+    except ExtractorError as err:
+        # Only a household with BIM status is priced on these. Failing the
+        # card over them kept every Brussels entry on its last one, so a
+        # reworded sentence on this page held a new year's rates back from
+        # all of them. Without the figures pricing leaves that household's
+        # cost unknown, and the daily live check fails on the card.
+        _LOGGER.warning(
+            "VIVAQUA's intervention sociale could not be read (%s); serving the tariff "
+            "without it, so a household with BIM status shows no cost until it can",
+            err,
+        )
+        return tariff
     return dataclasses.replace(
         tariff,
         social_intervention_first_person=first,

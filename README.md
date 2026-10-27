@@ -207,7 +207,10 @@ bill, and only two of them follow a rule the integration can price.
   sensor goes below 0 for it. A card saved by an earlier release has no
   such figures, so a refresh that has to fall back on one leaves the
   cost sensors unknown until the next fetch, rather than billing without
-  the intervention.
+  the intervention. The same goes for a day the page cannot be read: the
+  tariff is still served, without the intervention, so every other
+  Brussels household keeps current rates, and the daily live check
+  reports the page.
 - **Wallonia: none.** The Fonds social de l'eau is help the commune's
   CPAS grants case by case to a household that cannot pay, up to 649 EUR
   per request in 2026. It is not a tariff and nothing predicts it, so it

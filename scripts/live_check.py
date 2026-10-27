@@ -84,6 +84,7 @@ from card_texts import StoredTexts  # noqa: E402
 
 from custom_components.be_water_prices.const import (  # noqa: E402
     FETCH_BUDGET_S,
+    REGION_BRUSSELS,
     REGION_FLANDERS,
     REGION_WALLONIA,
 )
@@ -194,6 +195,12 @@ def _validate(tariff: WaterTariff, region: str) -> str | None:
     for r in rates:
         if not (MIN_RATE_EUR_M3 <= r <= MAX_RATE_EUR_M3):
             return f"volumetric rate {r:.4f} EUR/m³ outside [{MIN_RATE_EUR_M3}, {MAX_RATE_EUR_M3}]"
+    if tariff.region == REGION_BRUSSELS and tariff.social_intervention_first_person <= 0:
+        # The fetch serves the card without the intervention sociale when its
+        # page cannot be read, so the households it is not for still get the
+        # new rates. A household with BIM status then has no cost, and this
+        # is where that is noticed.
+        return "no intervention sociale on the card: its page could not be read"
 
     today = date.today()
     if tariff.valid_from.year not in (today.year - 1, today.year, today.year + 1):

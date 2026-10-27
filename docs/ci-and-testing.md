@@ -125,7 +125,9 @@ Daily at 06:11 UTC, after the card archive whose texts it reads, and by
 hand. It runs `scripts/live_check.py`, which fetches every registered
 extractor's real publication and checks the card it parses (region,
 a fee between 5 and 500 EUR a year, at least one volumetric rate between
-0.5 and 20 EUR/m³, a `valid_from` year next to today's). The commune
+0.5 and 20 EUR/m³, a `valid_from` year next to today's, and on the
+Brussels card the intervention sociale, which the fetch leaves off rather
+than failing when its page cannot be read). The commune
 lists of De Watergroep, Farys, Pidpa and Water-link are a row each: an
 error, or fewer communes than the floor in `MIN_COMMUNES`, fails it,
 since the config flow drops the commune selector when that list fails

@@ -320,6 +320,31 @@ def test_validate_refuses_an_implausible_tariff() -> None:
     assert "too far" in (_validate(far, "flanders") or "")
 
 
+def test_validate_refuses_a_brussels_card_without_the_intervention() -> None:
+    """The fetch serves the card without it when its page cannot be read,
+    and a household with BIM status then has no cost: the check says so."""
+    from custom_components.be_water_prices.providers import WaterTariff
+    from scripts.live_check import _validate
+
+    card = WaterTariff(
+        utility="vivaqua",
+        region="brussels",
+        valid_from=date(date.today().year, 1, 1),
+        valid_until=date(date.today().year, 12, 31),
+        publication_label="x",
+        source_url="https://example.invalid/",
+        yearly_fixed_fee=37.95,
+        linear_eur_per_m3=2.47,
+        social_intervention_first_person=58.70,
+        social_intervention_per_extra_person=53.36,
+    )
+    assert _validate(card, "brussels") is None
+    bare = replace(
+        card, social_intervention_first_person=0.0, social_intervention_per_extra_person=0.0
+    )
+    assert "intervention sociale" in (_validate(bare, "brussels") or "")
+
+
 async def test_a_pdf_the_archive_holds_is_not_rendered_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

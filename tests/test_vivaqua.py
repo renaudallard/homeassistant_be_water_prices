@@ -32,6 +32,7 @@ from datetime import date
 import pytest
 
 from custom_components.be_water_prices.providers import ExtractorError, _html, vivaqua
+from custom_components.be_water_prices.providers.base import TransientFetchError
 from custom_components.be_water_prices.providers.vivaqua import parse_intervention, parse_tariff
 from tests import fixture_html
 
@@ -104,6 +105,50 @@ async def test_fetch_parses_off_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     assert round(tariff.linear_eur_per_m3 * 1.06, 2) == 2.62
     assert tariff.social_intervention_first_person == 58.70
     assert tariff.social_intervention_per_extra_person == 53.36
+
+
+async def test_a_page_the_intervention_cannot_be_read_from_still_gives_the_card(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Only a household with BIM status is priced on the intervention. A
+    reworded page used to fail the card for every Brussels entry; it is now
+    served without the two figures, which leaves that household's cost
+    unknown, and says so."""
+    page = fixture_html("vivaqua_intervention_2026.html")
+    reworded = page.replace("l’intervention sociale s&#8217;élève à", "le montant est de")
+    assert reworded != page
+    pages = {
+        vivaqua.SOURCE_URL: fixture_html("vivaqua_linear_2026.html"),
+        vivaqua.INTERVENTION_URL: reworded,
+    }
+
+    async def _read(_session: object, url: str, **_kwargs: object) -> str:
+        return pages[url]
+
+    monkeypatch.setattr(_html, "fetch_html", _read)
+    monkeypatch.setattr(vivaqua, "belgian_today", lambda: date(2026, 6, 1))
+    tariff = await vivaqua.fetch(session=None)  # type: ignore[arg-type]
+    assert round(tariff.linear_eur_per_m3 * 1.06, 2) == 2.62
+    assert tariff.social_intervention_first_person == 0.0
+    assert tariff.social_intervention_per_extra_person == 0.0
+    assert "intervention sociale could not be read" in caplog.text
+
+
+async def test_a_blip_on_the_intervention_page_fails_the_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A network failure says nothing about the page, so the refresh keeps
+    the card it holds, intervention included, rather than dropping it."""
+
+    async def _read(_session: object, url: str, **_kwargs: object) -> str:
+        if url == vivaqua.INTERVENTION_URL:
+            raise TransientFetchError(f"HTTP 503 fetching {url}")
+        return fixture_html("vivaqua_linear_2026.html")
+
+    monkeypatch.setattr(_html, "fetch_html", _read)
+    monkeypatch.setattr(vivaqua, "belgian_today", lambda: date(2026, 6, 1))
+    with pytest.raises(TransientFetchError):
+        await vivaqua.fetch(session=None)  # type: ignore[arg-type]
 
 
 def test_parses_2026_intervention() -> None:

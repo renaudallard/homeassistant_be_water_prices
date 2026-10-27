@@ -22,7 +22,8 @@ is the bill so far, the fee scaled by the fraction of the year elapsed
   linear rate, a Walloon card with no CVD, a Flemish card with no basis
   rate, or a region it does not know. With the social tariff ticked, a
   Brussels card without the intervention sociale figures is one too: a
-  card saved, or archived, before they were read. The cost sensors are then unknown.
+  card saved, or archived, before they were read, or one fetched while
+  their page could not be read. The cost sensors are then unknown.
 
 `persons` and `social_tariff` change a Flemish or a Brussels bill, never a
 Walloon one.
