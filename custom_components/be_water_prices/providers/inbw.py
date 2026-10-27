@@ -67,6 +67,12 @@ UTILITY_ID = "inbw"
 LABEL = "inBW"
 SOURCE_URL = "https://eau.inbw.be/prix-de-leau"
 
+# The row "Redevance annuelle (20 x CVD)", lowercased. The gap after the
+# label is bounded, at nine times the page's: unbounded, it read on to the
+# end of the row from every "redevance" in it, the square of its length,
+# and this page is the one fetched without certificate checks.
+_REDEVANCE_ROW_RE = re.compile(r"redevance.{0,100}?20\s*[x×*]\s*cvd")
+
 
 def _row_amount_after_label(table: Tag, label_keywords: tuple[str, ...]) -> float | None:
     """Return the *Prix unitaire* (3rd cell) for the row whose first cell
@@ -131,7 +137,7 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     redevance_cvd_text = None
     for tr in table.find_all("tr"):
         text = tr.get_text(" ", strip=True).lower()
-        if re.search(r"redevance.*20\s*[x×*]\s*cvd", text):
+        if _REDEVANCE_ROW_RE.search(text):
             cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
             if len(cells) >= 4:
                 amts = extract_amounts(cells[3])  # Hors TVA total

@@ -92,9 +92,13 @@ _PDF_HOST = "aquaduin.be"
 # Anchored on the PDF's exact wording -- "Basistarief 30 m³ + 30 m³ per
 # gedomicilieerde persoon  N,NNNN euro/m³". The intervening "+ 30 m³ per
 # gedomicilieerde persoon" string carries digits, so the gap regex uses
-# ``.*?`` not ``[^0-9]*?``. Numeric format is 4-decimal Belgian (comma).
+# ``.`` not ``[^0-9]``. Numeric format is 4-decimal Belgian (comma).
+# The gap is bounded, at several times the card's, and the amount starts
+# at the first digit of a run. Unbounded, each anchor read on to the end of
+# the text, and an amount tried from inside a run read the rest of the run
+# again, both the square of the length.
 _BASIS_RE = re.compile(
-    r"basistarief\s+30\s*m³.*?([\d]+,\d{3,5})\s*euro/m³",
+    r"basistarief\s+30\s*m³.{0,200}?(?<!\d)(\d++,\d{3,5})\s*euro/m³",
     re.IGNORECASE | re.DOTALL,
 )
 # Anchor on the same "Basisverbruik" qualifier the PDF uses for the
@@ -110,12 +114,17 @@ _VASTRECHT_RE = re.compile(
     r"\(per\s+jaar\s+en\s+per\s+abonnee\)\s*([\d.,]+)\s*euro/jaar\s+([\d.,]+)",
     re.IGNORECASE | re.MULTILINE,
 )
+# "Korting op vast recht (per jaar en per persoon, max 5) 20,00%". The
+# parenthesis is read up to the next "(" or ")" and then asked whether it
+# is the per-person one: searched for "per persoon" in the same pattern, a
+# parenthesis left open was read to the end of the text once for each one.
 _KORTING_RE = re.compile(
-    r"Korting\s+op\s+vast\s+recht\s*\([^)]*per\s+persoon[^)]*\)\s*([\d.,]+)\s*%",
+    r"Korting\s+op\s+vast\s+recht\s*\(([^()]*+)\)\s*([\d.,]+)\s*%",
     re.IGNORECASE,
 )
+_PER_PERSON_RE = re.compile(r"per\s+persoon", re.IGNORECASE)
 _COMFORT_RE = re.compile(
-    r"comforttarief\s*(?:>\s*)?basisverbruik.*?([\d]+,\d{3,5})\s*euro/m³",
+    r"comforttarief\s*(?:>\s*)?basisverbruik.{0,200}?(?<!\d)(\d++,\d{3,5})\s*euro/m³",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -165,12 +174,14 @@ def _fixed_terms(text: str) -> tuple[float, float, float]:
         legs.setdefault(
             match.group(1).split()[0].lower(), (to_float(match.group(2)), to_float(match.group(3)))
         )
-    korting = _KORTING_RE.search(text)
+    korting = next(
+        (m for m in _KORTING_RE.finditer(text) if _PER_PERSON_RE.search(m.group(1))), None
+    )
     if set(legs) != {"water", "afvoer", "zuivering"} or korting is None:
         raise ExtractorError("could not parse Aquaduin's vast recht / korting lines")
     vastrecht = sum(ex for ex, _ in legs.values())
     vat = vat_from_pair("Aquaduin", vastrecht, sum(twin for _, twin in legs.values()))
-    return vastrecht, vastrecht * to_float(korting.group(1)) / 100.0, vat
+    return vastrecht, vastrecht * to_float(korting.group(2)) / 100.0, vat
 
 
 def parse_tariff(text: str, year: int | None = None) -> WaterTariff:

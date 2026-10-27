@@ -78,6 +78,49 @@ def test_find_pdf_href_extracts_versioned_link() -> None:
     assert _find_pdf_href(html, 2026).endswith("overzicht-tarieven-2026.pdf?v=1774021955")
 
 
+_CARD_LINES = (
+    "Basistarief 30 m³ + 30 m³ per gedomicilieerde persoon 5,9908 euro/m³ 6,35\n"
+    "Comforttarief > Basisverbruik (pro rata verrekend) 11,9816 euro/m³ 12\n"
+    "Vast recht water (per jaar en per abonnee) 50,00 euro/jaar 53,00\n"
+    "Vast recht afvoer afvalwater (per jaar en per abonnee) 30,00 euro/jaar 31,80\n"
+    "Vast recht zuivering afvalwater (per jaar en per abonnee) 20,00 euro/jaar 21,20\n"
+    "Korting op vast recht (per jaar en per persoon, max 5) 20,00%\n"
+)
+
+
+@pytest.mark.timeout(5)
+def test_the_rate_anchors_stay_linear_on_repeated_labels_and_digit_runs() -> None:
+    """Each label used to read on to the end of the text, and an amount
+    tried from inside a run of digits read the rest of the run again."""
+    from custom_components.be_water_prices.providers.aquaduin import _BASIS_RE, _COMFORT_RE
+
+    basis = _BASIS_RE.search("Basistarief 30 m³ " * 20_000 + _CARD_LINES)
+    assert basis is not None and basis.group(1) == "5,9908"
+    assert _BASIS_RE.search("Basistarief 30 m³ " + "1" * 100_000) is None
+    line = _CARD_LINES.splitlines()[1]
+    comfort = _COMFORT_RE.search("Comforttarief Basisverbruik " * 20_000 + line)
+    assert comfort is not None and comfort.group(1) == "11,9816"
+    assert _COMFORT_RE.search("Comforttarief Basisverbruik " + "1" * 100_000) is None
+
+
+@pytest.mark.timeout(5)
+def test_the_korting_scan_stays_linear_on_parentheses_left_open() -> None:
+    """Searched for "per persoon" in one pattern, every open parenthesis
+    after the label was read to the end of the text."""
+    from custom_components.be_water_prices.providers.aquaduin import _fixed_terms
+
+    junk = "Korting op vast recht (per persoon " * 20_000
+    assert _fixed_terms(junk + "\n" + _CARD_LINES) == (100.0, 20.0, 0.06)
+
+
+def test_the_korting_is_the_per_person_one() -> None:
+    """Another discount on the vastrecht printed first is not the one."""
+    from custom_components.be_water_prices.providers.aquaduin import _fixed_terms
+
+    other = "Korting op vast recht (per jaar en per aansluiting) 10,00%\n"
+    assert _fixed_terms(other + _CARD_LINES)[1] == 20.0
+
+
 @pytest.mark.timeout(5)
 def test_the_pdf_link_scan_stays_linear_on_a_long_href() -> None:
     """Searched for in one pattern, the card's name was looked for again

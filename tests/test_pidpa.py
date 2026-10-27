@@ -328,3 +328,18 @@ async def test_the_default_fetch_has_nothing_under_it() -> None:
     ):
         await pidpa.fetch(session=None)  # type: ignore[arg-type]
     pdf.assert_not_awaited()
+
+
+@pytest.mark.timeout(5)
+def test_an_amount_scan_stays_linear_on_a_long_digit_run() -> None:
+    """Tried from every position in a run, each try read the rest of the
+    run again: the square of its length, minutes for this cell."""
+    from custom_components.be_water_prices.providers.pidpa import (
+        _WITH_VAT_AMOUNT_RE,
+        _ex_vat_amount,
+    )
+
+    run = "1" * 100_000
+    assert _ex_vat_amount(run + " 2,1888 euro excl. btw") == 2.1888
+    twin = _WITH_VAT_AMOUNT_RE.search(run + " 106 euro incl. btw")
+    assert twin is not None and twin.group(1) == "106"

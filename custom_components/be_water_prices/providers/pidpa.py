@@ -333,8 +333,11 @@ async def fetch_tariefplan(session: aiohttp.ClientSession) -> WaterTariff:
 # "2,1888 euro excl. btw - 2,3201 euro incl. btw" with optional whitespace
 # (incl. NBSP) between the number and the unit; we anchor on the ex-VAT half.
 # The vastrecht and korting rows print whole euros ("50 euro excl. btw").
-_EX_VAT_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*euro\s*excl", re.IGNORECASE)
-_WITH_VAT_AMOUNT_RE = re.compile(r"(\d+(?:,\d+)?)\s*euro\s*incl", re.IGNORECASE)
+# An amount starts at the first digit of a run: tried from every position
+# in a long one, each try read the rest of the run again, the square of its
+# length, and a 32 kB cell held the parser for over a minute.
+_EX_VAT_AMOUNT_RE = re.compile(r"(?<!\d)(\d++(?:,\d++)?)\s*euro\s*excl", re.IGNORECASE)
+_WITH_VAT_AMOUNT_RE = re.compile(r"(?<!\d)(\d++(?:,\d++)?)\s*euro\s*incl", re.IGNORECASE)
 # Pidpa publishes its commune slugs in the public sitemap.xml.
 _COMMUNE_SLUG_RE = re.compile(r"https://www\.pidpa\.be/ons-aanbod/je-gemeente/([a-z][a-z0-9-]*)<")
 

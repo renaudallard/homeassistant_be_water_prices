@@ -126,3 +126,14 @@ async def test_only_a_tls_failure_earns_the_unverified_retry(
     tariff = await inbw.fetch(None)  # type: ignore[arg-type]
     assert tariff.utility == "inbw"
     assert [c.get("verify_ssl", True) for c in calls] == [True, False]
+
+
+@pytest.mark.timeout(5)
+def test_the_redevance_row_check_stays_linear_on_a_long_row() -> None:
+    """The gap after the label read on to the end of the row from every
+    "redevance" in it: the square of its length, on the one page this
+    integration fetches without certificate checks."""
+    from custom_components.be_water_prices.providers.inbw import _REDEVANCE_ROW_RE
+
+    assert _REDEVANCE_ROW_RE.search("redevance 20 " * 100_000) is None
+    assert _REDEVANCE_ROW_RE.search("redevance annuelle (20 x cvd) 1 52,000 €") is not None
