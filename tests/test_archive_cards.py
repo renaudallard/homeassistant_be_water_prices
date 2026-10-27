@@ -979,14 +979,22 @@ def test_main_fails_the_run_only_when_nothing_was_archived(
     assert ac.main() == 0
 
 
+def _workflow_step(job: str, name: str) -> str:
+    """The shell of the step ``name`` in the archive workflow's job ``job``."""
+    import yaml  # type: ignore[import-untyped]
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/archive_cards.yml").read_text()
+    )
+    return str(next(s["run"] for s in workflow["jobs"][job]["steps"] if s.get("name") == name))
+
+
 def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> None:
     """The electricity and gas archives push to the cards repository's main
     too, and one can land between this step's clone and its push. The step's
     own shell must rebase and land rather than fail the run."""
     import os
     import subprocess
-
-    import yaml  # type: ignore[import-untyped]
 
     def git(*args: str, cwd: Path) -> str:
         return subprocess.run(
@@ -1013,9 +1021,11 @@ def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> Non
     git("commit", "-q", "-m", "Cards seen", cwd=other)
 
     work = tmp_path / "work"
-    (work / "tmp" / "archive" / "coverage").mkdir(parents=True)
-    (work / "tmp" / "archive" / "coverage.md").write_text("# Coverage\n")
-    (work / "tmp" / "archive" / "coverage" / "farys.md").write_text("# Farys\n")
+    (work / "tmp" / "listings" / "water" / "coverage").mkdir(parents=True)
+    (work / "tmp" / "listings" / "README.md").write_text("# Price cards\n")
+    (work / "tmp" / "listings" / "water" / "README.md").write_text("# Water cards\n")
+    (work / "tmp" / "listings" / "water" / "coverage.md").write_text("# Coverage\n")
+    (work / "tmp" / "listings" / "water" / "coverage" / "farys.md").write_text("# Farys\n")
 
     stubs = tmp_path / "bin"
     stubs.mkdir()
@@ -1028,18 +1038,12 @@ def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> Non
     for stub in stubs.iterdir():
         stub.chmod(0o755)
 
-    workflow = yaml.safe_load(
-        (Path(__file__).resolve().parents[1] / ".github/workflows/archive_cards.yml").read_text()
-    )
-    steps = workflow["jobs"]["archive"]["steps"]
-    script = next(
-        s["run"] for s in steps if s.get("name") == "Publish the listings in the cards repository"
-    )
+    script = _workflow_step("push", "Publish the listings in the cards repository")
     token = "t0ken"
     env = {
         **os.environ,
         "PATH": f"{stubs}:{os.environ['PATH']}",
-        "CARDS_TOKEN": token,
+        "GH_TOKEN": token,
         "CARDS_REPO": "renaudallard/be_price_cards",
         # The step's GitHub URL is the local origin here.
         "GIT_CONFIG_COUNT": "1",
@@ -1066,8 +1070,6 @@ def _keep_step(
     under tmp/pdfs, ``gh`` the body of a case over the stub's first two
     arguments, and ``today`` what the stub date prints."""
     import os
-
-    import yaml  # type: ignore[import-untyped]
 
     def git(*args: str, cwd: Path) -> str:
         return subprocess.run(
@@ -1106,22 +1108,15 @@ def _keep_step(
     for stub in stubs.iterdir():
         stub.chmod(0o755)
 
-    workflow = yaml.safe_load(
-        (Path(__file__).resolve().parents[1] / ".github/workflows/archive_cards.yml").read_text()
-    )
-    steps = workflow["jobs"]["archive"]["steps"]
-    script = next(s["run"] for s in steps if s.get("name") == "Keep the cards themselves")
-    token = "t0ken"
+    script = _workflow_step("keep", "Keep the cards themselves")
     env = {
         **os.environ,
         "PATH": f"{stubs}:{os.environ['PATH']}",
-        "GH_TOKEN": token,
+        "GH_TOKEN": "t0ken",
         "CARDS_REPO": "renaudallard/be_price_cards",
         "GIT_CONFIG_COUNT": "1",
         "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
-        "GIT_CONFIG_VALUE_0": (
-            f"https://x-access-token:{token}@github.com/renaudallard/be_price_cards.git"
-        ),
+        "GIT_CONFIG_VALUE_0": "https://github.com/renaudallard/be_price_cards.git",
     }
     done = subprocess.run(
         ["bash", "-e", "-o", "pipefail", "-c", script],
@@ -1170,6 +1165,91 @@ def test_a_card_picture_is_uploaded_and_recorded_like_a_pdf(tmp_path: Path) -> N
     assert uploaded.read_text().split() == ["water-2026-10", f"tmp/pdfs/water-2026-10/{digest}.jpg"]
     manifest = json.loads((work / "tmp" / "archive" / "pdfs.json").read_text())
     assert manifest == {digest: f"water-2026-10/{digest}.jpg"}
+
+
+def test_only_the_cards_the_walk_names_are_uploaded(tmp_path: Path) -> None:
+    """The keep job holds the cards token and takes the walk's files from
+    an artifact, so it uploads only a month folder and a card named as the
+    walk names them, and nothing else that came with them."""
+    uploaded = tmp_path / "uploaded.txt"
+    digest = "e" * 64
+    gh = (
+        '"release view") exit 1 ;;\n'
+        f'"release upload") echo "$4" >> {uploaded} ;;\n'
+        '"release list") ;;\n'
+    )
+    cards = {
+        f"water-2026-10/{digest}.pdf": b"%PDF-1.7",
+        "water-2026-10/notes.sh": b"#!/bin/sh",
+        f"elsewhere/{digest}.pdf": b"%PDF-1.7",
+        f"water-2026-1/{digest}.pdf": b"%PDF-1.7",
+    }
+    done, work = _keep_step(tmp_path, {}, cards, gh, "2026-10-19")
+    assert done.returncode == 0, done.stderr
+    assert uploaded.read_text().split() == [f"tmp/pdfs/water-2026-10/{digest}.pdf"]
+    manifest = json.loads((work / "tmp" / "archive" / "pdfs.json").read_text())
+    assert manifest == {digest: f"water-2026-10/{digest}.pdf"}
+
+
+def test_the_branch_takes_the_indexed_tree_as_plain_files(tmp_path: Path) -> None:
+    """The push job replaces the branch with the index job's tree, so a row
+    the walk pruned goes, and drops any .git entry the hand-over carries
+    before laying it over the clone: a hook there would run with the token."""
+    import os
+
+    def git(*args: str, cwd: Path) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    (seed / "vivaqua" / "default").mkdir(parents=True)
+    git("init", "-q", "-b", "archive", cwd=seed)
+    (seed / "vivaqua" / "default" / "2023-09.json").write_text("{}\n")
+    (seed / "vivaqua" / "default" / "2026-09.json").write_text("{}\n")
+    git("add", "-A", cwd=seed)
+    git("commit", "-q", "-m", "start", cwd=seed)
+    git("clone", "-q", "--bare", str(seed), str(origin), cwd=tmp_path)
+
+    work = tmp_path / "work"
+    indexed = work / "tmp" / "indexed"
+    (indexed / "vivaqua" / "default").mkdir(parents=True)
+    (indexed / "vivaqua" / "default" / "2026-09.json").write_text("{}\n")
+    (indexed / "vivaqua" / "default" / "2026-10.json").write_text('{"a": 1}\n')
+    ran = tmp_path / "hook-ran"
+    (indexed / ".git" / "hooks").mkdir(parents=True)
+    (indexed / ".git" / "hooks" / "pre-commit").write_text(f"#!/bin/sh\ntouch {ran}\n")
+    (indexed / ".git" / "hooks" / "pre-commit").chmod(0o755)
+    (work / "tmp" / "listings").mkdir(parents=True)
+
+    env = {
+        **os.environ,
+        "GH_TOKEN": "t0ken",
+        "REPO": "renaudallard/homeassistant_be_water_prices",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
+        "GIT_CONFIG_VALUE_0": "https://github.com/renaudallard/homeassistant_be_water_prices.git",
+    }
+    for name in ("Keep to plain files", "Commit and push what changed"):
+        done = subprocess.run(
+            ["bash", "-e", "-o", "pipefail", "-c", _workflow_step("push", name)],
+            cwd=work,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert done.returncode == 0, done.stderr
+    assert not ran.exists()
+    assert git("ls-tree", "-r", "--name-only", "archive", cwd=origin).split() == [
+        "vivaqua/default/2026-09.json",
+        "vivaqua/default/2026-10.json",
+    ]
+    assert "t0ken" not in (work / "tmp" / "branch" / ".git" / "config").read_text()
 
 
 PICTURE_URL = "https://acme.test/tarif.jpg"

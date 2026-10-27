@@ -274,26 +274,37 @@ commits the branch when anything changed. A manual run can ask for
 `--reparse` or `--rerender`. Water-link is skipped on a runner; an archive
 run from a residential address stores it.
 
-The job's own token, which writes the branch, is not kept in the checkout
-while the walk runs third-party code; only the push is given it, as an
-authorization header on that call. The listings push gets the cards token
-the same way, and the listings clone needs none, the cards repository
-being public, so neither token lands in a checkout's config. The upload
-needs a fine-grained token with contents read and write on the cards
-repository in the `BE_WATER_CARDS` secret; without it the branch still
-gets the parsed cards and their texts and the step says so. An upload or
-a listings push that fails, an expired token among them, does not hold
-the branch back either: the cards it missed are offered again by the next
-run.
+The run is seven jobs, as the electricity archive's is, so no token
+shares a runner with third-party code. `walk` runs the archiver, the PDF
+reader and Tesseract on whatever the utilities serve, with a read-only
+token and no secret, and hands its files over as artifacts; a process it
+leaves behind, or a git hook, a git config entry or a `GITHUB_ENV` line,
+dies with its runner. `keep` holds the cards token and uploads the cards
+with gh, jq and git alone, taking only files named as the walk names them
+(`water-<YYYY-MM>/<sha256>.pdf`, `.jpg` or `.png`). `index` rewrites the
+sheets with the integration's code and no token. `push` holds the cards
+token and a `github.token` that can write the branch, and only clones,
+lays the indexed files over the clones as plain files, with any `.git`
+entry dropped, and pushes. `token` warns of the cards token's expiry, and
+`ocr` and `report` file issues with `github.token` alone. Both tokens
+reach git through gh's credential helper (`gh auth git-credential`), which
+reads `GH_TOKEN`, so neither is on a command line or in a file, and the
+clones need none, both repositories being public. The upload needs a
+fine-grained token with contents read and write on the cards repository
+in the `BE_WATER_CARDS` secret; without it the branch still gets the
+parsed cards and their texts and the job says so. An upload or a listings
+push that fails, an expired token among them, does not hold the branch
+back either: the cards it missed are offered again by the next run.
 
 A run that stores nothing, a refused push or an expired token files an
-issue labelled `archive-cards`, one per problem with a comment per
-further failing run. The token's expiry is announced two weeks ahead the
-same way, under a label of its own, `archive-cards-token`, so the warning
-never lands in an open failure thread. A card picture whose reading was
-refused, or disagrees with a transcription, is filed under
-`archive-cards-ocr`, fingerprinted on the list of refusals, so the same
-pictures failing again within the week add nothing.
+issue labelled `archive-cards`, naming the job that failed, one per
+problem with a comment per further failing run. The token's expiry is
+announced two weeks ahead the same way, under a label of its own,
+`archive-cards-token`, so the warning never lands in an open failure
+thread. A card picture whose reading was refused, or disagrees with a
+transcription, is filed under `archive-cards-ocr`, fingerprinted on the
+list of refusals, so the same pictures failing again within the week add
+nothing.
 
 ### Finding a stored card by hand
 
