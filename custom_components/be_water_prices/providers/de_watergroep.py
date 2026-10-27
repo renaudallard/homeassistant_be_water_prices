@@ -134,8 +134,13 @@ _ZUIVERING_UNAVAILABLE_RE = re.compile(
 
 # A leg's row in the vastrecht and korting tables: "Waterverbruik
 # drinkwater € 50 (incl. € 53)", the korting "- € 10 (incl. - € 10,60)".
+# The whitespace after an optional minus belongs to the minus. Read as two
+# free runs around it, a run of whitespace with no "€" after it was split
+# every way in turn, the square of its length, as inasep._CVD_RE says.
 _FIXED_LEGS = ("Waterverbruik drinkwater", "Afvoer van afvalwater", "Zuivering van afvalwater")
-_FIXED_ROW_RE_FMT = r"{label}\s*-?\s*€\s*(\d+(?:,\d+)?)\s*\(incl\.\s*-?\s*€\s*(\d+(?:,\d+)?)\)"
+_FIXED_ROW_RE_FMT = (
+    r"{label}\s*(?:-\s*)?€\s*(\d+(?:,\d+)?)\s*\(incl\.\s*(?:-\s*)?€\s*(\d+(?:,\d+)?)\)"
+)
 
 
 def _fixed_terms(text: str, before: int) -> tuple[float, float, float]:

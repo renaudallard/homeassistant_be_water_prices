@@ -418,3 +418,19 @@ async def test_the_commune_is_part_of_the_memo_key() -> None:
         with pytest.raises(AttributeError):
             # A miss reaches the session, which here is nothing.
             await de_watergroep._fetch_commune_ajax(None, "guid-2", 2026)  # type: ignore[arg-type]
+
+
+@pytest.mark.timeout(5)
+def test_the_fixed_row_scan_stays_linear_on_a_run_of_whitespace() -> None:
+    """Two free runs around the optional minus split one run of whitespace
+    every way when no euro sign followed: the square of its length."""
+    import re
+
+    from custom_components.be_water_prices.providers.de_watergroep import _FIXED_ROW_RE_FMT
+
+    row = re.compile(_FIXED_ROW_RE_FMT.format(label=r"Waterverbruik\s+drinkwater"), re.IGNORECASE)
+    assert row.search("Waterverbruik drinkwater" + " " * 100_000 + "x") is None
+    fee = row.search("Waterverbruik drinkwater € 50 (incl. € 53)")
+    assert fee is not None and fee.groups() == ("50", "53")
+    korting = row.search("Waterverbruik drinkwater - € 10 (incl. - € 10,60)")
+    assert korting is not None and korting.groups() == ("10", "10,60")
