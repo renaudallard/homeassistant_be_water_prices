@@ -64,6 +64,7 @@ from .._phantom_blocklists import (
 )
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
+from ._html import dropdown_options
 from ._pdf import (
     USER_AGENT,
     _http_error,
@@ -426,15 +427,7 @@ async def _commune_listed(session: aiohttp.ClientSession, commune: str) -> bool:
 # Each <option> is "<postcode> - <commune> (<gemeente>)" with value =
 # numeric ID. We store the numeric ID as the option's id and the full
 # label as its display string.
-# The gap between the tag and the label is not padded with \\s* on
-# either side: three ways to split the same run of whitespace makes
-# the engine enumerate every split when the match fails, which is
-# cubic in the length of that run. .strip() below does the same job
-# in linear time.
-_OPTION_RE = re.compile(
-    r'<option[^>]*value="(\d+)"[^>]*>([^<]*)</option>',
-    re.IGNORECASE | re.DOTALL,
-)
+_ID_RE = re.compile(r'value="(\d+)"', re.IGNORECASE)
 
 
 # Phantom entries in Farys's dropdown -- the AJAX endpoint returns a
@@ -453,9 +446,8 @@ _OPTION_RE = re.compile(
 def _parse_commune_options(html: str) -> list[CommuneOption]:
     communes: list[CommuneOption] = []
     seen: set[str] = set()
-    for match in _OPTION_RE.finditer(html):
-        commune_id = match.group(1)
-        label = match.group(2).strip()
+    for commune_id, text in dropdown_options(html, _ID_RE):
+        label = text.strip()
         if not label or commune_id in seen or label in _UNSERVABLE_COMMUNE_LABELS:
             continue
         seen.add(commune_id)

@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import aiohttp
@@ -51,6 +51,7 @@ from ._pdf import fetch_text, to_float
 fetch_html = fetch_text
 __all__ = [
     "BeautifulSoup",
+    "dropdown_options",
     "extract_amounts",
     "fetch_and_parse",
     "fetch_html",
@@ -119,3 +120,23 @@ def extract_amounts(text: str) -> list[float]:
                 value = -value
             seen[m.start(number)] = value
     return [seen[k] for k in sorted(seen)]
+
+
+# An <option> and its text. The tag stops at the next "<" as well as at its
+# own ">", so a tag left open is read up to the next one and no further.
+# Read with the value in the same pattern, every "<option" on a page with no
+# ">" after it scanned the rest of the page, which costs the square of its
+# length: 64 kB held the parser for five seconds. Nor is the text padded
+# with \s*: one run of whitespace split two ways is tried every way when a
+# match fails, so callers strip it instead.
+_OPTION_RE = re.compile(r"<option([^<>]*+)>([^<]*+)</option>", re.IGNORECASE)
+
+
+def dropdown_options(html: str, value: re.Pattern[str]) -> Iterator[tuple[str, str]]:
+    """The value and the text of each ``<option>`` in ``html`` whose
+    attributes ``value`` matches, in document order: the value is
+    ``value``'s first group, the text as the page has it."""
+    for option in _OPTION_RE.finditer(html):
+        found = value.search(option.group(1))
+        if found is not None:
+            yield found.group(1), option.group(2)

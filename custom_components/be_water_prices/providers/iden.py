@@ -61,7 +61,11 @@ _LABEL_PREFIX = "IDEN tarification"
 # The three rates sit in readonly <input> fields, so they are attributes
 # rather than text and get_text() drops them. Inline each value where the
 # input stands, then the labels and the values read in document order.
-_INPUT_VALUE_RE = re.compile(r"<input\b[^>]*?\bvalue\s*=\s*\"([^\"]*)\"[^>]*>", re.IGNORECASE)
+# The tag stops at the next "<" as well as at its own ">". Searched for a
+# value in the same pattern, every "<input" on a page with no ">" after it
+# read the rest of the page, which costs the square of its length.
+_INPUT_RE = re.compile(r"<input\b([^<>]*+)>", re.IGNORECASE)
+_VALUE_RE = re.compile(r"\bvalue\s*=\s*\"([^\"]*)\"", re.IGNORECASE)
 _VALUE_OPEN = "‹"
 _VALUE_CLOSE = "›"
 
@@ -76,9 +80,17 @@ _FSE_RE = re.compile(
 )
 
 
+def _inlined(field: re.Match[str]) -> str:
+    """An input as its value between the markers, one with no value as it was."""
+    value = _VALUE_RE.search(field.group(1))
+    if value is None:
+        return field.group(0)
+    return f" {_VALUE_OPEN}{value.group(1)}{_VALUE_CLOSE} "
+
+
 def _text_with_field_values(html: str) -> str:
     """The page's text with each input's value inlined where the input sits."""
-    inlined = _INPUT_VALUE_RE.sub(lambda m: f" {_VALUE_OPEN}{m.group(1)}{_VALUE_CLOSE} ", html)
+    inlined = _INPUT_RE.sub(_inlined, html)
     soup = BeautifulSoup(inlined, "html.parser")
     for tag in soup(["script", "style"]):
         tag.decompose()

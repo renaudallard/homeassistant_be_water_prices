@@ -412,6 +412,16 @@ def test_iden_is_priced_on_the_spge_figures_its_page_prints() -> None:
     assert (moved.cva_eur_per_m3, moved.fse_eur_per_m3) == (2.85, 0.04)
 
 
+@pytest.mark.timeout(5)
+def test_iden_s_field_scan_stays_linear_on_tags_left_open() -> None:
+    """Searched for a value in one pattern, every "<input" on a page with
+    no ">" after it read the rest of the page: the square of its length."""
+    from custom_components.be_water_prices.providers.iden import _text_with_field_values
+
+    text = _text_with_field_values('<input value="3,3552">' + "<input " * 100_000)
+    assert text.startswith("‹3,3552›")
+
+
 def test_iden_does_not_read_the_rate_out_of_the_explanatory_section() -> None:
     """The FAQ below repeats every label with no value; only the card counts."""
     page = fixture_html("iden_2026.html")

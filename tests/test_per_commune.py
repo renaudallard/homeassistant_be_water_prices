@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -38,19 +39,19 @@ from custom_components.be_water_prices.providers.base import (
     relabel_with_human_commune,
 )
 from custom_components.be_water_prices.providers.de_watergroep import (
-    _OPTION_RE as DWG_OPTION_RE,
+    EXTRACTOR as DWG,
 )
 from custom_components.be_water_prices.providers.de_watergroep import (
-    EXTRACTOR as DWG,
+    _parse_commune_options as parse_dwg_options,
 )
 from custom_components.be_water_prices.providers.de_watergroep import (
     parse_commune_tariff as parse_dwg_commune,
 )
 from custom_components.be_water_prices.providers.farys import (
-    _OPTION_RE as FARYS_OPTION_RE,
+    EXTRACTOR as FARYS,
 )
 from custom_components.be_water_prices.providers.farys import (
-    EXTRACTOR as FARYS,
+    _parse_commune_options as parse_farys_options,
 )
 from custom_components.be_water_prices.providers.water_link import (
     EXTRACTOR as WATER_LINK,
@@ -183,7 +184,7 @@ def test_dwg_per_commune_does_not_bleed_into_comforttarief_block() -> None:
 
 def test_dwg_commune_dropdown_yields_700_options() -> None:
     html = fixture_html("dewatergroep_tarieven_2026.html")
-    options = list(DWG_OPTION_RE.finditer(html))
+    options = parse_dwg_options(html)
     # The dropdown carries every Vlaams commune DWG serves; ~700 in 2026.
     assert len(options) > 600
 
@@ -191,19 +192,35 @@ def test_dwg_commune_dropdown_yields_700_options() -> None:
 def test_farys_commune_dropdown_yields_290_options() -> None:
     # Used in tests/fixtures/farys_gent_2026.json indirectly; the live
     # dropdown is on the page itself, captured separately. Smoke-test
-    # that the option regex still matches a plausible count.
-    from custom_components.be_water_prices.providers.farys import _OPTION_RE
-
-    # Build a minimal fixture to exercise the option regex.
+    # that the option parse still finds what a plain dropdown holds.
     html = (
         '<select name="municipality">'
         '<option value="24511">9300 - Aalst (Aalst)</option>'
         '<option value="25071">9000 - Gent-centrum (Gent)</option>'
         "</select>"
     )
-    options = list(_OPTION_RE.finditer(html))
+    options = parse_farys_options(html)
     assert len(options) == 2
-    assert options[0].group(1) == "24511"
+    assert options[0].id == "24511"
+
+
+@pytest.mark.timeout(5)
+@pytest.mark.parametrize(
+    ("parse", "option"),
+    [
+        (
+            parse_dwg_options,
+            '<option value="{B16A143A-49E6-4CE5-A241-1AA09BFC406A}">1500 - Halle</option>',
+        ),
+        (parse_farys_options, '<option value="25071">9000 - Gent-centrum (Gent)</option>'),
+    ],
+)
+def test_the_dropdown_scan_stays_linear_on_tags_left_open(parse: Any, option: str) -> None:
+    """Read with the value in one pattern, every "<option" on a page with
+    no ">" after it scanned the rest of the page: the square of its length,
+    minutes for this one."""
+    options = parse(option + "<option " * 100_000)
+    assert [o.label for o in options] == [option.split(">")[1].split("<")[0]]
 
 
 def test_extractors_advertise_their_metadata_correctly() -> None:
@@ -217,11 +234,6 @@ def test_extractors_advertise_their_metadata_correctly() -> None:
     # VIVAQUA, SWDE and the rest are still single-fetch.
     aquaduin = next(e for e in all_extractors() if e.id == "aquaduin")
     assert not aquaduin.supports_communes
-
-
-# Sentinel to keep the module-level import sorted; ensures test_per_commune
-# imports the option regexes in a single pass.
-_SENTINEL_REGEXES = (DWG_OPTION_RE, FARYS_OPTION_RE)
 
 
 def _farys_25071_tariff() -> WaterTariff:

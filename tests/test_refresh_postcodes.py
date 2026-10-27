@@ -34,7 +34,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scripts.refresh_postcodes import ZdeQueryError, query_zde_for_centroid
+from scripts.refresh_postcodes import ZdeQueryError, _scrape_postcodes, query_zde_for_centroid
 
 
 class _Resp(io.BytesIO):
@@ -205,3 +205,11 @@ def test_a_short_walloon_map_aborts_instead_of_being_printed(
     ):
         assert R.main() == 1
     assert "expected at least" in capsys.readouterr().err
+
+
+@pytest.mark.timeout(5)
+def test_the_dropdown_scan_stays_linear_on_tags_left_open() -> None:
+    """Every "<option" on a page with no ">" after it read the rest of the
+    page: the square of its length."""
+    page = '<option value="1">1500 - Halle (Halle)</option>' + "<option " * 100_000
+    assert _scrape_postcodes(page) == {"1500"}

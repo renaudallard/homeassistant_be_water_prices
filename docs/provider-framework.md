@@ -242,6 +242,11 @@ April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`). See
   minus against the sign or the number as a negative, and a figure that
   both patterns find once. Dot-grouped thousands are left alone because
   SWDE prints "€ 2.748" with a dot decimal.
+- `dropdown_options(html, value)` yields the value and the text of each
+  `<option>` whose attributes `value` matches, its first group being the
+  value: De Watergroep's and Farys's commune lists. Each tag is read up to
+  its own `>` or the next `<`, whichever comes first, so a page of tags
+  left open costs what it is long.
 
 ### `_flanders.py`: the Flemish builder
 

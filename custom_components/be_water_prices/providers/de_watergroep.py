@@ -60,7 +60,7 @@ from bs4 import BeautifulSoup
 
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._html import fetch_html
+from ._html import dropdown_options, fetch_html
 from ._pdf import USER_AGENT, _http_error, _read_text_capped, error_text, memoised_text, to_float
 from .base import (
     CommuneOption,
@@ -436,23 +436,15 @@ async def fetch_for_commune(session: aiohttp.ClientSession, commune: str) -> Wat
     return await _newest_commune_card(session, _DEFAULT_COMMUNE_GUID, _DEFAULT_COMMUNE_LABEL)
 
 
-# The gap between the tag and the label is not padded with \\s* on
-# either side: three ways to split the same run of whitespace makes
-# the engine enumerate every split when the match fails, which is
-# cubic in the length of that run. .strip() below does the same job
-# in linear time.
-_OPTION_RE = re.compile(
-    r'<option[^>]*value="(\{[0-9A-Fa-f-]+\})"[^>]*>([^<]*)</option>',
-    re.IGNORECASE | re.DOTALL,
-)
+# What each commune's <option> carries as its value: its GUID.
+_GUID_RE = re.compile(r'value="(\{[0-9A-Fa-f-]+\})"', re.IGNORECASE)
 
 
 def _parse_commune_options(html: str) -> list[CommuneOption]:
     communes: list[CommuneOption] = []
     seen: set[str] = set()
-    for match in _OPTION_RE.finditer(html):
-        guid = match.group(1)
-        label = match.group(2).strip()
+    for guid, text in dropdown_options(html, _GUID_RE):
+        label = text.strip()
         if not label or guid in seen:
             continue
         seen.add(guid)

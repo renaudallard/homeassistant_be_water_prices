@@ -278,11 +278,10 @@ _POSTCODE_FROM_LABEL_RE = re.compile(r"^\s*(\d{4})\b")
 # either side: three ways to split the same run of whitespace makes
 # the engine enumerate every split when the match fails, which is
 # cubic in the length of that run. .strip() below does the same job
-# in linear time.
-_OPTION_LABEL_RE = re.compile(
-    r"<option[^>]*>([^<]*)</option>",
-    re.IGNORECASE | re.DOTALL,
-)
+# in linear time. The tag stops at the next "<" as well as at its own
+# ">", or every "<option" on a page with no ">" after it reads the rest
+# of the page, which is quadratic in its length.
+_OPTION_LABEL_RE = re.compile(r"<option[^<>]*+>([^<]*+)</option>", re.IGNORECASE)
 
 
 def _fetch(url: str) -> str:
