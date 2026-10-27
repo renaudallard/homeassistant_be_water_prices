@@ -63,7 +63,7 @@ import aiohttp
 
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
-from ._html import fetch_and_parse
+from ._html import fetch_and_parse, first_href
 from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
 from .base import (
     ExtractorError,
@@ -130,14 +130,13 @@ def _find_pdf_href(html: str, year: int) -> str:
     """
     # A re-uploaded file gets a "_0", "_1", ... suffix from the CMS; a
     # corrected card would arrive that way, so the suffix is accepted.
-    m = re.search(
-        rf'href=["\']?([^"\'>\s]*overzicht-tarieven-{year}(?:_\d+)?\.pdf[^"\'>\s]*)',
+    href = first_href(
         html,
-        re.IGNORECASE,
+        re.compile(rf'[^"\'>\s]*overzicht-tarieven-{year}(?:_\d+)?\.pdf[^"\'>\s]*', re.IGNORECASE),
     )
-    if m is None:
+    if href is None:
         raise ExtractorError(f"no {year} tariff PDF link on Aquaduin year page")
-    return m.group(1)
+    return href
 
 
 async def _discover_pdf_url(session: aiohttp.ClientSession, year: int) -> str:

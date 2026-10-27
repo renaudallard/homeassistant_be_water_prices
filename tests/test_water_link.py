@@ -132,6 +132,24 @@ def test_find_pdf_href_ignores_the_year_in_the_upload_directory() -> None:
     assert _find_pdf_href(page, 2027).endswith("2027%20HH.pdf")
 
 
+@pytest.mark.timeout(5)
+def test_the_pdf_link_scan_stays_linear_on_a_long_href() -> None:
+    """Searched for in one pattern, the card's name was looked for again
+    from every "href=" inside a value already scanned: the square of its
+    length."""
+    from custom_components.be_water_prices.providers.water_link import _find_pdf_href
+
+    href = "/sites/default/files/2026-01/2026%20HH.pdf"
+    assert _find_pdf_href("href=" * 100_000 + f' <a href="{href}">x</a>', 2026) == href
+
+
+def test_find_pdf_href_reads_a_name_with_a_space_before_hh() -> None:
+    """The one space the name may hold between the year and HH, unencoded."""
+    from custom_components.be_water_prices.providers.water_link import _find_pdf_href
+
+    assert _find_pdf_href('<a href="/files/2026 HH.pdf">x</a>', 2026) == "/files/2026 HH.pdf"
+
+
 def test_find_pdf_href_raises_when_year_absent() -> None:
     from custom_components.be_water_prices.providers.water_link import _find_pdf_href
 

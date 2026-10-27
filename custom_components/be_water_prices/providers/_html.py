@@ -55,6 +55,7 @@ __all__ = [
     "extract_amounts",
     "fetch_and_parse",
     "fetch_html",
+    "first_href",
     "to_float",
 ]
 
@@ -140,3 +141,20 @@ def dropdown_options(html: str, value: re.Pattern[str]) -> Iterator[tuple[str, s
         found = value.search(option.group(1))
         if found is not None:
             yield found.group(1), option.group(2)
+
+
+# Where each href's value starts, each value read once. Searched for a card's
+# name in the same pattern, a value was scanned again from every "href=" in
+# it, which costs the square of its length: 80 kB held the parser for twenty
+# seconds. A value always matches, so the scan never starts again inside one.
+_HREF_RE = re.compile(r"""href=["']?([^"'>\s]*+)""", re.IGNORECASE)
+
+
+def first_href(html: str, value: re.Pattern[str]) -> str | None:
+    """The first href in ``html`` whose value ``value`` matches from its
+    start, as ``value`` matched it."""
+    for href in _HREF_RE.finditer(html):
+        found = value.match(html, href.start(1))
+        if found is not None:
+            return found.group(0)
+    return None

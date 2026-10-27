@@ -74,7 +74,7 @@ import aiohttp
 
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff, leg_total
-from ._html import fetch_and_parse
+from ._html import fetch_and_parse, first_href
 from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
 from .base import (
     CommuneOption,
@@ -108,7 +108,7 @@ _PDF_HOST = "water-link.be"
 # same name, which is how a corrected card would arrive; the suffix is
 # allowed so that card is found rather than the January template or
 # last year's.
-_PDF_HREF_RE_FMT = r'href=["\']?([^"\'>\s]*{year}(?:%20|[\s_-])?HH(?:_\d+)?\.pdf[^"\'>\s]*)'
+_PDF_HREF_RE_FMT = r'[^"\'>\s]*{year}(?:%20|[\s_-])?HH(?:_\d+)?\.pdf[^"\'>\s]*'
 
 # Commune to anchor the rate row on. Antwerpen is the largest customer
 # block; ring communes share the same drinkwater/zuivering numbers but
@@ -244,10 +244,10 @@ def parse_tariff(
 
 def _find_pdf_href(html: str, year: int) -> str:
     """Pull the household tariff PDF link for ``year`` out of the page."""
-    m = re.search(_PDF_HREF_RE_FMT.format(year=year), html, re.IGNORECASE)
-    if m is None:
+    href = first_href(html, re.compile(_PDF_HREF_RE_FMT.format(year=year), re.IGNORECASE))
+    if href is None:
         raise ExtractorError(f"no {year} household tariff PDF link on the Water-link page")
-    return m.group(1)
+    return href
 
 
 async def _pdf_url_for(session: aiohttp.ClientSession, year: int) -> str:

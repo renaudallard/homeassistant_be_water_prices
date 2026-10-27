@@ -247,6 +247,10 @@ April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`). See
   value: De Watergroep's and Farys's commune lists. Each tag is read up to
   its own `>` or the next `<`, whichever comes first, so a page of tags
   left open costs what it is long.
+- `first_href(html, value)` returns the first href whose value `value`
+  matches from its start, as matched: the PDF links Water-link and
+  Aquaduin read off their pages. Each value is read once, so a long one
+  costs what it is long.
 
 ### `_flanders.py`: the Flemish builder
 

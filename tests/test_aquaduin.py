@@ -78,6 +78,17 @@ def test_find_pdf_href_extracts_versioned_link() -> None:
     assert _find_pdf_href(html, 2026).endswith("overzicht-tarieven-2026.pdf?v=1774021955")
 
 
+@pytest.mark.timeout(5)
+def test_the_pdf_link_scan_stays_linear_on_a_long_href() -> None:
+    """Searched for in one pattern, the card's name was looked for again
+    from every "href=" inside a value already scanned: the square of its
+    length."""
+    from custom_components.be_water_prices.providers.aquaduin import _find_pdf_href
+
+    href = "https://www.aquaduin.be/volumes/overzicht-tarieven-2026.pdf?v=1"
+    assert _find_pdf_href("href=" * 100_000 + f' <a href="{href}">x</a>', 2026) == href
+
+
 def test_find_pdf_href_raises_when_page_has_no_pdf() -> None:
     from custom_components.be_water_prices.providers.aquaduin import _find_pdf_href
 
