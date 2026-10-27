@@ -220,7 +220,11 @@ leaving `state` out for an external statistic or a meter that resets on
 a schedule, whose state is not a register. The coordinator keeps that
 verdict for a meter in `_resetting_meter`, taken from its last numeric
 state since an unavailable one loses the attributes it rests on, and
-`_live_reading` gives no reading for such a meter. It
+`_live_reading` gives no reading for such a meter. A meter with no
+numeric state yet, one whose integration comes up after this one, reads
+as a register until it reports; the two cached year-long reads below
+keep the verdict they were made under and are made again once it
+changes. It
 returns `None` when there is no recorder, no running instance, or no
 statistic for the meter, and raises `RecorderUnavailable` when a running
 recorder failed to answer. `_admitted_changes` then decides which buckets
@@ -254,10 +258,17 @@ twice.
 
 `_read_metered_days` reads the meter's closed days back `_METERED_DAYS`
 (365 + 31) days, once a day per meter, through `_admitted_changes` at debug
-level, and saves `meter`, `read_on` and `days` to the metered Store
-(`be_water_prices.<entry_id>.metered`). A failed read keeps the last one
-for up to `_METERED_HOLD` (7 days), and `async_load_metered_days` adopts a
-stored read only within that window.
+level, and saves `meter`, `read_on`, `register` (whether it read the
+meter as a register) and `days` to the metered Store
+(`be_water_prices.<entry_id>.metered`). A read made under another verdict
+than the meter's current one is made again the same day: a meter that only
+says it resets once its integration is up was read as a register at
+setup, which for a daily meter gave a fifth of its water. The hourly read
+of such a meter makes it, and `_publish_ytd` republishes the year figures
+when they moved even if the year to date did not. A failed read keeps the
+last one for up to `_METERED_HOLD` (7 days), but not one made under the
+other verdict, and `async_load_metered_days` adopts a stored read only
+within that window; a record without `register` reads as a register's.
 
 `_year_figures` builds `YearFigures` from it on the card in force:
 `_rolling_year_m3` is the 365 closed days before the read, priced as a
@@ -294,8 +305,9 @@ refresh.
   last calendar year's metered figure, rounded, when it lies within the
   consumption bounds and is at least `PROJECTION_DRIFT_RATIO` (10 %) off
   the typed figure. The fix writes it into the options, which reloads the
-  entry. The answer is kept in memory per meter, year and typed figure, so
-  later ticks skip the query until a restart.
+  entry. The answer is kept in memory per meter, year, typed figure and
+  register verdict, so later ticks skip the query until a restart or until
+  the meter says it resets.
 - `several_water_meters_<entry_id>` (`_sync_several_meters_issue`): the
   Energy dashboard lists more than one water source and no meter is set.
 - `operator_moved_<entry_id>` (`_sync_operator_issue`): the stored

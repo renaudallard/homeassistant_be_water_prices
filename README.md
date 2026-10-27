@@ -508,7 +508,9 @@ you paid is worth more than a tidy chart.
   is read the same way: its reading is what was used since its last
   reset, not a register the year can be measured against. Point the
   integration at the meter the utility meter counts from to keep the
-  figures live.
+  figures live. Such a meter only says it resets once its integration has
+  reported, so after a restart that brings it up later than this one,
+  the rolling and projected year are read again at the next five past.
   The January 1 meter reading is anchored once from the recorder and
   then **persisted across restarts**, so the figure tracks the live
   meter as `live − baseline` and is not pulled back down to the

@@ -46,7 +46,7 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.be_water_prices.const import (
     CONF_CONSUMPTION_M3_PER_YEAR,
@@ -59,6 +59,7 @@ from custom_components.be_water_prices.const import (
 from custom_components.be_water_prices.coordinator import (
     RecorderUnavailable,
     YearFigures,
+    _metered_from_record,
     _metered_m3,
     _recorder_ytd_m3,
     _rest_of_year_m3,
@@ -706,3 +707,114 @@ async def test_a_read_landing_after_removal_does_not_bring_the_file_back(
         await coordinator._read_metered_days("sensor.water_meter")
     await hass.async_block_till_done()
     assert f"{DOMAIN}.{entry.entry_id}.metered" not in hass_storage
+
+
+# --- a meter that says it resets only once it is up ---------------------------
+
+_DAILY = {"next_reset": "2026-09-16T00:00:00+02:00", "state_class": "total_increasing"}
+
+
+def _rows_by_mode() -> AsyncMock:
+    """A recorder answering a register's read with a quarter of a cubic metre
+    a day and a resetting meter's with half of one."""
+    register = _a_year_of_water()
+    resetting = _buckets(_span(_TODAY - timedelta(days=396), _TODAY - timedelta(days=1), 0.5))
+
+    async def _rows(*_args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        return register if kwargs.get("register", True) else resetting
+
+    return AsyncMock(side_effect=_rows)
+
+
+def _daily_meter_entry(hass: HomeAssistant) -> MockConfigEntry:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_WATER_METER_SENSOR: "sensor.water_today"},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+@pytest.mark.asyncio
+async def test_a_meter_that_says_it_resets_after_setup_is_read_again(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """A meter whose integration comes up after this one has no state at
+    setup to say it resets, so its year is read as a register's. Once it
+    says so, the hourly read reads the days and the full year again the
+    same day, and publishes what they give."""
+    freezer.move_to(_NOW)
+    entry = _daily_meter_entry(hass)
+    rows = _rows_by_mode()
+    full_year = AsyncMock(return_value=None)
+    with _card_and_recorder(rows, full_year=full_year):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert rows.await_args.kwargs["register"] is True
+        assert full_year.await_args.kwargs["register"] is True
+        assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+
+        hass.states.async_set("sensor.water_today", "0.3", _DAILY)
+        await hass.async_block_till_done()
+        freezer.move_to("2026-09-15 11:05:00+00:00")
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    assert rows.await_args.kwargs["register"] is False
+    assert full_year.await_args.kwargs["register"] is False
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(182.5)
+
+
+@pytest.mark.asyncio
+async def test_a_read_kept_from_before_a_restart_is_made_again_in_the_right_mode(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """The read made as a register's is stored, and a restart the same day
+    used to adopt it until the next day."""
+    freezer.move_to(_NOW)
+    entry = _daily_meter_entry(hass)
+    with _card_and_recorder(_rows_by_mode()):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+    hass.states.async_set("sensor.water_today", "0.3", _DAILY)
+    rows = _rows_by_mode()
+    await _restart(hass, entry, rows)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert rows.await_count == 1
+    assert rows.await_args.kwargs["register"] is False
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(182.5)
+
+
+@pytest.mark.asyncio
+async def test_a_read_made_in_the_right_mode_is_not_made_again_after_a_restart(
+    hass: HomeAssistant, freezer: Any
+) -> None:
+    """The way of reading is stored with the days, so a restart the same
+    day keeps a resetting meter's read rather than taking it for a
+    register's and reading it again."""
+    freezer.move_to(_NOW)
+    entry = _daily_meter_entry(hass)
+    hass.states.async_set("sensor.water_today", "0.3", _DAILY)
+    with _card_and_recorder(_rows_by_mode()):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(182.5)
+    rows = _rows_by_mode()
+    await _restart(hass, entry, rows)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert rows.await_count == 0
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(182.5)
+
+
+def test_a_stored_read_says_how_it_was_made() -> None:
+    """A record from before the way of reading was kept is a register's;
+    one that names it otherwise than true or false is no read at all."""
+    record = {"meter": "sensor.water_meter", "read_on": "2026-09-15", "days": {"2026-09-14": 0.3}}
+    held = _metered_from_record(record)
+    assert held is not None and held.register is True
+    held = _metered_from_record({**record, "register": False})
+    assert held is not None and held.register is False
+    assert _metered_from_record({**record, "register": "no"}) is None

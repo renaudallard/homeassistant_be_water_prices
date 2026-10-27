@@ -1023,6 +1023,11 @@ class _MeteredDays:
     meter: str
     read_on: date
     days: dict[date, float]
+    # Whether the days were read as a register's, see _sees_a_register. A
+    # meter whose integration comes up after this one has no state yet to
+    # say it resets, so it is read as a register until it does, and a read
+    # made that way is made again once it has.
+    register: bool = True
 
 
 class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
@@ -1099,15 +1104,16 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # additionally schedules a debounced save so a hard crash between
         # ticks keeps the climbing figure.
         self._cycle_dirty = False
-        # (meter, year, configured m3) the projection prompt was last
-        # decided for. The answer only changes when one of those does, so
-        # remembering them spares the thirteen-month statistics query on
-        # every tick but the first. The meter belongs in the key: an
-        # options change reloads the entry and rebuilds this, but
-        # Energy-dashboard auto-discovery can resolve a different meter
+        # (meter, year, configured m3, read as a register) the projection
+        # prompt was last decided for. The answer only changes when one of
+        # those does, so remembering them spares the thirteen-month
+        # statistics query on every tick but the first. The meter belongs
+        # in the key: an options change reloads the entry and rebuilds this,
+        # but Energy-dashboard auto-discovery can resolve a different meter
         # with no reload at all, and that is a different year's worth of
-        # water.
-        self._projection_checked: tuple[str, int, float] | None = None
+        # water. So does the way it was read, for the reason _MeteredDays
+        # keeps it.
+        self._projection_checked: tuple[str, int, float, bool] | None = None
         # The meter's closed days back to a month before the rolling year,
         # read once a day: the rolling year and the rest of the calendar
         # year, taken from last year's same days, both come off it.
@@ -1550,21 +1556,17 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         configured = float(
             self.entry.options.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3)
         )
-        if self._projection_checked == (meter, year, configured):
+        register = self._sees_a_register(meter, self.hass.states.get(meter))
+        if self._projection_checked == (meter, year, configured, register):
             return
         try:
-            metered = await _recorder_full_year_m3(
-                self.hass,
-                meter,
-                year,
-                register=self._sees_a_register(meter, self.hass.states.get(meter)),
-            )
+            metered = await _recorder_full_year_m3(self.hass, meter, year, register=register)
         except RecorderUnavailable as err:
             # Leave the pair unrecorded so the next tick asks again rather
             # than treating an unreadable database as a settled answer.
             _LOGGER.debug("could not read %d for %s: %s", year, meter, err)
             return
-        self._projection_checked = (meter, year, configured)
+        self._projection_checked = (meter, year, configured, register)
         if not self._owns_the_entry():
             # That read yielded to the loop; the entry may be gone by now.
             return
@@ -1616,25 +1618,31 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         finds the same water. A read that fails keeps what an earlier one
         found for this meter for up to :data:`_METERED_HOLD`, so a database
         hiccup leaves the figures a day behind rather than unknown until
-        the next tick.
+        the next tick. A read made as a register's for a meter that has
+        since said it resets is made again, and is not kept when that
+        fails: a daily meter read that way gave a fifth of its water.
         """
         today = dt_util.now().date()
+        register = self._sees_a_register(meter, self.hass.states.get(meter))
         held = self._metered
-        if held is not None and held.meter == meter and held.read_on == today:
+        if (
+            held is not None
+            and held.meter == meter
+            and held.read_on == today
+            and held.register == register
+        ):
             return
         start = today - timedelta(days=_METERED_DAYS)
         end = today - timedelta(days=1)
         try:
-            rows = await _recorder_daily_rows(
-                self.hass,
-                meter,
-                start,
-                end,
-                register=self._sees_a_register(meter, self.hass.states.get(meter)),
-            )
+            rows = await _recorder_daily_rows(self.hass, meter, start, end, register=register)
         except RecorderUnavailable as err:
             _LOGGER.debug("could not read the last year of %s: %s", meter, err)
-            if held is not None and (held.meter != meter or today - held.read_on > _METERED_HOLD):
+            if held is not None and (
+                held.meter != meter
+                or held.register != register
+                or today - held.read_on > _METERED_HOLD
+            ):
                 self._metered = None
             return
         # Quietly: this reads the same thirteen months every day, so a bucket
@@ -1648,7 +1656,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             for bucket, m3 in admitted
             if bucket is not None
         }
-        self._metered = _MeteredDays(meter=meter, read_on=today, days=days)
+        self._metered = _MeteredDays(meter=meter, read_on=today, days=days, register=register)
         if self._owns_the_entry():
             # Only for the entry this coordinator still speaks for: a read
             # that lands after a removal would bring the file back.
@@ -1656,6 +1664,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 {
                     "meter": meter,
                     "read_on": today.isoformat(),
+                    "register": register,
                     "days": {day.isoformat(): m3 for day, m3 in days.items()},
                 }
             )
@@ -2329,13 +2338,20 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             # whatever the reading proved, so the sensors hold rather than
             # blanking on a year that has not started.
             return
-        if ytd_m3 == self.data.ytd_consumption_m3 and ytd_cost == self.data.current_year_cost_eur:
+        figures = self._year_figures(self.data.tariff, ytd_m3, ytd_cost)
+        if (
+            ytd_m3 == self.data.ytd_consumption_m3
+            and ytd_cost == self.data.current_year_cost_eur
+            and figures == self.data.year_figures
+        ):
             # Nothing changed -- a same-value meter re-report or an
             # attribute-only state event. Skip so a frequently-reporting
             # meter does not write a redundant recorder row for every
             # sensor. The cost is part of the check so a year rollover (or
             # the midnight fee-proration step) still republishes even when
-            # the volume figure is unchanged at ~0.
+            # the volume figure is unchanged at ~0, and so are the year
+            # figures, which the hourly read can read again with the year
+            # where it stood.
             return
         if self._cycle_dirty and self._owns_the_entry():
             # The cycle moved. Schedule a debounced flush (the daily tick and
@@ -2361,7 +2377,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             ytd_consumption_m3=ytd_m3,
             current_year_cost_eur=ytd_cost,
             ytd_started_at=self._ytd.started,
-            year_figures=self._year_figures(self.data.tariff, ytd_m3, ytd_cost),
+            year_figures=figures,
         )
         self.async_update_listeners()
 
@@ -2546,12 +2562,17 @@ def _held_from_record(data: object) -> tuple[WaterTariff, datetime, str | None] 
 def _metered_from_record(data: object) -> _MeteredDays | None:
     """The persisted read of the meter's days, or None when the record
     does not describe one. The file is in .storage where anyone can edit
-    it, and a bad one costs a read, not the entry."""
+    it, and a bad one costs a read, not the entry. A record written before
+    the way of reading was kept is taken as a register's, so a meter that
+    resets reads its days again once."""
     if not isinstance(data, dict):
         return None
     meter = data.get("meter")
     stored = data.get("days")
+    register = data.get("register", True)
     if not isinstance(meter, str) or not isinstance(stored, dict):
+        return None
+    if not isinstance(register, bool):
         return None
     try:
         read_on = date.fromisoformat(str(data.get("read_on")))
@@ -2564,6 +2585,7 @@ def _metered_from_record(data: object) -> _MeteredDays | None:
         meter=meter,
         read_on=read_on,
         days={day: m3 for day, m3 in days.items() if m3 is not None},
+        register=register,
     )
 
 
