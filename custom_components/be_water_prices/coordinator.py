@@ -3456,4 +3456,8 @@ def _rest_of_year_m3(days: Mapping[date, float], today: date) -> float | None:
         if start <= leap_day:
             # Nor has last year's in a year without one.
             rest -= days.get(leap_day, 0.0)
+    if rest is not None and calendar.isleap(today.year) and tomorrow < date(today.year, 2, 29):
+        # A 29 February still to come takes its water from last year's 28th,
+        # which last year's window holds once, for this year's 28th.
+        rest += days.get(date(today.year - 1, 2, 28), 0.0)
     return rest

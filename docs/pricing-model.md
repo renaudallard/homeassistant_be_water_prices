@@ -236,7 +236,8 @@ in [coordinator.md](coordinator.md).
   the card in force.
 - The projected year consumption is the year to date plus what the meter
   recorded last year from tomorrow's date to 31 December (a 29 February
-  last year is left out when this year has none).
+  last year is left out when this year has none, and one still to come this
+  year takes last year's 28th).
 - The projected year end cost is the running bill plus what those days
   add on the card in force:
 

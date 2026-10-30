@@ -167,6 +167,13 @@ def test_29_february_borrows_last_years_28th() -> None:
     assert _rest_of_year_m3(days, date(2028, 2, 28)) == pytest.approx(307 * 0.25)
 
 
+def test_a_29_february_further_ahead_borrows_last_years_28th_too() -> None:
+    """On 10 January 2028 the 356 days to 31 December hold a 29 February,
+    and 11 January to 31 December 2027 only 355."""
+    days = _span(date(2027, 1, 1), date(2028, 1, 9))
+    assert _rest_of_year_m3(days, date(2028, 1, 10)) == pytest.approx(356 * 0.25)
+
+
 def test_last_years_29_february_has_no_twin() -> None:
     """2025 is not leap: 28 February to 31 December is 307 days, and 2024's
     same dates are 308 with its 29 February."""
