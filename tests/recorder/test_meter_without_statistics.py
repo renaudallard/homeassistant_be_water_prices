@@ -128,6 +128,10 @@ def _vivaqua() -> Any:
             "custom_components.be_water_prices.statistics.async_maybe_backfill_once",
             new=AsyncMock(return_value=None),
         ),
+        patch(
+            "custom_components.be_water_prices.statistics.async_maybe_backfill_year",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         yield
 

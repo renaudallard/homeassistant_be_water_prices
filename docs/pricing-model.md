@@ -281,4 +281,5 @@ korting, the social tariff or the intervention sociale. In Wallonia
 less. The four cost sensors are what the household is billed, korting,
 social tariff, intervention sociale, tiers and VAT included. The price
 backfill writes only the five rate sensors' history (`_BACKFILL_KEYS` in
-`statistics.py`).
+`statistics.py`); the year-to-date pair's comes from the meter's history
+(`async_backfill_year`).

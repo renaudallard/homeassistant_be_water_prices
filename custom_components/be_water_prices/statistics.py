@@ -34,8 +34,8 @@ This module backfills hourly rows from the configured start
 (default Jan 1 of the current year) up to the last hour the recorder
 has compiled, flat-lining at the currently-known tariff value for every
 ``MEASUREMENT``-class price sensor on the entry. The ``TOTAL`` YTD
-sensors depend on the user's actual meter history and are intentionally
-excluded -- synthesising them would invent consumption.
+sensors are written apart, from the meter's own history, by
+:func:`async_backfill_year`.
 """
 
 from __future__ import annotations
@@ -43,17 +43,23 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any, Literal
 
 import voluptuous as vol
+from homeassistant.const import CURRENCY_EURO, UnitOfVolume
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import VolumeConverter
 
 from .const import DOMAIN
 from .coordinator import WaterConfigEntry, entry_coordinator, loaded_entries
+
+if TYPE_CHECKING:
+    from homeassistant.components.recorder.models import StatisticData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,11 +77,10 @@ DATA_BACKFILL_YEAR = "backfill_year"
 # How many hourly rows to build between yields to the event loop.
 _BACKFILL_YIELD_EVERY = 744  # a long month
 
-# Sensor keys eligible for backfill: the card's rates and fee, read
-# straight off the latest tariff. The meter-driven sensors are excluded on
-# purpose, since their values come from the user's water meter history,
-# and so is the projected annual cost, which is computed from the
-# configured consumption rather than read off the card.
+# Sensor keys eligible for the flat-line backfill: the card's rates and fee,
+# read straight off the latest tariff. The year-to-date sensors come from
+# the meter's history instead (_YEAR_KEYS), and the projected annual cost
+# is computed from the configured consumption rather than read off the card.
 _BACKFILL_KEYS: tuple[str, ...] = (
     "yearly_fee",
     "basis_rate",
@@ -523,3 +528,277 @@ def async_register_services(hass: HomeAssistant) -> None:
         _handle_backfill,
         schema=SERVICE_BACKFILL_SCHEMA,
     )
+
+
+# The sensors whose year the meter's history fills: each with its place in
+# the (m3, cost) pairs async_year_by_hour gives, and its unit and unit class
+# as Home Assistant compiles the sensor's own statistics.
+_YEAR_KEYS: tuple[tuple[str, int, str, str | None], ...] = (
+    ("current_year_cost", 1, CURRENCY_EURO, None),
+    ("ytd_consumption", 0, UnitOfVolume.CUBIC_METERS, VolumeConverter.UNIT_CLASS),
+)
+
+
+async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> int | None:
+    """Write the year-to-date sensors' hourly rows from 1 January.
+
+    Home Assistant counts a new total sensor's statistics from its first
+    value, so a monthly graph of the year's cost on a fresh entry starts at
+    the install. The rows are the year's m³ and cost at the end of each
+    hour, as the meter's history gives them (``async_year_by_hour``), the
+    last of them the sensors' own figures.
+
+    Only a sensor whose cycle opens on 1 January and whose statistics hold
+    no row for that hour is written: one that has run since then, or was
+    restarted on a meter swap since, already holds its year. Returns the
+    rows written, or None when it could not tell or write, to be asked
+    again.
+    """
+    from homeassistant.helpers.recorder import DATA_INSTANCE
+
+    if DATA_INSTANCE not in hass.data:
+        return None
+    coordinator = entry_coordinator(entry)
+    if coordinator is None or coordinator.data is None:
+        return None
+    reset = dt_util.as_utc(_jan_1_local())
+    end = await _async_compiled_until(hass)
+    hours: list[datetime] = []
+    hour = reset
+    while hour < end:
+        hours.append(hour)
+        hour += timedelta(hours=1)
+    if not hours:
+        return 0
+    ent_reg = er.async_get(hass)
+    wanted: list[tuple[int, str, str, str | None]] = []
+    for key, column, unit, unit_class in _YEAR_KEYS:
+        sid = ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
+        state = None if sid is None else hass.states.get(sid)
+        if sid is None or state is None:
+            continue
+        opened = dt_util.parse_datetime(str(state.attributes.get("last_reset")))
+        if opened is None or opened != reset:
+            continue
+        first = await _read(hass, sid, reset, reset + timedelta(hours=1), "hour")
+        if first is None:
+            return None
+        if not first:
+            wanted.append((column, sid, unit, unit_class))
+    if not wanted:
+        return 0
+    year = await coordinator.async_year_by_hour(hours)
+    if year is None:
+        return None
+    written = 0
+    for column, sid, unit, unit_class in wanted:
+        totals: list[tuple[datetime, float]] = []
+        for hour, figures in zip(hours, year, strict=True):
+            value = figures[column]
+            if value is None:
+                return None
+            totals.append((hour, value))
+        if not await _import_year_rows(hass, sid, unit, unit_class, totals, reset):
+            return None
+        written += len(totals)
+    _LOGGER.debug("be_water_prices year backfill for %s: %d rows", entry.entry_id, written)
+    return written
+
+
+async def _import_year_rows(
+    hass: HomeAssistant,
+    sid: str,
+    unit: str,
+    unit_class: str | None,
+    totals: list[tuple[datetime, float]],
+    reset: datetime,
+) -> bool:
+    """Import ``totals`` as a continuation of the recorded total.
+
+    The live compile carries its total on across a new cycle rather than
+    restart it, so on an entry that ran through last year the row before
+    the window holds last year's whole figure: the rows are shifted by what
+    the total held before them. The rows the live compile wrote after them,
+    short-term and hourly, are moved onto the imported total, the newest
+    short-term row, which the compile resumes from, with them; a short-term
+    row at the last imported hour seeds it when there is none yet.
+
+    False, with nothing imported, when the recorder did not answer one of
+    the reads: a total it could not read, taken for none, put every row
+    below the recorded one.
+    """
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+    from homeassistant.components.recorder.db_schema import Statistics, StatisticsShortTerm
+    from homeassistant.components.recorder.models import (  # type: ignore[attr-defined,unused-ignore]
+        StatisticData,
+        StatisticMeanType,
+        StatisticMetaData,
+    )
+
+    base = await _total_before(hass, sid, totals[0][0], reset)
+    if base is None:
+        return False
+    rows = [
+        StatisticData(
+            start=hour,
+            state=round(total, 4),
+            sum=round(base + total, 4),
+            last_reset=reset,
+        )
+        for hour, total in totals
+    ]
+    last = rows[-1]
+    short = await _read(hass, sid, last["start"] + timedelta(minutes=5), None, "5minute")
+    hourly = await _read(hass, sid, last["start"] + timedelta(hours=1), None, "hour")
+    if short is None or hourly is None:
+        return False
+    metadata = StatisticMetaData(
+        mean_type=StatisticMeanType.NONE,
+        has_sum=True,
+        name=None,
+        source="recorder",
+        statistic_id=sid,
+        unit_class=unit_class,
+        unit_of_measurement=unit,
+    )
+    instance = get_instance(hass)
+    instance.async_import_statistics(metadata, [*rows, *_moved(last, reset, hourly)], Statistics)
+    instance.async_import_statistics(
+        metadata, [last, *_moved(last, reset, short)], StatisticsShortTerm
+    )
+    return True
+
+
+async def _read(
+    hass: HomeAssistant,
+    sid: str,
+    start: datetime,
+    end: datetime | None,
+    period: Literal["5minute", "hour", "month"],
+) -> list[Any] | None:
+    """The rows of ``period`` from ``start`` to ``end``, or to the newest
+    when None; None when the recorder did not answer."""
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+    from homeassistant.components.recorder.statistics import (
+        statistics_during_period,
+    )
+
+    try:
+        got = await get_instance(hass).async_add_executor_job(
+            statistics_during_period,
+            hass,
+            start,
+            end,
+            {sid},
+            period,
+            None,
+            {"sum", "state", "last_reset"},
+        )
+    except Exception as err:
+        _LOGGER.debug("could not read the statistics of %s: %s", sid, err)
+        return None
+    return list(got.get(sid, []))
+
+
+async def _total_before(
+    hass: HomeAssistant, sid: str, first: datetime, reset: datetime
+) -> float | None:
+    """What the recorded total holds before ``first`` beyond the figure of
+    this cycle: all of it for a row of an earlier cycle, 0.0 with nothing
+    recorded, None when the recorder did not answer.
+
+    The last row is found by month, then by hour within that month, so a
+    long gap costs two short reads. A read by month runs on to the end of
+    the month ``first`` opens when it falls on the 1st, as 1 January does,
+    so a month from ``first`` on is not one before it.
+    """
+    months = await _read(hass, sid, first - timedelta(days=400), first, "month")
+    if months is None:
+        return None
+    months = [row for row in months if row["start"] < first.timestamp()]
+    if not months:
+        return 0.0
+    hours = await _read(
+        hass, sid, datetime.fromtimestamp(months[-1]["start"], dt_util.UTC), first, "hour"
+    )
+    if hours is None:
+        return None
+    if not hours or hours[-1].get("sum") is None:
+        return 0.0
+    row = hours[-1]
+    total = float(row["sum"])
+    if datetime.fromtimestamp(row["start"], dt_util.UTC) < reset:
+        return total
+    return total - float(row.get("state") or 0.0)
+
+
+def _moved(last: StatisticData, reset: datetime, later: list[Any]) -> list[StatisticData]:
+    """The live rows after ``last``, moved onto its total.
+
+    Each keeps its state, and the total moves from ``last`` by what the live
+    compile added: the figure's move within the cycle, and the whole state
+    of a new one across its reset, as the compile counts it. A row of an
+    earlier cycle is left where it is.
+    """
+    from homeassistant.components.recorder.models import (  # type: ignore[attr-defined,unused-ignore]
+        StatisticData,
+    )
+
+    cycle = reset.timestamp()
+    total = float(last.get("sum") or 0.0)
+    before = float(last.get("state") or 0.0)
+    opened = cycle
+    moved: list[StatisticData] = []
+    for row in later:
+        state, row_reset = row.get("state"), row.get("last_reset")
+        if state is None or row_reset is None or row_reset < cycle:
+            continue
+        if row_reset != opened:
+            before, opened = 0.0, row_reset
+        total += state - before
+        before = state
+        moved.append(
+            StatisticData(
+                start=datetime.fromtimestamp(row["start"], dt_util.UTC),
+                state=state,
+                sum=round(total, 4),
+                last_reset=datetime.fromtimestamp(row_reset, dt_util.UTC),
+            )
+        )
+    return moved
+
+
+async def async_maybe_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> None:
+    """Run :func:`async_backfill_year` until it has settled the year.
+
+    Asked on every update until it has, but at most once an hour while the
+    recorder cannot tell, and not at all once it has for the calendar year.
+    """
+    coordinator = entry_coordinator(entry)
+    data = None if coordinator is None else coordinator.data
+    if (
+        coordinator is None
+        or data is None
+        or data.ytd_consumption_m3 is None
+        or data.current_year_cost_eur is None
+    ):
+        return
+    now = dt_util.utcnow()
+    year = dt_util.now().year
+    if coordinator.year_backfilled == year:
+        return
+    tried = coordinator.year_backfill_tried
+    if tried is not None and now - tried < timedelta(hours=1):
+        return
+    coordinator.year_backfill_tried = now
+    try:
+        written = await async_backfill_year(hass, entry)
+    except Exception:
+        _LOGGER.exception("year-to-date history backfill failed")
+        return
+    if written is not None:
+        coordinator.year_backfilled = year

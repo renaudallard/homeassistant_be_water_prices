@@ -36,7 +36,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from functools import partial
-from typing import Any
+from typing import Any, Literal
 
 from homeassistant.components.sensor import (
     ATTR_LAST_RESET,
@@ -1046,6 +1046,10 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # captured on each daily tick so meter state-change events can
         # recompute YTD live without re-querying the recorder.
         self._meter_entity_id: str | None = None
+        # The calendar year the year-to-date statistics were settled for,
+        # and when that was last asked (statistics.async_maybe_backfill_year).
+        self.year_backfilled: int | None = None
+        self.year_backfill_tried: datetime | None = None
         # The meter last seen going back to zero on a schedule, see
         # :meth:`_sees_a_register`.
         self._resetting_meter: str | None = None
@@ -2187,8 +2191,11 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 )
         return ytd_m3, ytd_cost
 
-    def _ytd_cost_from_m3(self, tariff: WaterTariff, ytd_m3: float, year: int) -> float | None:
-        """Apply the pro-rated YTD bill math to a year-to-date m³ figure.
+    def _ytd_cost_from_m3(
+        self, tariff: WaterTariff, ytd_m3: float, year: int, day: date | None = None
+    ) -> float | None:
+        """Apply the pro-rated YTD bill math to a year-to-date m³ figure,
+        the fees accrued to ``day`` when given.
 
         Shared by the daily recorder path (:meth:`_compute_ytd`) and the
         live meter-event path (:meth:`_recompute_live_ytd`) so both use
@@ -2199,7 +2206,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         local midnight while its recorder query runs would otherwise price
         the closing year at one day elapsed and hand back a fee of nothing.
         """
-        today = _priced_on(year)
+        today = _priced_on(year) if day is None else day
         jan1 = date(year, 1, 1)
         elapsed = (today - jan1).days + 1  # include today
         days_in_year = 366 if calendar.isleap(year) else 365
@@ -2207,6 +2214,80 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         persons = int(self.entry.options.get(CONF_PERSONS, DEFAULT_PERSONS))
         social = bool(self.entry.options.get(CONF_SOCIAL_TARIFF, False))
         return compute_ytd_cost(tariff, ytd_m3, persons, fraction, social_tariff=social)
+
+    async def async_year_by_hour(
+        self, hours: list[datetime]
+    ) -> list[tuple[float, float | None]] | None:
+        """The year's m³ and cost at the end of each of ``hours``, UTC hours
+        from 1 January, for the statistics backfill.
+
+        Each day holds the water its daily change admits, as the year's own
+        reading does, shared over its hours as the meter's hourly changes
+        rose, and the whole is scaled to the m³ the year publishes, so the
+        last hour is the sensor's figure. Each hour is priced as the year
+        is, the fees accrued to its own day. None while the year publishes
+        no figure, without a meter or statistics to read, or when the
+        recorder did not answer.
+        """
+        data = self.data
+        meter = self._meter_entity_id
+        if data is None or meter is None or data.ytd_consumption_m3 is None or not hours:
+            return None
+        year = dt_util.as_local(hours[0]).year
+        jan1 = date(year, 1, 1)
+        last_day = dt_util.as_local(hours[-1]).date()
+        register = self._sees_a_register(meter, self.hass.states.get(meter))
+        try:
+            daily = await _recorder_daily_rows(self.hass, meter, jan1, last_day, register=register)
+            hourly = await _recorder_daily_rows(
+                self.hass, meter, jan1, last_day, register=register, period="hour"
+            )
+        except RecorderUnavailable:
+            return None
+        if daily is None or hourly is None:
+            return None
+        admitted, _refused, _taken_back = _admitted_changes(
+            daily, meter, jan1, last_day, level=logging.DEBUG
+        )
+        used: dict[date, float] = {}
+        for bucket, m3 in admitted:
+            if bucket is not None:
+                day = dt_util.as_local(datetime.fromtimestamp(bucket, UTC)).date()
+                used[day] = used.get(day, 0.0) + m3
+        rises = {
+            float(row["start"]): max(0.0, float(row["change"]))
+            for row in hourly
+            if row.get("change") is not None
+        }
+        days: dict[date, list[datetime]] = {}
+        for hour in hours:
+            days.setdefault(dt_util.as_local(hour).date(), []).append(hour)
+        water = dict.fromkeys(hours, 0.0)
+        for day, m3 in used.items():
+            day_hours = days.get(day)
+            if not day_hours:
+                continue
+            rose = sum(rises.get(hour.timestamp(), 0.0) for hour in day_hours)
+            if rose == 0.0:
+                # Water the day admits in an hour after the last one there is.
+                water[day_hours[-1]] += m3
+                continue
+            for hour in day_hours:
+                water[hour] += m3 * rises.get(hour.timestamp(), 0.0) / rose
+        recorded = sum(water.values())
+        if recorded == 0.0:
+            # A year the recorder holds no water for: what it publishes is
+            # put on the last hour.
+            water[hours[-1]] = recorded = data.ytd_consumption_m3
+        scale = 0.0 if recorded == 0.0 else data.ytd_consumption_m3 / recorded
+        out: list[tuple[float, float | None]] = []
+        total = 0.0
+        for hour in hours:
+            total += water[hour]
+            m3 = total * scale
+            day = dt_util.as_local(hour).date()
+            out.append((m3, self._ytd_cost_from_m3(data.tariff, m3, year, day)))
+        return out
 
     def _sees_a_register(self, meter: str, state: State | None) -> bool:
         """Whether ``meter`` reads as a register that only ever climbs.
@@ -2785,9 +2866,16 @@ async def _refuse_an_unconvertible_unit(hass: HomeAssistant, instance: Any, enti
 
 
 async def _recorder_daily_rows(
-    hass: HomeAssistant, entity_id: str, start: date, end: date, *, register: bool = True
+    hass: HomeAssistant,
+    entity_id: str,
+    start: date,
+    end: date,
+    *,
+    register: bool = True,
+    period: Literal["day", "hour"] = "day",
 ) -> list[Any] | None:
-    """Return the daily statistics buckets for ``entity_id`` over ``[start, end]``.
+    """Return the daily statistics buckets for ``entity_id`` over ``[start, end]``,
+    or the hourly ones with ``period``.
 
     Wraps :func:`statistics_during_period` via the recorder's executor so
     the SQLite query never runs on the event loop.
@@ -2870,7 +2958,7 @@ async def _recorder_daily_rows(
             start_dt,
             end_dt,
             {entity_id},
-            "day",
+            period,
             # Normalise the change deltas to m³ regardless of the meter's
             # own unit (HA permits water sensors in L / gal / ft³ / CCF as
             # well as m³); the recorder converts via the statistic's unit

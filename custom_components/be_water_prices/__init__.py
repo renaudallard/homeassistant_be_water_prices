@@ -100,13 +100,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> bool:
+    from homeassistant.core import callback
     from homeassistant.exceptions import ConfigEntryNotReady
+    from homeassistant.util import dt as dt_util
 
     from .const import CONF_UTILITY
     from .coordinator import WaterCoordinator
     from .providers import async_load as async_load_providers
     from .providers import get as get_extractor
-    from .statistics import async_maybe_backfill_once
+    from .statistics import async_maybe_backfill_once, async_maybe_backfill_year
 
     # Drop any phantom commune id the runtime list_communes filter
     # blocks. Runs on every setup (not only v1->v2 migration) so a
@@ -205,6 +207,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> boo
         await async_maybe_backfill_once(hass, entry)
     except Exception:
         _LOGGER.exception("price-history backfill failed; entry continues without it")
+
+    # The year-to-date sensors' history, from the meter's, once the year
+    # publishes a figure: one run at a time, in the background.
+    running: set[str] = set()
+
+    @callback
+    def _maybe_backfill_year() -> None:
+        if running or coordinator.year_backfilled == dt_util.now().year:
+            return
+        running.add(entry.entry_id)
+
+        async def _run() -> None:
+            try:
+                await async_maybe_backfill_year(hass, entry)
+            finally:
+                running.discard(entry.entry_id)
+
+        entry.async_create_background_task(hass, _run(), f"{DOMAIN} year history {entry.entry_id}")
+
+    entry.async_on_unload(coordinator.async_add_listener(_maybe_backfill_year))
+    _maybe_backfill_year()
     # After the backfill, not before: the orphan-statistics cleanup finds
     # the rows it has to consider through the entity registry, so pulling
     # the registry entry first would strand them permanently.

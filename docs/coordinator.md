@@ -27,7 +27,9 @@ platforms are forwarded, `async_setup_live_tracking` subscribes to the
 meter, `async_read_meter_history` starts as an entry background task when
 the refresh left it pending, an update listener reloads the entry on any
 change to it, and `statistics.async_maybe_backfill_once` writes the price
-history (wrapped so a failure only logs).
+history (wrapped so a failure only logs). An update listener then has
+`statistics.async_maybe_backfill_year` write the year-to-date sensors'
+history once the year publishes a figure.
 
 ## One tick
 

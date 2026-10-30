@@ -96,6 +96,17 @@ loaded entry raises a translated `ServiceValidationError`
   registered with `async_register_admin_service`, so a user who is not an
   administrator is refused; an automation, which has no user, is not.
 
+The year-to-date sensors' history is written apart, by
+`async_backfill_year` from `async_maybe_backfill_year`, which an update
+listener asks after setup until the year is settled: once the year
+publishes a figure, only for a sensor whose `last_reset` is 1 January and
+whose statistics hold no row for that hour, at most once an hour while
+the recorder cannot answer. The rows are the year's m³ and cost at the
+end of each hour (`WaterCoordinator.async_year_by_hour`: each day's
+admitted change spread over the hours the meter climbed in, scaled to the
+published m³, priced with that day's share of the fees), joined to the
+total the recorder compiled from the live sensor (`_import_year_rows`).
+
 The service fields and descriptions are in `services.yaml`, with
 translations under `services` in `strings.json` and `translations/`.
 

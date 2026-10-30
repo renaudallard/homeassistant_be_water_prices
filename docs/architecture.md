@@ -49,7 +49,7 @@ registry.
 | `pricing.py` | The bill math, without Home Assistant imports ([pricing-model.md](pricing-model.md)) |
 | `sensor.py` | The sensors ([entities.md](entities.md)) |
 | `button.py` | The refresh button |
-| `statistics.py` | The price-history backfill and its service |
+| `statistics.py` | The price-history backfill and its service, and the year-to-date sensors' history |
 | `repairs.py` | The fix flows of the stale-snapshot and projection cards |
 | `diagnostics.py` | The diagnostics dump |
 | `_redact.py` | Commune redaction shared by the attributes, the log and diagnostics |
