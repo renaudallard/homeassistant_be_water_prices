@@ -34,6 +34,13 @@ runs keep their caches under `tmp/mypy_strict` and `tmp/mypy_scripts`.
 `GATE_PYTHON` names the interpreter, else `.venv/bin/python`; arguments
 are passed to pytest (`scripts/gate.sh tests/test_pidpa.py`).
 
+With `GATE_REMOTE=<host>` pytest runs on that host instead, on the same
+commit shipped with `git archive`, and the quick checks stay local. The host
+needs a venv at `~/water_gate/.venv`, which the gate refreshes with uv when
+`requirements-dev.txt` changes, and Tesseract with its French data for the
+AIEC picture tests. A host that does not answer, or drops mid-run, gets the
+suite run locally instead.
+
 ## The test suite
 
 `pyproject.toml` runs pytest on `tests/` only (a repo copy kept under
