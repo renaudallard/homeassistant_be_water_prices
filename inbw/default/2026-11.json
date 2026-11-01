@@ -1,0 +1,29 @@
+{
+ "_seen_on": "2026-11-01",
+ "_sources": [
+  {
+   "text": "texts/11e59c13bc15740981a9211c2425f616387548bf3e0d316cadd320db38a04202.txt",
+   "url": "https://eau.inbw.be/prix-de-leau",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 2.6,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "inBW prix de l'eau 2026",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
+ "source_url": "https://eau.inbw.be/prix-de-leau",
+ "utility": "inbw",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 134.44,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

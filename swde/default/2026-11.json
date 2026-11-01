@@ -1,0 +1,29 @@
+{
+ "_seen_on": "2026-11-01",
+ "_sources": [
+  {
+   "text": "texts/08473827d3107bdefdb54bff1e5d9eaaac6694387d1b2a60df7f26d517e36e9f.txt",
+   "url": "https://www.swde.be/en/water-prices-swde",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 2.748,
+ "cvd_eur_per_m3": 3.24,
+ "fse_eur_per_m3": 0.0339,
+ "linear_eur_per_m3": null,
+ "publication_label": "SWDE water prices 2026 (page states no year)",
+ "region": "wallonia",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 0.0,
+ "social_intervention_first_person": 0.0,
+ "social_intervention_per_extra_person": 0.0,
+ "source_url": "https://www.swde.be/en/water-prices-swde",
+ "utility": "swde",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 147.24,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}

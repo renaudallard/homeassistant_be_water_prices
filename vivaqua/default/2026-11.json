@@ -1,0 +1,34 @@
+{
+ "_seen_on": "2026-11-01",
+ "_sources": [
+  {
+   "text": "texts/d5f7ec8106b17e2be8a774e808c1bd29b1064fbd906164e59c2995ea5c813f2d.txt",
+   "url": "https://www.vivaqua.be/en/the-domestic-linear-rate/",
+   "variant": "text"
+  },
+  {
+   "text": "texts/7372b714c6c7a12d9abab4a21ecc3babaa79f592d7317155d7c45c4e1cdd2a61.txt",
+   "url": "https://www.vivaqua.be/fr/intervention-sociale/",
+   "variant": "text"
+  }
+ ],
+ "basis_eur_per_m3": null,
+ "comfort_eur_per_m3": null,
+ "cva_eur_per_m3": 0.0,
+ "cvd_eur_per_m3": 0.0,
+ "fse_eur_per_m3": 0.0,
+ "linear_eur_per_m3": 2.4716981132075473,
+ "publication_label": "Price from January 1st 2026 (VAT included 6 %)",
+ "region": "brussels",
+ "sanering_bovengemeentelijk_eur_per_m3": 0.0,
+ "sanering_gemeentelijk_eur_per_m3": 2.5754716981132075,
+ "social_intervention_first_person": 58.7,
+ "social_intervention_per_extra_person": 53.36,
+ "source_url": "https://www.vivaqua.be/en/the-domestic-linear-rate/",
+ "utility": "vivaqua",
+ "valid_from": "2026-01-01",
+ "valid_until": "2026-12-31",
+ "vat_rate": 0.06,
+ "yearly_fixed_fee": 37.95283018867924,
+ "yearly_fixed_fee_per_resident_discount": 0.0
+}
