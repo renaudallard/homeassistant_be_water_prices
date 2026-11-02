@@ -104,8 +104,9 @@ whose statistics hold no row for that hour, at most once an hour while
 the recorder cannot answer. The rows are the year's m³ and cost at the
 end of each hour (`WaterCoordinator.async_year_by_hour`: each day's
 admitted change spread over the hours the meter climbed in, scaled to the
-published m³, priced with that day's share of the fees), joined to the
-total the recorder compiled from the live sensor (`_import_year_rows`).
+published m³, priced on the card in force with that day's share of the
+fees), joined to the total the recorder compiled from the live sensor
+(`_import_year_rows`).
 
 The service fields and descriptions are in `services.yaml`, with
 translations under `services` in `strings.json` and `translations/`.

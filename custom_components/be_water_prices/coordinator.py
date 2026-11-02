@@ -2225,15 +2225,24 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         reading does, shared over its hours as the meter's hourly changes
         rose, and the whole is scaled to the m³ the year publishes, so the
         last hour is the sensor's figure. Each hour is priced as the year
-        is, the fees accrued to its own day. None while the year publishes
-        no figure, without a meter or statistics to read, or when the
-        recorder did not answer.
+        is, on the card the running bill is on and the fees accrued to its
+        own day. None while the year publishes no figure, or one for another
+        year, without a meter or statistics to read, or when the recorder
+        did not answer.
         """
         data = self.data
         meter = self._meter_entity_id
         if data is None or meter is None or data.ytd_consumption_m3 is None or not hours:
             return None
         year = dt_util.as_local(hours[0]).year
+        if self._ytd.year != year:
+            # The figure is the new year's when the hours were counted out
+            # before midnight, and scaled to it the year would end at the
+            # new one's first minutes.
+            return None
+        # Not the card fetched, which can be next year's from December: priced
+        # on that, the closing year was written at next year's rates.
+        card = self._card_in_force(data.tariff, year)
         jan1 = date(year, 1, 1)
         last_day = dt_util.as_local(hours[-1]).date()
         register = self._sees_a_register(meter, self.hass.states.get(meter))
@@ -2286,7 +2295,7 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             total += water[hour]
             m3 = total * scale
             day = dt_util.as_local(hour).date()
-            out.append((m3, self._ytd_cost_from_m3(data.tariff, m3, year, day)))
+            out.append((m3, self._ytd_cost_from_m3(card, m3, year, day)))
         return out
 
     def _sees_a_register(self, meter: str, state: State | None) -> bool:

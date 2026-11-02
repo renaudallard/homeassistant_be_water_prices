@@ -35,13 +35,14 @@ each flip of the page between the two cards dropped the cost floor.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.be_water_prices.const import (
@@ -252,3 +253,91 @@ def test_the_card_in_force_round_trips_through_the_record() -> None:
     assert _card_from_record(None) is None
     assert _card_from_record({"commune": None}) is None
     assert _card_from_record({**tariff_to_dict(_CARD_2026), "commune": 7}) is None
+
+
+def _year_of_rows(start: Any, days: int, period: str) -> list[dict[str, float]]:
+    """75 m3 over ``days`` days from ``start``, an even share of every hour,
+    with a row the day before so the first is not the statistic's first."""
+    n = days * (24 if period == "hour" else 1)
+    step = timedelta(hours=1) if period == "hour" else timedelta(days=1)
+    return [
+        {
+            "start": (start + step * k).timestamp(),
+            "change": 75.0 / n,
+            "sum": 75.0 * (k + 1) / n,
+            "state": 4000 + 75.0 * (k + 1) / n,
+        }
+        for k in range(-1, n)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_year_backfill_prices_on_the_card_in_force(
+    hass: HomeAssistant, hass_storage: dict[str, Any], freezer: Any
+) -> None:
+    """With 2027's card up in December, the closing year's history is written
+    on the card its running bill is on, not on the card the page shows."""
+    freezer.move_to("2026-12-15 11:00:00+00:00")
+    entry = await _entry(hass, hass_storage)
+    served = {"card": _CARD_2026}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return served["card"]
+
+    async def _rows(*_args: Any, period: str = "day", **_kwargs: Any) -> list[dict[str, float]]:
+        return _year_of_rows(jan1, 348, period)
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    jan1 = dt_util.as_utc(dt_util.start_of_local_day(date(2026, 1, 1)))
+    hours = [jan1 + timedelta(hours=k) for k in range(348 * 24)]
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=(0.0, 0.0)),
+        ),
+        patch("custom_components.be_water_prices.coordinator._recorder_daily_rows", new=_rows),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        coordinator = entry.runtime_data
+        served["card"] = _next_years_card(1.1)
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert coordinator.data.tariff.valid_from == date(2027, 1, 1)
+        year = await coordinator.async_year_by_hour(hours)
+    assert year is not None
+    m3, cost = year[-1]
+    day = dt_util.as_local(hours[-1]).date()
+    assert cost == coordinator._ytd_cost_from_m3(_CARD_2026, m3, 2026, day)
+    assert cost != coordinator._ytd_cost_from_m3(_next_years_card(1.1), m3, 2026, day)
+
+
+@pytest.mark.asyncio
+async def test_the_year_backfill_refuses_hours_of_another_year(
+    hass: HomeAssistant, hass_storage: dict[str, Any], freezer: Any
+) -> None:
+    """Hours counted out on 31 December and handed over after the first round
+    of the new year would be scaled to the new year's figure."""
+    freezer.move_to("2026-12-15 11:00:00+00:00")
+    entry = await _entry(hass, hass_storage)
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        return _CARD_2026
+
+    fake = WaterExtractor(id="vivaqua", label="VIVAQUA", region="brussels", fetch=_fetch)
+    with (
+        patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
+        patch(
+            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            new=AsyncMock(return_value=(0.0, 0.0)),
+        ),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    coordinator = entry.runtime_data
+    assert coordinator._ytd.year == 2026
+    reader = AsyncMock(side_effect=AssertionError("read for another year"))
+    last_year = dt_util.as_utc(dt_util.start_of_local_day(date(2025, 1, 1)))
+    with patch("custom_components.be_water_prices.coordinator._recorder_daily_rows", new=reader):
+        assert await coordinator.async_year_by_hour([last_year + timedelta(hours=1)]) is None

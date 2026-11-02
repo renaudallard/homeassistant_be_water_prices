@@ -196,6 +196,8 @@ async def test_the_year_follows_the_meter_hour_by_hour(
         hass=hass,
         data=SimpleNamespace(ytd_consumption_m3=0.6, tariff=None),
         _meter_entity_id=METER,
+        _ytd=SimpleNamespace(year=2026),
+        _card_in_force=lambda tariff, year: tariff,
         _sees_a_register=lambda meter, state: True,
         _ytd_cost_from_m3=lambda tariff, m3, year, day: 3.0 * m3 + day.day,
     )
