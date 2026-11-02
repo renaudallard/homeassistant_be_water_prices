@@ -110,7 +110,8 @@ fees), joined to the total the recorder compiled from the live sensor
 showed at the last hour written, the live row the join is anchored on, and
 the recorder moves the live rows onto it in its own queue: a sum adjustment
 from 1 January queued ahead of the import, so a row it compiles meanwhile
-is moved with the rest. A sensor with no live row yet is asked again. Both
+is moved with the rest. A sensor with no live row yet is asked again; one
+the recorder does not record never has one, and is left out. Both
 are read and written in the unit the statistic is kept in (`_kept_unit`):
 Home Assistant answers a read in the unit the sensor shows, and converts
 the reset times along with the figures.

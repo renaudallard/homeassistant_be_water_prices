@@ -381,6 +381,46 @@ async def _a_year_in(hass: HomeAssistant, freezer: Any, first_unit: str) -> tupl
     return entry, volume
 
 
+@pytest.mark.parametrize("left_out", ["volume", "both"])
+async def test_a_sensor_the_recorder_does_not_record_is_left_out(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any, left_out: str
+) -> None:
+    """A sensor the recorder excludes never compiles the statistics its year
+    joins, and waiting for them priced the year again every hour for good.
+    It is left out: the other sensor's year is written, and with neither left
+    the year is settled without being priced."""
+    await _sensor(hass)
+    entry, cost, volume = _year_entry(hass)
+    excluded = {volume} if left_out == "volume" else {cost, volume}
+    get_instance(hass).entity_filter = lambda entity_id: entity_id not in excluded
+    h = datetime(2026, 1, 2, 8, tzinfo=UTC)
+    await _hour_of_litres(hass, freezer, (cost, volume), h + timedelta(minutes=1), 1.0, "m³")
+    await _hour_of_litres(hass, freezer, (cost, volume), h + timedelta(minutes=56), 1.05, "m³")
+    freezer.move_to(h + timedelta(hours=1, minutes=3))
+    coordinator = MagicMock()
+    coordinator.data = SimpleNamespace(ytd_consumption_m3=1.05, current_year_cost_eur=10.5)
+    coordinator.async_year_by_hour = AsyncMock(
+        side_effect=lambda hours: [
+            (1.05 * (n + 1) / len(hours), 10.5 * (n + 1) / len(hours)) for n, _ in enumerate(hours)
+        ]
+    )
+    entry.runtime_data = coordinator
+    written = await async_backfill_year(hass, entry)
+    await async_wait_recording_done(hass)
+    if left_out == "both":
+        assert written == 0
+        coordinator.async_year_by_hour.assert_not_awaited()
+        return
+
+    def cost_rows() -> list[Any]:
+        got = statistics_during_period(hass, OLD, None, {cost}, "hour", None, {"sum"})
+        return got.get(cost, [])
+
+    rows = await hass.async_add_executor_job(cost_rows)
+    assert written and len(rows) == written
+    assert await hass.async_add_executor_job(_volume_rows, hass, volume) == []
+
+
 async def test_a_year_shown_in_litres_is_written_in_cubic_metres(
     recorder_mock: None, hass: HomeAssistant, freezer: Any
 ) -> None:

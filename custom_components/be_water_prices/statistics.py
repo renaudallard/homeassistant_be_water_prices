@@ -541,10 +541,15 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
 
     Only a sensor whose cycle opens on 1 January and whose statistics hold
     no row for that hour is written: one that has run since then, or was
-    restarted on a meter swap since, already holds its year. Returns the
+    restarted on a meter swap since, already holds its year. A sensor the
+    recorder does not record never compiles the statistics its year joins,
+    so it is left out rather than asked for again every hour. Returns the
     rows written, or None when it could not tell or write, or a sensor has
     no live statistics yet to join its year to, to be asked again.
     """
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
     from homeassistant.helpers.recorder import DATA_INSTANCE
 
     if DATA_INSTANCE not in hass.data:
@@ -562,11 +567,15 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
     if not hours:
         return 0
     ent_reg = er.async_get(hass)
+    recorded = get_instance(hass).entity_filter
     wanted: list[tuple[int, str, str, str | None, Callable[[float], float]]] = []
     for key, column, ours in _YEAR_KEYS:
         sid = ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
         state = None if sid is None else hass.states.get(sid)
         if sid is None or state is None:
+            continue
+        if recorded is not None and not recorded(sid):
+            _LOGGER.debug("%s is not recorded; its year is not written", sid)
             continue
         opened = dt_util.parse_datetime(str(state.attributes.get("last_reset")))
         if opened is None or opened != reset:
