@@ -633,7 +633,7 @@ async def _import_year_rows(
         StatisticMetaData,
     )
 
-    base = await _total_before(hass, sid, totals[0][0], reset)
+    base = await _total_before(hass, sid, reset)
     if base is None:
         return False
     rows = [
@@ -700,36 +700,30 @@ async def _read(
     return list(got.get(sid, []))
 
 
-async def _total_before(
-    hass: HomeAssistant, sid: str, first: datetime, reset: datetime
-) -> float | None:
-    """What the recorded total holds before ``first`` beyond the figure of
-    this cycle: all of it for a row of an earlier cycle, 0.0 with nothing
-    recorded, None when the recorder did not answer.
+async def _total_before(hass: HomeAssistant, sid: str, reset: datetime) -> float | None:
+    """What the recorded total holds before ``reset``, the whole of an
+    earlier cycle: 0.0 with nothing recorded, None when the recorder did
+    not answer.
 
     The last row is found by month, then by hour within that month, so a
     long gap costs two short reads. A read by month runs on to the end of
-    the month ``first`` opens when it falls on the 1st, as 1 January does,
-    so a month from ``first`` on is not one before it.
+    the month ``reset`` opens, since it falls on the 1st, so a month from
+    ``reset`` on is not one before it.
     """
-    months = await _read(hass, sid, first - timedelta(days=400), first, "month")
+    months = await _read(hass, sid, reset - timedelta(days=400), reset, "month")
     if months is None:
         return None
-    months = [row for row in months if row["start"] < first.timestamp()]
+    months = [row for row in months if row["start"] < reset.timestamp()]
     if not months:
         return 0.0
     hours = await _read(
-        hass, sid, datetime.fromtimestamp(months[-1]["start"], dt_util.UTC), first, "hour"
+        hass, sid, datetime.fromtimestamp(months[-1]["start"], dt_util.UTC), reset, "hour"
     )
     if hours is None:
         return None
     if not hours or hours[-1].get("sum") is None:
         return 0.0
-    row = hours[-1]
-    total = float(row["sum"])
-    if datetime.fromtimestamp(row["start"], dt_util.UTC) < reset:
-        return total
-    return total - float(row.get("state") or 0.0)
+    return float(hours[-1]["sum"])
 
 
 def _moved(last: StatisticData, reset: datetime, later: list[Any]) -> list[StatisticData]:
