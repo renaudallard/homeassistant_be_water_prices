@@ -37,9 +37,10 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Literal
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import (
     StatisticData,
     StatisticMeanType,
@@ -58,6 +59,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     do_adhoc_statistics,
 )
 
+from custom_components.be_water_prices import statistics as statistics_module
 from custom_components.be_water_prices.const import CONF_UTILITY, DOMAIN
 from custom_components.be_water_prices.coordinator import WaterCoordinator
 from custom_components.be_water_prices.statistics import (
@@ -72,12 +74,17 @@ NEW = datetime(2026, 12, 31, 23, tzinfo=UTC)  # 1 January 2027, Brussels
 
 
 async def _live(
-    hass: HomeAssistant, freezer: Any, when: datetime, value: float, reset: datetime
+    hass: HomeAssistant,
+    freezer: Any,
+    when: datetime,
+    value: float,
+    reset: datetime,
+    sid: str = SID,
 ) -> None:
     """The sensor reports ``value`` at ``when`` and its five minutes compile."""
     freezer.move_to(when)
     hass.states.async_set(
-        SID,
+        sid,
         str(value),
         {
             "device_class": "monetary",
@@ -136,7 +143,8 @@ async def test_a_new_year_continues_last_years_total(
     recorder_mock: None, hass: HomeAssistant, freezer: Any
 ) -> None:
     """The live total holds last year's figure at 31 December; the new
-    year's imported hours add to it rather than start below it."""
+    year's imported hours add to it rather than start below it. The live
+    rows already carry on from it, so nothing has to move them."""
     await _sensor(hass)
     last = NEW - timedelta(hours=2)
     await _live(hass, freezer, last + timedelta(minutes=1), 400.0, OLD)
@@ -145,9 +153,14 @@ async def test_a_new_year_continues_last_years_total(
     await _live(hass, freezer, NEW + timedelta(minutes=1), 3.0, NEW)
     await _live(hass, freezer, NEW + timedelta(hours=1, minutes=56), 5.0, NEW)
     freezer.move_to(NEW + timedelta(hours=2, minutes=1))
-    assert await _import_year_rows(
-        hass, SID, "€", None, [(NEW, 3.0), (NEW + timedelta(hours=1), 5.0)], NEW
-    )
+    instance = get_instance(hass)
+    with patch.object(
+        instance, "async_adjust_statistics", wraps=instance.async_adjust_statistics
+    ) as adjust:
+        assert await _import_year_rows(
+            hass, SID, "€", None, [(NEW, 3.0), (NEW + timedelta(hours=1), 5.0)], NEW
+        )
+    adjust.assert_not_called()
     await async_wait_recording_done(hass)
     got = await hass.async_add_executor_job(_rows, hass, last)
     assert [r[2] for r in got[1:]] == pytest.approx([3.0, 2.0]), got
@@ -217,10 +230,10 @@ async def test_the_year_follows_the_meter_hour_by_hour(
 async def test_the_year_is_written_once(
     recorder_mock: None, hass: HomeAssistant, freezer: Any
 ) -> None:
-    """Written for a cycle that opens on 1 January; a sensor restarted on a
-    meter swap since is left alone, and once written, nothing more is."""
+    """Written for a cycle that opens on 1 January once the sensor has live
+    statistics to join it to; a sensor restarted on a meter swap since is
+    left alone, and once written, nothing more is."""
     await _sensor(hass)
-    freezer.move_to(datetime(2026, 1, 2, 10, 30, tzinfo=UTC))
     jan1 = dt_util.as_utc(dt_util.start_of_local_day(date(2026, 1, 1)))
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_UTILITY: "vivaqua"})
     entry.add_to_hass(hass)
@@ -231,15 +244,30 @@ async def test_the_year_is_written_once(
         ).entity_id
         for key in ("current_year_cost", "ytd_consumption")
     )
-    hass.states.async_set(cost, "12.0", {"last_reset": dt_util.as_local(jan1).isoformat()})
+    attrs = {
+        "device_class": "monetary",
+        "state_class": "total",
+        "unit_of_measurement": "€",
+        "last_reset": dt_util.as_local(jan1).isoformat(),
+    }
     swapped = dt_util.as_local(jan1 + timedelta(days=1)).isoformat()
-    hass.states.async_set(volume, "1.0", {"last_reset": swapped})
     coordinator = MagicMock()
     coordinator.data = SimpleNamespace(ytd_consumption_m3=1.0, current_year_cost_eur=12.0)
     coordinator.async_year_by_hour = AsyncMock(
         side_effect=lambda hours: [(n / 10.0, n / 2.0) for n, _hour in enumerate(hours)]
     )
     entry.runtime_data = coordinator
+    h = datetime(2026, 1, 2, 8, tzinfo=UTC)
+    freezer.move_to(h + timedelta(minutes=1))
+    hass.states.async_set(cost, "12.0", attrs)
+    hass.states.async_set(volume, "1.0", {"last_reset": swapped})
+    await hass.async_block_till_done()
+    # Nothing compiled for the sensor yet: there is no total to join the year
+    # to, so it is asked again.
+    assert await async_backfill_year(hass, entry) is None
+    await _live(hass, freezer, h + timedelta(minutes=1), 12.0, jan1, cost)
+    await _live(hass, freezer, h + timedelta(minutes=56), 12.0, jan1, cost)
+    freezer.move_to(h + timedelta(hours=1, minutes=3))
     written = await async_backfill_year(hass, entry)
     assert written
     await async_wait_recording_done(hass)
@@ -250,7 +278,12 @@ async def test_the_year_is_written_once(
 
     rows = await hass.async_add_executor_job(stats, cost)
     assert len(rows) == written
-    assert [row["state"] for row in rows[:3]] == pytest.approx([0.0, 0.5, 1.0])
+    # 34 hours to 08:00 UTC, the last at 16.5 by async_year_by_hour, scaled
+    # to the 12.0 the sensor showed at the end of it.
+    assert [row["state"] for row in rows[:3]] == pytest.approx(
+        [0.0, 0.5 / 1.375, 1.0 / 1.375], abs=1e-4
+    )
+    assert rows[-1]["state"] == pytest.approx(12.0)
     assert await hass.async_add_executor_job(stats, volume) == []
     assert await async_backfill_year(hass, entry) == 0
 
@@ -378,3 +411,72 @@ async def test_a_year_kept_in_litres_is_written_in_litres(
     assert rows[0][0] == pytest.approx(1.1 / 35), rows
     assert min(change for _state, _sum, change in rows) >= 0.0, rows
     assert rows[-1][1] == pytest.approx(1.11), rows
+
+
+async def test_a_compile_between_the_read_and_the_import_joins_the_year(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The recorder compiles every five minutes, whatever the backfill is doing.
+    A row it compiled after the live rows were read and before the import
+    reached its queue stayed on the old total, and the next hour then fell
+    by the whole year: 1.0 after 300.5."""
+    await _sensor(hass)
+    h = datetime(2026, 10, 10, 8, tzinfo=UTC)
+    await _live(hass, freezer, h + timedelta(minutes=1), 300.0, OLD)
+    await _live(hass, freezer, h + timedelta(minutes=56), 300.5, OLD)
+    await _live(hass, freezer, h + timedelta(hours=1, minutes=1), 300.6, OLD)
+    totals = [(OLD + timedelta(days=31 * n), 30.0 * (n + 1)) for n in range(9)]
+    totals += [(h - timedelta(hours=1), 299.9), (h, 300.5)]
+    read = statistics_module._read
+    compiled: list[bool] = []
+
+    async def _then_compile(*args: Any) -> list[Any] | None:
+        got = await read(*args)
+        if not compiled and args[4] == "hour" and args[2] >= h:
+            # The last read of the live rows, then the five minutes at 09:05.
+            compiled.append(True)
+            await _live(hass, freezer, h + timedelta(hours=1, minutes=6), 300.7, OLD)
+        return got
+
+    monkeypatch.setattr(statistics_module, "_read", _then_compile)
+    assert await _import_year_rows(hass, SID, "€", None, totals, OLD)
+    assert compiled
+    await async_wait_recording_done(hass)
+    await _live(hass, freezer, h + timedelta(hours=1, minutes=56), 301.0, OLD)
+    hours = await hass.async_add_executor_job(_rows, hass, h)
+    assert [r[1] for r in hours] == pytest.approx([300.5, 301.0]), hours
+
+
+async def test_the_five_minute_rows_carry_on_from_the_year(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any
+) -> None:
+    """The year ends on the figure the sensor showed at the end of its last
+    hour, not on the one at the moment it is written, so the five-minute
+    rows the live compile wrote since then climb on from it instead of
+    falling back first: -1.5 in one of them before."""
+    await _sensor(hass)
+    h = datetime(2026, 10, 10, 8, tzinfo=UTC)
+    value = 300.0
+    for k in range(17):
+        await _live(hass, freezer, h + timedelta(minutes=5 * k + 1), value, OLD)
+        value = round(value + 0.1, 2)
+    # Written at 09:21 with the newest compiled hour ending at 09:00, the
+    # year's figure standing at 301.6 by then.
+    totals = [(OLD + timedelta(days=31 * n), 30.0 * (n + 1)) for n in range(9)]
+    totals += [(h, 301.6)]
+    assert await _import_year_rows(hass, SID, "€", None, totals, OLD)
+    await async_wait_recording_done(hass)
+
+    def short() -> list[tuple[Any, ...]]:
+        got = statistics_during_period(
+            hass, h, None, {SID}, "5minute", None, {"sum", "state", "change"}
+        )
+        return [(r["state"], r["sum"], r["change"]) for r in got.get(SID, [])]
+
+    rows = await hass.async_add_executor_job(short)
+    assert min(change for _state, _sum, change in rows) >= 0.0, rows
+    assert [s - state for state, s, _change in rows] == pytest.approx([0.0] * len(rows)), rows
+    assert rows[-1][1] == pytest.approx(301.6), rows
+    # The hours hold the year to 09:00, at the 301.1 the sensor showed then.
+    months = await hass.async_add_executor_job(_rows, hass, OLD - timedelta(days=1), "month")
+    assert sum(change for _state, _sum, change in months) == pytest.approx(301.1), months

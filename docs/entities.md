@@ -106,9 +106,14 @@ end of each hour (`WaterCoordinator.async_year_by_hour`: each day's
 admitted change spread over the hours the meter climbed in, scaled to the
 published m³, priced on the card in force with that day's share of the
 fees), joined to the total the recorder compiled from the live sensor
-(`_import_year_rows`). Both are read and written in the unit the statistic
-is kept in (`_kept_unit`): Home Assistant answers a read in the unit the
-sensor shows, and converts the reset times along with the figures.
+(`_import_year_rows`). The year is scaled to end on the figure the sensor
+showed at the last hour written, the live row the join is anchored on, and
+the recorder moves the live rows onto it in its own queue: a sum adjustment
+from 1 January queued ahead of the import, so a row it compiles meanwhile
+is moved with the rest. A sensor with no live row yet is asked again. Both
+are read and written in the unit the statistic is kept in (`_kept_unit`):
+Home Assistant answers a read in the unit the sensor shows, and converts
+the reset times along with the figures.
 
 The service fields and descriptions are in `services.yaml`, with
 translations under `services` in `strings.json` and `translations/`.

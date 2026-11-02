@@ -45,7 +45,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import voluptuous as vol
 from homeassistant.const import CURRENCY_EURO, UnitOfVolume
@@ -59,9 +59,6 @@ from homeassistant.util.unit_conversion import VolumeConverter
 
 from .const import DOMAIN
 from .coordinator import WaterConfigEntry, entry_coordinator, jan_1_local, loaded_entries
-
-if TYPE_CHECKING:
-    from homeassistant.components.recorder.models import StatisticData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -543,13 +540,13 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
     value, so a monthly graph of the year's cost on a fresh entry starts at
     the install. The rows are the year's m³ and cost at the end of each
     hour, as the meter's history gives them (``async_year_by_hour``), the
-    last of them the sensors' own figures.
+    last of them the figures the sensors showed then.
 
     Only a sensor whose cycle opens on 1 January and whose statistics hold
     no row for that hour is written: one that has run since then, or was
     restarted on a meter swap since, already holds its year. Returns the
-    rows written, or None when it could not tell or write, to be asked
-    again.
+    rows written, or None when it could not tell or write, or a sensor has
+    no live statistics yet to join its year to, to be asked again.
     """
     from homeassistant.helpers.recorder import DATA_INSTANCE
 
@@ -660,25 +657,34 @@ async def _import_year_rows(
     totals: list[tuple[datetime, float]],
     reset: datetime,
 ) -> bool:
-    """Import ``totals`` as a continuation of the recorded total, all of it
-    in ``unit``, the one the statistic is kept in.
+    """Import ``totals`` as the year of the recorded total, all of it in
+    ``unit``, the one the statistic is kept in.
 
-    The live compile carries its total on across a new cycle rather than
-    restart it, so on an entry that ran through last year the row before
-    the window holds last year's whole figure: the rows are shifted by what
-    the total held before them. The rows the live compile wrote after them,
-    short-term and hourly, are moved onto the imported total, the newest
-    short-term row, which the compile resumes from, with them; a short-term
-    row at the last imported hour seeds it when there is none yet.
+    The rows continue the total recorded before the year: the live compile
+    carries its total on across a new cycle rather than restart it, so on
+    an entry that ran through last year the row before the window holds
+    last year's whole figure. They are scaled to end on the figure the
+    sensor itself showed at the end of the last of them, so the hours after
+    them count only what the sensor added since.
+
+    The rows the live compile wrote are moved onto the imported total by
+    the recorder: an adjustment queued ahead of the import shifts the total
+    of every row from the reset by what lies between the two, five-minute
+    and hourly alike, and the import then writes its hours over the live
+    ones. A row compiled before the adjustment reaches the queue is shifted
+    with the rest, and one compiled after it carries on from a shifted one.
+    Read and written back from here, the rows the recorder compiled between
+    the read and the import stayed on the old total, and the next hour fell
+    by the whole year.
 
     False, with nothing imported, when the recorder did not answer one of
-    the reads: a total it could not read, taken for none, put every row
-    below the recorded one.
+    the reads, or holds no live row of the sensor yet to join the year to:
+    a new sensor's first is compiled within five minutes.
     """
     from homeassistant.components.recorder import (  # type: ignore[attr-defined]
         get_instance,
     )
-    from homeassistant.components.recorder.db_schema import Statistics, StatisticsShortTerm
+    from homeassistant.components.recorder.db_schema import Statistics
     from homeassistant.components.recorder.models import (  # type: ignore[attr-defined,unused-ignore]
         StatisticData,
         StatisticMeanType,
@@ -689,20 +695,21 @@ async def _import_year_rows(
     base = await _total_before(hass, sid, reset, units)
     if base is None:
         return False
+    anchor = await _live_anchor(hass, sid, totals[-1][0] + timedelta(hours=1), units)
+    if anchor is None:
+        return False
+    state, total = anchor
+    last = totals[-1][1]
+    scale = state / last if last else 1.0
     rows = [
         StatisticData(
             start=hour,
-            state=round(total, 4),
-            sum=round(base + total, 4),
+            state=round(value * scale, 4),
+            sum=round(base + value * scale, 4),
             last_reset=reset,
         )
-        for hour, total in totals
+        for hour, value in totals
     ]
-    last = rows[-1]
-    short = await _read(hass, sid, last["start"] + timedelta(minutes=5), None, "5minute", units)
-    hourly = await _read(hass, sid, last["start"] + timedelta(hours=1), None, "hour", units)
-    if short is None or hourly is None:
-        return False
     metadata = StatisticMetaData(
         mean_type=StatisticMeanType.NONE,
         has_sum=True,
@@ -713,11 +720,32 @@ async def _import_year_rows(
         unit_of_measurement=unit,
     )
     instance = get_instance(hass)
-    instance.async_import_statistics(metadata, [*rows, *_moved(last, reset, hourly)], Statistics)
-    instance.async_import_statistics(
-        metadata, [last, *_moved(last, reset, short)], StatisticsShortTerm
-    )
+    # Within a cycle the live compile adds to the total exactly what the
+    # state moves by, so every live row stands the same distance above or
+    # below its state, and one shift puts them all on the imported total.
+    # None is needed once they are there, as after a run cut off between
+    # the two tasks.
+    shift = round(base - (total - state), 4)
+    if shift:
+        instance.async_adjust_statistics(sid, reset, shift, unit)
+    instance.async_import_statistics(metadata, rows, Statistics)
     return True
+
+
+async def _live_anchor(
+    hass: HomeAssistant, sid: str, end: datetime, units: dict[str, str] | None
+) -> tuple[float, float] | None:
+    """The state and the total of the live row the year joins at ``end``:
+    the sensor's hour before it, or, for a sensor that started after it,
+    its first five minutes. None when the recorder did not answer, or holds
+    neither."""
+    rows = await _read(hass, sid, end - timedelta(hours=1), end, "hour", units)
+    if rows is not None and not rows:
+        rows = await _read(hass, sid, end, None, "5minute", units)
+    for row in rows or []:
+        if row.get("state") is not None and row.get("sum") is not None:
+            return float(row["state"]), float(row["sum"])
+    return None
 
 
 async def _read(
@@ -747,7 +775,7 @@ async def _read(
             {sid},
             period,
             units,
-            {"sum", "state", "last_reset"},
+            {"sum", "state"},
         )
     except Exception as err:
         _LOGGER.debug("could not read the statistics of %s: %s", sid, err)
@@ -783,47 +811,12 @@ async def _total_before(
     return float(hours[-1]["sum"])
 
 
-def _moved(last: StatisticData, reset: datetime, later: list[Any]) -> list[StatisticData]:
-    """The live rows after ``last``, moved onto its total.
-
-    Each keeps its state, and the total moves from ``last`` by what the live
-    compile added: the figure's move within the cycle, and the whole state
-    of a new one across its reset, as the compile counts it. A row of an
-    earlier cycle is left where it is.
-    """
-    from homeassistant.components.recorder.models import (  # type: ignore[attr-defined,unused-ignore]
-        StatisticData,
-    )
-
-    cycle = reset.timestamp()
-    total = float(last.get("sum") or 0.0)
-    before = float(last.get("state") or 0.0)
-    opened = cycle
-    moved: list[StatisticData] = []
-    for row in later:
-        state, row_reset = row.get("state"), row.get("last_reset")
-        if state is None or row_reset is None or row_reset < cycle:
-            continue
-        if row_reset != opened:
-            before, opened = 0.0, row_reset
-        total += state - before
-        before = state
-        moved.append(
-            StatisticData(
-                start=datetime.fromtimestamp(row["start"], dt_util.UTC),
-                state=state,
-                sum=round(total, 4),
-                last_reset=datetime.fromtimestamp(row_reset, dt_util.UTC),
-            )
-        )
-    return moved
-
-
 async def async_maybe_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> None:
     """Run :func:`async_backfill_year` until it has settled the year.
 
     Asked on every update until it has, but at most once an hour while the
-    recorder cannot tell, and not at all once it has for the calendar year.
+    recorder cannot tell or a sensor has compiled no statistics of its own
+    yet, and not at all once it has for the calendar year.
     """
     coordinator = entry_coordinator(entry)
     data = None if coordinator is None else coordinator.data
