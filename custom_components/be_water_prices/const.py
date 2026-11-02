@@ -65,6 +65,11 @@ UPDATE_INTERVAL_HOURS = 24
 # out for users fails there too instead of being graded fine.
 FETCH_BUDGET_S = 180
 
+# How many hours of a year the backfills build between yields to the event
+# loop: a long month. A whole year at once held the loop for a fifth of a
+# second on a Raspberry Pi, and the price backfill builds five of them.
+BACKFILL_YIELD_EVERY = 744
+
 # The project's own daily capture of every utility's card, one JSON per
 # utility, commune and month on the archive branch (scripts/archive_cards.py
 # writes it). Read when a refresh fails with nothing to serve, a restart

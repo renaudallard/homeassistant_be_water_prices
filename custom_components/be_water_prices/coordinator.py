@@ -70,6 +70,7 @@ from homeassistant.util.unit_conversion import VolumeConverter
 
 from ._redact import scrub_tokens, sensitive_tokens, source_url_without_commune
 from .const import (
+    BACKFILL_YIELD_EVERY,
     CONF_CARD_ARCHIVE,
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
@@ -2268,21 +2269,26 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
             for row in hourly
             if row.get("change") is not None
         }
-        days: dict[date, list[datetime]] = {}
-        for hour in hours:
-            days.setdefault(dt_util.as_local(hour).date(), []).append(hour)
+        days: dict[date, list[tuple[datetime, float]]] = {}
+        on: list[date] = []
+        for n, hour in enumerate(hours, 1):
+            day = dt_util.as_local(hour).date()
+            on.append(day)
+            days.setdefault(day, []).append((hour, rises.get(hour.timestamp(), 0.0)))
+            if n % BACKFILL_YIELD_EVERY == 0:
+                await asyncio.sleep(0)
         water = dict.fromkeys(hours, 0.0)
         for day, m3 in used.items():
             day_hours = days.get(day)
             if not day_hours:
                 continue
-            rose = sum(rises.get(hour.timestamp(), 0.0) for hour in day_hours)
+            rose = sum(rise for _hour, rise in day_hours)
             if rose == 0.0:
                 # Water the day admits in an hour after the last one there is.
-                water[day_hours[-1]] += m3
+                water[day_hours[-1][0]] += m3
                 continue
-            for hour in day_hours:
-                water[hour] += m3 * rises.get(hour.timestamp(), 0.0) / rose
+            for hour, rise in day_hours:
+                water[hour] += m3 * rise / rose
         recorded = sum(water.values())
         if recorded == 0.0:
             # A year the recorder holds no water for: what it publishes is
@@ -2291,11 +2297,12 @@ class WaterCoordinator(DataUpdateCoordinator[CoordinatorData]):
         scale = 0.0 if recorded == 0.0 else data.ytd_consumption_m3 / recorded
         out: list[tuple[float, float | None]] = []
         total = 0.0
-        for hour in hours:
+        for n, (hour, day) in enumerate(zip(hours, on, strict=True), 1):
             total += water[hour]
             m3 = total * scale
-            day = dt_util.as_local(hour).date()
             out.append((m3, self._ytd_cost_from_m3(card, m3, year, day)))
+            if n % BACKFILL_YIELD_EVERY == 0:
+                await asyncio.sleep(0)
         return out
 
     def _sees_a_register(self, meter: str, state: State | None) -> bool:

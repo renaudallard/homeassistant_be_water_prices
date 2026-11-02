@@ -57,7 +57,7 @@ from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import VolumeConverter
 
-from .const import DOMAIN
+from .const import BACKFILL_YIELD_EVERY, DOMAIN
 from .coordinator import WaterConfigEntry, entry_coordinator, jan_1_local, loaded_entries
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,9 +72,6 @@ ATTR_CLEAR = "clear"
 # rolls over, the value will no longer match and the next setup extends
 # the flat line into the new year automatically.
 DATA_BACKFILL_YEAR = "backfill_year"
-
-# How many hourly rows to build between yields to the event loop.
-_BACKFILL_YIELD_EVERY = 744  # a long month
 
 # Sensor keys eligible for the flat-line backfill: the card's rates and fee,
 # read straight off the latest tariff. The year-to-date sensors come from
@@ -236,7 +233,7 @@ async def async_backfill_prices(
             # through this loop, so building them in one go held the
             # event loop for a third of a second on this hardware. Give
             # it air every month's worth.
-            if len(rows) % _BACKFILL_YIELD_EVERY == 0:
+            if len(rows) % BACKFILL_YIELD_EVERY == 0:
                 await asyncio.sleep(0)
 
         metadata = StatisticMetaData(
@@ -701,15 +698,18 @@ async def _import_year_rows(
     state, total = anchor
     last = totals[-1][1]
     scale = state / last if last else 1.0
-    rows = [
-        StatisticData(
-            start=hour,
-            state=round(value * scale, 4),
-            sum=round(base + value * scale, 4),
-            last_reset=reset,
+    rows: list[StatisticData] = []
+    for hour, value in totals:
+        rows.append(
+            StatisticData(
+                start=hour,
+                state=round(value * scale, 4),
+                sum=round(base + value * scale, 4),
+                last_reset=reset,
+            )
         )
-        for hour, value in totals
-    ]
+        if len(rows) % BACKFILL_YIELD_EVERY == 0:
+            await asyncio.sleep(0)
     metadata = StatisticMetaData(
         mean_type=StatisticMeanType.NONE,
         has_sum=True,

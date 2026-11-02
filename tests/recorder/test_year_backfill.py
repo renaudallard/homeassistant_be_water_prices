@@ -34,6 +34,7 @@ recorder.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Literal
@@ -59,8 +60,9 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     do_adhoc_statistics,
 )
 
+from custom_components.be_water_prices import coordinator as coordinator_module
 from custom_components.be_water_prices import statistics as statistics_module
-from custom_components.be_water_prices.const import CONF_UTILITY, DOMAIN
+from custom_components.be_water_prices.const import BACKFILL_YIELD_EVERY, CONF_UTILITY, DOMAIN
 from custom_components.be_water_prices.coordinator import WaterCoordinator
 from custom_components.be_water_prices.statistics import (
     _import_year_rows,
@@ -480,3 +482,49 @@ async def test_the_five_minute_rows_carry_on_from_the_year(
     # The hours hold the year to 09:00, at the 301.1 the sensor showed then.
     months = await hass.async_add_executor_job(_rows, hass, OLD - timedelta(days=1), "month")
     assert sum(change for _state, _sum, change in months) == pytest.approx(301.1), months
+
+
+async def test_the_year_is_built_in_slices(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A whole year of hours held the event loop for a fifth of a second on
+    a Raspberry Pi. It is built a long month at a time, the loop free to run
+    whatever else is waiting in between."""
+    await hass.config.async_set_time_zone("Europe/Brussels")
+    jan1 = dt_util.as_utc(dt_util.start_of_local_day(date(2026, 1, 1)))
+    hours = [jan1 + timedelta(hours=n) for n in range(8760)]
+
+    async def _rows(*_args: Any, period: str = "day", **_kwargs: Any) -> list[dict[str, float]]:
+        step, count = (timedelta(hours=1), 8760) if period == "hour" else (timedelta(days=1), 365)
+        return [
+            {"start": (jan1 + step * n).timestamp(), "change": 0.01, "sum": 0.01 * n}
+            for n in range(-1, count)
+        ]
+
+    monkeypatch.setattr(coordinator_module, "_recorder_daily_rows", _rows)
+    owner = SimpleNamespace(
+        hass=hass,
+        data=SimpleNamespace(ytd_consumption_m3=60.0, tariff=None),
+        _meter_entity_id=METER,
+        _ytd=SimpleNamespace(year=2026),
+        _card_in_force=lambda tariff, year: tariff,
+        _sees_a_register=lambda meter, state: False,
+        _ytd_cost_from_m3=lambda tariff, m3, year, day: m3,
+    )
+    turns = 0
+    building = True
+
+    async def _waiting() -> None:
+        nonlocal turns
+        while building:
+            turns += 1
+            await asyncio.sleep(0)
+
+    other = asyncio.ensure_future(_waiting())
+    year = await WaterCoordinator.async_year_by_hour(owner, hours)  # type: ignore[arg-type]
+    building = False
+    await other
+    assert year is not None
+    assert year[-1][0] == pytest.approx(60.0)
+    # Two passes over the hours, each giving way every 744 of them.
+    assert turns >= 2 * (len(hours) // BACKFILL_YIELD_EVERY), turns
