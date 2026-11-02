@@ -800,7 +800,12 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             # No-op rewrite (postcode resolved to the same utility we
             # already have, no commune change). Reload the entry anyway
             # so the user sees a fresh fetch on the next sensor tick.
-            return self.async_update_reload_and_abort(entry)
+            # Nothing changes, so the update listener does not fire, and the
+            # reload is scheduled here: async_update_reload_and_abort on an
+            # entry with an update listener is reported from Home Assistant
+            # 2026.6 as something that stops working in 2026.12.
+            self.hass.config_entries.async_schedule_reload(entry.entry_id)
+            return self.async_abort(reason="reconfigure_successful")
 
         # A branch that changes something leaves the reload to the update
         # listener __init__ registers. Asking for one here as well ran

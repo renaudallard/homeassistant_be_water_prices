@@ -2182,6 +2182,57 @@ async def test_reconfiguring_an_entry_that_never_loaded_schedules_no_reload(
 
 
 @pytest.mark.asyncio
+async def test_a_reconfigure_that_changes_nothing_schedules_its_own_reload(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A loaded entry carries the update listener setup registers, and from
+    Home Assistant 2026.6 async_update_reload_and_abort on such an entry
+    logs that it stops working in 2026.12, asking users to report it. A
+    reconfigure that changes nothing fires no listener, so it schedules the
+    reload itself."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={
+            CONF_CONSUMPTION_M3_PER_YEAR: 80,
+            CONF_PERSONS: 2,
+            CONF_SOCIAL_TARIFF: False,
+            CONF_POSTCODE: "1000",
+        },
+        unique_id=f"{DOMAIN}_vivaqua",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+
+    async def _listener(_hass: HomeAssistant, _entry: config_entries.ConfigEntry) -> None:
+        return None
+
+    entry.add_update_listener(_listener)
+    options = dict(entry.options)
+    with (
+        patch.object(hass.config_entries, "async_schedule_reload") as reload,
+        patch.object(
+            config_entries.ConfigFlow,
+            "async_update_reload_and_abort",
+            side_effect=AssertionError("called on an entry with an update listener"),
+        ),
+    ):
+        result = await entry.start_reconfigure_flow(hass)
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_POSTCODE: "1000"}
+        )
+    assert result["type"] == data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert dict(entry.options) == options
+    reload.assert_called_once_with(entry.entry_id)
+    assert not [r for r in caplog.records if "update listener" in r.getMessage()]
+
+
+@pytest.mark.asyncio
 async def test_a_move_onto_a_utility_already_configured_aborts_before_the_household_form(
     hass: HomeAssistant,
 ) -> None:
