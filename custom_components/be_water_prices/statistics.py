@@ -56,7 +56,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import VolumeConverter
 
 from .const import DOMAIN
-from .coordinator import WaterConfigEntry, entry_coordinator, loaded_entries
+from .coordinator import WaterConfigEntry, entry_coordinator, jan_1_local, loaded_entries
 
 if TYPE_CHECKING:
     from homeassistant.components.recorder.models import StatisticData
@@ -97,10 +97,6 @@ SERVICE_BACKFILL_SCHEMA = vol.Schema(
         vol.Optional(ATTR_CLEAR, default=False): cv.boolean,
     }
 )
-
-
-def _jan_1_local() -> datetime:
-    return dt_util.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 async def async_backfill_prices(
@@ -472,7 +468,7 @@ async def async_maybe_backfill_once(hass: HomeAssistant, entry: WaterConfigEntry
     # flat-line for the year so far without wiping older historical rows
     # (prior years, manual annotations). The flatline replacement is
     # what we actually want on an operator switch.
-    rows = await async_backfill_prices(hass, entry, start=_jan_1_local(), clear=False)
+    rows = await async_backfill_prices(hass, entry, start=jan_1_local(), clear=False)
     if rows <= 0:
         return
 
@@ -516,7 +512,7 @@ def async_register_services(hass: HomeAssistant) -> None:
                 tzinfo=dt_util.DEFAULT_TIME_ZONE,
             )
         else:
-            start_dt = _jan_1_local()
+            start_dt = jan_1_local()
 
         for entry in targets:
             await async_backfill_prices(hass, entry, start=start_dt, clear=clear)
@@ -561,7 +557,7 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
     coordinator = entry_coordinator(entry)
     if coordinator is None or coordinator.data is None:
         return None
-    reset = dt_util.as_utc(_jan_1_local())
+    reset = dt_util.as_utc(jan_1_local())
     end = await _async_compiled_until(hass)
     hours: list[datetime] = []
     hour = reset

@@ -2509,6 +2509,12 @@ def loaded_entries(hass: HomeAssistant, entry_id: str | None) -> list[WaterConfi
     return entries
 
 
+def jan_1_local() -> datetime:
+    """Local midnight on 1 January of the current year: the reset the
+    year-to-date sensors report, and where the backfills start."""
+    return dt_util.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
 def _priced_on(year: int) -> date:
     """The day a round folded for ``year`` is priced on.
 

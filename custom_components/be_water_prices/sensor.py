@@ -54,7 +54,13 @@ from .const import (
     DOMAIN,
     REGION_FLANDERS,
 )
-from .coordinator import CoordinatorData, WaterConfigEntry, WaterCoordinator, utility_device_info
+from .coordinator import (
+    CoordinatorData,
+    WaterConfigEntry,
+    WaterCoordinator,
+    jan_1_local,
+    utility_device_info,
+)
 from .providers import get
 
 # Kept under the old private name so the sensor attribute and the
@@ -111,15 +117,6 @@ class WaterSensorDescription(SensorEntityDescription):
     # without it ``TOTAL`` falls back to detecting drops as resets,
     # which is fragile around year boundaries.
     last_reset_fn: Callable[[], datetime] | None = None
-
-
-def _jan_1_local() -> datetime:
-    """Return the local-timezone start of the current calendar year.
-
-    Used as ``last_reset`` for the YTD sensors so the statistics engine
-    treats each calendar year as its own bucket.
-    """
-    return dt_util.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _basis_or_linear(data: CoordinatorData) -> float | None:
@@ -261,7 +258,7 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         suggested_display_precision=2,
         value_fn=_current_year_cost,
-        last_reset_fn=_jan_1_local,
+        last_reset_fn=jan_1_local,
     ),
     WaterSensorDescription(
         key="ytd_consumption",
@@ -275,7 +272,7 @@ SENSORS: tuple[WaterSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         suggested_display_precision=3,
         value_fn=_ytd_consumption,
-        last_reset_fn=_jan_1_local,
+        last_reset_fn=jan_1_local,
     ),
     # The four below are levels revised both ways, not accumulators, so
     # MEASUREMENT for the same reason as projected_annual_cost. That rules
