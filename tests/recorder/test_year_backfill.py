@@ -45,6 +45,7 @@ from homeassistant.components.recorder.statistics import (
     StatisticMeanType,
     StatisticMetaData,
     async_import_statistics,
+    get_metadata,
     statistics_during_period,
 )
 from homeassistant.core import HomeAssistant
@@ -252,3 +253,128 @@ async def test_the_year_is_written_once(
     assert [row["state"] for row in rows[:3]] == pytest.approx([0.0, 0.5, 1.0])
     assert await hass.async_add_executor_job(stats, volume) == []
     assert await async_backfill_year(hass, entry) == 0
+
+
+def _year_entry(hass: HomeAssistant) -> tuple[MockConfigEntry, str, str]:
+    """An entry and its two year-to-date sensors, as the registry has them."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_UTILITY: "vivaqua"})
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    cost, volume = (
+        registry.async_get_or_create(
+            "sensor", DOMAIN, f"{entry.entry_id}_{key}", suggested_object_id=f"v_{key}"
+        ).entity_id
+        for key in ("current_year_cost", "ytd_consumption")
+    )
+    return entry, cost, volume
+
+
+async def _hour_of_litres(
+    hass: HomeAssistant,
+    freezer: Any,
+    sids: tuple[str, str],
+    when: datetime,
+    m3: float,
+    unit: str,
+) -> None:
+    """The two sensors report at ``when`` and its five minutes compile, the
+    volume in ``unit``."""
+    cost, volume = sids
+    reset = dt_util.as_local(OLD).isoformat()
+    freezer.move_to(when)
+    hass.states.async_set(
+        volume,
+        str(m3 if unit == "m³" else m3 * 1000),
+        {
+            "device_class": "water",
+            "state_class": "total",
+            "unit_of_measurement": unit,
+            "last_reset": reset,
+        },
+    )
+    hass.states.async_set(
+        cost,
+        str(10.0 * m3),
+        {
+            "device_class": "monetary",
+            "state_class": "total",
+            "unit_of_measurement": "€",
+            "last_reset": reset,
+        },
+    )
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
+    do_adhoc_statistics(hass, start=when.replace(minute=when.minute - when.minute % 5, second=0))
+    await async_wait_recording_done(hass)
+
+
+def _volume_rows(hass: HomeAssistant, sid: str) -> list[tuple[float, float, float]]:
+    """The volume's hourly rows as the recorder keeps them."""
+    got = statistics_during_period(
+        hass, OLD, None, {sid}, "hour", {"volume": "m³"}, {"state", "sum", "change"}
+    )
+    return [(r["state"], r["sum"], r["change"]) for r in got.get(sid, [])]
+
+
+async def _a_year_in(hass: HomeAssistant, freezer: Any, first_unit: str) -> tuple[Any, str]:
+    """Installed on 2 January at 09:00 with 1 m3 used, the volume compiled
+    first in ``first_unit`` and shown in litres from 09:56, then the year
+    written two hours on: the entry and the volume's statistic id."""
+    await _sensor(hass)
+    entry, cost, volume = _year_entry(hass)
+    h = datetime(2026, 1, 2, 8, tzinfo=UTC)
+    await _hour_of_litres(hass, freezer, (cost, volume), h + timedelta(minutes=1), 1.0, first_unit)
+    await _hour_of_litres(hass, freezer, (cost, volume), h + timedelta(minutes=56), 1.05, "L")
+    for k in range(12):
+        when = h + timedelta(hours=1, minutes=5 * k + 1)
+        await _hour_of_litres(hass, freezer, (cost, volume), when, 1.1, "L")
+    freezer.move_to(h + timedelta(hours=2, minutes=3))
+    coordinator = MagicMock()
+    coordinator.data = SimpleNamespace(ytd_consumption_m3=1.1, current_year_cost_eur=11.0)
+    coordinator.async_year_by_hour = AsyncMock(
+        side_effect=lambda hours: [
+            (1.1 * (n + 1) / len(hours), 11.0 * (n + 1) / len(hours)) for n, _ in enumerate(hours)
+        ]
+    )
+    entry.runtime_data = coordinator
+    assert await async_backfill_year(hass, entry)
+    await async_wait_recording_done(hass)
+    # And the hour after it compiles, the volume at 1.11 m3.
+    for k in range(12):
+        when = h + timedelta(hours=2, minutes=5 * k + 1)
+        await _hour_of_litres(hass, freezer, (cost, volume), when, 1.11, "L")
+    return entry, volume
+
+
+async def test_a_year_shown_in_litres_is_written_in_cubic_metres(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any
+) -> None:
+    """Home Assistant answers a read in the unit the sensor shows and converts
+    the reset times with the figures, so in litres they came back fifty
+    thousand years ahead, the import stopped half done and the next hour fell
+    by the whole year. Kept in cubic metres, the year is written in them and
+    the live total carries on from it."""
+    _entry, volume = await _a_year_in(hass, freezer, "m³")
+    meta = await hass.async_add_executor_job(lambda: get_metadata(hass, statistic_ids={volume}))
+    assert meta[volume][1]["unit_of_measurement"] == "m³"
+    rows = await hass.async_add_executor_job(_volume_rows, hass, volume)
+    assert min(change for _state, _sum, change in rows) >= 0.0, rows
+    assert rows[-1][1] == pytest.approx(1.11), rows
+    assert rows[-1][2] == pytest.approx(0.01), rows
+
+
+async def test_a_year_kept_in_litres_is_written_in_litres(
+    recorder_mock: None, hass: HomeAssistant, freezer: Any
+) -> None:
+    """A sensor shown in litres before its first compile keeps its statistics
+    in litres. The year goes in as litres, and the statistic stays in them:
+    written in cubic metres, every litre kept before it would have read as
+    a cubic metre."""
+    _entry, volume = await _a_year_in(hass, freezer, "L")
+    meta = await hass.async_add_executor_job(lambda: get_metadata(hass, statistic_ids={volume}))
+    assert meta[volume][1]["unit_of_measurement"] == "L"
+    rows = await hass.async_add_executor_job(_volume_rows, hass, volume)
+    # 35 hours, from midnight on 1 January to 11:00 on the 2nd, Brussels time.
+    assert rows[0][0] == pytest.approx(1.1 / 35), rows
+    assert min(change for _state, _sum, change in rows) >= 0.0, rows
+    assert rows[-1][1] == pytest.approx(1.11), rows

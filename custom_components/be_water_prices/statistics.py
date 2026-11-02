@@ -42,7 +42,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from functools import partial
 from typing import TYPE_CHECKING, Any, Literal
 
 import voluptuous as vol
@@ -527,11 +529,10 @@ def async_register_services(hass: HomeAssistant) -> None:
 
 
 # The sensors whose year the meter's history fills: each with its place in
-# the (m3, cost) pairs async_year_by_hour gives, and its unit and unit class
-# as Home Assistant compiles the sensor's own statistics.
-_YEAR_KEYS: tuple[tuple[str, int, str, str | None], ...] = (
-    ("current_year_cost", 1, CURRENCY_EURO, None),
-    ("ytd_consumption", 0, UnitOfVolume.CUBIC_METERS, VolumeConverter.UNIT_CLASS),
+# the (m3, cost) pairs async_year_by_hour gives, and the unit those are in.
+_YEAR_KEYS: tuple[tuple[str, int, str], ...] = (
+    ("current_year_cost", 1, CURRENCY_EURO),
+    ("ytd_consumption", 0, UnitOfVolume.CUBIC_METERS),
 )
 
 
@@ -567,8 +568,8 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
     if not hours:
         return 0
     ent_reg = er.async_get(hass)
-    wanted: list[tuple[int, str, str, str | None]] = []
-    for key, column, unit, unit_class in _YEAR_KEYS:
+    wanted: list[tuple[int, str, str, str | None, Callable[[float], float]]] = []
+    for key, column, ours in _YEAR_KEYS:
         sid = ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
         state = None if sid is None else hass.states.get(sid)
         if sid is None or state is None:
@@ -576,29 +577,79 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
         opened = dt_util.parse_datetime(str(state.attributes.get("last_reset")))
         if opened is None or opened != reset:
             continue
-        first = await _read(hass, sid, reset, reset + timedelta(hours=1), "hour")
+        first = await _read(hass, sid, reset, reset + timedelta(hours=1), "hour", None)
         if first is None:
             return None
-        if not first:
-            wanted.append((column, sid, unit, unit_class))
+        if first:
+            continue
+        kept = await _kept_unit(hass, sid, ours)
+        if kept is None:
+            return None
+        unit, unit_class = kept
+        convert = None if unit is None else _converter(ours, unit)
+        if unit is None or convert is None:
+            _LOGGER.debug("%s keeps its statistics in %r; its year is not written", sid, unit)
+            continue
+        wanted.append((column, sid, unit, unit_class, convert))
     if not wanted:
         return 0
     year = await coordinator.async_year_by_hour(hours)
     if year is None:
         return None
     written = 0
-    for column, sid, unit, unit_class in wanted:
+    for column, sid, unit, unit_class, convert in wanted:
         totals: list[tuple[datetime, float]] = []
         for hour, figures in zip(hours, year, strict=True):
             value = figures[column]
             if value is None:
                 return None
-            totals.append((hour, value))
+            totals.append((hour, convert(value)))
         if not await _import_year_rows(hass, sid, unit, unit_class, totals, reset):
             return None
         written += len(totals)
     _LOGGER.debug("be_water_prices year backfill for %s: %d rows", entry.entry_id, written)
     return written
+
+
+async def _kept_unit(
+    hass: HomeAssistant, sid: str, ours: str
+) -> tuple[str | None, str | None] | None:
+    """The unit and unit class ``sid``'s statistics are kept in, ``ours`` when
+    it has none yet; None when the recorder did not answer.
+
+    Home Assistant keeps a statistic in the unit the sensor showed when it
+    was first compiled, and answers a read in the unit the sensor shows now,
+    the reset times converted with the figures. Read and written in the kept
+    unit, nothing is converted: read in litres, a reset came back as a date
+    some fifty thousand years ahead, and a row written in cubic metres would
+    have turned every litre kept before it into a cubic metre.
+    """
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+    from homeassistant.components.recorder.statistics import get_metadata
+
+    try:
+        found = await get_instance(hass).async_add_executor_job(
+            partial(get_metadata, hass, statistic_ids={sid})
+        )
+    except Exception as err:
+        _LOGGER.debug("could not read the unit of %s: %s", sid, err)
+        return None
+    if sid not in found:
+        volume = ours == UnitOfVolume.CUBIC_METERS
+        return ours, VolumeConverter.UNIT_CLASS if volume else None
+    metadata = found[sid][1]
+    return metadata["unit_of_measurement"], metadata["unit_class"]
+
+
+def _converter(ours: str, unit: str) -> Callable[[float], float] | None:
+    """How a figure in ``ours`` is written in ``unit``, None when it cannot be."""
+    if unit == ours:
+        return float
+    if ours == UnitOfVolume.CUBIC_METERS and unit in VolumeConverter.VALID_UNITS:
+        return VolumeConverter.converter_factory(ours, unit)
+    return None
 
 
 async def _import_year_rows(
@@ -609,7 +660,8 @@ async def _import_year_rows(
     totals: list[tuple[datetime, float]],
     reset: datetime,
 ) -> bool:
-    """Import ``totals`` as a continuation of the recorded total.
+    """Import ``totals`` as a continuation of the recorded total, all of it
+    in ``unit``, the one the statistic is kept in.
 
     The live compile carries its total on across a new cycle rather than
     restart it, so on an entry that ran through last year the row before
@@ -633,7 +685,8 @@ async def _import_year_rows(
         StatisticMetaData,
     )
 
-    base = await _total_before(hass, sid, reset)
+    units = None if unit_class is None else {unit_class: unit}
+    base = await _total_before(hass, sid, reset, units)
     if base is None:
         return False
     rows = [
@@ -646,8 +699,8 @@ async def _import_year_rows(
         for hour, total in totals
     ]
     last = rows[-1]
-    short = await _read(hass, sid, last["start"] + timedelta(minutes=5), None, "5minute")
-    hourly = await _read(hass, sid, last["start"] + timedelta(hours=1), None, "hour")
+    short = await _read(hass, sid, last["start"] + timedelta(minutes=5), None, "5minute", units)
+    hourly = await _read(hass, sid, last["start"] + timedelta(hours=1), None, "hour", units)
     if short is None or hourly is None:
         return False
     metadata = StatisticMetaData(
@@ -673,9 +726,11 @@ async def _read(
     start: datetime,
     end: datetime | None,
     period: Literal["5minute", "hour", "month"],
+    units: dict[str, str] | None,
 ) -> list[Any] | None:
     """The rows of ``period`` from ``start`` to ``end``, or to the newest
-    when None; None when the recorder did not answer."""
+    when None, in ``units`` or the unit the sensor shows; None when the
+    recorder did not answer."""
     from homeassistant.components.recorder import (  # type: ignore[attr-defined]
         get_instance,
     )
@@ -691,7 +746,7 @@ async def _read(
             end,
             {sid},
             period,
-            None,
+            units,
             {"sum", "state", "last_reset"},
         )
     except Exception as err:
@@ -700,7 +755,9 @@ async def _read(
     return list(got.get(sid, []))
 
 
-async def _total_before(hass: HomeAssistant, sid: str, reset: datetime) -> float | None:
+async def _total_before(
+    hass: HomeAssistant, sid: str, reset: datetime, units: dict[str, str] | None
+) -> float | None:
     """What the recorded total holds before ``reset``, the whole of an
     earlier cycle: 0.0 with nothing recorded, None when the recorder did
     not answer.
@@ -710,14 +767,14 @@ async def _total_before(hass: HomeAssistant, sid: str, reset: datetime) -> float
     the month ``reset`` opens, since it falls on the 1st, so a month from
     ``reset`` on is not one before it.
     """
-    months = await _read(hass, sid, reset - timedelta(days=400), reset, "month")
+    months = await _read(hass, sid, reset - timedelta(days=400), reset, "month", units)
     if months is None:
         return None
     months = [row for row in months if row["start"] < reset.timestamp()]
     if not months:
         return 0.0
     hours = await _read(
-        hass, sid, datetime.fromtimestamp(months[-1]["start"], dt_util.UTC), reset, "hour"
+        hass, sid, datetime.fromtimestamp(months[-1]["start"], dt_util.UTC), reset, "hour", units
     )
     if hours is None:
         return None
