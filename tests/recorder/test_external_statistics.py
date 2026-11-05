@@ -49,7 +49,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
-from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+from custom_components.be_water_prices.meter_reads import _recorder_ytd_m3
 
 _ID = "nhc2:water_meter_watervolume"
 

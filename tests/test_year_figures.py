@@ -56,10 +56,10 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import (
+from custom_components.be_water_prices.coordinator_meter import YearFigures
+from custom_components.be_water_prices.coordinator_store import _metered_from_record
+from custom_components.be_water_prices.meter_reads import (
     RecorderUnavailable,
-    YearFigures,
-    _metered_from_record,
     _metered_m3,
     _recorder_ytd_m3,
     _rest_of_year_m3,
@@ -69,9 +69,9 @@ from custom_components.be_water_prices.pricing import compute_annual_cost, compu
 from custom_components.be_water_prices.providers._flanders import build_flanders_tariff
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 
-_ROWS = "custom_components.be_water_prices.coordinator._recorder_daily_rows"
-_FULL_YEAR = "custom_components.be_water_prices.coordinator._recorder_full_year_m3"
-_YTD = "custom_components.be_water_prices.coordinator._recorder_ytd_m3"
+_ROWS = "custom_components.be_water_prices.meter_reads._recorder_daily_rows"
+_FULL_YEAR = "custom_components.be_water_prices.coordinator_meter._recorder_full_year_m3"
+_YTD = "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3"
 
 # Noon in Brussels. 258 days of 2026 have elapsed, today included, and 107
 # are left after it.

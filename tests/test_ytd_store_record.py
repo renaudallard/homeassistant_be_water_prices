@@ -41,7 +41,7 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import _YTD_STORE_MINOR_VERSION
+from custom_components.be_water_prices.coordinator_store import _YTD_STORE_MINOR_VERSION
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 from tests.test_ha_coordinator import _fresh_tariff
 
@@ -90,7 +90,7 @@ async def test_a_malformed_record_starts_a_fresh_cycle(
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=(20.0, 0.0)),
         ),
     ):
@@ -111,7 +111,7 @@ def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
     cannot lower anything on its own, which is the one guard that should
     hold an upgrading install back and only for a round.
     """
-    from custom_components.be_water_prices.coordinator import _cycle_from_record
+    from custom_components.be_water_prices.coordinator_store import _cycle_from_record
 
     old = _cycle_from_record(
         {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "offset_m3": 1000.0}
@@ -123,7 +123,7 @@ def test_a_record_written_before_the_new_keys_can_still_be_corrected() -> None:
 
 
 def test_the_new_keys_round_trip_through_the_record() -> None:
-    from custom_components.be_water_prices.coordinator import _cycle_from_record
+    from custom_components.be_water_prices.coordinator_store import _cycle_from_record
 
     cycle = _cycle_from_record(
         {
@@ -149,7 +149,7 @@ def test_when_the_meter_was_last_seen_survives_a_restart() -> None:
     and Home Assistant being down is the longest such gap there is. Only a
     stamp on the record can measure it, so it is written and read back.
     """
-    from custom_components.be_water_prices.coordinator import _cycle_from_record
+    from custom_components.be_water_prices.coordinator_store import _cycle_from_record
 
     base = {"meter": "sensor.water_meter", "year": 2026, "m3": 40.0, "offset_m3": 1000.0}
 
@@ -169,7 +169,7 @@ def test_when_the_meter_was_last_seen_survives_a_restart() -> None:
 
 def test_a_recorder_high_water_mark_that_is_not_a_number_is_refused() -> None:
     """The same rule the other figures follow: unreadable means re-bootstrap."""
-    from custom_components.be_water_prices.coordinator import _cycle_from_record
+    from custom_components.be_water_prices.coordinator_store import _cycle_from_record
 
     assert (
         _cycle_from_record(

@@ -53,7 +53,7 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import (
+from custom_components.be_water_prices.meter_reads import (
     RecorderUnavailable,
     _recorder_full_year_m3,
 )
@@ -64,9 +64,9 @@ from custom_components.be_water_prices.repairs import (
     async_create_fix_flow,
 )
 
-_ROWS = "custom_components.be_water_prices.coordinator._recorder_daily_rows"
-_FULL_YEAR = "custom_components.be_water_prices.coordinator._recorder_full_year_m3"
-_YTD = "custom_components.be_water_prices.coordinator._recorder_ytd_m3"
+_ROWS = "custom_components.be_water_prices.meter_reads._recorder_daily_rows"
+_FULL_YEAR = "custom_components.be_water_prices.coordinator_meter._recorder_full_year_m3"
+_YTD = "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3"
 
 
 def _tariff() -> WaterTariff:

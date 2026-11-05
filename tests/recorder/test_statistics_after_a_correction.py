@@ -51,8 +51,8 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
 )
 
 from custom_components.be_water_prices.const import CONF_UTILITY
-from custom_components.be_water_prices.coordinator import _fold, _YtdCycle
 from custom_components.be_water_prices.sensor import SENSORS, WaterSensor
+from custom_components.be_water_prices.ytd_fold import _fold, _YtdCycle
 
 _ENTITY = "sensor.vivaqua_current_year_cost"
 _ATTRS = {

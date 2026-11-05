@@ -1,7 +1,7 @@
 # The pricing model
 
-How a year of water is billed, as `pricing.py` implements it and
-`coordinator.py` applies it. `pricing.py` is pure: no Home Assistant, no
+How a year of water is billed, as `pricing.py` implements it and the
+coordinator applies it (`coordinator_ytd.py`, `coordinator_meter.py`). `pricing.py` is pure: no Home Assistant, no
 network, so `tests/test_pricing.py` runs it from a plain venv. The worked
 examples below are that file's, on the tariffs it builds by hand.
 

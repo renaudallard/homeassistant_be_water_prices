@@ -49,13 +49,14 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import RecorderUnavailable, entry_coordinator
+from custom_components.be_water_prices.coordinator import entry_coordinator
+from custom_components.be_water_prices.meter_reads import RecorderUnavailable
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 from tests.test_ha_coordinator import _fresh_tariff
 
 _GET = "custom_components.be_water_prices.coordinator.get"
-_YTD = "custom_components.be_water_prices.coordinator._recorder_ytd_m3"
-_FULL_YEAR = "custom_components.be_water_prices.coordinator._recorder_full_year_m3"
+_YTD = "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3"
+_FULL_YEAR = "custom_components.be_water_prices.coordinator_meter._recorder_full_year_m3"
 
 
 def _metered_entry(hass: HomeAssistant) -> MockConfigEntry:
@@ -96,7 +97,7 @@ async def test_no_repair_card_for_an_entry_that_is_no_longer_loaded(hass: HomeAs
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=None),
         ),
     ):
@@ -300,7 +301,7 @@ async def test_the_coordinator_a_reload_replaced_leaves_the_new_cards_up(
     with (
         patch(_GET, new=_get),
         patch(
-            "custom_components.be_water_prices.coordinator._discover_energy_water_meter",
+            "custom_components.be_water_prices.coordinator_meter._discover_energy_water_meter",
             new=_discover,
         ),
         patch(_YTD, new=AsyncMock(return_value=None)),

@@ -39,12 +39,8 @@ from collections.abc import Callable
 
 import pytest
 
-from custom_components.be_water_prices.coordinator import (
-    _fold,
-    _migrate_cycle_to_v2,
-    _YtdCycle,
-    _YtdFold,
-)
+from custom_components.be_water_prices.coordinator_store import _migrate_cycle_to_v2
+from custom_components.be_water_prices.ytd_fold import _fold, _YtdCycle, _YtdFold
 
 _METER = "sensor.water_meter"
 _OTHER = "sensor.other_meter"
@@ -1397,7 +1393,7 @@ def test_a_correction_shipped_in_a_release_reaches_the_running_bill() -> None:
     every IDEN household would have stayed on the higher figure.
     """
     from custom_components.be_water_prices.const import INTEGRATION_VERSION
-    from custom_components.be_water_prices.coordinator import _cost_basis
+    from custom_components.be_water_prices.coordinator_ytd import _cost_basis
 
     now = _cost_basis(utility="iden", commune=None, persons=1, social=False, card_year=2026)
     assert now.startswith(f"{INTEGRATION_VERSION}|")
@@ -1425,7 +1421,7 @@ def test_the_card_a_late_publisher_stood_in_with_does_not_hold_the_year() -> Non
     price backfill has kept the card's year in its own gate all along for
     exactly this; the floor had no term for it.
     """
-    from custom_components.be_water_prices.coordinator import _cost_basis
+    from custom_components.be_water_prices.coordinator_ytd import _cost_basis
 
     stood_in = _cost_basis(
         utility="swde", commune=None, persons=1, social=False, card_year=_YEAR - 1
@@ -1460,7 +1456,7 @@ def test_a_floor_measured_for_another_household_does_not_hold(
     an options change reloads the entry and the stored cycle comes back
     with the basis it was measured under.
     """
-    from custom_components.be_water_prices.coordinator import _cost_basis
+    from custom_components.be_water_prices.coordinator_ytd import _cost_basis
 
     old = _cost_basis(utility="pidpa", commune=None, persons=2, social=False, card_year=_YEAR)
     new = _cost_basis(utility="pidpa", commune=commune, persons=2, social=social, card_year=_YEAR)
@@ -1855,7 +1851,7 @@ def test_a_record_from_before_the_correction_is_still_corrected() -> None:
     recorder answers, as it does for any other record: the first only
     establishes that the recorder is there.
     """
-    from custom_components.be_water_prices.coordinator import _cycle_from_record
+    from custom_components.be_water_prices.coordinator_store import _cycle_from_record
 
     cycle = _cycle_from_record(
         {

@@ -44,7 +44,7 @@ from custom_components.be_water_prices.const import (
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
 from tests.test_ha_coordinator import _fresh_tariff
 
-_YTD = "custom_components.be_water_prices.coordinator._recorder_ytd_m3"
+_YTD = "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3"
 
 
 async def _fetch(_session: Any) -> WaterTariff:

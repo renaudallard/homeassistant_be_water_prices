@@ -60,7 +60,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     do_adhoc_statistics,
 )
 
-from custom_components.be_water_prices import coordinator as coordinator_module
+from custom_components.be_water_prices import meter_reads
 from custom_components.be_water_prices import statistics as statistics_module
 from custom_components.be_water_prices.const import BACKFILL_YIELD_EVERY, CONF_UTILITY, DOMAIN
 from custom_components.be_water_prices.coordinator import WaterCoordinator
@@ -541,7 +541,7 @@ async def test_the_year_is_built_in_slices(
             for n in range(-1, count)
         ]
 
-    monkeypatch.setattr(coordinator_module, "_recorder_daily_rows", _rows)
+    monkeypatch.setattr(meter_reads, "_recorder_daily_rows", _rows)
     owner = SimpleNamespace(
         hass=hass,
         data=SimpleNamespace(ytd_consumption_m3=60.0, tariff=None),

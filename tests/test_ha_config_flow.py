@@ -1801,7 +1801,7 @@ async def test_failed_first_refresh_leaves_no_meter_listener(hass: HomeAssistant
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=(20.0, 0.0)),
         ),
         # The refresh succeeds and subscribes; platform setup then fails.
@@ -1858,7 +1858,7 @@ async def test_a_failed_setup_leaves_no_coordinator(hass: HomeAssistant) -> None
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=None),
         ),
         patch.object(
@@ -1901,7 +1901,7 @@ async def test_reconfiguring_an_entry_whose_setup_failed_reloads_it(hass: HomeAs
             return_value=WaterExtractor(id="x", label="X", region="brussels", fetch=_fetch),
         ),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=None),
         ),
     )

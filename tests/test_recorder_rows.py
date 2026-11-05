@@ -34,9 +34,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from homeassistant.util import dt as dt_util
 
-from custom_components.be_water_prices import coordinator as co
+from custom_components.be_water_prices import meter_reads as co
 
-_ROWS = "custom_components.be_water_prices.coordinator._recorder_daily_rows"
+_ROWS = "custom_components.be_water_prices.meter_reads._recorder_daily_rows"
 
 
 def _row(day: date, *, change: float, state: float, total: float) -> dict[str, Any]:

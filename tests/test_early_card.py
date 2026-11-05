@@ -52,11 +52,9 @@ from custom_components.be_water_prices.const import (
     CONF_WATER_METER_SENSOR,
     DOMAIN,
 )
-from custom_components.be_water_prices.coordinator import (
-    WaterCoordinator,
-    _card_from_record,
-    _cost_basis,
-)
+from custom_components.be_water_prices.coordinator import WaterCoordinator
+from custom_components.be_water_prices.coordinator_store import _card_from_record
+from custom_components.be_water_prices.coordinator_ytd import _cost_basis
 from custom_components.be_water_prices.providers.base import (
     WaterExtractor,
     WaterTariff,
@@ -129,7 +127,7 @@ async def test_next_years_card_in_december_leaves_the_closing_year_alone(
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=(0.0, 0.0)),
         ),
     ):
@@ -204,7 +202,7 @@ async def test_a_fresh_install_in_december_prices_on_the_card_it_has(
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=(0.0, 0.0)),
         ),
     ):
@@ -293,10 +291,10 @@ async def test_the_year_backfill_prices_on_the_card_in_force(
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=(0.0, 0.0)),
         ),
-        patch("custom_components.be_water_prices.coordinator._recorder_daily_rows", new=_rows),
+        patch("custom_components.be_water_prices.meter_reads._recorder_daily_rows", new=_rows),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -329,7 +327,7 @@ async def test_the_year_backfill_refuses_hours_of_another_year(
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=(0.0, 0.0)),
         ),
     ):
@@ -339,5 +337,5 @@ async def test_the_year_backfill_refuses_hours_of_another_year(
     assert coordinator._ytd.year == 2026
     reader = AsyncMock(side_effect=AssertionError("read for another year"))
     last_year = dt_util.as_utc(dt_util.start_of_local_day(date(2025, 1, 1)))
-    with patch("custom_components.be_water_prices.coordinator._recorder_daily_rows", new=reader):
+    with patch("custom_components.be_water_prices.meter_reads._recorder_daily_rows", new=reader):
         assert await coordinator.async_year_by_hour([last_year + timedelta(hours=1)]) is None

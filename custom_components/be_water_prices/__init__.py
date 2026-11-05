@@ -280,7 +280,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     Unload alone leaves the Store files behind, so removing and re-adding the
     same utility used to restore a baseline belonging to the deleted entry.
     """
-    from .coordinator import async_remove_stores
+    from .coordinator_store import async_remove_stores
 
     await async_remove_stores(hass, entry.entry_id)
 

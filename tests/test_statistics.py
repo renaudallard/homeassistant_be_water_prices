@@ -150,7 +150,7 @@ async def test_the_service_belongs_to_the_integration(hass: HomeAssistant) -> No
     with (
         patch("custom_components.be_water_prices.coordinator.get", return_value=fake),
         patch(
-            "custom_components.be_water_prices.coordinator._recorder_ytd_m3",
+            "custom_components.be_water_prices.coordinator_ytd._recorder_ytd_m3",
             new=AsyncMock(return_value=None),
         ),
     ):
@@ -889,7 +889,8 @@ async def _backfill_a_metered_entry(
 
     from homeassistant.helpers.recorder import DATA_INSTANCE
 
-    from custom_components.be_water_prices.coordinator import CoordinatorData, YearFigures
+    from custom_components.be_water_prices.coordinator import CoordinatorData
+    from custom_components.be_water_prices.coordinator_meter import YearFigures
     from custom_components.be_water_prices.sensor import SENSORS
     from tests.test_ha_coordinator import _fresh_tariff
 

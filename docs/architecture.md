@@ -45,7 +45,12 @@ registry.
 | --- | --- |
 | `__init__.py` | Entry setup and unload, the services (`async_setup`), the setup-time commune sweeps, migration. Imports nothing from Home Assistant at module level, since the CI checks import the extractors without it; `CONFIG_SCHEMA` is built on first read. |
 | `config_flow.py` | The setup wizard, the options and reconfigure ([config-flow.md](config-flow.md)) |
-| `coordinator.py` | `WaterCoordinator`, the year-to-date cycle and its Stores, the recorder reads, the Repairs cards ([coordinator.md](coordinator.md)) |
+| `coordinator.py` | `WaterCoordinator`: the daily fetch, what a failed one serves, the stale and operator Repairs cards ([coordinator.md](coordinator.md)) |
+| `coordinator_ytd.py` | `_YtdMixin`: the year to date, restored, folded, priced on the card in force and followed live |
+| `coordinator_meter.py` | `_MeterMixin`: the meter's year (its days, the rolling year, the projection) and its Repairs cards |
+| `ytd_fold.py` | The year-to-date cycle and `_fold`, the rule each reading goes through, with no clock and no I/O |
+| `meter_reads.py` | The meter's state, the Energy dashboard's water meter and the recorder's daily rows |
+| `coordinator_store.py` | The three Stores and how a stored record is read back |
 | `pricing.py` | The bill math, without Home Assistant imports ([pricing-model.md](pricing-model.md)) |
 | `sensor.py` | The sensors ([entities.md](entities.md)) |
 | `button.py` | The refresh button |

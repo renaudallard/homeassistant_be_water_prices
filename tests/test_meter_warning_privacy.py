@@ -37,16 +37,15 @@ import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from custom_components.be_water_prices import coordinator as module
-from custom_components.be_water_prices.coordinator import (
-    WaterCoordinator,
+from custom_components.be_water_prices import meter_reads as module
+from custom_components.be_water_prices.coordinator import WaterCoordinator
+from custom_components.be_water_prices.meter_reads import (
     _admitted_changes,
     _discover_energy_water_meter,
-    _fold,
     _recorder_full_year_m3,
     _recorder_ytd_m3,
-    _YtdCycle,
 )
+from custom_components.be_water_prices.ytd_fold import _fold, _YtdCycle
 
 _METER = "sensor.water_meter_serial_12345678"
 

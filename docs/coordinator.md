@@ -5,6 +5,13 @@ ticks once a day (`UPDATE_INTERVAL_HOURS`, 24). Water tariffs are annual,
 so the tick is mostly a check that the utility's page still parses; the
 meter-driven figures move between ticks on the meter's own state events.
 This page follows one tick, then what the coordinator keeps between them.
+
+The class is in `coordinator.py`, with the fetch and what stands in for
+a failed one. Two mixins hold the rest of it: `coordinator_ytd.py` the
+year to date and `coordinator_meter.py` the meter's year. What needs no
+coordinator sits apart: the cycle and `_fold` in `ytd_fold.py`, the
+meter's state and the recorder's rows in `meter_reads.py`, the Stores in
+`coordinator_store.py`.
 See [glossary.md](glossary.md) for the terms and
 [pricing-model.md](pricing-model.md) for the bill itself.
 

@@ -45,7 +45,7 @@ from pytest_homeassistant_custom_component.components.recorder.common import (
     do_adhoc_statistics,
 )
 
-from custom_components.be_water_prices.coordinator import _recorder_ytd_m3
+from custom_components.be_water_prices.meter_reads import _recorder_ytd_m3
 
 _METER = "sensor.water_meter"
 _ATTRS = {
