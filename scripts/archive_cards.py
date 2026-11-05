@@ -473,6 +473,28 @@ def _parser_digest() -> str:
     return digest.hexdigest()
 
 
+def rerender_due(out: Path) -> bool:
+    """Whether the next run replays the branch and renders kept PDFs afresh
+    in it, their texts made by another pdfplumber or other render code than
+    the installed ones; the workflow sizes the walk's budget on the same
+    answer. Only until the replay has run under these readers: a row it could
+    not replay keeps its old texts, and must not hold every later run on the
+    long budget. A card picture does not count, as in the energy archives.
+    A branch never stamped is only stamped."""
+    stamp = out / _PARSER_STAMP
+    if not stamp.exists() or stamp.read_text(encoding="utf-8").strip() == _parser_digest():
+        return False
+    readers = readers_line()
+    for path in _rows(out):
+        row = _read_row(path)
+        if row is None:
+            continue
+        for source in row.get("_sources", []):
+            if isinstance(source, dict) and "pdf" in source and source.get("readers") != readers:
+                return True
+    return False
+
+
 def _month_id(year: int, month: int) -> str:
     return f"{year:04d}-{month:02d}"
 

@@ -257,6 +257,10 @@ pdfplumber release and render code that read it, and its text is served
 again only to the same, so after a reader upgrade or a render fix every
 kept PDF is rendered afresh, in the walk, the replay, the live check and
 the drift check (`--rerender` forces it, `--reparse` forces the replay).
+Rendering every kept PDF can take longer than the walk's hour, so the workflow
+asks `rerender_due` first and gives such a run's walk three hours, as a
+dispatched `rerender` gets; the gas archive's first run after its render
+digest moved stopped at the hour and stored nothing (5 November 2026).
 A card picture (AIEC's) names the Tesseract that read it the same way, and
 a Tesseract upgrade reads the kept pictures again. The readings a provider
 refused, and a reading of AIEC's transcribed card that disagrees with the

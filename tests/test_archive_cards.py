@@ -602,6 +602,45 @@ async def test_a_reader_upgrade_renders_every_card_again(
     assert [s["readers"] for s in row["_sources"] if "pdf" in s] == ["pdfplumber==2 render=a"]
 
 
+async def test_only_a_text_reader_change_is_a_rerender(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, renders: list[bytes]
+) -> None:
+    """The workflow sizes the walk's budget on this answer. Once the replay
+    ran under these readers it is no longer due, a branch never stamped is
+    only stamped, and a card picture does not count."""
+    out, pdfs = tmp_path / "out", tmp_path / "pdfs"
+    session = _Session({PDF_URL: b"%PDF v1"})
+    _readers(monkeypatch, "pdfplumber==1 render=a")
+    await ac.archive(
+        out,
+        extractors=[_extractor(_pdf_fetch(session))],
+        pdf_dir=pdfs,
+        now=NOW.replace(day=5),
+        sleep=_no_sleep,
+    )
+    stamp = out / "parser.txt"
+    assert not ac.rerender_due(out)
+    stamp.write_text("an older parser\n", encoding="utf-8")
+    assert not ac.rerender_due(out)
+    _readers(monkeypatch, "pdfplumber==2 render=a")
+    assert ac.rerender_due(out)
+    stamp.write_text(f"{ac._parser_digest()}\n", encoding="utf-8")
+    assert not ac.rerender_due(out)
+    stamp.unlink()
+    assert not ac.rerender_due(out)
+    stamp.write_text("an older parser\n", encoding="utf-8")
+    path = out / "acme/default/2026-09.json"
+    row = json.loads(path.read_text(encoding="utf-8"))
+    row["_sources"] = [
+        {**{k: v for k, v in s.items() if k not in ("pdf", "readers")}, "picture": s["pdf"]}
+        if "pdf" in s
+        else s
+        for s in row["_sources"]
+    ]
+    path.write_text(json.dumps(row), encoding="utf-8")
+    assert not ac.rerender_due(out)
+
+
 async def test_a_kept_card_not_downloaded_replays_again_next_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, renders: list[bytes]
 ) -> None:
