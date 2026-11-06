@@ -229,6 +229,11 @@ fingerprint of what failed in a marker comment. When the open issue's
 latest post carries the same fingerprint and is younger than the cooldown
 (seven days), the run posts nothing, so a utility that stays broken gets
 one comment a week and a failure that changes shape is posted at once.
+Only the bot's own posts count (gh names it `app/github-actions` as an
+issue's author and `github-actions` as a comment's), since anyone can
+comment and a comment repeating the last marker kept the same failure
+quiet for another week; and only the last marker of a post, the one the
+script writes, since a report can quote one.
 
 ### Runner limits
 
