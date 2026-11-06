@@ -54,3 +54,17 @@ def test_readme_quotes_the_same_floor() -> None:
     readme = (_ROOT / "README.md").read_text(encoding="utf-8")
     assert f"**{declared} or newer**" in readme
     assert f"Home%20Assistant-{declared}%2B" in readme
+
+
+def test_the_manifest_floor_keeps_a_pdfminer_that_unpickles_cmaps_out() -> None:
+    """pdfplumber up to 0.11.8 pins a pdfminer.six whose CMap loader builds
+    a path from a name the PDF chooses and unpickles the file it finds
+    there; 0.11.9 pins 20251230, which reads JSON. An install that some
+    other integration held on an older pdfplumber kept that loader."""
+    manifest = json.loads(
+        (_ROOT / "custom_components" / "be_water_prices" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    floors = [req for req in manifest["requirements"] if req.startswith("pdfplumber")]
+    assert floors == ["pdfplumber>=0.11.9"]
