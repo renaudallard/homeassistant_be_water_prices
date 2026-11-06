@@ -290,7 +290,8 @@ commune before they are published, so an entry configured for one commune
 does not name it on every sensor.
 
 Each entry also carries a diagnostic **Refresh tariff** button, which
-fetches the tariff again at once; see [Refresh cadence](#refresh-cadence).
+fetches the tariff again at once, at most once a quarter of an hour; see
+[Refresh cadence](#refresh-cadence).
 
 ## Installation
 
@@ -489,7 +490,14 @@ you paid is worth more than a tidy chart.
   available while the sensors are not, or call the
   `be_water_prices.refresh` service, for one `entry_id` or, without
   one, every loaded entry. The call returns once the fetches are done,
-  so an automation step after it reads the new figures.
+  so an automation step after it reads the new figures. Only an
+  administrator can call the service, as with `backfill_prices`; an
+  automation can too. The service and the stale-tariff Repair's retry
+  fetch every time. The button fetches at most once a quarter of an
+  hour: a press within that time of the last fetch is refused and says
+  when it can fetch again. Asking Home Assistant to update one of the
+  entry's entities fetches nothing within that time either; the daily
+  refresh, a day after the last one, always fetches.
 - **Projected cost** — recomputed every coordinator tick **and**
   immediately when you save new options, so changing your consumption
   or household size shows up without waiting for the next refresh.

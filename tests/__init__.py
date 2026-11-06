@@ -28,6 +28,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from custom_components.be_water_prices.coordinator import WaterCoordinator
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -42,3 +46,9 @@ def fixture_html(name: str) -> str:
 
 def fixture_bytes(name: str) -> bytes:
     return (FIXTURES / name).read_bytes()
+
+
+def let_the_fetch_interval_pass(coordinator: WaterCoordinator) -> None:
+    """Have the coordinator's next refresh fetch, as it does once
+    ``MIN_FETCH_INTERVAL``, a quarter of an hour, has passed since the last."""
+    coordinator._last_fetch_at = None

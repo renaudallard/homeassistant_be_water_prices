@@ -60,7 +60,7 @@ from custom_components.be_water_prices.providers.base import (
     WaterTariff,
     belgian_today,
 )
-from tests import fixture_html
+from tests import fixture_html, let_the_fetch_interval_pass
 from tests.test_ha_coordinator import _setup_entry, _this_years_card
 
 
@@ -90,6 +90,7 @@ async def test_last_error_keeps_the_first_line_of_a_long_message(
     entry = await _setup_entry(hass, fetch)
     coordinator = entry.runtime_data
     caplog.set_level(logging.WARNING)
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 

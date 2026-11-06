@@ -75,21 +75,28 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     import voluptuous as vol
     from homeassistant.core import ServiceCall
     from homeassistant.helpers import config_validation as cv
+    from homeassistant.helpers.service import async_register_admin_service
 
     from .coordinator import loaded_entries
     from .statistics import async_register_services
 
     async def _refresh(call: ServiceCall) -> None:
         # Done when the fetches are, so what follows the call reads the
-        # tariff they give; the entries side by side.
+        # tariff they give; the entries side by side. Each fetches however
+        # recent its last fetch was (async_fetch_now).
         await asyncio.gather(
             *(
-                entry.runtime_data.async_refresh()
+                entry.runtime_data.async_fetch_now()
                 for entry in loaded_entries(hass, call.data.get("entry_id"))
             )
         )
 
-    hass.services.async_register(
+    # For administrators only, as backfill_prices is: every call fetches and
+    # parses every entry's tariff again, and any user, read-only ones
+    # included, could repeat it at will. A call with no user, as an
+    # automation's is, still goes through.
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_REFRESH,
         _refresh,

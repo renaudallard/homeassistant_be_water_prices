@@ -66,7 +66,14 @@ while the two year-to-date sensors keep the icons of their device classes.
 tariff"). Pressing it runs `async_refresh` on the coordinator, which
 fetches the tariff again at once. It stays available while the sensors
 are not, since pressing it is how an entry whose tariff cannot be read is
-retried.
+retried. It fetches at most once a quarter of an hour after the last
+fetch, whatever ran it, the setup's included (`MIN_FETCH_INTERVAL` in
+`coordinator.py`): any user who is not read-only can press a button, and
+twenty-five presses ran twenty-five fetches. A press within that time is
+refused with the translated `refresh_pressed_recently` error. Home
+Assistant's `update_entity` on any entity of the entry is held to the same
+interval, with no error: within it the refresh fetches nothing and the
+entities keep what they show.
 
 ## Services
 
@@ -78,7 +85,10 @@ loaded entry raises a translated `ServiceValidationError`
 (`unknown_entry`).
 
 - **`be_water_prices.refresh`** (`__init__.py`): refreshes the targeted
-  coordinators side by side and returns once the fetches are done.
+  coordinators side by side and returns once the fetches are done. Each
+  fetches however recent its last fetch was (`async_fetch_now`). It is
+  registered with `async_register_admin_service`, so a user who is not an
+  administrator is refused; an automation, which has no user, is not.
 - **`be_water_prices.backfill_prices`** (`statistics.py`): writes hourly
   flat-line long-term statistics for the five card-driven sensors
   (`_BACKFILL_KEYS`: `yearly_fee`, `basis_rate`, `comfort_rate`,

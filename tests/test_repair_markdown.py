@@ -46,6 +46,7 @@ from custom_components.be_water_prices.providers.base import (
     belgian_today,
 )
 from custom_components.be_water_prices.repairs import async_create_fix_flow
+from tests import let_the_fetch_interval_pass
 from tests.test_ha_coordinator import _setup_entry, _this_years_card
 
 _MARKDOWN = "[Fix now](https://evil.example/ha) ![](https://evil.example/p.png)"
@@ -66,6 +67,7 @@ async def test_last_error_reaches_the_repair_dialog_as_plain_words(hass: HomeAss
 
     entry = await _setup_entry(hass, fetch)
     coordinator = entry.runtime_data
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     issue = ir.async_get(hass).async_get_issue(DOMAIN, coordinator.stale_issue_id)

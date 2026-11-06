@@ -144,6 +144,18 @@ class CoordinatorData:
     year_figures: YearFigures = field(default_factory=YearFigures)
 
 
+# The shortest time between two fetches of the tariff. Every refresh fetched,
+# a PDF card taking seconds of a parsing process, and Home Assistant's
+# update_entity lets any user who may control an entity ask for a refresh
+# every ten seconds. A refresh within this time of the last fetch publishes
+# what it holds and fetches nothing, and the refresh button refuses a press.
+# The daily tick goes through the same check and is never held: Home
+# Assistant arms it a day after the end of the last refresh, on the loop
+# clock this is counted on. The refresh action and the Repair's retry fetch
+# whenever they are asked (async_fetch_now).
+MIN_FETCH_INTERVAL = timedelta(minutes=15)
+
+
 class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[CoordinatorData]):
     """Fetches the configured utility's tariff once a day."""
 
@@ -156,6 +168,9 @@ class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[Coordinator
         # The last good card and when it was fetched or captured, restored
         # from _card_store at setup: what a failed refresh serves.
         self._last_good: tuple[WaterTariff, datetime] | None = None
+        # When the last fetch began, worked or not, on the event loop's
+        # clock: what MIN_FETCH_INTERVAL counts from.
+        self._last_fetch_at: float | None = None
         # Resolved meter entity and the meter's reading back at Jan 1,
         # captured on each daily tick so meter state-change events can
         # recompute YTD live without re-querying the recorder.
@@ -265,7 +280,36 @@ class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[Coordinator
             return str(commune)
         return None
 
+    def fetch_held_for(self) -> timedelta:
+        """How long a refresh would still fetch nothing for
+        (``MIN_FETCH_INTERVAL``); zero once the next one fetches."""
+        if self._last_fetch_at is None:
+            return timedelta(0)
+        left = self._last_fetch_at + MIN_FETCH_INTERVAL.total_seconds() - self.hass.loop.time()
+        return timedelta(seconds=max(left, 0.0))
+
+    async def async_fetch_now(self) -> None:
+        """Refresh, fetching however recent the last fetch was: what the
+        refresh action and the stale Repair's retry run. Only an
+        administrator can ask for either, and one can fetch at any time
+        anyway by reloading the entry, whose first refresh always fetches."""
+        self._last_fetch_at = None
+        await self.async_refresh()
+
     async def _async_update_data(self) -> CoordinatorData:
+        if self.data is not None and self.fetch_held_for():
+            # Nothing is folded or read from the recorder either: between
+            # ticks the meter's own events, or the hourly read for a meter
+            # with no register, keep the year current.
+            _LOGGER.debug(
+                "water tariff fetched less than %s ago, not fetching again", MIN_FETCH_INTERVAL
+            )
+            if not self.last_update_success:
+                # A refresh that failed still stands: this one tried nothing,
+                # and returning would mark the entry recovered.
+                raise UpdateFailed("the last refresh failed, and the next fetch is held")
+            return self.data
+        self._last_fetch_at = self.hass.loop.time()
         session = async_get_clientsession(self.hass)
         commune = self._fetched_commune()
         budget = asyncio.timeout(FETCH_BUDGET_S)

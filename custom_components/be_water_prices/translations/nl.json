@@ -235,6 +235,9 @@
     },
     "clear_needs_entry": {
       "message": "Wissen voor importeren vereist een configuratie-invoer: alle geladen invoeren tegelijk wissen is onomkeerbaar."
+    },
+    "refresh_pressed_recently": {
+      "message": "Het tarief werd het laatst opgehaald om {last}; vanaf {next} kan het opnieuw worden opgehaald."
     }
   }
 }

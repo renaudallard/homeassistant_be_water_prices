@@ -209,6 +209,9 @@
     },
     "clear_needs_entry": {
       "message": "Clear before importing needs a config entry: clearing every loaded entry at once cannot be undone."
+    },
+    "refresh_pressed_recently": {
+      "message": "The tariff was last fetched at {last}; the next fetch can start from {next}."
     }
   }
 }

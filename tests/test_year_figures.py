@@ -68,6 +68,7 @@ from custom_components.be_water_prices.meter_reads import (
 from custom_components.be_water_prices.pricing import compute_annual_cost, compute_ytd_cost
 from custom_components.be_water_prices.providers._flanders import build_flanders_tariff
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+from tests import let_the_fetch_interval_pass
 
 _ROWS = "custom_components.be_water_prices.meter_reads._recorder_daily_rows"
 _FULL_YEAR = "custom_components.be_water_prices.coordinator_meter._recorder_full_year_m3"
@@ -359,6 +360,7 @@ async def test_the_meter_is_read_once_a_day(hass: HomeAssistant, freezer: Any) -
     entry = await _setup_entry(hass, rows)
     coordinator = entry.runtime_data
     with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_ROWS, new=rows):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert rows.await_count == 1
@@ -427,6 +429,7 @@ async def test_a_draw_during_the_read_is_not_overwritten(hass: HomeAssistant, fr
     # Setup framed the meter on the recorder's answer and asks it once more
     # on the next tick; that tick comes first, so the one below is the
     # meter's alone.
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
@@ -556,6 +559,7 @@ async def test_a_read_of_another_meter_is_not_kept(hass: HomeAssistant, freezer:
         patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_ROWS, new=AsyncMock(side_effect=RecorderUnavailable("locked"))),
     ):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert coordinator.data.year_figures == YearFigures()
@@ -570,6 +574,7 @@ async def test_a_meter_that_goes_away_takes_its_year_along(
     coordinator = entry.runtime_data
     assert coordinator.data.year_figures.rolling_m3 == pytest.approx(91.25)
     with patch.object(coordinator, "async_resolve_meter_entity", AsyncMock(return_value=None)):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert coordinator.data.year_figures == YearFigures()

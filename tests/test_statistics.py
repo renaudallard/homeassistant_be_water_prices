@@ -53,6 +53,7 @@ from custom_components.be_water_prices.statistics import (
     async_backfill_prices,
     async_register_services,
 )
+from tests import let_the_fetch_interval_pass
 
 
 def _entry(hass: HomeAssistant) -> MockConfigEntry:
@@ -868,6 +869,7 @@ async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
         # The operator finally publishes, and the daily tick picks it up.
         card_year = year
         coordinator = entry.runtime_data
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 

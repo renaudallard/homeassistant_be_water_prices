@@ -46,6 +46,7 @@ from custom_components.be_water_prices.providers.base import (
     WaterExtractor,
     WaterTariff,
 )
+from tests import let_the_fetch_interval_pass
 from tests.test_ha_coordinator import _fresh_tariff
 
 
@@ -134,6 +135,7 @@ async def test_a_fault_on_the_cached_path_does_not_print_the_raw_fetch_error(
         coordinator = entry.runtime_data
         outage = True
         with patch.object(coordinator, "_compute_ytd", side_effect=RuntimeError("fault")):
+            let_the_fetch_interval_pass(coordinator)
             await coordinator.async_refresh()
             await hass.async_block_till_done()
 

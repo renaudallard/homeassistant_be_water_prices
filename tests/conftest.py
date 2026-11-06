@@ -35,10 +35,13 @@ itself is exported here for any test that needs it.
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from homeassistant.core import HomeAssistant
+
+from custom_components.be_water_prices.coordinator import CoordinatorData, WaterCoordinator
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -58,6 +61,31 @@ def _card_archive_holds_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "custom_components.be_water_prices.providers._archive.archived_row", nothing
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_refresh_is_held(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Fail a test whose refresh MIN_FETCH_INTERVAL held, unless it is
+    marked fetch_pacing. A held refresh fetches nothing, folds nothing and
+    asks the recorder nothing, so a test that stands one for a tick asserts
+    on figures nothing touched; let_the_fetch_interval_pass before it."""
+    if request.node.get_closest_marker("fetch_pacing") is not None:
+        yield
+        return
+    held = 0
+    update = WaterCoordinator._async_update_data
+
+    async def _update(self: WaterCoordinator) -> CoordinatorData:
+        nonlocal held
+        if self.data is not None and self.fetch_held_for():
+            held += 1
+        return await update(self)
+
+    monkeypatch.setattr(WaterCoordinator, "_async_update_data", _update)
+    yield
+    assert held == 0, f"{held} refresh(es) held by MIN_FETCH_INTERVAL"
 
 
 @pytest.fixture(autouse=True)

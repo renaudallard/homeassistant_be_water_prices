@@ -235,6 +235,9 @@
     },
     "clear_needs_entry": {
       "message": "Effacer avant import nécessite une entrée de configuration : tout effacer d'un coup est irréversible."
+    },
+    "refresh_pressed_recently": {
+      "message": "Le tarif a été récupéré pour la dernière fois à {last} ; la prochaine récupération peut commencer à partir de {next}."
     }
   }
 }

@@ -27,13 +27,23 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from .coordinator import WaterConfigEntry, WaterCoordinator, utility_device_info
+from .const import DOMAIN
+from .coordinator import (
+    MIN_FETCH_INTERVAL,
+    WaterConfigEntry,
+    WaterCoordinator,
+    utility_device_info,
+)
 
 _REFRESH = ButtonEntityDescription(
     key="refresh",
@@ -67,4 +77,22 @@ class RefreshButton(CoordinatorEntity[WaterCoordinator], ButtonEntity):
         return True
 
     async def async_press(self) -> None:
+        # Any user allowed to press a button can press this one, and the
+        # coordinator fetches at most once in MIN_FETCH_INTERVAL. A press
+        # it would fetch nothing for is refused, saying when the button
+        # can fetch again, rather than looking as if it had fetched.
+        if held := self.coordinator.fetch_held_for():
+            ready = dt_util.utcnow() + held
+            # Up to the minute, so a press at the time it gives fetches.
+            shown = ready.replace(second=0, microsecond=0)
+            if shown < ready:
+                shown += timedelta(minutes=1)
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="refresh_pressed_recently",
+                translation_placeholders={
+                    "last": dt_util.as_local(ready - MIN_FETCH_INTERVAL).strftime("%H:%M"),
+                    "next": dt_util.as_local(shown).strftime("%H:%M"),
+                },
+            )
         await self.coordinator.async_refresh()

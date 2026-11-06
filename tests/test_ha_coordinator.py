@@ -79,6 +79,7 @@ from custom_components.be_water_prices.providers.base import (
     belgian_today,
 )
 from custom_components.be_water_prices.repairs import async_create_fix_flow
+from tests import let_the_fetch_interval_pass
 
 
 def _fresh_tariff(valid_until: date | None = None) -> WaterTariff:
@@ -203,6 +204,7 @@ async def test_repair_issue_clears_when_next_fetch_is_fresh(hass: HomeAssistant)
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
 
     # Manually trigger a second refresh to consume the fresh fixture.
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert coordinator.data is not None
@@ -226,6 +228,7 @@ async def test_extractor_error_serves_cached_snapshot(hass: HomeAssistant) -> No
     assert first is not None
     assert first.last_error == ""
 
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     second = coordinator.data
@@ -249,7 +252,9 @@ async def test_repair_fix_flow_triggers_coordinator_refresh(hass: HomeAssistant)
     issue = issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id)
     assert issue is not None and issue.is_fixable
 
-    # Walk the fix flow: open it, then submit the confirmation step.
+    # Walk the fix flow: open it, then submit the confirmation step. The
+    # card was raised by the setup's own fetch a moment ago, and the retry
+    # fetches all the same.
     flow = await async_create_fix_flow(hass, coordinator.stale_issue_id, issue.data)
     flow.hass = hass
     # The RepairsFlowManager sets these before the first step in production.
@@ -411,6 +416,7 @@ async def test_recorder_fallback_does_not_publish_below_the_live_mark(
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.return_value = (49.7, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 50.0
@@ -613,6 +619,7 @@ async def test_a_meter_that_resets_daily_is_read_from_the_recorder(hass: HomeAss
         # the verdict must outlast it or the next tick reads it as a register.
         hass.states.async_set("sensor.water_meter", "unavailable", {})
         recorder.return_value = (0.6, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         assert recorder.await_args.kwargs["register"] is False
         assert coordinator.data.ytd_consumption_m3 == 0.6
@@ -836,6 +843,7 @@ async def test_live_tracking_follows_a_changed_auto_discovered_meter(
         # The dashboard is re-pointed at another meter; the next tick
         # re-anchors on it (baseline 500 - 20).
         discovered = "sensor.meter_b"
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator._meter_entity_id == "sensor.meter_b"
@@ -1271,6 +1279,7 @@ async def test_live_ytd_cost_held_when_tariff_drops(hass: HomeAssistant) -> None
         assert cost_peak is not None
 
         # Daily tick fetches the lower tariff; the meter has not moved.
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         # m³ is flat and the new tariff is cheaper, so the un-clamped cost
@@ -1374,6 +1383,7 @@ async def test_ytd_cost_floor_drops_on_rollover_while_meter_offline(hass: HomeAs
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.return_value = (2.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -1425,6 +1435,7 @@ async def test_meter_recovery_keeps_the_new_year_recorder_figure(hass: HomeAssis
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.return_value = (5.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 5.0
@@ -2172,6 +2183,7 @@ async def test_repointed_meter_does_not_inherit_the_old_meter_baseline(
         assert coordinator.data.ytd_started_at is None
 
         discovered = "sensor.meter_b"
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 40.0
@@ -2291,6 +2303,7 @@ async def test_rollover_with_no_recorder_figure_still_reanchors(hass: HomeAssist
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.return_value = (0.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 0.0
@@ -2351,6 +2364,7 @@ async def test_transient_recorder_gap_does_not_reset_the_year(hass: HomeAssistan
         # The next tick's recorder query fails transiently. The figure is
         # still this year's, so it keeps being served rather than blanked.
         recorder.side_effect = RecorderUnavailable("database is locked")
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 12.0
@@ -2488,6 +2502,7 @@ async def test_tick_defers_the_anchor_when_the_recorder_query_fails(
         # The next healthy tick anchors properly and keeps the 40.
         recorder.side_effect = None
         recorder.return_value = (40.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator._ytd.offset_m3 == 4480.0
@@ -2536,6 +2551,7 @@ async def test_an_old_recorder_failure_does_not_block_the_new_year(
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.side_effect = RecorderUnavailable("database is locked")
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -2543,6 +2559,7 @@ async def test_an_old_recorder_failure_does_not_block_the_new_year(
         recorder.side_effect = None
         hass.states.async_set("sensor.water_meter", "130")
         await hass.async_block_till_done()
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 50.0
@@ -2675,6 +2692,7 @@ async def test_cost_floor_drops_at_rollover_for_a_never_anchored_cycle(
         # Roll over: the figure now belongs to last year.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
         recorder.return_value = (0.4, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -2730,6 +2748,7 @@ async def test_resuming_live_tracking_keeps_the_cost_floor(hass: HomeAssistant) 
         # The utility cuts its rate while the meter is still down; the
         # floor holds the bill where it was.
         cheap = True
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.current_year_cost_eur == peak
@@ -2783,6 +2802,7 @@ async def test_recorder_hiccup_does_not_blank_a_known_figure(hass: HomeAssistant
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.side_effect = RecorderUnavailable("database is locked")
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 50.0
@@ -2894,12 +2914,14 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         hass.states.async_set("sensor.water_meter", "unavailable")
         await hass.async_block_till_done()
         recorder.return_value = (30.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
 
         # The recorder then fails: the figure must hold, not drop back.
         recorder.side_effect = RecorderUnavailable("database is locked")
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 30.0
@@ -2918,6 +2940,7 @@ async def test_served_recorder_figure_is_folded_into_the_mark(hass: HomeAssistan
         recorder.return_value = (30.0, 0.0)
         hass.states.async_set("sensor.water_meter", "107")
         await hass.async_block_till_done()
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator._ytd.offset_m3 == 77.0
@@ -3037,6 +3060,7 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
 
         # The recorder hiccups: keep serving what is known.
         recorder.side_effect = RecorderUnavailable("database is locked")
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 70.0
@@ -3044,6 +3068,7 @@ async def test_never_anchored_entry_keeps_reporting_through_a_recorder_gap(
 
         # After a rollover there is nothing this year to serve yet.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 is None
@@ -3166,12 +3191,14 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
 
         # The recorder total steps backwards inside the same year.
         recorder.return_value = (40.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 45.0
 
         # A genuine climb still gets through.
         recorder.return_value = (51.0, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 51.0
@@ -3179,6 +3206,7 @@ async def test_served_volume_does_not_walk_back_without_an_anchor(
         # And the new year is free to start near zero.
         coordinator._ytd = replace(coordinator._ytd, year=dt_util.now().year - 1)
         recorder.return_value = (0.4, 0.0)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 0.4
@@ -3233,6 +3261,7 @@ async def test_tick_does_not_publish_a_figure_the_cycle_moved_past(
 
         coordinator._cycle_dirty = True
         with patch.object(coordinator._store, "async_save", new=_slow_save):
+            let_the_fetch_interval_pass(coordinator)
             await coordinator.async_refresh()
             await hass.async_block_till_done()
 
@@ -3291,6 +3320,7 @@ async def test_the_tick_republishing_does_not_claim_the_meter_was_gone(
 
         coordinator._cycle_dirty = True
         with patch.object(coordinator._store, "async_save", new=_slow_save):
+            let_the_fetch_interval_pass(coordinator)
             await coordinator.async_refresh()
             await hass.async_block_till_done()
         assert coordinator.data.ytd_consumption_m3 == 45.0
@@ -3982,6 +4012,7 @@ async def test_a_swap_moves_the_sensors_reset_to_its_start(hass: HomeAssistant) 
         # A round served from the held snapshot carries the start as well,
         # so a tariff outage does not take the reset back to 1 January.
         failing = True
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.last_error
@@ -4462,6 +4493,7 @@ async def test_a_first_refresh_that_fails_serves_the_archived_card(
         ("vivaqua", "default", today.replace(day=1) - timedelta(days=1)),
     ]
     # The next failure serves it as the cached snapshot, archive not asked.
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert coordinator.data.tariff is data.tariff
@@ -4508,6 +4540,7 @@ async def test_a_stale_snapshot_follows_the_archive(
     assert asked == 1
 
     holds["row"] = newer
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert coordinator.data.tariff.publication_label == "VIVAQUA archived in the summer"
@@ -4517,6 +4550,7 @@ async def test_a_stale_snapshot_follows_the_archive(
     # The archive answering with an older capture than the one being
     # served leaves it where it is.
     holds["row"] = older
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert coordinator.data.tariff.publication_label == "VIVAQUA archived in the summer"
@@ -4559,6 +4593,7 @@ async def test_a_failing_refresh_folds_the_year_once(
         return await fold(tariff)
 
     monkeypatch.setattr(coordinator, "_compute_ytd", counted)
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert folds == 1

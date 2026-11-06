@@ -57,6 +57,7 @@ from custom_components.be_water_prices.const import (
 )
 from custom_components.be_water_prices.coordinator import WaterCoordinator
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+from tests import let_the_fetch_interval_pass
 from tests.test_ha_coordinator import _fresh_tariff
 
 _METER = "sensor.water_meter"
@@ -115,6 +116,7 @@ async def _setup(hass: HomeAssistant) -> tuple[MockConfigEntry, WaterCoordinator
 
 
 async def _tick(hass: HomeAssistant, coordinator: WaterCoordinator) -> None:
+    let_the_fetch_interval_pass(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 

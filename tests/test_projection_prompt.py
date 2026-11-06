@@ -63,6 +63,7 @@ from custom_components.be_water_prices.repairs import (
     SnapshotStaleRepairFlow,
     async_create_fix_flow,
 )
+from tests import let_the_fetch_interval_pass
 
 _ROWS = "custom_components.be_water_prices.meter_reads._recorder_daily_rows"
 _FULL_YEAR = "custom_components.be_water_prices.coordinator_meter._recorder_full_year_m3"
@@ -363,6 +364,7 @@ async def test_a_different_meter_is_re_checked_without_an_options_change(
             "async_resolve_meter_entity",
             new=AsyncMock(return_value="sensor.other_meter"),
         ):
+            let_the_fetch_interval_pass(coordinator)
             await coordinator.async_refresh()
             await hass.async_block_till_done()
     assert full_year.await_count == 2
@@ -421,8 +423,10 @@ async def test_answer_is_not_re_queried_while_nothing_changed(hass: HomeAssistan
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
     coordinator = entry.runtime_data
     with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert full_year.await_count == 1
@@ -438,6 +442,7 @@ async def test_unreadable_recorder_is_retried_rather_than_believed(
     coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
     with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert full_year.await_count == 2
@@ -460,6 +465,7 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
     # more on the next tick; that tick comes first, so the one below is
     # the meter's alone.
     with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 
@@ -475,6 +481,7 @@ async def test_a_draw_during_the_query_is_not_overwritten(hass: HomeAssistant) -
         patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
         patch(_FULL_YEAR, new=_draw_while_querying),
     ):
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert coordinator.data.ytd_consumption_m3 == 50.0

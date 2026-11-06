@@ -235,6 +235,9 @@
     },
     "clear_needs_entry": {
       "message": "Vor dem Import löschen erfordert einen Konfigurationseintrag: alle geladenen Einträge auf einmal zu löschen ist unumkehrbar."
+    },
+    "refresh_pressed_recently": {
+      "message": "Der Tarif wurde zuletzt um {last} abgerufen; ab {next} kann er erneut abgerufen werden."
     }
   }
 }

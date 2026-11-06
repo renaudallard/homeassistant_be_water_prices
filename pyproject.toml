@@ -9,6 +9,9 @@ asyncio_default_fixture_loop_scope = "function"
 # would otherwise hang CI silently instead of failing the offending
 # test; 30s is generous enough not to flake on slow CI runners.
 timeout = 30
+markers = [
+    "fetch_pacing: the test is about MIN_FETCH_INTERVAL holding a refresh",
+]
 
 [tool.ruff]
 line-length = 100

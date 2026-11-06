@@ -52,6 +52,7 @@ from custom_components.be_water_prices.const import (
 from custom_components.be_water_prices.coordinator import entry_coordinator
 from custom_components.be_water_prices.meter_reads import RecorderUnavailable
 from custom_components.be_water_prices.providers.base import WaterExtractor, WaterTariff
+from tests import let_the_fetch_interval_pass
 from tests.test_ha_coordinator import _fresh_tariff
 
 _GET = "custom_components.be_water_prices.coordinator.get"
@@ -149,6 +150,7 @@ async def test_a_late_refresh_does_not_write_the_store_of_a_removed_entry(
         coordinator = entry.runtime_data
         assert store_key in hass_storage
 
+        let_the_fetch_interval_pass(coordinator)
         refresh = hass.loop.create_task(coordinator.async_refresh())
         await asyncio.sleep(0)
         await asyncio.sleep(0)
@@ -197,6 +199,7 @@ async def test_a_late_refresh_does_not_raise_the_projection_card_after_unload(
         await hass.async_block_till_done()
         coordinator = entry.runtime_data
 
+        let_the_fetch_interval_pass(coordinator)
         task = hass.async_create_task(coordinator.async_refresh())
         await asyncio.wait_for(entered.wait(), 5)
         assert await hass.config_entries.async_unload(entry.entry_id)
@@ -368,7 +371,7 @@ async def test_a_replaced_coordinator_does_not_follow_the_new_meter(
         old = entry.runtime_data
 
         # Retry on the stale card: a refresh in the flow's task, with a slow fetch.
-        refresh = hass.loop.create_task(old.async_refresh())
+        refresh = hass.loop.create_task(old.async_fetch_now())
         for _ in range(6):
             await asyncio.sleep(0)
         assert calls == 2 and not gate.is_set()
@@ -437,6 +440,7 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
         await hass.async_block_till_done()
         old = entry.runtime_data
 
+        let_the_fetch_interval_pass(old)
         refresh = hass.loop.create_task(old.async_refresh())
         for _ in range(6):
             await asyncio.sleep(0)

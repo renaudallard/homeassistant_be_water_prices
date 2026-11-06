@@ -60,6 +60,7 @@ from custom_components.be_water_prices.providers.base import (
     WaterTariff,
     tariff_to_dict,
 )
+from tests import let_the_fetch_interval_pass
 from tests.test_ha_coordinator import _fresh_tariff
 
 _CARD_2026 = _fresh_tariff()
@@ -142,6 +143,7 @@ async def test_next_years_card_in_december_leaves_the_closing_year_alone(
         # sensors follow it, the closing year's bill and floor do not.
         for factor in (1.05, 0.95):
             served["card"] = _next_years_card(factor)
+            let_the_fetch_interval_pass(coordinator)
             await coordinator.async_refresh()
             await hass.async_block_till_done()
             assert coordinator.data.tariff.valid_from == date(2027, 1, 1)
@@ -163,6 +165,7 @@ async def test_next_years_card_in_december_leaves_the_closing_year_alone(
 
         # And the page flipping back to its 2026 tab moves nothing either.
         served["card"] = _CARD_2026
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.current_year_cost_eur == bill
@@ -300,6 +303,7 @@ async def test_the_year_backfill_prices_on_the_card_in_force(
         await hass.async_block_till_done()
         coordinator = entry.runtime_data
         served["card"] = _next_years_card(1.1)
+        let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert coordinator.data.tariff.valid_from == date(2027, 1, 1)

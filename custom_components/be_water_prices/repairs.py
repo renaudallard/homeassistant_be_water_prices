@@ -97,7 +97,9 @@ class SnapshotStaleRepairFlow(RepairsFlow):
         entry = self.hass.config_entries.async_get_entry(self._entry_id)
         coordinator = entry_coordinator(entry) if entry is not None else None
         if coordinator is not None:
-            await coordinator.async_refresh()
+            # A retry fetches, however recent the last fetch was: a card
+            # raised by the setup's own fetch is retried within minutes.
+            await coordinator.async_fetch_now()
         if coordinator is None or coordinator.data is None or coordinator.data.snapshot_stale:
             # Completing the flow makes the Repairs manager delete the
             # issue. That is right once the refresh has cleared it, but on

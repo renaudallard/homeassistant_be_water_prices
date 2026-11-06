@@ -370,11 +370,35 @@ so removing and re-adding a utility starts clean.
 ## The refresh service and the button
 
 `be_water_prices.refresh`, registered in `async_setup`, runs
-`async_refresh` on every entry `loaded_entries` returns (the one named by
+`async_fetch_now` on every entry `loaded_entries` returns (the one named by
 `entry_id`, else all loaded ones) side by side and returns when they are
 done. A named entry that is not loaded is refused with `unknown_entry`.
-The *Refresh tariff* button (`button.py`, `RefreshButton`) awaits the same
+It is registered with `async_register_admin_service`, as `backfill_prices`
+is, so a user who is not an administrator is refused and an automation,
+which has no user, is not.
+
+A refresh fetches at most once in `MIN_FETCH_INTERVAL` (15 minutes),
+counted on the event loop's clock from the start of the last fetch,
+whether it worked or not. Within it `_async_update_data` returns the data
+it holds: nothing is fetched, the year is not folded and the meter's year
+is not read from the recorder. After a refresh that failed it raises
+`UpdateFailed` again instead, so the entry is not marked recovered with
+nothing tried. Home Assistant's `update_entity`, which any
+user who may control an entity can call, runs the coordinator's debounced
+refresh, at most one every ten seconds, and every one of them fetched. The
+tick goes through the same check and is never held by it: Home Assistant
+arms the tick `UPDATE_INTERVAL_HOURS` after the end of the last refresh,
+on that same clock, so a day with no other refresh fetches once, as it
+did. `async_fetch_now` forgets the last fetch, then refreshes: the refresh
+action and the stale Repair's retry run it, since only an administrator
+can ask for either, and an administrator can fetch at any time anyway by
+reloading the entry, whose first refresh always fetches.
+
+The *Refresh tariff* button (`button.py`, `RefreshButton`) awaits
 `async_refresh` and stays available while the sensors are not, since it is
-how an entry whose card cannot be read is retried. Every tick fetches, so
-neither needs a force flag. `backfill_prices` is described in
-[entities.md](entities.md).
+how an entry whose card cannot be read is retried. Any user who is not
+read-only can press a button, so a press within `MIN_FETCH_INTERVAL` of
+the last fetch, alone or among presses arriving together, is refused with
+the translated `refresh_pressed_recently` error. It gives the time the
+last fetch began and the time the next can, rounded up to the minute.
+`backfill_prices` is described in [entities.md](entities.md).
