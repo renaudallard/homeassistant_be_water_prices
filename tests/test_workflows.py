@@ -28,8 +28,12 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
+import zipfile
 from pathlib import Path
 
+import pytest
 import yaml  # type: ignore[import-untyped]
 
 WORKFLOWS = Path(__file__).resolve().parent.parent / ".github" / "workflows"
@@ -51,3 +55,61 @@ def test_every_action_and_git_install_names_a_commit() -> None:
                     assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", ref), (path.name, ref)
         for url in re.findall(r"git\+https://[^\s\"']+", text):
             assert re.search(r"@[0-9a-f]{40}$", url), (path.name, url)
+
+
+def _component(root: Path) -> Path:
+    """The component as the checkout leaves it, and beside it the runner's
+    temp folder with the credentials file the checkout writes there."""
+    component = root / "custom_components" / "be_water_prices"
+    (component / "providers" / "__pycache__").mkdir(parents=True)
+    (component / "manifest.json").write_text("{}\n")
+    (component / "providers" / "a.py").write_text("x = 1\n")
+    (component / "providers" / "__pycache__" / "a.cpython-313.pyc").write_bytes(b"")
+    temp = root / "_temp"
+    temp.mkdir()
+    (temp / "git-credentials-1.config").write_text("extraheader = basic t0ken\n")
+    return component
+
+
+def _build_zip(root: Path) -> subprocess.CompletedProcess[str]:
+    """The release job's zip step, run in ``root``."""
+    steps = yaml.safe_load((WORKFLOWS / "autorelease.yml").read_text())["jobs"]["release"]["steps"]
+    script = next(s["run"] for s in steps if s.get("name") == "Build release zip")
+    return subprocess.run(
+        ["bash", "-e", "-c", script], cwd=root, capture_output=True, text=True, check=False
+    )
+
+
+@pytest.mark.skipif(
+    shutil.which("zip") is None or shutil.which("unzip") is None,
+    reason="needs zip and unzip, which the release runner has",
+)
+def test_the_release_zip_holds_the_component(tmp_path: Path) -> None:
+    """The zip HACS installs: the component's files, without the bytecode."""
+    _component(tmp_path)
+    done = _build_zip(tmp_path)
+    assert done.returncode == 0, done.stderr
+    with zipfile.ZipFile(tmp_path / "dist" / "be_water_prices.zip") as built:
+        assert sorted(built.namelist()) == ["manifest.json", "providers/", "providers/a.py"]
+
+
+@pytest.mark.parametrize("where", ["file", "folder", "component"])
+def test_the_release_zip_refuses_a_symbolic_link(tmp_path: Path, where: str) -> None:
+    """zip stores what a link points at, a folder's files included, so a link
+    in the component to the runner's temp folder, where the checkout keeps
+    the job's write token, shipped the token to every installation. A link
+    anywhere from custom_components down fails the step before anything is
+    zipped."""
+    component = _component(tmp_path)
+    temp = tmp_path / "_temp"
+    if where == "file":
+        (component / "notes.txt").symlink_to(temp / "git-credentials-1.config")
+    elif where == "folder":
+        (component / "providers" / "cache").symlink_to(temp)
+    else:
+        component.rename(tmp_path / "elsewhere")
+        component.symlink_to(tmp_path / "elsewhere")
+    done = _build_zip(tmp_path)
+    assert done.returncode != 0
+    assert "symbolic links under custom_components" in done.stderr
+    assert not (tmp_path / "dist").exists()

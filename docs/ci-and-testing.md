@@ -127,7 +127,11 @@ by hand). The release job waits on three gates: the test suite through
 release with `be_water_prices.zip`. `hacs.json` names that zip with
 `zip_release`, so HACS and the Marketplace install it rather than the
 archive of the tag, and it is also the file the README's manual install
-downloads.
+downloads. A symbolic link anywhere from `custom_components` down fails
+the zip step first: zip stores what a link points at, a folder's files
+included, so a link to the runner's temp folder, where the checkout keeps
+the job's write token, would ship the token to every installation, and
+the repository holds no link there (`tests/test_workflows.py`).
 
 A release counts only once it is published with the zip: `gh release
 create` makes a draft first and publishes it after the upload, so a draft
