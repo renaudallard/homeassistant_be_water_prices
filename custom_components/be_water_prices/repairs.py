@@ -42,6 +42,7 @@ options, which reloads the entry and moves the sensor.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from homeassistant.components.repairs import RepairsFlow
@@ -51,6 +52,15 @@ from homeassistant.helpers import issue_registry as ir
 
 from .const import CONF_CONSUMPTION_M3_PER_YEAR
 from .coordinator import entry_coordinator
+
+# Every ASCII punctuation character, each of which CommonMark lets a
+# backslash make literal.
+_PUNCTUATION_RE = re.compile(r"([!-/:-@\[-`{-~])")
+
+
+def _literal(text: str) -> str:
+    """``text`` as plain words inside markdown, on one line."""
+    return _PUNCTUATION_RE.sub(r"\\\1", " ".join(text.split()))
 
 
 class SnapshotStaleRepairFlow(RepairsFlow):
@@ -76,6 +86,12 @@ class SnapshotStaleRepairFlow(RepairsFlow):
         placeholders = None
         if issue := issue_registry.async_get_issue(self.handler, self.issue_id):
             placeholders = issue.translation_placeholders
+        if placeholders is not None and "last_error" in placeholders:
+            # The description renders as markdown, and last_error can quote
+            # what a card host chose, a filter name or a table cell: written
+            # as markdown it showed a link, and a picture the admin's browser
+            # fetched from wherever it pointed the moment the form opened.
+            placeholders = {**placeholders, "last_error": _literal(placeholders["last_error"])}
         if user_input is None:
             return self.async_show_form(step_id="confirm", description_placeholders=placeholders)
         entry = self.hass.config_entries.async_get_entry(self._entry_id)

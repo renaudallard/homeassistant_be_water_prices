@@ -313,7 +313,11 @@ refresh.
 
 - `snapshot_stale_<entry_id>` (`_sync_repair_issue`), fixable: the fix
   flow in `repairs.py` runs `async_refresh` and aborts with `still_stale`
-  when the snapshot did not recover, so the card stays.
+  when the snapshot did not recover, so the card stays. Its form renders
+  `last_error` as markdown, so the flow hands it over with every ASCII
+  punctuation character backslashed and on one line (`_literal`): the
+  message can quote what a card host chose, and a link or a remote
+  picture written there showed in the admin's dialog.
 - `projection_outdated_<entry_id>` (`_sync_projection_issue`), fixable:
   last calendar year's metered figure, rounded, when it lies within the
   consumption bounds and is at least `PROJECTION_DRIFT_RATIO` (10 %) off

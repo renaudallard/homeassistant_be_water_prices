@@ -126,7 +126,7 @@ the entry id. All are warnings.
 
 | Card | Raised when | Fix |
 | --- | --- | --- |
-| `snapshot_stale` | The snapshot is older than 35 days or past its `valid_until`, last year's card counting until 31 March | `SnapshotStaleRepairFlow`: refreshes now; a refresh that does not help leaves the card in place (`still_stale`) |
+| `snapshot_stale` | The snapshot is older than 35 days or past its `valid_until`, last year's card counting until 31 March | `SnapshotStaleRepairFlow`: refreshes now; a refresh that does not help leaves the card in place (`still_stale`). The form shows `last_error` with its punctuation escaped, so no markdown in it renders |
 | `projection_outdated` | A whole calendar year the meter measured disagrees with the configured consumption | `ProjectionOutdatedRepairFlow`: writes the measured figure into the options, which reloads the entry; ignoring the card keeps the setting |
 | `several_water_meters` | No meter is configured and the Energy dashboard lists more than one water meter | None: pick one in the options |
 | `operator_moved` | The saved postcode now resolves to operators that leave the entry's out, other than the ones recorded when it was picked by hand (`postcode_resolved`) | None: reconfigure, or ignore |
