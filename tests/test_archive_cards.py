@@ -1206,6 +1206,35 @@ def test_a_card_picture_is_uploaded_and_recorded_like_a_pdf(tmp_path: Path) -> N
     assert manifest == {digest: f"water-2026-10/{digest}.jpg"}
 
 
+def test_the_pictures_not_read_are_listed_in_a_code_block(tmp_path: Path) -> None:
+    """A refusal quotes the utility's page, its address and what the reading
+    made of the picture, and the issue listed it as markdown, where a
+    mention, a link or an image in it rendered. The list is a code block no
+    line of it can close: a CR goes, and every line starts with "- "."""
+    work = tmp_path / "work"
+    (work / "tmp" / "ocr").mkdir(parents=True)
+    (work / "tmp" / "ocr" / "ocr_failures.txt").write_text(
+        "AIEC picture https://x.test/a.jpg: @renaudallard [x](https://evil.example)\r```\n```\n",
+        encoding="utf-8",
+    )
+    (work / "scripts").mkdir()
+    (work / "scripts" / "file_ci_issue.sh").write_text(
+        'while [ $# -gt 0 ]; do case "$1" in --body) cp "$2" filed_body.md ;; esac; shift; done\n'
+    )
+    script = _workflow_step("ocr", "File the card pictures that were not read")
+    subprocess.run(["bash", "-e", "-c", script], cwd=work, check=True)
+    # Read as bytes: text mode would turn a CR into a line ending.
+    body = (work / "filed_body.md").read_bytes().decode("utf-8")
+    assert "\r" not in body
+    lines = body.split("\n")
+    fences = [i for i, line in enumerate(lines) if line.startswith("```")]
+    assert len(fences) == 2
+    assert lines[fences[0] + 1 : fences[1]] == [
+        "- AIEC picture https://x.test/a.jpg: @renaudallard [x](https://evil.example) ```",
+        "- ```",
+    ]
+
+
 def test_only_the_cards_the_walk_names_are_uploaded(tmp_path: Path) -> None:
     """The keep job holds the cards token and takes the walk's files from
     an artifact, so it uploads only a month folder and a card named as the

@@ -210,6 +210,33 @@ def test_render_reports_transient_without_a_failure_banner() -> None:
     assert "checks failed" not in out
 
 
+def test_a_detail_is_shown_as_code_spans() -> None:
+    """A detail can quote what a utility serves, and the report is posted as
+    an issue: as it came, a mention, a link, an image and an issue reference
+    would all render, and a CR would end the table row. Each line of a
+    detail is a code span of its own, no backtick of its own to close it and
+    its pipes escaped, the spans apart on a <br>. A blank one leaves the
+    cell empty."""
+    detail = (
+        "ExtractorError: `Zen` @renaudallard [fix](https://evil.example/phish)\r\n"
+        "![](https://evil.example/pixel.png) see #1 a|b <!-- x\r::warning title=spoofed::fake"
+    )
+    out = _render(
+        [
+            CheckResult("x", "X", "flanders", "FAIL", detail),
+            CheckResult("y", "Y", "flanders", "FAIL", "``"),
+        ]
+    )
+    assert "\r" not in out
+    rows = [row for row in out.split("\n") if "| FAIL |" in row]
+    assert rows == [
+        "| X | flanders | FAIL | `ExtractorError: Zen @renaudallard [fix](https://evil.example/phish)`"
+        "<br>`![](https://evil.example/pixel.png) see #1 a\\|b <!-- x`"
+        "<br>`::warning title=spoofed::fake` |",
+        "| Y | flanders | FAIL |  |",
+    ]
+
+
 def test_render_names_what_it_could_not_check() -> None:
     """A transient row is not an all-clear, and nothing here escalates.
 

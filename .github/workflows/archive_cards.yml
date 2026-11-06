@@ -188,10 +188,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           [ -s tmp/ocr/ocr_failures.txt ] || exit 0
+          # A refusal quotes the utility's page, its address and what the
+          # reading made of the picture, so the list goes in a code block,
+          # where GitHub renders no mention, link or image. A CR would end
+          # a line there, so it goes, and every line starts with "- ", so
+          # no line of the list can close the block.
           {
             echo "## Card pictures not read"
             echo
-            sed 's/^/- /' tmp/ocr/ocr_failures.txt
+            echo '```'
+            tr '\r' ' ' < tmp/ocr/ocr_failures.txt | sed 's/^/- /'
+            echo '```'
             echo
             echo "Until a reading checks out, installations price on the aggregator. Read the"
             echo "picture and add its figures to \`_TRANSCRIBED\` in \`providers/aiec.py\`."

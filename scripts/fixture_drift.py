@@ -74,6 +74,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # the card archiver's own, so a live PDF the archive already holds is not
 # rendered again here; the fixture side renders as always.
 from card_texts import StoredTexts  # noqa: E402
+from issue_text import code_spans  # noqa: E402
 
 from custom_components.be_water_prices.const import FETCH_BUDGET_S  # noqa: E402
 from custom_components.be_water_prices.providers import (  # noqa: E402
@@ -483,7 +484,7 @@ def _render(results: list[DriftResult], cache: StoredTexts | None = None) -> str
             lines.append("## Skipped (CI-unreachable, no issue raised)")
             lines.append("")
             for r in skipped:
-                lines.append(f"- **{r.check.label}**: {r.skipped}")
+                lines.append(f"- **{r.check.label}**: {code_spans(r.skipped or '')}")
         return "\n".join(lines) + _texts_line(cache)
 
     lines.append(
@@ -513,15 +514,20 @@ def _render(results: list[DriftResult], cache: StoredTexts | None = None) -> str
         lines.append("")
         lines.append("## Errors")
         lines.append("")
+        # An error quotes the utility's answer, a server's reason phrase or
+        # the page's text, a crash its whole traceback, and the report is
+        # the issue's body: each item is quoted as code, one line a span
+        # (scripts/issue_text.py). The item stays on one line, the line the
+        # workflow's fingerprint takes for the utility.
         for r in errored:
-            lines.append(f"- **{r.check.label}**: {r.error}")
+            lines.append(f"- **{r.check.label}**: {code_spans(r.error or '')}")
 
     if skipped:
         lines.append("")
         lines.append("## Skipped (CI-unreachable, no issue raised)")
         lines.append("")
         for r in skipped:
-            lines.append(f"- **{r.check.label}**: {r.skipped}")
+            lines.append(f"- **{r.check.label}**: {code_spans(r.skipped or '')}")
 
     if clean:
         lines.append("")

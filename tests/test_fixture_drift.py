@@ -28,17 +28,22 @@
 from __future__ import annotations
 
 import asyncio
+import re
+import subprocess
+from dataclasses import replace
 from datetime import date
+from pathlib import Path
 
 import aiohttp
 import pytest
+import yaml  # type: ignore[import-untyped]
 
 from custom_components.be_water_prices.providers.base import (
     ExtractorError,
     TransientFetchError,
     WaterTariff,
 )
-from scripts.fixture_drift import FixtureCheck, _check_one
+from scripts.fixture_drift import FixtureCheck, _check_one, _render
 
 
 def _dummy_tariff(_payload: bytes) -> WaterTariff:
@@ -242,3 +247,64 @@ async def test_run_exit_code_follows_the_worst_outcome(
     _results, rc, cache = await fixture_drift._run()
     assert rc == expected_rc
     assert cache is None
+
+
+async def test_what_a_utility_serves_reaches_the_issue_as_code(tmp_path: Path) -> None:
+    """The report is the fixture-drift issue's body, and an error or a skip
+    quotes what the utility answered: as it came, a mention, a link, an
+    image and an issue reference in it rendered, and a crash's traceback ran
+    on as lines of markdown, one of them a forged item. Each item is quoted
+    as code, a span per line, and the workflow's fingerprint takes one line
+    per drifted field, per error and per skip."""
+    crafted = "@renaudallard [fix](https://evil.example/phish) ![](https://evil.example/p.png) #1"
+
+    async def moved(_session: aiohttp.ClientSession) -> WaterTariff:
+        return replace(_dummy_tariff(b""), yearly_fixed_fee=12.0)
+
+    async def failing(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise ExtractorError(f"HTTP 404 {crafted}")
+
+    async def crashing(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise RuntimeError(f"{crafted}\r\n- **forged**: item")
+
+    async def blip(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise TransientFetchError(f"HTTP 503 {crafted}")
+
+    fetches = {"A": moved, "B": failing, "C": crashing, "D": blip}
+    results = [
+        await _check_one(
+            None,  # type: ignore[arg-type]
+            FixtureCheck(label, "vivaqua_linear_2026.html", _dummy_tariff, fetch),
+        )
+        for label, fetch in fetches.items()
+    ]
+    work = tmp_path / "work"
+    (work / "tmp" / "report").mkdir(parents=True)
+    (work / "tmp" / "report" / "report.md").write_text(_render(results), encoding="utf-8")
+    (work / "scripts").mkdir()
+    (work / "scripts" / "file_ci_issue.sh").write_text(
+        'while [ $# -gt 0 ]; do case "$1" in\n'
+        '  --body) cp "$2" filed_body.md ;; --fingerprint) cp "$2" filed_fingerprint.txt ;;\n'
+        "esac; shift; done\n"
+    )
+    workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "fixture_drift.yml"
+    steps = yaml.safe_load(workflow.read_text())["jobs"]["file"]["steps"]
+    script = next(s["run"] for s in steps if s.get("name") == "Open or update fixture-drift issue")
+    subprocess.run(
+        ["bash", "-e", "-c", re.sub(r"\$\{\{[^}]*\}\}", "x", script)], cwd=work, check=True
+    )
+
+    # Read as bytes: text mode would turn a CR into a line ending.
+    body = (work / "filed_body.md").read_bytes().decode("utf-8")
+    outside = re.sub(r"`[^`]*`", "", body)
+    for markup in ("@renaudallard", "evil.example", "#1", "**forged**", "\r"):
+        assert markup not in outside, markup
+    fingerprint = (work / "filed_fingerprint.txt").read_text(encoding="utf-8").splitlines()
+    assert [line[:9] for line in fingerprint] == [
+        "| utility",
+        "| A | `ye",
+        "- **B**: ",
+        "- **C**: ",
+        "- **D**: ",
+    ]
+    assert fingerprint[3].startswith("- **C**: `live fetch crashed:`<br>`Traceback ")

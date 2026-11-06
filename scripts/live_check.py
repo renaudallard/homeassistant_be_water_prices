@@ -81,6 +81,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # the card archiver's own, so a card the archive already holds is not
 # rendered again here.
 from card_texts import StoredTexts  # noqa: E402
+from issue_text import code_spans  # noqa: E402
 
 from custom_components.be_water_prices.const import (  # noqa: E402
     FETCH_BUDGET_S,
@@ -421,7 +422,9 @@ def _render(results: list[CheckResult], cache: StoredTexts | None = None) -> str
     lines.append("| utility | region | status | detail |")
     lines.append("|---|---|---|---|")
     for r in results:
-        detail = r.detail.replace("\n", "<br>").replace("|", "\\|")
+        # The detail is posted as quoted (scripts/issue_text.py); a pipe
+        # would end its cell even inside a code span.
+        detail = code_spans(r.detail).replace("|", "\\|")
         lines.append(f"| {r.label} | {r.region} | {r.status} | {detail} |")
     failed = [r for r in results if r.status == "FAIL"]
     transient = [r for r in results if r.status == "TRANSIENT"]

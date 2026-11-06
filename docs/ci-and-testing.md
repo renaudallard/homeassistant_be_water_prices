@@ -176,6 +176,14 @@ issue labelled `live-check` (`[live-check] water extractor broken`); a
 report that never got written (the script crashed) becomes an issue that
 says so, with the traceback left in the run log.
 
+The report's table shows each line of a row's detail as a code span of its
+own, the lines apart on a `<br>` (`code_spans` in `scripts/issue_text.py`,
+which the fixture drift check shares). A detail can quote what a utility
+serves, a cell off its card or an address off its pages, and inside a code
+span GitHub renders no mention, link, image or issue reference. The detail
+loses its backticks, which would close a span, and its pipes keep their
+escape.
+
 The check runs in a job with a read-only token and no credentials in its
 checkout (`persist-credentials: false`), since it runs the extractors'
 parsers on whatever the utilities serve; it hands the failing report over
@@ -201,7 +209,13 @@ one it did not recheck, and says so in the step summary. A clean run
 comments "drift cleared" on an open issue but never closes it. A live
 fetch past the 180 second budget is an error, as in the live check. As
 there, the check runs without a token that can write, and a second job,
-`file`, files the issue or the comment from the report it hands over.
+`file`, files the issue or the comment from the report it hands over. An
+error or a skip in the report quotes what the utility answered, a server's
+reason phrase, a page's text or a crash's whole traceback, so each is
+written as code the way the live check writes a detail, every line a span
+of its own on the item's one line: the fingerprint takes that line for the
+utility, and no line of a traceback can pass for an item of its own
+(`test_what_a_utility_serves_reaches_the_issue_as_code`).
 
 ### archive_cards.yml
 
@@ -323,7 +337,9 @@ announced two weeks ahead the same way, under a label of its own,
 thread. A card picture whose reading was refused, or disagrees with a
 transcription, is filed under `archive-cards-ocr`, fingerprinted on the
 list of refusals, so the same pictures failing again within the week add
-nothing.
+nothing. A refusal quotes the utility's page, so the list sits in a code
+block, its CRs gone and every line led by `- `, so that no line of it can
+close the block.
 
 ### Finding a stored card by hand
 
