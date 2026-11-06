@@ -146,5 +146,8 @@ consumption, the year figures and `last_error`. The postcode, what it
 resolved to, the commune, its label and the meter entity id are redacted
 by key (`_REDACT_KEYS`), and the commune is scrubbed out of every other
 value too (the source URL, the publication label, the error text and the
-backfill gate), so the file can be attached to an issue as it is. An
+backfill gate), so the file can be attached to an issue as it is. The
+gate's commune term is redacted whatever it names
+(`gate_without_commune`): the gate is stamped only when a backfill writes
+rows, so it can still name the commune the entry had before. An
 entry that never loaded dumps its config with an empty snapshot.

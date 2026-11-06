@@ -33,7 +33,7 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from ._redact import scrub_tokens, sensitive_tokens
+from ._redact import gate_without_commune, scrub_tokens, sensitive_tokens
 from .const import (
     CONF_COMMUNE,
     CONF_COMMUNE_LABEL,
@@ -42,6 +42,7 @@ from .const import (
     CONF_WATER_METER_SENSOR,
 )
 from .coordinator import WaterConfigEntry, entry_coordinator
+from .statistics import DATA_BACKFILL_YEAR
 
 # Fields that uniquely or near-uniquely identify the household; the
 # diagnostics file ends up attached to GitHub issues so anything that
@@ -83,12 +84,17 @@ async def async_get_config_entry_diagnostics(
     # commune. Values built from it travel under other keys: the tariff's
     # source_url / publication_label, any last_error, and the price
     # backfill's gate, which carries the commune as its last term. Scrub
-    # the commune out of every value as well.
+    # the commune out of every value as well. The gate can name a commune
+    # the entry no longer has, which no token matches, so its commune term
+    # goes whatever it is.
     tokens = sensitive_tokens(entry)
+    entry_data = dict(entry.data)
+    if DATA_BACKFILL_YEAR in entry_data:
+        entry_data[DATA_BACKFILL_YEAR] = gate_without_commune(entry_data[DATA_BACKFILL_YEAR])
     return {
         "entry": {
             "state": entry.state.value,
-            "data": scrub_tokens(async_redact_data(dict(entry.data), _REDACT_KEYS), tokens),
+            "data": scrub_tokens(async_redact_data(entry_data, _REDACT_KEYS), tokens),
             "options": scrub_tokens(async_redact_data(dict(entry.options), _REDACT_KEYS), tokens),
         },
         "snapshot": scrub_tokens(snapshot, tokens),

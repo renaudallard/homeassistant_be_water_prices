@@ -27,6 +27,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from custom_components.be_water_prices._redact import scrub_tokens, sensitive_tokens
 from custom_components.be_water_prices.const import (
     CONF_COMMUNE,
@@ -234,6 +236,43 @@ async def test_the_backfill_gate_does_not_carry_the_commune_out(hass) -> None:  
     assert "nijlen" not in json.dumps(dump).lower()
     # The rest of the gate is still there to read.
     assert dump["entry"]["data"][DATA_BACKFILL_YEAR].startswith("2026:pidpa:2026:")
+
+
+async def test_the_backfill_gate_does_not_carry_a_former_commune_out(hass) -> None:  # type: ignore[no-untyped-def]
+    """The gate is stamped only when a backfill writes rows, so a commune
+    changed while the card was stale stays in it, and no token of the
+    entry's present config matches it."""
+    import json
+
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.be_water_prices.const import CONF_UTILITY, DOMAIN
+    from custom_components.be_water_prices.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+    from custom_components.be_water_prices.statistics import DATA_BACKFILL_YEAR
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa", DATA_BACKFILL_YEAR: "2026:pidpa:2026:geel"},
+        options={CONF_COMMUNE: "nijlen", CONF_COMMUNE_LABEL: "Nijlen"},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    dump = await async_get_config_entry_diagnostics(hass, entry)
+
+    assert "geel" not in json.dumps(dump).lower()
+    assert dump["entry"]["data"][DATA_BACKFILL_YEAR] == "2026:pidpa:2026:**REDACTED**"
+
+
+@pytest.mark.parametrize(
+    "gate", ["2026:pidpa", "2026:pidpa:2026", "2026:pidpa:2026:None", "2026:pidpa:2026:", 2026]
+)
+def test_a_gate_without_a_commune_is_left_whole(gate: object) -> None:
+    from custom_components.be_water_prices._redact import gate_without_commune
+
+    assert gate_without_commune(gate) == gate
 
 
 async def test_the_recorded_resolver_answer_is_redacted(hass) -> None:  # type: ignore[no-untyped-def]

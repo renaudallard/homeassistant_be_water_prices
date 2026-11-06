@@ -59,6 +59,23 @@ def sensitive_tokens(entry: ConfigEntry) -> list[str]:
     return sorted(tokens, key=len, reverse=True)
 
 
+def gate_without_commune(gate: Any, placeholder: str = "**REDACTED**") -> Any:
+    """The price backfill's gate with its commune term redacted.
+
+    The gate is "<year>:<utility>:<card year>:<commune>", and it is stamped
+    only when a backfill writes rows, so after the commune was changed
+    while the card was stale it still names the commune before, which no
+    token of the entry's present config matches. A gate written before the
+    commune joined it, or for an entry with none ("None"), is left whole.
+    """
+    if not isinstance(gate, str):
+        return gate
+    fields = gate.split(":", 3)
+    if len(fields) < 4 or fields[3] in ("", "None"):
+        return gate
+    return ":".join([*fields[:3], placeholder])
+
+
 def scrub_tokens(value: Any, tokens: list[str], placeholder: str = "**REDACTED**") -> Any:
     """Replace every token with ``placeholder`` throughout ``value``."""
     if isinstance(value, str):

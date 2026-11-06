@@ -378,6 +378,9 @@ scrubbed in `_redact.py`:
 - `source_url_without_commune(source_url, commune)`: redacts the commune
   from the URL, for the `source_url` attribute and the device's
   configuration URL.
+- `gate_without_commune(gate)`: redacts the commune term of the price
+  backfill's gate for diagnostics, whatever commune it names, since the
+  gate can outlive a change of commune.
 
 The sensors also drop a trailing parenthesis from `publication_label` when
 it names the commune, so a provider should put the commune there, as
