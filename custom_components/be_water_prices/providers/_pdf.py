@@ -70,6 +70,21 @@ def error_text(err: BaseException) -> str:
     return str(err) or type(err).__name__
 
 
+# Where str.splitlines ends a line.
+_LINE_BREAK_RE = re.compile(r"[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")
+
+
+def first_line(text: str, limit: int = 200) -> str:
+    """The first line of ``text``, cut to ``limit`` characters.
+
+    What a log line or last_error quotes of text an operator wrote: a
+    page or a card can make a value or a message as long as itself, and a
+    line of a megabyte reached the log at its default level on every
+    fetch. Quote an exception as ``first_line(error_text(err))``.
+    """
+    return _LINE_BREAK_RE.split(text.strip(), maxsplit=1)[0][:limit]
+
+
 def _http_error(url: str, status: int) -> ExtractorError:
     """Map an HTTP status to the right error class.
 

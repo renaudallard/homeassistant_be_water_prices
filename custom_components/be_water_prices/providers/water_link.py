@@ -75,7 +75,7 @@ import aiohttp
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff, leg_total
 from ._html import fetch_and_parse, first_href
-from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
+from ._pdf import error_text, fetch_pdf_text_layout, first_line, stated_card_year, to_float
 from .base import (
     CommuneOption,
     ExtractorError,
@@ -264,7 +264,9 @@ async def _pdf_url_for(session: aiohttp.ClientSession, year: int) -> str:
         raise
     except ExtractorError as err:
         _LOGGER.info(
-            "Water-link %d PDF link not on the tariff page (%s); using the January path", year, err
+            "Water-link %d PDF link not on the tariff page (%s); using the January path",
+            year,
+            first_line(error_text(err)),
         )
         return SOURCE_URL_FMT.format(year=year)
     url = urljoin(TARIFF_PAGE_URL, href)
@@ -293,7 +295,12 @@ async def _fetch_pdf_text(session: aiohttp.ClientSession) -> tuple[str, int, str
             # propagate so live_check classifies it as TRANSIENT instead of
             # being masked by silently serving last year's prices.
             raise
-        _LOGGER.info("Water-link %d PDF unavailable (%s); trying %d", target, err, target - 1)
+        _LOGGER.info(
+            "Water-link %d PDF unavailable (%s); trying %d",
+            target,
+            first_line(error_text(err)),
+            target - 1,
+        )
         url = await _pdf_url_for(session, target - 1)
         return await fetch_pdf_text_layout(session, url), target - 1, url
 

@@ -120,6 +120,7 @@ from .const import (
     REGION_FLANDERS,
 )
 from .providers import all_extractors, async_load, get
+from .providers._pdf import error_text, first_line
 from .providers._postcodes import resolve_candidates as _resolve_candidates
 from .providers.base import CommuneOption
 
@@ -291,8 +292,13 @@ async def _async_communes(hass: HomeAssistant, utility_id: str) -> tuple[Commune
 
         session = async_get_clientsession(hass)
         return await extractor.list_communes(session)
-    except Exception:  # network or parser failure: degrade gracefully
-        _LOGGER.exception("could not fetch commune list for %s", utility_id)
+    except Exception as err:  # network or parser failure: degrade gracefully
+        # The message can quote a link off the operator's page whole, and
+        # the traceback each message it was raised during.
+        _LOGGER.error(
+            "could not fetch commune list for %s: %s", utility_id, first_line(error_text(err))
+        )
+        _LOGGER.debug("commune list failure for %s", utility_id, exc_info=True)
         return ()
 
 

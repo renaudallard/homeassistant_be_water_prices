@@ -335,7 +335,11 @@ def guard_pdf_streams(payload: bytes) -> None:
                 raise Refused("PDF stream uses a filter chain, which cannot be bounded")
             name = _FILTER_NAME_RE.match(head, filters[0])
             if name is not None and name[0] not in _PLAIN_FILTERS:
-                raise Refused(f"PDF stream uses the {name[0].decode('ascii', 'replace')} filter")
+                # Cut short: a card can make the name as long as itself, and
+                # the message lands in last_error. The standard names run to
+                # 16 characters.
+                shown = name[0][:32].decode("ascii", "replace")
+                raise Refused(f"PDF stream uses the {shown} filter")
             raise Refused(
                 "PDF stream names its filter by reference or in a form that cannot be "
                 "checked; refusing to read it"

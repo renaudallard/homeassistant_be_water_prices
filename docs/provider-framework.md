@@ -172,7 +172,8 @@ The module is a vendored subset of the electricity integration's reader.
   bounded decompressor and refuses a card whose streams would inflate past
   `MAX_INFLATED_BYTES` (64 MiB) in total, an encrypted card, a stream that
   names more than one filter or a filter chain, a filter other than Flate
-  or JPEG (`DCTDecode`), and a filter given by reference. It is a text
+  or JPEG (`DCTDecode`), whose name the message cuts to 32 characters,
+  and a filter given by reference. It is a text
   pass over the bytes and only refuses the shapes it can see. The reader
   child runs it, before pdfplumber is imported, under the child's memory
   and time limits: its regular expressions hold the interpreter while they
@@ -230,7 +231,13 @@ The module is a vendored subset of the electricity integration's reader.
   `fold_accents`, `stated_card_year` (the year a Dutch card says it
   applies from, "Geldig vanaf 1 januari" or "tarieven per 1 januari", used
   by Water-link and Aquaduin to refuse a link pointing at another year's
-  card), and `error_text`, an exception message that is never empty.
+  card), `error_text`, an exception message that is never empty, and
+  `first_line(text, limit=200)`, its first line cut short. A provider that
+  logs text a page or card carries, a value or a failure it recovers from,
+  quotes it through `first_line` (`first_line(error_text(err))` for an
+  exception), since a page can make it as long as itself: Farys's period
+  value and Aquaduin's and Water-link's off-site links were each logged a
+  megabyte long on every fetch.
 
 ### `_archive.py`: the card archive
 

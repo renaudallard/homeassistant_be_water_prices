@@ -78,7 +78,7 @@ from bs4 import BeautifulSoup, Tag
 
 from ..const import REGION_BRUSSELS
 from ._html import extract_amounts, fetch_and_parse
-from ._pdf import fold_accents, to_float
+from ._pdf import error_text, first_line, fold_accents, to_float
 from .base import (
     ExtractorError,
     TransientFetchError,
@@ -327,7 +327,7 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
         _LOGGER.warning(
             "VIVAQUA's intervention sociale could not be read (%s); serving the tariff "
             "without it, so a household with BIM status shows no cost until it can",
-            err,
+            first_line(error_text(err)),
         )
         return tariff
     return dataclasses.replace(

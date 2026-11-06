@@ -67,8 +67,12 @@ On success the tick:
 ## What a failed refresh serves
 
 `_serve_cached` scrubs the failure (`scrub_tokens`, with
-`sensitive_tokens` of the entry) into `last_error`; a budget overrun
-becomes "fetch did not finish within 180 s". It then picks a card:
+`sensitive_tokens` of the entry) into `last_error`, keeping the first line
+of the scrubbed message cut to `_LAST_ERROR_CHARS` (500) characters
+(`first_line` from `providers/_pdf.py`), since a card host can make the
+message as long as it likes and it is copied onto every sensor, the
+Repair card, the log and diagnostics; a budget overrun becomes "fetch did
+not finish within 180 s". It then picks a card:
 
 - When nothing is held, when what is held is stale, or when it is last
   year's card, it asks the card archive (`_from_card_archive`) and takes

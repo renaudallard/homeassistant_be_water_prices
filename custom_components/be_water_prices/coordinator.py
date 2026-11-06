@@ -70,6 +70,7 @@ from .providers import ExtractorError, TransientFetchError, WaterTariff, get
 from .providers._archive import ARCHIVE_MONTHS_BACK as _ARCHIVE_MONTHS_BACK
 from .providers._archive import archive_reads
 from .providers._archive import archived_row as _archived_row
+from .providers._pdf import first_line
 from .providers._postcodes import resolve_candidates
 from .providers.base import (
     WaterExtractor,
@@ -81,6 +82,14 @@ from .providers.base import (
 from .ytd_fold import _YtdCycle
 
 _LOGGER = logging.getLogger(__name__)
+
+# How much of a failed fetch's message last_error keeps: its first line,
+# cut to this length. The message can quote what a card host chose, a
+# filter name or a table cell, at any length, and it is copied onto every
+# sensor, the Repair card, the log and diagnostics: one 16 MB card put
+# 16 MB on each of eleven sensors. The longest real message seen, inBW's
+# certificate failure, is 287 characters.
+_LAST_ERROR_CHARS = 500
 
 
 def utility_device_info(coordinator: WaterCoordinator) -> DeviceInfo:
@@ -411,9 +420,11 @@ class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[Coordinator
         # The message quotes the URL it failed on, and a per-commune URL
         # carries the town name. The sensor attribute, diagnostics and the
         # Repair card all scrub that; the log was the one surface left
-        # publishing it.
-        scrubbed = scrub_tokens(
-            str(failure), sensitive_tokens(self.entry), placeholder="**redacted**"
+        # publishing it. Scrubbed whole before it is cut, so a town name
+        # cannot straddle the cut and leave its first letters behind.
+        scrubbed = first_line(
+            scrub_tokens(str(failure), sensitive_tokens(self.entry), placeholder="**redacted**"),
+            _LAST_ERROR_CHARS,
         )
         held = self._last_good
         held_at = held[1] if held is not None else None

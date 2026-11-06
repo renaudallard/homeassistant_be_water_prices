@@ -70,7 +70,13 @@ from ..const import REGION_WALLONIA
 from ._archive import archived_picture_text
 from ._card_figures import CardFigures, read_figures
 from ._html import fetch_html
-from ._pdf import fetch_picture_text, note_unread_picture, reads_pictures
+from ._pdf import (
+    error_text,
+    fetch_picture_text,
+    first_line,
+    note_unread_picture,
+    reads_pictures,
+)
 from ._walloon_simple import build_extractor, build_tariff, spge_components
 from ._walloon_simple import parse_tariff as _parse_tariff
 from .base import (
@@ -289,7 +295,7 @@ async def _read_picture(
     except TransientFetchError:
         raise
     except ExtractorError as err:
-        _LOGGER.warning("AIEC's picture %s was not read: %s", url, err)
+        _LOGGER.warning("AIEC's picture %s was not read: %s", url, first_line(error_text(err)))
         note_unread_picture(str(err))
         return None
 
@@ -317,7 +323,12 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
         # Not a blip: the page has moved or stopped being a page. There is
         # then no way to tell which card is on screen, and the aggregator
         # standing in undated is better than nothing at all.
-        _LOGGER.warning("could not read %s: %s; serving %s", OPERATOR_URL, err, SOURCE_URL)
+        _LOGGER.warning(
+            "could not read %s: %s; serving %s",
+            OPERATOR_URL,
+            first_line(error_text(err)),
+            SOURCE_URL,
+        )
         return await _fetch_aggregator(session)
     # The page is parsed off the event loop, as every other extractor's is.
     picture = await asyncio.to_thread(published_card, html)
@@ -332,7 +343,11 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             try:
                 read = await _read_picture(session, picture.published, picture.url)
             except TransientFetchError as err:
-                _LOGGER.debug("AIEC's picture %s not compared today: %s", picture.url, err)
+                _LOGGER.debug(
+                    "AIEC's picture %s not compared today: %s",
+                    picture.url,
+                    first_line(error_text(err)),
+                )
                 read = None
             if read is not None and not _same_rates(read, transcribed):
                 note_unread_picture(

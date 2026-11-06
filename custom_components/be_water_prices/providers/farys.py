@@ -71,6 +71,7 @@ from ._pdf import (
     _read_text_capped,
     error_text,
     fetch_text,
+    first_line,
     memoised_text,
     to_float,
 )
@@ -196,7 +197,10 @@ def _active_period_year(soup: BeautifulSoup) -> int | None:
     # over, and a page that changed shape should not do so in silence,
     # since the clock cannot tell a card stuck on last year from a
     # current one.
-    _LOGGER.warning("Farys marks its period as %r, not a year; dating the card by the clock", value)
+    _LOGGER.warning(
+        "Farys marks its period as %r, not a year; dating the card by the clock",
+        first_line(value),
+    )
     return None
 
 

@@ -64,7 +64,7 @@ import aiohttp
 from ..const import REGION_FLANDERS
 from ._flanders import build_flanders_tariff
 from ._html import fetch_and_parse, first_href
-from ._pdf import fetch_pdf_text_layout, stated_card_year, to_float
+from ._pdf import error_text, fetch_pdf_text_layout, first_line, stated_card_year, to_float
 from .base import (
     ExtractorError,
     TransientFetchError,
@@ -246,7 +246,12 @@ async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
             # page or PDF must propagate so live_check classifies it as
             # TRANSIENT instead of being masked by serving last year's prices.
             raise
-        _LOGGER.info("Aquaduin %d tariff unavailable (%s); trying %d", target, err, target - 1)
+        _LOGGER.info(
+            "Aquaduin %d tariff unavailable (%s); trying %d",
+            target,
+            first_line(error_text(err)),
+            target - 1,
+        )
         pdf_url = await _discover_pdf_url(session, target - 1)
         text = await fetch_pdf_text_layout(session, pdf_url)
         prior = await asyncio.to_thread(parse_tariff, text, year=target - 1)
