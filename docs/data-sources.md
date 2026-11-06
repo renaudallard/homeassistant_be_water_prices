@@ -75,11 +75,14 @@ The integration reads the branch through `CARD_ARCHIVE_URL`
 `<utility>/<commune>/<YYYY-MM>.json`, the commune percent-encoded, with the
 usual User-Agent and nothing else. A transient failure is raised; any
 other HTTP error (a missing month is a 404), a body that is not JSON or a
-JSON value that is not an object reads as no row. The coordinator reads a
-row when a refresh fails (when it is asked, and how far back it walks, is
-in [coordinator.md](coordinator.md)), and AIEC reads the text the archive's
-OCR made of its picture (`archived_picture_text`, a text only from
-`texts/<sha256>.txt` and only when its SHA-256 is its name). The
+JSON value that is not an object reads as no row, and so does a body past
+`MAX_ROW_CHARS` (64 KiB) or with more than `MAX_ROW_BRACKETS` (64)
+brackets and braces, which is never parsed: the largest real row is 1,410
+characters with seven. A row is parsed in a worker thread. The coordinator
+reads a row when a refresh fails (when it is asked, and how far back it
+walks, is in [coordinator.md](coordinator.md)), and AIEC reads the text the
+archive's OCR made of its picture (`archived_picture_text`, a text only
+from `texts/<sha256>.txt` and only when its SHA-256 is its name). The
 `card_archive` option (`CONF_CARD_ARCHIVE`, on by default) turns both off.
 
 ## The recorder and the Energy dashboard

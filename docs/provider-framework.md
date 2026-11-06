@@ -245,6 +245,8 @@ The module is a vendored subset of the electricity integration's reader.
 archive branch (see [data-sources.md](data-sources.md#the-card-archive)),
 raising `TransientFetchError` when the archive could not be asked and
 returning None for a month it does not hold or a body that is not a row.
+A body past `MAX_ROW_CHARS` or `MAX_ROW_BRACKETS` is not parsed at all,
+and a row is parsed in a worker thread.
 `archived_picture_text(session, utility, url, today)` gives the text the
 archive's OCR read off the picture at `url`: the newest row of the
 utility's default card, walking back up to `ARCHIVE_MONTHS_BACK` (12)

@@ -37,6 +37,7 @@ states for the duration of a fetch with :func:`archive_reads`.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -63,6 +64,15 @@ from .base import ExtractorError, TransientFetchError
 # extractor already stands on in January, and the staleness clock still
 # runs from the day it was captured.
 ARCHIVE_MONTHS_BACK = 12
+# What a row may be before it is parsed. Of the 3,135 rows on the branch
+# on 2 November 2026 the largest is 1,410 characters, nested three deep
+# with seven brackets and braces in all, strings included. Anything far
+# past either is not a row, and is refused before json.loads sees it: a
+# 16 MB array held the event loop for two seconds a row, and deep nesting
+# raised RecursionError out of the read. Counting the brackets keeps the
+# parse shallow whatever stack the interpreter runs it on.
+MAX_ROW_CHARS = 64 * 1024
+MAX_ROW_BRACKETS = 64
 # A text is stored under the SHA-256 of its own bytes, which is what makes
 # it checkable: anything else in a row's ``text`` is not followed.
 _TEXT_PATH_RE = re.compile(r"texts/([0-9a-f]{64})\.txt")
@@ -96,9 +106,13 @@ async def archived_row(
         raise
     except ExtractorError:
         return None
+    if len(body) > MAX_ROW_CHARS or body.count("[") + body.count("{") > MAX_ROW_BRACKETS:
+        return None
     try:
-        row = json.loads(body)
-    except ValueError:
+        # In a worker thread, off the event loop.
+        row = await asyncio.to_thread(json.loads, body)
+    except (ValueError, RecursionError):
+        # Not JSON at all, or nested past what the stack can parse.
         return None
     return row if isinstance(row, dict) else None
 
