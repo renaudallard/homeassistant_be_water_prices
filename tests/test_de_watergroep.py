@@ -390,6 +390,30 @@ async def test_the_default_card_still_falls_back_to_last_year(
 
 
 @pytest.mark.asyncio
+async def test_the_fall_back_to_last_year_logs_no_commune(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The failure names the commune, and the INFO line quoted it as it was;
+    users turn INFO on when they file an issue."""
+    import logging
+    from datetime import date
+
+    from custom_components.be_water_prices.providers import de_watergroep as dwg
+    from custom_components.be_water_prices.providers._pdf import memoise_text_fetches
+
+    monkeypatch.setattr(dwg, "belgian_today", lambda: date(2026, 2, 1))
+    guid = "{0D1E8F6A-1234-4ABC-9DEF-00112233AABB}"
+    url = dwg.COMMUNE_DETAIL_URL_FMT.format
+    store = {f"{url(year=2026)}#dwg_l={guid}": "", f"{url(year=2025)}#dwg_l={guid}": _halle_2025()}
+    caplog.set_level(logging.INFO, logger=dwg.__name__)
+    with memoise_text_fetches(store):
+        await dwg.fetch_for_commune(None, guid)  # type: ignore[arg-type]
+
+    assert "2026 card unavailable (ExtractorError); trying 2025" in caplog.text
+    assert guid not in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_the_default_commune_has_nothing_to_fall_back_to() -> None:
     """Otherwise it would ask itself the same question for ever."""
     from unittest.mock import AsyncMock, patch

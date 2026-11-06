@@ -113,7 +113,9 @@ show it or a parser problem, never a commune that levies nothing.
   fails, or answers with last year's tab), last year's card is fetched from
   its own endpoint and stands until 31 March (`carry_prior_year_card`).
   `tests/test_de_watergroep.py` pins both shapes with the clock at
-  5 January 2027.
+  5 January 2027. The step back is logged at info level naming only the
+  kind of failure, since the message can carry the commune id and nothing
+  scrubs that line.
 
 ### A commune whose page will not show a leg
 

@@ -406,7 +406,15 @@ async def _newest_commune_card(
         # has nothing else to fall back to, so it keeps last year's card.
         if isinstance(err, UnshowableLeg) and commune != _DEFAULT_COMMUNE_GUID:
             raise
-        _LOGGER.info("De Watergroep %d card unavailable (%s); trying %d", target, err, target - 1)
+        # The kind of failure only: the message can name the commune, and
+        # nothing scrubs this line the way the coordinator scrubs what it
+        # logs.
+        _LOGGER.info(
+            "De Watergroep %d card unavailable (%s); trying %d",
+            target,
+            type(err).__name__,
+            target - 1,
+        )
         return await _commune_card(session, commune, label, target, year=target - 1)
 
 
