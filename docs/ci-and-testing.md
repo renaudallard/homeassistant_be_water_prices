@@ -113,7 +113,9 @@ integration's 06:00 runs on 2026-08-27 with no run created at all.
 A version bump in `manifest.json` releases itself (it can also be started
 by hand). The release job waits on three gates: the test suite through
 `test.yml`, HACS and hassfest. It then tags the version and publishes the
-release with `be_water_prices.zip`, the file the README's manual install
+release with `be_water_prices.zip`. `hacs.json` names that zip with
+`zip_release`, so HACS and the Marketplace install it rather than the
+archive of the tag, and it is also the file the README's manual install
 downloads.
 
 A release counts only once it is published with the zip: `gh release
