@@ -82,6 +82,17 @@ check below says when one is due.
 
 Each workflow grants its job token only the permissions it uses.
 
+Every action they use is pinned to a commit, with the release or the
+branch it was taken from in a comment beside it: a tag or a branch is
+whatever its repository makes it next, and the archive's push job holds a
+token that writes this repository (`tests/test_workflows.py`). To move one,
+look up the commit the new tag names (`gh api
+repos/OWNER/REPO/commits/TAG --jq .sha`) and change the hash and its
+comment together. The pins stop at the action: hacs runs the
+`ghcr.io/hacs/action:main` image and hassfest the untagged
+`ghcr.io/home-assistant/hassfest`, which their repositories move, so both
+jobs keep a read-only token.
+
 ### test.yml
 
 On every push to main, on pull requests, by hand, and called by
