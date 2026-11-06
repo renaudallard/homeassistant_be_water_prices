@@ -255,7 +255,8 @@ python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa]
 What the branch holds, how a month's row is written and replayed through
 the current parser, and how the integration reads it back are in
 [data-sources.md](data-sources.md#the-card-archive). Each PDF names the
-pdfplumber release and render code that read it, and its text is served
+pdfplumber release and render code (`_pdf.py` and the stream guard in
+`_pdf_guard.py`) that read it, and its text is served
 again only to the same, so after a reader upgrade or a render fix every
 kept PDF is rendered afresh, in the walk, the replay, the live check and
 the drift check (`--rerender` forces it, `--reparse` forces the replay).

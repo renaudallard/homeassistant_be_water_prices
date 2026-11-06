@@ -32,7 +32,7 @@ from typing import Any
 
 import pytest
 
-from custom_components.be_water_prices.providers import _pdf
+from custom_components.be_water_prices.providers import _pdf, _pdf_guard
 from custom_components.be_water_prices.providers._pdf import (
     fold_accents,
     to_float,
@@ -378,7 +378,7 @@ def test_every_keyword_line_pdfminer_reads_past_is_counted(
     from pdfminer.pdfdocument import PDFDocument
     from pdfminer.pdfparser import PDFParser
 
-    monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
+    monkeypatch.setattr(_pdf_guard, "MAX_INFLATED_BYTES", 1 << 20)
     content = b" " * (2 << 20)
     body = zlib.compress(content, 9)
     payload = _pdf_with_xref(b"<</Length %d/Filter/FlateDecode>>" % len(body), body, keyword)
@@ -392,7 +392,7 @@ def test_an_endstream_inside_the_data_does_not_end_the_count(monkeypatch: Any) -
     """A stored block spells "endstream" long before the stream is done."""
     import zlib
 
-    monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
+    monkeypatch.setattr(_pdf_guard, "MAX_INFLATED_BYTES", 1 << 20)
     content = b" " * (2 << 20)
     body = (
         b"\x78\x9c"
@@ -535,7 +535,7 @@ def test_a_head_past_the_walk_s_cap_counts_nested_filter_keys_too() -> None:
     """Read whole, a head finds the nested /F the walk would have left out,
     so the cap can only refuse a card, never let one through."""
     nested = b"/Resources<</Font<</F 5 0 R>>>>"
-    filler = b"[]" * _pdf._MAX_DICT_SYNTAX
+    filler = b"[]" * _pdf_guard._MAX_DICT_SYNTAX
     payload = _pdf_with_stream(b"<<%s/Filter/FlateDecode%s>>" % (nested, filler), b"x")
     with pytest.raises(ExtractorError, match="more than one filter"):
         _pdf.guard_pdf_streams(payload)
@@ -631,7 +631,7 @@ def test_an_encrypted_document_is_refused(name: bytes, monkeypatch: Any) -> None
     user = Arcfour(key).encrypt(pad)
     object_key = hashlib.md5(key + (4).to_bytes(3, "little") + b"\0\0").digest()[:10]
 
-    monkeypatch.setattr(_pdf, "MAX_INFLATED_BYTES", 1 << 20)
+    monkeypatch.setattr(_pdf_guard, "MAX_INFLATED_BYTES", 1 << 20)
     content = b" " * (2 << 20)
     body = Arcfour(object_key).encrypt(zlib.compress(content, 9))
     payload = _pdf_with_xref(
@@ -677,15 +677,17 @@ def test_streams_that_share_their_bytes_are_refused() -> None:
         _pdf.guard_pdf_streams(payload)
 
 
-def test_many_stream_keywords_are_scanned_in_linear_time() -> None:
+def test_many_stream_keywords_are_scanned_in_linear_time(monkeypatch: Any) -> None:
     """A megabyte of keywords with no stream behind them, and every
     "endstream" of two hundred images, once cost a rescan of the whole
     prefix each. Neither reaches the decompressor, so ten thousand tiny
     Flate streams check that each one stops at its own end instead of
-    feeding it the rest of the file."""
+    feeding it the rest of the file. The first and the last take more
+    steps than any card, so the step limit is lifted to walk them whole."""
     import time
     import zlib
 
+    monkeypatch.setattr(_pdf_guard, "MAX_GUARD_STEPS", 1_000_000)
     junk = b"%PDF-1.4\n1 0 obj\n" + b"stream\n" * 150_000
     image = b"<</Type/XObject/Subtype/Image/Filter/DCTDecode/Length 65536>>stream\n"
     image += b"\xff\xd8\xff\xe0" + bytes(range(256)) * 256 + b"\nendstream\n"

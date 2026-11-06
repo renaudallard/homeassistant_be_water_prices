@@ -167,15 +167,32 @@ The module is a vendored subset of the electricity integration's reader.
   the `%PDF` signature after stripping a BOM or leading blank lines, and
   renders it with `extract_pdf_text_layout`. An answer that is no PDF is
   refused naming its content type, never quoting its bytes.
-- Inflate guard: `guard_pdf_streams(payload)` inflates every stream with a
+- Inflate guard: `guard_pdf_streams(payload)` in `_pdf_guard.py`, a
+  module of the standard library alone, inflates every stream with a
   bounded decompressor and refuses a card whose streams would inflate past
   `MAX_INFLATED_BYTES` (64 MiB) in total, an encrypted card, a stream that
   names more than one filter or a filter chain, a filter other than Flate
   or JPEG (`DCTDecode`), and a filter given by reference. It is a text
-  pass over the bytes and only refuses the shapes it can see.
+  pass over the bytes and only refuses the shapes it can see. The reader
+  child runs it, before pdfplumber is imported, under the child's memory
+  and time limits: its regular expressions hold the interpreter while they
+  scan, a single scan of a crafted 16 MiB card for seconds, and run in Home
+  Assistant's process they stalled the event loop for as long. Its loops
+  are bounded too: every one (stream keywords, the walk back to "N G
+  obj", the dictionary's brackets, strings and comments, its filter keys,
+  and the calls into the decompressor) counts against `MAX_GUARD_STEPS`
+  (50,000), and a card past it is refused. The water cards on file take at
+  most 182 steps. Each decompressor call makes at most a chunk (64 KiB),
+  and a call that fails is charged that much, so a stream that inflates
+  and then breaks counts toward `MAX_INFLATED_BYTES` too.
+  `_pdf.guard_pdf_streams` runs the same check in this process, a refusal
+  as an `ExtractorError`, for the tests and the tools.
 - The reader runs in a child process (`extract_pdf_text_layout`): the
   current interpreter started with `-P`, the PDF on stdin and its text on
-  stdout, pdfplumber's `extract_text` on each page after `dedupe_chars`.
+  stdout, the stream guard loaded from its file by path, then pdfplumber's
+  `extract_text` on each page after `dedupe_chars`. A card the guard
+  refuses ends the child with `GUARD_REFUSED` and comes back as the
+  guard's own message.
   It is held to `PDF_READER_MEMORY_BYTES` (256 MiB, as `RLIMIT_DATA`)
   and `PDF_READER_TIMEOUT_S` (`FETCH_BUDGET_S - 60`, so 120 s), with
   `PYTHONMALLOC=malloc` because the mimalloc arena Home Assistant OS

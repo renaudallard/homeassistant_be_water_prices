@@ -69,7 +69,7 @@ registry.
 | --- | --- |
 | `__init__.py` | The registry: `_MODULE_NAMES`, built lazily (`async_load` off the event loop) |
 | `base.py` | `WaterExtractor`, `WaterTariff`, `CommuneOption`, the errors, `belgian_today`, `carry_prior_year_card` |
-| `_html.py`, `_pdf.py` | Fetching and reading pages, PDFs and card pictures, with their guards |
+| `_html.py`, `_pdf.py`, `_pdf_guard.py` | Fetching and reading pages, PDFs and card pictures, with their guards; the stream guard the PDF reader's child runs |
 | `_archive.py` | Reading the card archive: a stored row, and the text its OCR read off a picture |
 | `_card_figures.py` | The one CWaPE tariff a card's printed figures agree on |
 | `_flanders.py` | The Flemish integrale waterprijs builder |

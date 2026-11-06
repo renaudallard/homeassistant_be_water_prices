@@ -39,13 +39,11 @@ from pathlib import Path
 # version and code: a reader upgrade or a render fix reads every card
 # afresh, in the archive, the live check and the drift check alike.
 _READER = "pdfplumber"
-_RENDER_CODE = (
-    Path(__file__).resolve().parent.parent
-    / "custom_components"
-    / "be_water_prices"
-    / "providers"
-    / "_pdf.py"
+_PROVIDERS = (
+    Path(__file__).resolve().parent.parent / "custom_components" / "be_water_prices" / "providers"
 )
+# The reader and the stream guard it runs before reading.
+_RENDER_CODE = (_PROVIDERS / "_pdf.py", _PROVIDERS / "_pdf_guard.py")
 
 
 def read_text(path: Path) -> str:
@@ -130,7 +128,10 @@ def readers_line() -> str:
         version = importlib.metadata.version(_READER)
     except importlib.metadata.PackageNotFoundError:
         version = "absent"
-    render = hashlib.sha256(_RENDER_CODE.read_bytes()).hexdigest()[:16]
+    code = hashlib.sha256()
+    for path in _RENDER_CODE:
+        code.update(path.read_bytes())
+    render = code.hexdigest()[:16]
     return f"{_READER}=={version} render={render}"
 
 
