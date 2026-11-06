@@ -126,6 +126,31 @@ async def test_read_text_capped_falls_back_on_unknown_charset() -> None:
     assert "75,00 euro" in text
 
 
+async def test_read_text_capped_reads_an_unlisted_charset_as_utf8() -> None:
+    """Decoded as declared, punycode takes time quadratic in the body, on
+    the event loop: 320 KB froze Home Assistant for eight seconds."""
+    body = b"-" + b"a" * 2000
+    resp = _FakeResp([body], content_length=len(body), charset="punycode")
+    assert await _pdf._read_text_capped(resp, "u") == body.decode()  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("charset", "body", "text"),
+    [
+        ("UTF8", "café".encode(), "café"),
+        ("ISO-8859-1", "café".encode("latin-1"), "café"),
+        ("latin1", "café".encode("latin-1"), "café"),
+        ("windows-1252", "€ 2,50".encode("cp1252"), "€ 2,50"),
+        ("US-ASCII", b"75,00 euro", "75,00 euro"),
+    ],
+)
+async def test_read_text_capped_honours_a_listed_charset_however_spelled(
+    charset: str, body: bytes, text: str
+) -> None:
+    resp = _FakeResp([body], content_length=len(body), charset=charset)
+    assert await _pdf._read_text_capped(resp, "u") == text  # type: ignore[arg-type]
+
+
 def test_a_bom_prefixed_pdf_is_read_rather_than_silently_empty() -> None:
     """The BOM was accepted and then handed to a reader that cannot skip it.
 
@@ -876,7 +901,8 @@ def test_a_reader_failure_names_the_error_and_not_the_traceback() -> None:
 
 
 async def test_read_text_capped_survives_a_codec_without_a_replace_handler() -> None:
-    """idna passes the codec lookup and then refuses errors="replace"."""
+    """idna passes the codec lookup and then refuses errors="replace"; it is
+    not a codec a body is decoded with."""
     resp = _FakeResp([b"caf\xc3\xa9 75,00 euro"], content_length=None, charset="idna")
     assert await _pdf._read_text_capped(resp, "u") == "café 75,00 euro"  # type: ignore[arg-type]
 

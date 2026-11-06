@@ -136,8 +136,11 @@ The module is a vendored subset of the electricity integration's reader.
 - Size cap: `MAX_RESPONSE_BYTES` (16 MiB). A declared length over it is
   refused, and the body is streamed and refused once it passes the cap,
   since a chunked answer declares none. Text is decoded with the declared
-  charset, falling back to UTF-8 with replacement for an unknown or
-  unusable one.
+  charset when it names UTF-8, Latin-1, Windows-1252 or ASCII
+  (`_TEXT_CODECS`, matched through `codecs.lookup`, so any spelling of
+  them), and as UTF-8 otherwise, with replacement for bytes that do not
+  decode: decoded as declared, punycode took time quadratic in the body,
+  on the event loop.
 - Redirects: `fetch_text`, `fetch_pdf_text_layout` and
   `fetch_picture_text` ask with `allow_redirects=False` and follow up to
   `MAX_REDIRECTS` (5) hops by hand (`_get`), all within the one timeout,

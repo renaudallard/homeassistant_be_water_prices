@@ -35,6 +35,7 @@ through the same guards, though only the card archiver ever reads one.
 from __future__ import annotations
 
 import asyncio
+import codecs
 import ipaddress
 import logging
 import math
@@ -242,26 +243,40 @@ async def _get(
     raise ExtractorError(f"{url} redirected more than {MAX_REDIRECTS} times; refusing to follow it")
 
 
+# The codecs a text body is decoded with. Every page and answer declared
+# UTF-8 or no charset at all, which is read as UTF-8, when each utility
+# and the archive were fetched on 6 November 2026; the other three are
+# the labels an older page uses instead. A label counts by the codec it
+# names, so "UTF8" and "windows-1252" pass with the canonical spellings.
+# Decoded with whatever a server declared, "punycode" took time quadratic
+# in the body, on the event loop: a few hundred kilobytes froze Home
+# Assistant for seconds.
+_TEXT_CODECS = frozenset({"utf-8", "iso8859-1", "cp1252", "ascii"})
+
+
+def _text_codec(charset: str | None) -> str:
+    """The codec for a body declared as ``charset``, UTF-8 for any other."""
+    try:
+        name = codecs.lookup(charset or "utf-8").name
+    except (LookupError, ValueError):
+        # An unknown label (a typo, or a vendor token like "utf8mb4"), or
+        # one with a NUL in it.
+        return "utf-8"
+    return name if name in _TEXT_CODECS else "utf-8"
+
+
 async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
     """Read a text body under the size cap, decoding leniently.
 
     Streams via :func:`_read_capped` so a chunked or Content-Length-less
     body cannot blow past the cap (``resp.text()`` reads unbounded), and
-    decodes with the declared charset, falling back to UTF-8 with
-    ``errors="replace"`` so a charset-mislabelled page yields a parseable
-    string instead of raising an uncaught ``UnicodeDecodeError``.
+    decodes with the declared charset when it is one of
+    :data:`_TEXT_CODECS` and as UTF-8 otherwise, with ``errors="replace"``
+    so a charset-mislabelled page yields a parseable string instead of
+    raising an uncaught ``UnicodeDecodeError``.
     """
     payload = await _read_capped(resp, url)
-    charset = resp.charset or "utf-8"
-    try:
-        return payload.decode(charset, errors="replace")
-    except (LookupError, UnicodeError):
-        # An unknown charset label (a typo, or a vendor token like
-        # "utf8mb4") raises LookupError before decoding, and a codec that
-        # exists but has no "replace" handler (idna is one) raises
-        # UnicodeError on the first non-ASCII byte. Neither is a page we
-        # cannot read: fall back to UTF-8, mirroring aiohttp's get_encoding.
-        return payload.decode("utf-8", errors="replace")
+    return payload.decode(_text_codec(resp.charset), errors="replace")
 
 
 _UTF8_BOM = b"\xef\xbb\xbf"
