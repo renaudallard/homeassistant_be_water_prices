@@ -64,6 +64,15 @@ _PLACES = 4
 _QUANTUM = Decimal(1).scaleb(-_PLACES)
 # The three inputs are printed with three or four.
 _INPUT_PLACES = 3
+# How many candidate tariffs, every CVD by every CVA by every Fonds social,
+# a reading may offer. Each is checked against all ten derived figures, so
+# the work is their product, and a text crowded with plausible numbers made
+# it cubic in the text: 839 characters took seven seconds on a Raspberry Pi
+# 4, in a thread that holds the interpreter. The five real readings on file
+# on 6 November 2026, the four editions since 2021 and the archive's
+# reading of April 2026, offer at most 1,890 (15, 21 and 6); this is five
+# times that, and about a second at the worst.
+MAX_CANDIDATES = 10_000
 # A number as an OCR engine returns it: digits, with points and commas
 # between them. Bounded, so a long run of digits costs what it is long.
 _NUMBER_RE = re.compile(r"\d[\d.,]{0,30}\d|\d")
@@ -149,6 +158,12 @@ def read_figures(text: str, *, label: str) -> CardFigures:
     cvds = [v for v in inputs if _within(v, _MIN_PLAUSIBLE_CVD, _MAX_PLAUSIBLE_CVD)]
     cvas = [v for v in inputs if _within(v, *_SPGE_WINDOWS["CVA"])]
     fses = [v for v in inputs if _within(v, *_SPGE_WINDOWS["FSE"])]
+    candidates = len(cvds) * len(cvas) * len(fses)
+    if candidates > MAX_CANDIDATES:
+        raise ExtractorError(
+            f"{label}: {candidates} candidate tariffs among the numbers read, "
+            f"more than the {MAX_CANDIDATES} a reading is checked for"
+        )
     found: list[CardFigures] = []
     best: tuple[int, CardFigures, list[str]] | None = None
     for cvd, cva, fse in itertools.product(cvds, cvas, fses):

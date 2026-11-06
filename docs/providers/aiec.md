@@ -98,12 +98,17 @@ four decimals, rounded half-up:
 | First and second totals × v | (0,5·CVD + FSE)·v and (CVD + CVA + FSE)·v |
 
 None, or more than one, is a refusal naming the figures the closest
-candidate misses. Every edition since 2021 prints all ten at four
-decimals. An OCR engine does not compute, so its misreads are independent
-of each other: a wrong tariff would need ten of them to agree with it, and
-what a misread does instead is make a figure go missing. A whole number
-never stands for a figure; the first trial run matched a bare `2` from the
-per-inhabitant table to anything rounded to a unit.
+candidate misses. Every CVD candidate is tried with every CVA and every
+Fonds social, so the work is their product: a text offering more than
+`MAX_CANDIDATES` (10,000) such tariffs is refused before any is tried,
+since 839 characters crowded with plausible numbers took seven seconds.
+The real readings offer at most 1,890 (15, 21 and 6, January 2026). Every
+edition since 2021 prints all ten at four decimals. An OCR engine does not
+compute, so its misreads are independent of each other: a wrong tariff
+would need ten of them to agree with it, and what a misread does instead
+is make a figure go missing. A whole number never stands for a figure; the
+first trial run matched a bare `2` from the per-inhabitant table to
+anything rounded to a unit.
 
 `fetch` then requires the picture's own date, `dd/mm/yyyy`, in the text:
 every edition heads its card "au 01/04/2026", and a text read off another

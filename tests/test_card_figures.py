@@ -39,6 +39,11 @@ from custom_components.be_water_prices.providers._card_figures import (
     numbers,
     read_figures,
 )
+from custom_components.be_water_prices.providers._walloon_simple import (
+    _MAX_PLAUSIBLE_CVD,
+    _MIN_PLAUSIBLE_CVD,
+    _SPGE_WINDOWS,
+)
 from custom_components.be_water_prices.providers.base import ExtractorError
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -123,6 +128,25 @@ def test_two_tariffs_that_both_explain_the_text_are_refused() -> None:
     )
     with pytest.raises(ExtractorError, match="2 tariffs explain every figure"):
         read_figures(f"{text}\n2,4600 € {extra}\n", label="AIEC")
+
+
+def _crowded(per_window: int) -> str:
+    """Numbers spread evenly over the CVD, CVA and Fonds social windows."""
+    windows = ((_MIN_PLAUSIBLE_CVD, _MAX_PLAUSIBLE_CVD), _SPGE_WINDOWS["CVA"], _SPGE_WINDOWS["FSE"])
+    return " ".join(
+        f"{low + (high - low) * (i + 0.5) / per_window:.4f}".replace(".", ",")
+        for i in range(per_window)
+        for low, high in windows
+    )
+
+
+@pytest.mark.parametrize("per_window", [40, 400])
+def test_a_text_crowded_with_candidates_is_refused_unchecked(per_window: int) -> None:
+    """Every CVD was tried with every CVA and every Fonds social, so the
+    work was the cube of the numbers in the windows: 839 characters of them
+    took seven seconds, and ten times as many would take hours."""
+    with pytest.raises(ExtractorError, match="candidate tariffs among the numbers read"):
+        read_figures(_crowded(per_window), label="AIEC")
 
 
 def test_a_text_with_no_inputs_is_refused() -> None:

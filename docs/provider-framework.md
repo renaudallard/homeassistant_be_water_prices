@@ -264,7 +264,10 @@ redevance and the three tranches, each before and after VAT, and the first
 two totals with the Fonds social after VAT) are all in it at four
 decimals, and raises `ExtractorError` naming the missing figures
 otherwise. It looks for no label and no position, so it reads any layout
-that prints those figures. The texts it is tested on are what Tesseract
+that prints those figures. Every candidate CVD is tried with every CVA and
+every Fonds social, so a text offering more than `MAX_CANDIDATES` (10,000)
+such tariffs is refused before any is tried; the real readings offer at
+most 1,890. The texts it is tested on are what Tesseract
 5.5 read off AIEC's pictures of June 2021, January 2023, January 2026 and
 April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`). See
 [providers/aiec.md](providers/aiec.md#the-check).
