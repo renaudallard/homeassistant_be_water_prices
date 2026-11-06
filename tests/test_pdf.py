@@ -185,16 +185,12 @@ def test_an_argless_exception_still_produces_a_message() -> None:
     assert error_text(ValueError("boom")) == "boom"
 
 
-class _RedirectedResp(_FakeResp):
-    """A 200 that arrived through a redirect."""
+class _BodyResp(_FakeResp):
+    """A direct 200 carrying ``body``."""
 
-    def __init__(self, final: str, body: bytes = b"hello") -> None:
-        from yarl import URL
-
+    def __init__(self, body: bytes = b"hello") -> None:
         super().__init__([body], content_length=len(body))
         self.status = 200
-        self.url = URL(final)
-        self.history = (object(),)
         self.content_type = "text/plain"
 
 
@@ -204,7 +200,6 @@ class _StatusResp(_FakeResp):
     def __init__(self, status: int, body: bytes = b"<html>") -> None:
         super().__init__([body], content_length=len(body))
         self.status = status
-        self.history = ()
         self.content_type = "text/html"
 
 
@@ -215,70 +210,11 @@ class _FakeSession:
     def get(self, *_a: object, **_k: object) -> _FakeSession:
         return self
 
-    async def __aenter__(self) -> _RedirectedResp:
+    async def __aenter__(self) -> _FakeResp:
         return self._resp
 
     async def __aexit__(self, *_a: object) -> None:
         return None
-
-
-async def test_a_redirect_off_the_requested_site_is_refused(caplog: Any) -> None:
-    """The href checks validate the link, aiohttp then follows a 30x anywhere.
-
-    The target stays out of the message, which lands in last_error and
-    the diagnostics dump; a LAN appliance or a captive portal is nobody's
-    business there. An https target on another site is the case the
-    https check cannot catch.
-    """
-    session = _FakeSession(_RedirectedResp("http://127.0.0.1:8123/admin"))
-    with pytest.raises(ExtractorError, match="redirected off https") as err:
-        await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
-    assert "127.0.0.1" not in str(err.value)
-    with pytest.raises(ExtractorError, match="redirected"):
-        await _pdf.fetch_pdf_text_layout(session, "https://water-link.be/x.pdf")  # type: ignore[arg-type]
-    session = _FakeSession(_RedirectedResp("https://evil.test/x"))
-    with pytest.raises(ExtractorError, match="redirected off-site") as err:
-        await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
-    assert "evil.test" not in str(err.value)
-    assert "evil.test" in caplog.text
-
-
-async def test_a_redirect_that_drops_https_is_refused() -> None:
-    session = _FakeSession(_RedirectedResp("http://water-link.be/x"))
-    with pytest.raises(ExtractorError, match="redirected off https"):
-        await _pdf.fetch_text(session, "https://water-link.be/x")  # type: ignore[arg-type]
-
-
-@pytest.mark.parametrize(
-    ("asked", "landed"),
-    [
-        ("https://www.vivaqua.be/en/the-domestic-linear-rate/", "https://www.vivaqua.be/"),
-        ("https://www.vivaqua.be/en/the-domestic-linear-rate/", "https://www.vivaqua.be/fr/"),
-        (
-            "https://www.agsoknokke-heist.be/waterbedrijf/tarieven",
-            "https://www.agsoknokke-heist.be/pagenotfound?page=tarieven.aspx",
-        ),
-    ],
-)
-async def test_a_redirect_to_the_home_or_a_not_found_page_is_a_moved_page(
-    asked: str, landed: str
-) -> None:
-    """VIVAQUA sends a removed page to its home page and AGSO Knokke-Heist
-    to "/pagenotfound", both with a 200. Parsed, that page failed as a
-    layout change; it is a page that moved."""
-    session = _FakeSession(_RedirectedResp(landed))
-    with pytest.raises(ExtractorError, match="the page moved or was removed"):
-        await _pdf.fetch_text(session, asked)  # type: ignore[arg-type]
-
-
-async def test_a_redirect_from_the_home_page_to_its_language_root_is_followed() -> None:
-    session = _FakeSession(_RedirectedResp("https://www.vivaqua.be/fr/"))
-    assert await _pdf.fetch_text(session, "https://www.vivaqua.be/") == "hello"  # type: ignore[arg-type]
-
-
-async def test_a_redirect_within_the_site_is_followed() -> None:
-    session = _FakeSession(_RedirectedResp("https://www.water-link.be/x"))
-    assert await _pdf.fetch_text(session, "https://water-link.be/x") == "hello"  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("status", [300, 304, 404])
@@ -299,8 +235,7 @@ async def test_a_5xx_on_the_pdf_fetch_is_transient() -> None:
 
 async def test_a_non_pdf_answer_is_named_by_type_not_quoted() -> None:
     """The first bytes of a stranger's page must not reach last_error."""
-    resp = _RedirectedResp("https://water-link.be/x.pdf", body=b"INTERNAL token=abc")
-    resp.history = ()
+    resp = _BodyResp(b"INTERNAL token=abc")
     with pytest.raises(ExtractorError) as err:
         await _pdf.fetch_pdf_text_layout(_FakeSession(resp), "https://water-link.be/x.pdf")  # type: ignore[arg-type]
     assert "token=abc" not in str(err.value)
@@ -958,9 +893,8 @@ class _CountingSession(_FakeSession):
         return self
 
 
-def _direct(body: bytes, content_type: str) -> _RedirectedResp:
-    resp = _RedirectedResp("https://water-link.be/x", body=body)
-    resp.history = ()
+def _direct(body: bytes, content_type: str) -> _BodyResp:
+    resp = _BodyResp(body)
     resp.content_type = content_type
     return resp
 

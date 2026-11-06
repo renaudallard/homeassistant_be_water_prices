@@ -35,6 +35,7 @@ through the same guards, though only the card archiver ever reads one.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import math
 import os
@@ -43,12 +44,13 @@ import subprocess
 import sys
 import unicodedata
 import zlib
-from collections.abc import Awaitable, Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
-from urllib.parse import urlparse
+from typing import Any
 
 import aiohttp
+from yarl import URL
 
 from ..const import FETCH_BUDGET_S, INTEGRATION_VERSION
 from .base import ExtractorError, TransientFetchError
@@ -128,37 +130,116 @@ _HOME_PATH = re.compile(r"^/(?:[a-z]{2}/?)?$")
 _NOT_FOUND_PATH = re.compile(r"page-?not-?found|/404(?:\.|/|$)", re.IGNORECASE)
 
 
-def _guard_redirect(url: str, resp: aiohttp.ClientResponse) -> None:
-    """Refuse a response that a redirect carried off the requested site.
+# How many redirects one fetch follows. Every page, card and answer came
+# straight back when each utility and the archive were fetched on 6
+# November 2026, 31 requests and not one redirect, so five leave room for
+# a move to https, a trailing slash and a language root on the way to a
+# page. The statuses are the ones aiohttp follows.
+MAX_REDIRECTS = 5
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
-    The PDF extractors validate the href they read off a page, but
-    aiohttp follows 30x replies wherever they point, so a redirect from
-    the validated URL reached any host or scheme, addresses only the
-    Home Assistant host can see included, and the target's first bytes
-    then landed in the last_error attribute. Staying on the requested
-    site and never dropping from https are the two things the href
-    checks exist for, so they hold for the final URL too.
+
+def _local_address(host: str) -> bool:
+    """Whether ``host`` is an address literal outside the public internet.
+
+    That is private, loopback, link-local, reserved, shared (carrier NAT)
+    and unspecified space, which ``is_global`` leaves out, and multicast,
+    which it counts in. An IPv4 address written as IPv6 is judged as the
+    IPv4 address it is.
     """
-    if not resp.history:
-        return
-    requested = urlparse(url)
-    final = resp.url
-    # The message lands in last_error and the diagnostics dump, and the
-    # target can be a LAN appliance or a captive portal: it goes to the
-    # debug log only.
-    if requested.scheme == "https" and final.scheme != "https":
-        _LOGGER.debug("%s redirected to %s", url, final)
-        raise ExtractorError(f"{url} redirected off https; refusing to read the answer")
-    if _site(final.host or "") != _site(requested.hostname or ""):
-        _LOGGER.debug("%s redirected to %s", url, final)
-        raise ExtractorError(f"{url} redirected off-site; refusing to read the answer")
-    # Same site from here on, so the path is safe to name. Read as a card,
-    # the page landed on failed the parser, which then took the blame for
-    # a page the utility had moved.
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    return not address.is_global or address.is_multicast
+
+
+def _redirect_target(url: str, current: URL, location: str) -> URL:
+    """Where a redirect from ``current`` points, checked before it is asked for.
+
+    ``url`` is what the fetch was asked for. The target must not drop from
+    https, must stay on the site ``url`` names, and must not be an address
+    literal outside the public internet: the site check already refuses
+    every address for a named site, and this covers a fetch asked of an
+    address. Staying on the site and on https are what the href checks of
+    the extractors exist for, so a redirect holds to them too. The target
+    goes to the debug log only, since it can be a LAN appliance or a
+    captive portal and the message lands in last_error and the diagnostics
+    dump.
+    """
+    try:
+        parsed = URL(location)
+        target = parsed if parsed.scheme else current.join(parsed)
+    except ValueError:
+        raise ExtractorError(f"{url} redirected to an address that does not parse") from None
+    if target.scheme not in ("http", "https") or (
+        current.scheme == "https" and target.scheme != "https"
+    ):
+        _LOGGER.debug("%s redirected to %s", url, target)
+        raise ExtractorError(f"{url} redirected off https; refusing to follow it")
+    host = target.host or ""
+    if _site(host) != _site(URL(url).host or ""):
+        _LOGGER.debug("%s redirected to %s", url, target)
+        raise ExtractorError(f"{url} redirected off-site; refusing to follow it")
+    if _local_address(host):
+        _LOGGER.debug("%s redirected to %s", url, target)
+        raise ExtractorError(f"{url} redirected to a private address; refusing to follow it")
+    return target
+
+
+def _guard_moved(url: str, final: URL) -> None:
+    """Refuse the home page or not-found page a redirect from ``url`` ended on.
+
+    Every hop stayed on the site, so the path is safe to name. Read as a
+    card, that page failed the parser, which then took the blame for a page
+    the utility had moved.
+    """
     if _NOT_FOUND_PATH.search(final.path) or (
-        _HOME_PATH.match(final.path) and not _HOME_PATH.match(requested.path or "/")
+        _HOME_PATH.match(final.path) and not _HOME_PATH.match(URL(url).path or "/")
     ):
         raise ExtractorError(f"{url} redirected to {final.path}: the page moved or was removed")
+
+
+@asynccontextmanager
+async def _get(
+    session: aiohttp.ClientSession, url: str, *, timeout: float, **kwargs: Any
+) -> AsyncIterator[aiohttp.ClientResponse]:
+    """GET ``url`` and hold its 2xx answer, following redirects by hand.
+
+    aiohttp follows a redirect before its caller sees the answer, so a
+    check on the URL it landed on came after the request to the target
+    had been sent: a host this integration fetches could have Home
+    Assistant send a GET, with a path and query of its choosing, to any
+    address on its network. Here each Location is checked by
+    :func:`_redirect_target` before anything is sent to it, at most
+    :data:`MAX_REDIRECTS` of them, all within the one ``timeout`` in
+    seconds. An answer outside 2xx raises :func:`_http_error`, a 3xx with
+    no Location included, and a redirect onto a moved page raises too.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    target: str | URL = url
+    for hops in range(MAX_REDIRECTS + 1):
+        left = deadline - loop.time()
+        if left <= 0:
+            raise TimeoutError
+        async with session.get(
+            target, allow_redirects=False, timeout=aiohttp.ClientTimeout(total=left), **kwargs
+        ) as resp:
+            location = None
+            if resp.status in _REDIRECT_STATUSES:
+                location = resp.headers.get("Location") or resp.headers.get("URI")
+            if location is None:
+                if not 200 <= resp.status < 300:
+                    raise _http_error(url, resp.status)
+                if hops:
+                    _guard_moved(url, URL(target))
+                yield resp
+                return
+        target = _redirect_target(url, URL(target), location)
+    raise ExtractorError(f"{url} redirected more than {MAX_REDIRECTS} times; refusing to follow it")
 
 
 async def _read_text_capped(resp: aiohttp.ClientResponse, url: str) -> str:
@@ -656,14 +737,7 @@ async def fetch_pdf_text_layout(session: aiohttp.ClientSession, url: str) -> str
 
     async def read() -> str:
         try:
-            async with session.get(
-                url,
-                headers={"User-Agent": USER_AGENT},
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if not 200 <= resp.status < 300:
-                    raise _http_error(url, resp.status)
-                _guard_redirect(url, resp)
+            async with _get(session, url, headers={"User-Agent": USER_AGENT}, timeout=30) as resp:
                 content_type = resp.content_type
                 payload = await _read_capped(resp, url)
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -746,14 +820,7 @@ async def fetch_picture_text(
 
     async def read() -> str:
         try:
-            async with session.get(
-                url,
-                headers={"User-Agent": USER_AGENT},
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if not 200 <= resp.status < 300:
-                    raise _http_error(url, resp.status)
-                _guard_redirect(url, resp)
+            async with _get(session, url, headers={"User-Agent": USER_AGENT}, timeout=30) as resp:
                 content_type = resp.content_type
                 payload = await _read_capped(resp, url)
         except (aiohttp.ClientError, TimeoutError) as err:
@@ -787,17 +854,13 @@ async def fetch_text(
     """
 
     async def read() -> str:
+        # Off for every hop when it is off, as it was for every redirect
+        # aiohttp followed.
+        tls: dict[str, Any] = {} if verify_ssl else {"ssl": False}
         try:
-            kwargs: dict[str, object] = {
-                "headers": {"User-Agent": USER_AGENT},
-                "timeout": aiohttp.ClientTimeout(total=timeout),
-            }
-            if not verify_ssl:
-                kwargs["ssl"] = False
-            async with session.get(url, **kwargs) as resp:  # type: ignore[arg-type]
-                if not 200 <= resp.status < 300:
-                    raise _http_error(url, resp.status)
-                _guard_redirect(url, resp)
+            async with _get(
+                session, url, headers={"User-Agent": USER_AGENT}, timeout=timeout, **tls
+            ) as resp:
                 return await _read_text_capped(resp, url)
         except (aiohttp.ClientError, TimeoutError) as err:
             raise TransientFetchError(f"network error fetching {url}: {error_text(err)}") from err

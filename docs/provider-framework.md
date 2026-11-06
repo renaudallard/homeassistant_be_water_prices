@@ -138,18 +138,28 @@ The module is a vendored subset of the electricity integration's reader.
   since a chunked answer declares none. Text is decoded with the declared
   charset, falling back to UTF-8 with replacement for an unknown or
   unusable one.
-- Redirect guard: a redirected answer is refused when it left https or
-  left the requested site (the last two labels of the host), and the
-  target is logged at debug level only, since it can be an address only
-  the Home Assistant host can see. One that stayed on the site but landed
-  on its home page (the bare language root included) from a deeper page,
-  or on a not-found page, is refused as a page that moved or was removed:
+- Redirects: `fetch_text`, `fetch_pdf_text_layout` and
+  `fetch_picture_text` ask with `allow_redirects=False` and follow up to
+  `MAX_REDIRECTS` (5) hops by hand (`_get`), all within the one timeout,
+  since aiohttp sends the request to a redirect's target before its
+  caller can look at it. Each Location is checked before anything is sent
+  to it (`_redirect_target`): it is refused when it is not http or https,
+  drops from https, leaves the requested site (the last two labels of the
+  host), or is an address literal outside the public internet (private,
+  loopback, link-local, reserved, shared, unspecified or multicast), and
+  so is a sixth hop. The target is logged at debug level only, since it
+  can be an address only the Home Assistant host can see. A redirect that
+  stayed on the site but landed on its home page (the bare language root
+  included) from a deeper page, or on a not-found page, is refused as a
+  page that moved or was removed:
   VIVAQUA sends a removed page to "/" and AGSO Knokke-Heist to
   "/pagenotfound", both answering 200, which the parser would otherwise
   have failed on as a layout change. The two AJAX fetchers that send a
   commune (De Watergroep's cookie, Farys's form field) do their own request
-  with `allow_redirects=False`, so the commune never travels to wherever a
-  redirect points, and a redirect fails them (`tests/test_ajax_redirects.py`).
+  with `allow_redirects=False` and follow none, so the commune never
+  travels to wherever a redirect points, and a redirect fails them
+  (`tests/test_ajax_redirects.py`; the others are in
+  `tests/test_fetch_redirects.py`).
 - `fetch_pdf_text_layout(session, url)` downloads a card (30 s), checks
   the `%PDF` signature after stripping a BOM or leading blank lines, and
   renders it with `extract_pdf_text_layout`. An answer that is no PDF is
@@ -176,7 +186,7 @@ The module is a vendored subset of the electricity integration's reader.
   it is; with a picture reader installed (`read_pictures_through(reader)`,
   which the card archiver does where Tesseract is installed) the picture
   is downloaded under the guards above (30 s, the size cap, the redirect
-  guard, a JPEG or PNG signature) and handed to `reader(url, payload)`, a
+  checks, a JPEG or PNG signature) and handed to `reader(url, payload)`, a
   reader failure becoming an `ExtractorError`; without one, which is
   always the case in Home Assistant, `archived()` gives the archive's
   reading or None. `reads_pictures()` says whether a reader is installed,
