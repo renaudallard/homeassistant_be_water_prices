@@ -355,7 +355,7 @@ async def test_a_different_meter_is_re_checked_without_an_options_change(
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
     coordinator = entry.runtime_data
     assert full_year.await_count == 1
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_FULL_YEAR, new=full_year):
         # Same year, same configured figure, different meter: that is a
         # different year's worth of water, not a settled answer.
         hass.states.async_set("sensor.other_meter", "500")
@@ -422,7 +422,7 @@ async def test_answer_is_not_re_queried_while_nothing_changed(hass: HomeAssistan
     full_year = AsyncMock(return_value=131.0)
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
     coordinator = entry.runtime_data
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_FULL_YEAR, new=full_year):
         let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
@@ -441,7 +441,7 @@ async def test_unreadable_recorder_is_retried_rather_than_believed(
     entry = await _setup_entry(hass, configured=80, full_year=full_year)
     coordinator = entry.runtime_data
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
-    with patch(_YTD, new=AsyncMock(return_value=20.0)), patch(_FULL_YEAR, new=full_year):
+    with patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))), patch(_FULL_YEAR, new=full_year):
         let_the_fetch_interval_pass(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
