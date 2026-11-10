@@ -225,6 +225,22 @@ def _judge_communes(communes: tuple[CommuneOption, ...], floor: int) -> tuple[st
     return "OK", f"{len(communes)} communes listed"
 
 
+def _certificate_refused(err: BaseException) -> bool:
+    """Whether ``err`` was raised from a TLS certificate the client could
+    not verify. The fetch helpers wrap it as a TransientFetchError, but a
+    host that changed its chain stays unverifiable until a release ships
+    what verifies it, as api.atrias.be's did for the gas integration on
+    10 November 2026."""
+    seen: set[int] = set()
+    cause: BaseException | None = err
+    while cause is not None and id(cause) not in seen:
+        if isinstance(cause, aiohttp.ClientConnectorCertificateError):
+            return True
+        seen.add(id(cause))
+        cause = cause.__cause__
+    return False
+
+
 async def _check[T](
     session: aiohttp.ClientSession,
     extractor: WaterExtractor,
@@ -245,8 +261,10 @@ async def _check[T](
     except TransientFetchError as err:
         # Upstream hiccup (timeout / connection reset / HTTP 5xx): not a
         # regression, so it must not open an issue. Checked before the
-        # ExtractorError branch because it is a subclass of it.
-        return CheckResult(check_id, label, region, "TRANSIENT", str(err))
+        # ExtractorError branch because it is a subclass of it. A
+        # certificate that does not verify is no hiccup and fails.
+        status = "FAIL" if _certificate_refused(err) else "TRANSIENT"
+        return CheckResult(check_id, label, region, status, str(err))
     except ExtractorError as err:
         return CheckResult(check_id, label, region, "FAIL", str(err))
     except Exception:  # top-level: report anything unexpected as a failure row

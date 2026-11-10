@@ -40,7 +40,9 @@ Errors:
   [coordinator.md](coordinator.md).
 - `TransientFetchError`, a subclass: a network error, a timeout, HTTP 5xx
   or 429. The live check reports these as `TRANSIENT` rather than opening
-  an issue. A fetch that falls back to last year's card on an
+  an issue, except one raised from aiohttp's
+  `ClientConnectorCertificateError`: a host whose chain does not verify
+  stays so until a release ships what verifies it, so that is a `FAIL`. A fetch that falls back to last year's card on an
   `ExtractorError` must re-raise a `TransientFetchError` instead
   (`aquaduin.fetch` shows the pattern), or a blip would quietly swap this
   year's card for last year's.

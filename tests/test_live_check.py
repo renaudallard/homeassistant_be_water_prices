@@ -33,6 +33,7 @@ a false GitHub issue; only a genuine parse / shape / 4xx failure is FAIL.
 from __future__ import annotations
 
 import asyncio
+import ssl
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import date
@@ -123,6 +124,25 @@ async def test_check_one_transient_fetch_error_is_transient() -> None:
 
     result = await _check_one(None, _fake_extractor(fetch))  # type: ignore[arg-type]
     assert result.status == "TRANSIENT"
+
+
+async def test_check_one_certificate_that_does_not_verify_is_fail() -> None:
+    """The fetch helpers wrap aiohttp's certificate error as transient, but
+    a host that changed its chain does not heal on its own."""
+    key: Any = SimpleNamespace(host="x", port=443, is_ssl=True)
+    refused = aiohttp.ClientConnectorCertificateError(
+        key, ssl.SSLCertVerificationError(1, "unable to get local issuer certificate")
+    )
+
+    async def fetch(_session: object) -> None:
+        try:
+            raise refused
+        except aiohttp.ClientError as err:
+            raise TransientFetchError(f"network error fetching https://x: {err}") from err
+
+    result = await _check_one(None, _fake_extractor(fetch))  # type: ignore[arg-type]
+    assert result.status == "FAIL"
+    assert "SSLCertVerificationError" in result.detail
 
 
 async def test_check_one_extractor_error_is_fail() -> None:
