@@ -44,7 +44,7 @@ jobs:
           # proved. Reading them from requirements-dev.txt keeps this off a
           # second copy of the same numbers, without pulling the test harness
           # into a job that has no use for it.
-          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4
+          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 certifi
 
       - name: Check out the archive branch's texts
         # A PDF the card archive walked earlier today and still holds is

@@ -27,6 +27,10 @@
 
 from __future__ import annotations
 
+import ssl
+from datetime import UTC, datetime
+from pathlib import Path
+
 import pytest
 
 from custom_components.be_water_prices.pricing import compute_annual_cost
@@ -86,53 +90,79 @@ def test_the_cva_is_read_off_the_30_x_cva_row() -> None:
     assert parse_tariff(page.replace("82,440 €", "87,000 €"), year=2026).cva_eur_per_m3 == 2.9
 
 
-async def test_only_a_tls_failure_earns_the_unverified_retry(
+async def test_a_tls_failure_is_raised_and_never_retried_unverified(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Any other error retried without verification would hand an on-path attacker the hint."""
-    import ssl
+    """inBW is fetched through a context that also trusts the intermediates
+    it does not send. A chain that still fails is raised as it is, for the
+    live check to file: retrying it without verification hands the page to
+    whoever is on the path."""
     from unittest.mock import AsyncMock
 
     from custom_components.be_water_prices.providers import inbw
     from custom_components.be_water_prices.providers.base import TransientFetchError
 
-    def _failing(cause: BaseException) -> AsyncMock:
-        async def _fetch(*_a: object, **_k: object) -> str:
-            try:
-                raise cause
-            except BaseException as err:
-                raise TransientFetchError("network error fetching inBW") from err
-
-        return AsyncMock(side_effect=_fetch)
-
-    timeout = _failing(TimeoutError())
-    monkeypatch.setattr(inbw, "fetch_html", timeout)
-    with pytest.raises(TransientFetchError):
-        await inbw.fetch(None)  # type: ignore[arg-type]
-    assert timeout.await_count == 1
-
-    calls: list[dict[str, object]] = []
-
-    async def _tls_then_page(*_a: object, **kwargs: object) -> str:
-        calls.append(kwargs)
-        if not kwargs.get("verify_ssl", True):
-            return fixture_html("inbw_2026.html")
+    async def _refused(*_a: object, **_k: object) -> str:
         try:
-            raise ssl.SSLError("certificate verify failed")
+            raise ssl.SSLCertVerificationError(1, "unable to get local issuer certificate")
         except ssl.SSLError as err:
             raise TransientFetchError("network error fetching inBW") from err
 
-    monkeypatch.setattr(inbw, "fetch_html", _tls_then_page)
-    tariff = await inbw.fetch(None)  # type: ignore[arg-type]
-    assert tariff.utility == "inbw"
-    assert [c.get("verify_ssl", True) for c in calls] == [True, False]
+    refused = AsyncMock(side_effect=_refused)
+    monkeypatch.setattr(inbw, "fetch_html", refused)
+    with pytest.raises(TransientFetchError):
+        await inbw.fetch(None)  # type: ignore[arg-type]
+    assert refused.await_count == 1
+    assert refused.await_args is not None
+    assert refused.await_args.kwargs == {"ssl_context": inbw.ssl_context()}
+
+    page = AsyncMock(return_value=fixture_html("inbw_2026.html"))
+    monkeypatch.setattr(inbw, "fetch_html", page)
+    assert (await inbw.fetch(None)).utility == "inbw"  # type: ignore[arg-type]
+
+
+# certifi carries a root with a serial number of zero, which cryptography
+# loads with a warning.
+@pytest.mark.filterwarnings("ignore:Parsed a serial number which wasn't positive")
+def test_the_shipped_intermediates_complete_the_chain_inbw_serves() -> None:
+    """The certificate eau.inbw.be served on 10 November 2026, with no
+    intermediate, verified through the shipped file against certifi's roots,
+    the ones the fetch's context trusts. Without the file it does not."""
+    import certifi
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.x509.verification import PolicyBuilder, Store, VerificationError
+
+    from custom_components.be_water_prices.providers import inbw
+
+    leaf = x509.load_pem_x509_certificate(
+        (Path(__file__).parent / "fixtures" / "inbw_leaf_2025_11.pem").read_bytes()
+    )
+    shipped = x509.load_pem_x509_certificates(inbw._INTERMEDIATES.read_bytes())
+    roots = x509.load_pem_x509_certificates(Path(certifi.where()).read_bytes())
+    verifier = (
+        PolicyBuilder()
+        .store(Store(roots))
+        .time(datetime(2026, 11, 10, 12, tzinfo=UTC))
+        .build_server_verifier(x509.DNSName("eau.inbw.be"))
+    )
+    names = [
+        str(cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value)
+        for cert in verifier.verify(leaf, shipped)
+    ]
+    assert names == [
+        "*.inbw.be",
+        "Go Daddy Secure Certificate Authority - G2",
+        "Go Daddy Root Certificate Authority - G2",
+    ]
+    with pytest.raises(VerificationError):
+        verifier.verify(leaf, [])
 
 
 @pytest.mark.timeout(5)
 def test_the_redevance_row_check_stays_linear_on_a_long_row() -> None:
     """The gap after the label read on to the end of the row from every
-    "redevance" in it: the square of its length, on the one page this
-    integration fetches without certificate checks."""
+    "redevance" in it: the square of its length."""
     from custom_components.be_water_prices.providers.inbw import _REDEVANCE_ROW_RE
 
     assert _REDEVANCE_ROW_RE.search("redevance 20 " * 100_000) is None

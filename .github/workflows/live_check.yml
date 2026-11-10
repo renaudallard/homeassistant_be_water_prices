@@ -56,7 +56,7 @@ jobs:
           # proved. Reading them from requirements-dev.txt keeps this off a
           # second copy of the same numbers, without pulling the test harness
           # into a job that has no use for it.
-          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4
+          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 certifi
 
       - name: Resolve names through nsec.arnor.org over TLS
         # As the electricity and gas live checks do. Fluvius serves its zone

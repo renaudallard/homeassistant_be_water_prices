@@ -66,7 +66,7 @@ jobs:
           # What the extractors need, at the versions the test suite
           # proved, plus freezegun, which pins the clock to a row's capture
           # day while a stored month is replayed through the current parser.
-          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 freezegun
+          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 certifi freezegun
           # Tesseract and its French data read AIEC's card, which is only
           # ever a picture. Installed here alone: no installation decodes a
           # picture, it reads the text this run stores.
@@ -381,7 +381,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 freezegun
+          pip install -c requirements-dev.txt pdfplumber aiohttp beautifulsoup4 certifi freezegun
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

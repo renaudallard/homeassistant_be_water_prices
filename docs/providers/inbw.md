@@ -31,22 +31,27 @@ communes.
 
 ## TLS
 
-The server's TLS chain is misconfigured: it does not send the GoDaddy
-intermediate certificate, so the default Python trust path fails.
+The server does not send its GoDaddy intermediate certificate, so the
+default trust path fails. GoDaddy's public intermediates ship in
+`certs/godaddy_intermediates.pem`, and `fetch` reads the page through a
+context of its own (`inbw.ssl_context`): certifi's roots, the ones Home
+Assistant's client context trusts, plus that file. Verification is never
+turned off.
 
-`fetch` verifies first. Only when the failure's cause is a TLS one
-(`aiohttp.ClientConnectorCertificateError`, `aiohttp.ClientSSLError` or
-`ssl.SSLError`) does it log a warning and retry once with
-`verify_ssl=False`. A timeout, a DNS failure or an HTTP 5xx is raised as
-it is: retrying those unverified would let an on-path attacker trigger the
-downgrade by disturbing the first request. `ClientPayloadError` is kept
-out of the TLS set for the same reason. The day inBW fixes its chain the
-downgrade stops on its own.
+- "Go Daddy Secure Certificate Authority - G2" issued the certificate
+  served on 10 November 2026, valid until 16 December 2026.
+- "GoDaddy TLS Intermediate CA DV - R1v1", with its "GoDaddy TLS Root CA -
+  R1" cross-signed by "Go Daddy Root Certificate Authority - G2", is what
+  GoDaddy issues from since; no CA bundle carries the R1 root yet. It is
+  there for the renewal, as api.atrias.be moved to it on 10 November 2026.
+- The file is the gas integration's, which reads Atrias the same way. Both
+  come from GoDaddy's `gd_bundle_dv-r1-g2.crt.pem` plus the G2
+  intermediate.
 
-The risk is bounded: no credentials are involved, and the worst case is a
-man in the middle serving wrong tariff numbers (the rationale is in the
-`fetch_text` docstring in `providers/_pdf.py`, which the module docstring
-points to).
+A chain the file does not verify raises a `TransientFetchError` from
+aiohttp's certificate error, which the live check reports as a failure and
+files. Until 10 November 2026 a TLS failure was retried with verification
+off, which let anyone on the path answer for inBW.
 
 ## Region and communes
 
@@ -97,8 +102,9 @@ the fetch.
 
 ## Failures
 
-- `TransientFetchError` for a network error, timeout, HTTP 5xx or 429 that
-  is not a TLS failure; the unverified retry is not attempted for those.
+- `TransientFetchError` for a network error, timeout, HTTP 5xx or 429, and
+  for a chain the shipped intermediates do not verify, which the live check
+  files.
 - `ExtractorError`: no table, no full-CVD row, a first block that is not
   half the CVD, a redevance that is not 20 x CVD, a CVD outside the
   window, a missing CVA or Fonds Social row, a CVA or FSE outside its

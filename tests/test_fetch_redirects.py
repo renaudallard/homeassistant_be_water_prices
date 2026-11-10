@@ -164,8 +164,8 @@ async def test_a_redirect_to_a_private_address_is_never_requested(network: _Netw
 async def test_inbw_does_not_follow_a_redirect_off_its_site(
     network: _Network, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """inBW is read with certificate checks off once they fail, so anyone on
-    the path can answer for it; its redirects are held to the same rules."""
+    """inBW is read through a context of its own; its redirects are held to
+    the same rules."""
     monkeypatch.setattr(inbw, "SOURCE_URL", network.url("eau.inbw.be", "/prix-de-leau"))
     network.routes["/prix-de-leau"] = (302, network.lan_url("192.168.1.1", "/cgi-bin/reboot"))
     with pytest.raises(ExtractorError, match="redirected off-site"):

@@ -128,10 +128,12 @@ without being named in either.
 
 The module is a vendored subset of the electricity integration's reader.
 
-- `fetch_text(session, url, *, timeout=20, verify_ssl=True)` returns a body
+- `fetch_text(session, url, *, timeout=20, ssl_context=None)` returns a body
   as text, sending `USER_AGENT` (`Home Assistant be_water_prices/<version>`).
-  `verify_ssl=False` is for a server with a broken chain and nothing else;
-  inBW is the one user, and only after a TLS failure.
+  `ssl_context` verifies the request and its redirects against that context
+  instead of the session's: inBW is the one user, with a context that also
+  trusts the intermediates its server does not send. Verification is never
+  turned off.
 - Status mapping (`_http_error`): 5xx and 429 are `TransientFetchError`,
   any other non-2xx (a 3xx that reaches the caller included) is
   `ExtractorError`. A network error or timeout is `TransientFetchError`.
@@ -277,10 +279,10 @@ April 2026 (`tests/fixtures/aiec_ocr_<date>.txt`). See
 ### `_html.py`: HTML
 
 - `fetch_html` is `fetch_text` under another name.
-- `fetch_and_parse(session, url, parser, *args, verify_ssl=True,
-  **kwargs)` fetches a page and runs `parser(html, *args, **kwargs)` in a
-  worker thread, so BeautifulSoup does not block the event loop. Every
-  HTML extractor goes through it.
+- `fetch_and_parse(session, url, parser, *args, **kwargs)` fetches a page
+  and runs `parser(html, *args, **kwargs)` in a worker thread, so
+  BeautifulSoup does not block the event loop. Every HTML extractor goes
+  through it.
 - `extract_amounts(text)` returns every euro amount in document order,
   "€ 12,34" and "12,34 €" alike, a space-grouped thousand as one amount, a
   minus against the sign or the number as a negative, and a figure that

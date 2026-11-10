@@ -34,13 +34,15 @@ unit price ("Prix unitaire" column), so we read CVD straight off the
 against the "Redevance annuelle (20 x CVD)" row. CVA / FSE are the
 SPGE flat-Wallonia figures, read off the same table.
 
-inBW's TLS chain is misconfigured -- the server does not send the
-GoDaddy intermediate certificate, so the default Python trust path
-fails. The fetch verifies normally and only retries with
-``verify_ssl=False`` after a certificate or SSL error specifically,
-logging a warning when it does, so the day inBW fixes its chain the
-downgrade stops happening on its own. See the rationale in
-:func:`_pdf.fetch_text`.
+inBW's server does not send its GoDaddy intermediate certificate, so the
+default trust path fails. GoDaddy's public intermediates ship in
+``certs/godaddy_intermediates.pem`` and are added, for this fetch alone,
+to a context on certifi's roots, the ones Home Assistant's own client
+context trusts; verification is never turned off.
+The file holds "Go Daddy Secure Certificate Authority - G2", which issued
+the certificate served on 10 November 2026, and "GoDaddy TLS Intermediate
+CA DV - R1v1" with its R1 root cross-signed by the G2 root, which GoDaddy
+issues from since, for the renewal due by 16 December 2026.
 
 Tariff structure is the standard Wallonia residential model; see
 :func:`pricing.compute_annual_cost` for the math.
@@ -49,11 +51,13 @@ Tariff structure is the standard Wallonia residential model; see
 from __future__ import annotations
 
 import asyncio
-import logging
+import functools
 import re
 import ssl
+from pathlib import Path
 
 import aiohttp
+import certifi
 from bs4 import BeautifulSoup, Tag
 
 from ..const import REGION_WALLONIA
@@ -61,16 +65,14 @@ from ._html import extract_amounts, fetch_html
 from ._walloon_simple import build_tariff, detect_published_year, spge_components, stated_vat_rate
 from .base import ExtractorError, WaterExtractor, WaterTariff, belgian_today
 
-_LOGGER = logging.getLogger(__name__)
-
 UTILITY_ID = "inbw"
 LABEL = "inBW"
 SOURCE_URL = "https://eau.inbw.be/prix-de-leau"
+_INTERMEDIATES = Path(__file__).parent.parent / "certs" / "godaddy_intermediates.pem"
 
 # The row "Redevance annuelle (20 x CVD)", lowercased. The gap after the
 # label is bounded, at nine times the page's: unbounded, it read on to the
-# end of the row from every "redevance" in it, the square of its length,
-# and this page is the one fetched without certificate checks.
+# end of the row from every "redevance" in it, the square of its length.
 _REDEVANCE_ROW_RE = re.compile(r"redevance.{0,100}?20\s*[x×*]\s*cvd")
 
 
@@ -176,43 +178,21 @@ def parse_tariff(html: str, year: int | None = None) -> WaterTariff:
     )
 
 
+@functools.cache
+def ssl_context() -> ssl.SSLContext:
+    """A client context on certifi's roots, as Home Assistant's is, also
+    trusting the intermediates inBW does not send. Not Home Assistant's own
+    helper: the live check and the card archive load this module without
+    Home Assistant. Blocking: it reads the CA bundle and the certificates
+    from disk, so it is built in a worker thread, once."""
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.load_verify_locations(cadata=_INTERMEDIATES.read_text(encoding="ascii"))
+    return context
+
+
 async def fetch(session: aiohttp.ClientSession) -> WaterTariff:
-    # Try with TLS verification first so a future server-side fix
-    # (inBW shipping the GoDaddy intermediate, or migrating to a CA
-    # whose chain is complete) is detectable. Fall back to
-    # verify_ssl=False ONLY on a TLS-specific failure -- a transient
-    # 5xx, DNS blip or timeout must not silently downgrade the
-    # connection (otherwise the whole 'verify first' point evaporates
-    # and an on-path attacker just needs to nudge the first request
-    # toward any non-cert failure to trigger the no-verify retry).
-    #
-    # TLS issues can surface at two layers under aiohttp:
-    #   - handshake-time:  ClientConnectorCertificateError, ClientSSLError
-    #   - underlying:      ssl.SSLError raised from the asyncio layer
-    #                      and surfaced via __cause__ chains
-    #
-    # ClientPayloadError is deliberately NOT in this set: it covers
-    # any mid-body interruption (decompression failures, malformed
-    # Transfer-Encoding, server reset for whatever reason) and only
-    # rarely is a TLS signal. Treating it as TLS would let any
-    # payload-layer failure trigger the verify_ssl=False retry, which
-    # is exactly the on-path-attacker hint the 'verify first'
-    # invariant exists to prevent.
-    try:
-        html = await fetch_html(session, SOURCE_URL)
-    except ExtractorError as err:
-        cause = err.__cause__
-        is_tls = isinstance(
-            cause,
-            aiohttp.ClientConnectorCertificateError | aiohttp.ClientSSLError | ssl.SSLError,
-        )
-        if not is_tls:
-            raise
-        _LOGGER.warning(
-            "inBW TLS verification failed (%s); falling back to verify_ssl=False",
-            err,
-        )
-        html = await fetch_html(session, SOURCE_URL, verify_ssl=False)
+    context = await asyncio.to_thread(ssl_context)
+    html = await fetch_html(session, SOURCE_URL, ssl_context=context)
     return await asyncio.to_thread(parse_tariff, html)
 
 

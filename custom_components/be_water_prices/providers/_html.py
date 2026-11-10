@@ -65,7 +65,6 @@ async def fetch_and_parse[T](
     url: str,
     parser: Callable[..., T],
     *args: Any,
-    verify_ssl: bool = True,
     **kwargs: Any,
 ) -> T:
     """GET ``url`` then run ``parser`` on the body off the event loop.
@@ -76,7 +75,7 @@ async def fetch_and_parse[T](
     HA's blocking-I/O guard cannot detect. Hand it to a worker thread,
     mirroring the PDF helpers, which already offload extraction.
     """
-    html = await fetch_html(session, url, verify_ssl=verify_ssl)
+    html = await fetch_html(session, url)
     return await asyncio.to_thread(parser, html, *args, **kwargs)
 
 

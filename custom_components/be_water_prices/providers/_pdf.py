@@ -41,6 +41,7 @@ import logging
 import math
 import os
 import re
+import ssl
 import subprocess
 import sys
 import unicodedata
@@ -652,21 +653,18 @@ async def fetch_text(
     url: str,
     *,
     timeout: int = 20,
-    verify_ssl: bool = True,
+    ssl_context: ssl.SSLContext | None = None,
 ) -> str:
     """GET ``url`` and return the response body as text.
 
-    ``verify_ssl=False`` skips TLS certificate verification for this
-    request only; reserve it for utility servers whose hosts genuinely
-    misconfigure their chain (e.g. inBW, where the GoDaddy intermediate
-    is not sent by the server). The risk is bounded -- worst case is
-    a MitM serving stale tariff numbers, no credentials are involved.
+    ``ssl_context`` verifies the request, every redirect included, against
+    that context instead of the session's: for a server that does not send
+    its intermediate certificate (inBW), whose provider builds a context
+    that also trusts the intermediates shipped in ``certs/``.
     """
 
     async def read() -> str:
-        # Off for every hop when it is off, as it was for every redirect
-        # aiohttp followed.
-        tls: dict[str, Any] = {} if verify_ssl else {"ssl": False}
+        tls: dict[str, Any] = {} if ssl_context is None else {"ssl": ssl_context}
         try:
             async with _get(
                 session, url, headers={"User-Agent": USER_AGENT}, timeout=timeout, **tls
