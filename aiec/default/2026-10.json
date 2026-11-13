@@ -7,9 +7,9 @@
    "variant": "text"
   },
   {
-   "ocr": "tesseract==5.3.4 -l fra --psm 6 prep=dfda6ec380d46329",
+   "ocr": "tesseract==5.5.0 -l fra --psm 6 prep=dfda6ec380d46329",
    "picture": "647cb69dcd012d1538a99e16e576baaab7070ce26881a4f1a05db80983c4be71",
-   "text": "texts/7af6186403e7bb93c671eda6504da0eec50059d203d32a43b0728bebcc9aa788.txt",
+   "text": "texts/f378a743cc3d294c35dad6b35d8c612a2421cea18771b424be5ce71ebddc4c16.txt",
    "url": "https://www.eauxducondroz.be/WEFiles/Image/WEImage/Tarif-2026-04-1-WEaf268c1c2a.jpg",
    "variant": "ocr"
   }
