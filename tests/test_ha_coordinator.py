@@ -4405,14 +4405,14 @@ async def _down(_session: Any) -> WaterTariff:
     raise ExtractorError("HTTP 503 from upstream")
 
 
-_ARCHIVE = "https://raw.githubusercontent.com/renaudallard/homeassistant_be_water_prices/archive"
+_ARCHIVE = "https://raw.githubusercontent.com/renaudallard/be_price_cards/main/water"
 
 
 @pytest.mark.asyncio
 async def test_an_archived_row_is_addressed_by_utility_commune_and_month(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Where a stored row is read from: the archive branch, the utility,
+    """Where a stored row is read from: the archive's rows, the utility,
     the commune id with everything that is not a path percent-encoded so
     De Watergroep's braces reach the file of that name, and the month."""
     from custom_components.be_water_prices.providers import _archive as module
@@ -4429,15 +4429,15 @@ async def test_an_archived_row_is_addressed_by_utility_commune_and_month(
     await _archived_row(session, "pidpa", "geel", date(2026, 1, 7))
     await _archived_row(session, "de_watergroep", "{004FE42A-CC2E}", date(2026, 12, 31))
     assert asked == [
-        f"{_ARCHIVE}/swde/default/2026-09.json",
-        f"{_ARCHIVE}/pidpa/geel/2026-01.json",
-        f"{_ARCHIVE}/de_watergroep/%7B004FE42A-CC2E%7D/2026-12.json",
+        f"{_ARCHIVE}/cards/swde/default/2026-09.json",
+        f"{_ARCHIVE}/cards/pidpa/geel/2026-01.json",
+        f"{_ARCHIVE}/cards/de_watergroep/%7B004FE42A-CC2E%7D/2026-12.json",
     ]
 
 
 @pytest.mark.asyncio
 async def test_an_unreadable_archived_row_is_no_row(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A month the branch does not hold answers 404, and a truncated or
+    """A month the archive does not hold answers 404, and a truncated or
     rewritten file is not a card. Both leave the caller with nothing to
     serve rather than an exception out of a failing refresh."""
     from custom_components.be_water_prices.providers import _archive as module

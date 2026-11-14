@@ -134,7 +134,7 @@ async def _no_sleep(_seconds: float) -> None:
 
 
 def _row(out: Path, commune: str = "default", month: str = "2026-09") -> dict[str, Any]:
-    return json.loads((out / "acme" / commune / f"{month}.json").read_text())
+    return json.loads((out / "cards" / "acme" / commune / f"{month}.json").read_text())
 
 
 async def test_a_stored_text_keeps_its_line_endings(tmp_path: Path) -> None:
@@ -178,7 +178,9 @@ async def test_a_shared_page_is_read_once_and_credited_to_every_row(tmp_path: Pa
     assert summary.stored == 2
     assert session.hits == 1
     texts = {
-        json.loads((tmp_path / f"{u}/default/2026-09.json").read_text())["_sources"][0]["text"]
+        json.loads((tmp_path / f"cards/{u}/default/2026-09.json").read_text())["_sources"][0][
+            "text"
+        ]
         for u in ("acme", "beta")
     }
     assert len(texts) == 1
@@ -190,7 +192,7 @@ async def test_a_repeat_run_keeps_the_first_capture(tmp_path: Path) -> None:
     session = _Session({PAGE_URL: b"fee=100.0"})
     extractors = [_extractor(_page_fetch(session))]
     await ac.archive(tmp_path, extractors=extractors, now=NOW, sleep=_no_sleep)
-    path = tmp_path / "acme/default/2026-09.json"
+    path = tmp_path / "cards/acme/default/2026-09.json"
     first = path.read_text()
     later = NOW.replace(day=13)
     summary = await ac.archive(tmp_path, extractors=extractors, now=later, sleep=_no_sleep)
@@ -312,7 +314,7 @@ async def test_every_commune_of_a_per_commune_utility_gets_its_own_row(tmp_path:
         tmp_path, extractors=[extractor], defaults_only=True, now=NOW, sleep=_no_sleep
     )
     assert (summary.stored, summary.unchanged, asked) == (0, 1, [])
-    assert (tmp_path / "acme/2/2026-09.json").exists()
+    assert (tmp_path / "cards/acme/2/2026-09.json").exists()
 
 
 async def test_a_commune_id_that_cannot_name_a_directory_is_refused(tmp_path: Path) -> None:
@@ -436,7 +438,7 @@ async def test_stored_rows_are_replayed_only_when_the_parser_changed(
     august = datetime(2026, 8, 5, 6, 0, tzinfo=UTC)
     await ac.archive(tmp_path, extractors=[extractor], now=august, sleep=_no_sleep)
     assert (tmp_path / "parser.txt").read_text().strip() == "digest-a"
-    row = tmp_path / "acme/default/2026-08.json"
+    row = tmp_path / "cards/acme/default/2026-08.json"
     assert json.loads(row.read_text())["yearly_fixed_fee"] == 100.0
 
     # September, same parser: the live walk stores this month's row on the
@@ -446,7 +448,7 @@ async def test_stored_rows_are_replayed_only_when_the_parser_changed(
     summary = await ac.archive(tmp_path, extractors=[extractor], now=later, sleep=_no_sleep)
     assert (summary.replayed, summary.reparsed) == (0, 0)
     assert seen == [date.today()]
-    assert (tmp_path / "acme/default/2026-09.json").exists()
+    assert (tmp_path / "cards/acme/default/2026-09.json").exists()
 
     # The parser changed: today's live walk rewrites September, then August
     # is replayed from its stored text under August's clock and rewritten,
@@ -482,7 +484,7 @@ async def test_a_row_that_cannot_be_reproduced_offline_is_left_alone(
     monkeypatch.setattr(ac, "_parser_digest", lambda: "digest-a")
     august = datetime(2026, 8, 5, 6, 0, tzinfo=UTC)
     await ac.archive(tmp_path, extractors=[extractor], now=august, sleep=_no_sleep)
-    row = tmp_path / "acme/default/2026-08.json"
+    row = tmp_path / "cards/acme/default/2026-08.json"
     before = row.read_text()
 
     async def wants_more(_session: Any) -> WaterTariff:
@@ -531,7 +533,7 @@ async def test_a_rerender_reads_every_card_back_from_the_kept_copy(
         sleep=_no_sleep,
     )
     assert renders == [b"%PDF v1"]
-    row = out / "acme/default/2026-09.json"
+    row = out / "cards/acme/default/2026-09.json"
     before = json.loads(row.read_text())
     session.pages.clear()  # the utility is gone; only the kept copy is left
     summary = await ac.archive(
@@ -561,7 +563,7 @@ def test_a_text_other_readers_made_is_not_served(
     """The live check and the drift check read the branch through the same
     cache, so after a reader upgrade they render the card rather than check
     the old reader's text."""
-    row = tmp_path / "acme/default/2026-09.json"
+    row = tmp_path / "cards/acme/default/2026-09.json"
     row.parent.mkdir(parents=True)
     source = {"url": PDF_URL, "variant": "layout", "text": "texts/a.txt", "pdf": "w/abc.pdf"}
     row.write_text(json.dumps({"_sources": [{**source, "readers": "pdfplumber==1 render=a"}]}))
@@ -598,7 +600,7 @@ async def test_a_reader_upgrade_renders_every_card_again(
             sleep=_no_sleep,
         )
         assert (summary.replayed, summary.unreplayable, len(renders)) == (replayed, [], 2)
-    row = json.loads((out / "acme/default/2026-09.json").read_text())
+    row = json.loads((out / "cards/acme/default/2026-09.json").read_text())
     assert [s["readers"] for s in row["_sources"] if "pdf" in s] == ["pdfplumber==2 render=a"]
 
 
@@ -629,7 +631,7 @@ async def test_only_a_text_reader_change_is_a_rerender(
     stamp.unlink()
     assert not ac.rerender_due(out)
     stamp.write_text("an older parser\n", encoding="utf-8")
-    path = out / "acme/default/2026-09.json"
+    path = out / "cards/acme/default/2026-09.json"
     row = json.loads(path.read_text(encoding="utf-8"))
     row["_sources"] = [
         {**{k: v for k, v in s.items() if k not in ("pdf", "readers")}, "picture": s["pdf"]}
@@ -762,7 +764,7 @@ def test_replay_session_refuses_what_it_does_not_hold(tmp_path: Path) -> None:
 
 def test_prune_removes_old_rows_and_the_texts_nothing_refers_to(tmp_path: Path) -> None:
     def row(commune: str, month: str, text: str) -> None:
-        path = tmp_path / "acme" / commune / f"{month}.json"
+        path = tmp_path / "cards" / "acme" / commune / f"{month}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"_sources": [{"text": f"texts/{text}.txt"}]}))
 
@@ -777,9 +779,9 @@ def test_prune_removes_old_rows_and_the_texts_nothing_refers_to(tmp_path: Path) 
         json.dumps({"old": "water-2023-08/old.pdf", "kept": "water-2023-09/kept.pdf"})
     )
     assert ac._prune(tmp_path, 36, date(2026, 9, 12)) == 5
-    assert not (tmp_path / "acme/gone").exists()
-    assert not (tmp_path / "acme/default/2023-08.json").exists()
-    assert (tmp_path / "acme/default/2023-09.json").exists()
+    assert not (tmp_path / "cards/acme/gone").exists()
+    assert not (tmp_path / "cards/acme/default/2023-08.json").exists()
+    assert (tmp_path / "cards/acme/default/2023-09.json").exists()
     assert sorted(p.name for p in (tmp_path / "texts").iterdir()) == ["kept.txt"]
     assert json.loads((tmp_path / "pdfs.json").read_text()) == {"kept": "water-2023-09/kept.pdf"}
 
@@ -790,7 +792,7 @@ def test_prune_keeps_a_pdf_a_remaining_month_still_names(tmp_path: Path) -> None
     any of those months does, even past the cutoff."""
 
     def row(month: str, digest: str) -> None:
-        path = tmp_path / "acme" / "default" / f"{month}.json"
+        path = tmp_path / "cards" / "acme" / "default" / f"{month}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         source = {"text": f"texts/{digest}.txt", "pdf": f"pdfs/{digest}.pdf"}
         path.write_text(json.dumps({"_sources": [source]}))
@@ -868,7 +870,7 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
     session = _Session({PAGE_URL: b"fee=100.0", PDF_URL: b"%PDF v1"})
     extractors = [_extractor(_page_fetch(session)), _extractor(_pdf_fetch(session), uid="beta")]
     cards = "https://cards.test/releases/download"
-    branch = "https://github.test/repo/blob/archive"
+    branch = "https://github.test/cards/blob/main/water"
     await ac.archive(
         out,
         extractors=extractors,
@@ -881,8 +883,8 @@ async def test_the_coverage_table_links_a_month_to_what_it_was_parsed_from(
     coverage = (out / "coverage/acme.md").read_text()
     text = _row(out)["_sources"][0]["text"]
     assert "# acme" in coverage
-    acme_json = f"[json]({branch}/acme/default/2026-09.json)"
-    beta_json = f"[json]({branch}/beta/default/2026-09.json)"
+    acme_json = f"[json]({branch}/cards/acme/default/2026-09.json)"
+    beta_json = f"[json]({branch}/cards/beta/default/2026-09.json)"
     assert f"| default |  | [page]({branch}/{text}) {acme_json} |" in coverage
     # The PDF is not uploaded yet: its cell says so without a link.
     beta = (out / "coverage/beta.md").read_text()
@@ -943,7 +945,7 @@ async def test_the_listing_is_refreshed_after_the_upload_and_the_old_index_dropp
         fetch_for_commune=fetch_for_commune,
     )
     base = "https://cards.test/releases/download"
-    branch = "https://github.test/repo/blob/archive"
+    branch = "https://github.test/cards/blob/main/water"
     await ac.archive(
         out, extractors=[extractor], pdf_dir=pdfs, pdf_base_url=base, now=NOW, sleep=_no_sleep
     )
@@ -954,8 +956,11 @@ async def test_the_listing_is_refreshed_after_the_upload_and_the_old_index_dropp
     ac._write_listings(out, base, branch)
     url = f"{base}/water-2026-09/{digest}.pdf"
     coverage = (out / "coverage/acme.md").read_text()
-    assert f"| default |  | [pdf]({url}) [json]({branch}/acme/default/2026-09.json) |" in coverage
-    assert f"| 1 | Gent | [pdf]({url}) [json]({branch}/acme/1/2026-09.json) |" in coverage
+    assert (
+        f"| default |  | [pdf]({url}) [json]({branch}/cards/acme/default/2026-09.json) |"
+        in coverage
+    )
+    assert f"| 1 | Gent | [pdf]({url}) [json]({branch}/cards/acme/1/2026-09.json) |" in coverage
     assert not (out / "pdfs.md").exists()
     assert (out / "README.md").read_text() == ac._README
 
@@ -977,7 +982,7 @@ def test_index_only_touches_nothing_but_the_listing(
 def test_a_utility_that_left_the_branch_loses_its_sheet(tmp_path: Path) -> None:
     (tmp_path / "coverage").mkdir()
     (tmp_path / "coverage/gone.md").write_text("stale sheet")
-    row = tmp_path / "acme/default/2026-09.json"
+    row = tmp_path / "cards/acme/default/2026-09.json"
     row.parent.mkdir(parents=True)
     row.write_text(json.dumps({"_sources": []}))
     ac._write_coverage(tmp_path)
@@ -1028,43 +1033,99 @@ def _workflow_step(job: str, name: str) -> str:
     return str(next(s["run"] for s in workflow["jobs"][job]["steps"] if s.get("name") == name))
 
 
-def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> None:
-    """The electricity and gas archives push to the cards repository's main
-    too, and one can land between this step's clone and its push. The step's
-    own shell must rebase and land rather than fail the run."""
-    import os
-    import subprocess
+def _git(*args: str, cwd: Path) -> str:
+    return subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
 
-    def git(*args: str, cwd: Path) -> str:
-        return subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
-            cwd=cwd,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
 
+def _cards_origin(tmp_path: Path, files: dict[str, str]) -> Path:
+    """A bare cards repository whose main holds ``files``."""
     origin = tmp_path / "origin.git"
     seed = tmp_path / "seed"
-    seed.mkdir()
-    git("init", "-q", "-b", "main", cwd=seed)
-    (seed / "README.md").write_text("# Price cards\n")
-    git("add", "README.md", cwd=seed)
-    git("commit", "-q", "-m", "start", cwd=seed)
-    git("clone", "-q", "--bare", str(seed), str(origin), cwd=tmp_path)
+    for rel, body in {"README.md": "# Price cards\n", **files}.items():
+        (seed / rel).parent.mkdir(parents=True, exist_ok=True)
+        (seed / rel).write_text(body)
+    _git("init", "-q", "-b", "main", cwd=seed)
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-q", "-m", "start", cwd=seed)
+    _git("clone", "-q", "--bare", str(seed), str(origin), cwd=tmp_path)
+    return origin
+
+
+def _cards_env(origin: Path, token: str) -> dict[str, str]:
+    """The environment a step talking to the cards repository runs in, its
+    GitHub URL being the local origin."""
+    import os
+
+    return {
+        **os.environ,
+        "GH_TOKEN": token,
+        "CARDS_REPO": "renaudallard/be_price_cards",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
+        "GIT_CONFIG_VALUE_0": "https://github.com/renaudallard/be_price_cards.git",
+    }
+
+
+def _push_job(work: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    """The push job's steps after its download, run in ``work``, stopping
+    at the first that fails."""
+    done = subprocess.CompletedProcess[str]([], 0, "", "")
+    for name in (
+        "Check out the cards repository",
+        "Lay the indexed files over the clone",
+        "Commit and push what changed",
+    ):
+        done = subprocess.run(
+            ["bash", "-e", "-o", "pipefail", "-c", _workflow_step("push", name)],
+            cwd=work,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        if done.returncode != 0:
+            break
+    return done
+
+
+def test_the_push_replaces_the_water_tree_and_survives_another_archives_push(
+    tmp_path: Path,
+) -> None:
+    """The push job lays the index job's tree over a fresh clone of the cards
+    repository, so a row the walk pruned goes, after dropping any .git entry
+    the hand-over carries: a hook there would run with the token. The
+    electricity and gas archives push to the same main, and one can land
+    between the clone and the push: the step rebases and lands rather than
+    fail the run, and leaves the token on no disk."""
+    origin = _cards_origin(
+        tmp_path,
+        {
+            "water/cards/vivaqua/default/2023-09.json": "{}\n",
+            "water/cards/vivaqua/default/2026-09.json": "{}\n",
+        },
+    )
     other = tmp_path / "electricity"
-    git("clone", "-q", "--depth=1", f"file://{origin}", str(other), cwd=tmp_path)
+    _git("clone", "-q", "--depth=1", f"file://{origin}", str(other), cwd=tmp_path)
     (other / "electricity").mkdir()
     (other / "electricity" / "row.json").write_text("{}\n")
-    git("add", "-A", cwd=other)
-    git("commit", "-q", "-m", "Cards seen", cwd=other)
+    _git("add", "-A", cwd=other)
+    _git("commit", "-q", "-m", "Cards seen", cwd=other)
 
     work = tmp_path / "work"
-    (work / "tmp" / "listings" / "water" / "coverage").mkdir(parents=True)
-    (work / "tmp" / "listings" / "README.md").write_text("# Price cards\n")
-    (work / "tmp" / "listings" / "water" / "README.md").write_text("# Water cards\n")
-    (work / "tmp" / "listings" / "water" / "coverage.md").write_text("# Coverage\n")
-    (work / "tmp" / "listings" / "water" / "coverage" / "farys.md").write_text("# Farys\n")
+    indexed = work / "tmp" / "indexed"
+    (indexed / "water" / "cards" / "vivaqua" / "default").mkdir(parents=True)
+    (indexed / "README.md").write_text("# Price cards\n")
+    (indexed / "water" / "cards" / "vivaqua" / "default" / "2026-09.json").write_text("{}\n")
+    (indexed / "water" / "cards" / "vivaqua" / "default" / "2026-10.json").write_text('{"a": 1}\n')
+    ran = tmp_path / "hook-ran"
+    (indexed / "water" / ".git" / "hooks").mkdir(parents=True)
+    (indexed / "water" / ".git" / "hooks" / "pre-commit").write_text(f"#!/bin/sh\ntouch {ran}\n")
+    (indexed / "water" / ".git" / "hooks" / "pre-commit").chmod(0o755)
 
     stubs = tmp_path / "bin"
     stubs.mkdir()
@@ -1076,29 +1137,124 @@ def test_the_listings_push_survives_another_archives_push(tmp_path: Path) -> Non
     )
     for stub in stubs.iterdir():
         stub.chmod(0o755)
+    env = _cards_env(origin, "t0ken")
+    env["PATH"] = f"{stubs}:{env['PATH']}"
 
-    script = _workflow_step("push", "Publish the listings in the cards repository")
-    token = "t0ken"
-    env = {
-        **os.environ,
-        "PATH": f"{stubs}:{os.environ['PATH']}",
-        "GH_TOKEN": token,
-        "CARDS_REPO": "renaudallard/be_price_cards",
-        # The step's GitHub URL is the local origin here.
-        "GIT_CONFIG_COUNT": "1",
-        "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
-        "GIT_CONFIG_VALUE_0": "https://github.com/renaudallard/be_price_cards.git",
-    }
+    done = _push_job(work, env)
+    assert done.returncode == 0, done.stderr
+    assert not ran.exists()
+    assert "t0ken" not in (work / "tmp" / "cards" / ".git" / "config").read_text()
+    log = _git("log", "--format=%s", "main", cwd=origin).splitlines()
+    assert log[:2] == ["Water cards seen on 2026-10-01", "Cards seen"]
+    assert _git("show", "main:electricity/row.json", cwd=origin) == "{}\n"
+    assert _git("ls-tree", "-r", "--name-only", "main", "water", cwd=origin).split() == [
+        "water/cards/vivaqua/default/2026-09.json",
+        "water/cards/vivaqua/default/2026-10.json",
+    ]
+
+
+def test_the_push_fails_without_the_cards_token(tmp_path: Path) -> None:
+    """The rows reach the archive only with the cards token: a run without
+    it must fail, so the report job files it, rather than end green with
+    nothing pushed."""
+    origin = _cards_origin(tmp_path, {})
+    work = tmp_path / "work"
+    (work / "tmp" / "indexed" / "water").mkdir(parents=True)
+    (work / "tmp" / "indexed" / "README.md").write_text("# Price cards\n")
+    (work / "tmp" / "indexed" / "water" / "coverage.md").write_text("# Coverage\n")
+    done = _push_job(work, _cards_env(origin, ""))
+    assert done.returncode != 0
+    assert "BE_WATER_CARDS is not set" in done.stderr
+    assert _git("log", "--format=%s", "main", cwd=origin).splitlines() == ["start"]
+
+
+def test_no_job_of_the_archive_writes_this_repository() -> None:
+    """The workflow's own token can write this repository's main, its tags
+    and its releases, which installations download. The archive lives in the
+    cards repository and is pushed with the cards token, so no job asks for
+    more than read access to this one."""
+    import yaml  # type: ignore[import-untyped]
+
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/archive_cards.yml").read_text()
+    )
+    assert workflow["permissions"] == {"contents": "read"}
+    for name, job in workflow["jobs"].items():
+        assert job.get("permissions", {}).get("contents", "read") == "read", name
+
+
+def _walk_checkout(tmp_path: Path, cards: dict[str, str]) -> Path:
+    """Run the walk's "Check out the cards repository" step in a scratch
+    checkout of this repository whose old archive branch holds two rows, a
+    text, the manifest and a sheet, against a cards repository holding
+    ``cards``; return the checkout."""
+    branch = tmp_path / "branch"
+    for rel in (
+        "vivaqua/default/2026-09.json",
+        "pidpa/geel/2026-08.json",
+        "texts/abc.txt",
+        "pdfs.json",
+        "parser.txt",
+        "coverage.md",
+        "coverage/pidpa.md",
+        "README.md",
+    ):
+        (branch / rel).parent.mkdir(parents=True, exist_ok=True)
+        (branch / rel).write_text(f"{rel}\n")
+    _git("init", "-q", "-b", "archive", cwd=branch)
+    _git("add", "-A", cwd=branch)
+    _git("commit", "-q", "-m", "Cards seen", cwd=branch)
+    work = tmp_path / "work"
+    work.mkdir()
+    _git("init", "-q", "-b", "main", cwd=work)
+    _git("remote", "add", "origin", f"file://{branch}", cwd=work)
+    origin = _cards_origin(tmp_path, cards)
     done = subprocess.run(
-        ["bash", "-e", "-c", script], cwd=work, env=env, capture_output=True, text=True
+        [
+            "bash",
+            "-e",
+            "-o",
+            "pipefail",
+            "-c",
+            _workflow_step("walk", "Check out the cards repository"),
+        ],
+        cwd=work,
+        env=_cards_env(origin, ""),
+        capture_output=True,
+        text=True,
     )
     assert done.returncode == 0, done.stderr
-    # The job goes on after this step; the token must not stay on disk.
-    assert token not in (work / "tmp" / "cards" / ".git" / "config").read_text()
-    log = git("log", "--format=%s", "main", cwd=origin).splitlines()
-    assert log[:2] == ["Water listings of 2026-10-01", "Cards seen"]
-    assert git("show", "main:electricity/row.json", cwd=origin) == "{}\n"
-    assert git("show", "main:water/coverage/farys.md", cwd=origin) == "# Farys\n"
+    return work / "tmp" / "cards" / "water"
+
+
+def test_the_first_walk_takes_the_archive_branch_over(tmp_path: Path) -> None:
+    """With no water rows in the cards repository yet, the walk starts from
+    the old archive branch's tree, its rows moved under cards/, rather than
+    from nothing: a replay, the prune and the sheets all read what is held."""
+    water = _walk_checkout(tmp_path, {"water/README.md": "# Water cards\n"})
+    held = sorted(p.relative_to(water).as_posix() for p in water.rglob("*") if p.is_file())
+    assert held == [
+        "README.md",
+        "cards/pidpa/geel/2026-08.json",
+        "cards/vivaqua/default/2026-09.json",
+        "coverage.md",
+        "coverage/pidpa.md",
+        "parser.txt",
+        "pdfs.json",
+        "texts/abc.txt",
+    ]
+    assert ac._rows(water) == [
+        water / "cards/pidpa/geel/2026-08.json",
+        water / "cards/vivaqua/default/2026-09.json",
+    ]
+
+
+def test_a_walk_with_rows_in_the_cards_repository_leaves_the_branch_alone(
+    tmp_path: Path,
+) -> None:
+    water = _walk_checkout(tmp_path, {"water/cards/swde/default/2026-10.json": "{}\n"})
+    held = sorted(p.relative_to(water).as_posix() for p in water.rglob("*") if p.is_file())
+    assert held == ["cards/swde/default/2026-10.json"]
 
 
 def _keep_step(
@@ -1259,67 +1415,6 @@ def test_only_the_cards_the_walk_names_are_uploaded(tmp_path: Path) -> None:
     assert manifest == {digest: f"water-2026-10/{digest}.pdf"}
 
 
-def test_the_branch_takes_the_indexed_tree_as_plain_files(tmp_path: Path) -> None:
-    """The push job replaces the branch with the index job's tree, so a row
-    the walk pruned goes, and drops any .git entry the hand-over carries
-    before laying it over the clone: a hook there would run with the token."""
-    import os
-
-    def git(*args: str, cwd: Path) -> str:
-        return subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
-            cwd=cwd,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-
-    origin = tmp_path / "origin.git"
-    seed = tmp_path / "seed"
-    (seed / "vivaqua" / "default").mkdir(parents=True)
-    git("init", "-q", "-b", "archive", cwd=seed)
-    (seed / "vivaqua" / "default" / "2023-09.json").write_text("{}\n")
-    (seed / "vivaqua" / "default" / "2026-09.json").write_text("{}\n")
-    git("add", "-A", cwd=seed)
-    git("commit", "-q", "-m", "start", cwd=seed)
-    git("clone", "-q", "--bare", str(seed), str(origin), cwd=tmp_path)
-
-    work = tmp_path / "work"
-    indexed = work / "tmp" / "indexed"
-    (indexed / "vivaqua" / "default").mkdir(parents=True)
-    (indexed / "vivaqua" / "default" / "2026-09.json").write_text("{}\n")
-    (indexed / "vivaqua" / "default" / "2026-10.json").write_text('{"a": 1}\n')
-    ran = tmp_path / "hook-ran"
-    (indexed / ".git" / "hooks").mkdir(parents=True)
-    (indexed / ".git" / "hooks" / "pre-commit").write_text(f"#!/bin/sh\ntouch {ran}\n")
-    (indexed / ".git" / "hooks" / "pre-commit").chmod(0o755)
-    (work / "tmp" / "listings").mkdir(parents=True)
-
-    env = {
-        **os.environ,
-        "GH_TOKEN": "t0ken",
-        "REPO": "renaudallard/homeassistant_be_water_prices",
-        "GIT_CONFIG_COUNT": "1",
-        "GIT_CONFIG_KEY_0": f"url.file://{origin}.insteadOf",
-        "GIT_CONFIG_VALUE_0": "https://github.com/renaudallard/homeassistant_be_water_prices.git",
-    }
-    for name in ("Keep to plain files", "Commit and push what changed"):
-        done = subprocess.run(
-            ["bash", "-e", "-o", "pipefail", "-c", _workflow_step("push", name)],
-            cwd=work,
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        assert done.returncode == 0, done.stderr
-    assert not ran.exists()
-    assert git("ls-tree", "-r", "--name-only", "archive", cwd=origin).split() == [
-        "vivaqua/default/2026-09.json",
-        "vivaqua/default/2026-10.json",
-    ]
-    assert "t0ken" not in (work / "tmp" / "branch" / ".git" / "config").read_text()
-
-
 PICTURE_URL = "https://acme.test/tarif.jpg"
 JPEG_V1 = b"\xff\xd8\xff card v1"
 
@@ -1465,8 +1560,8 @@ def test_the_coverage_table_links_a_picture_as_a_picture(tmp_path: Path) -> None
     out = tmp_path / "out"
     digest = "d" * 64
     row = {"_seen_on": "2026-09-12", "_sources": [{"picture": digest, "text": "texts/x.txt"}]}
-    (out / "aiec" / "default").mkdir(parents=True)
-    (out / "aiec" / "default" / "2026-09.json").write_text(json.dumps(row))
+    (out / "cards" / "aiec" / "default").mkdir(parents=True)
+    (out / "cards" / "aiec" / "default" / "2026-09.json").write_text(json.dumps(row))
     ac._write_coverage(out, "https://cards.test", "https://branch.test")
     assert "| card " not in (out / "coverage" / "aiec.md").read_text()
     assert "| picture [json]" in (out / "coverage" / "aiec.md").read_text()
@@ -1482,8 +1577,8 @@ def test_prune_keeps_a_picture_a_remaining_month_still_names(tmp_path: Path) -> 
     (out / "texts").mkdir(parents=True)
     (out / "texts" / "x.txt").write_text("read")
     row = {"_seen_on": "2026-09-12", "_sources": [{"picture": digest, "text": "texts/x.txt"}]}
-    (out / "aiec" / "default").mkdir(parents=True)
-    (out / "aiec" / "default" / "2026-09.json").write_text(json.dumps(row))
+    (out / "cards" / "aiec" / "default").mkdir(parents=True)
+    (out / "cards" / "aiec" / "default" / "2026-09.json").write_text(json.dumps(row))
     (out / "pdfs.json").write_text(json.dumps({digest: f"water-2024-01/{digest}.jpg"}))
     ac._prune(out, 12, date(2026, 9, 12))
     assert json.loads((out / "pdfs.json").read_text()) == {digest: f"water-2024-01/{digest}.jpg"}

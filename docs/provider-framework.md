@@ -246,7 +246,7 @@ The module is a vendored subset of the electricity integration's reader.
 ### `_archive.py`: the card archive
 
 `archived_row(session, utility, commune, month)` reads one row of the
-archive branch (see [data-sources.md](data-sources.md#the-card-archive)),
+card archive (see [data-sources.md](data-sources.md#the-card-archive)),
 raising `TransientFetchError` when the archive could not be asked and
 returning None for a month it does not hold or a body that is not a row.
 A body past `MAX_ROW_CHARS` or `MAX_ROW_BRACKETS` is not parsed at all,

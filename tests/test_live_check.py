@@ -395,7 +395,7 @@ def test_validate_refuses_a_brussels_card_without_the_intervention() -> None:
 async def test_a_pdf_the_archive_holds_is_not_rendered_again(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """With a checkout of the archive branch, a downloaded PDF whose bytes a
+    """With a checkout of the card archive, a downloaded PDF whose bytes a
     stored row names is served that row's text instead of being rendered,
     and the report says how many were."""
     import hashlib
@@ -411,7 +411,7 @@ async def test_a_pdf_the_archive_holds_is_not_rendered_again(
     digest = hashlib.sha256(payload).hexdigest()
     (tmp_path / "texts").mkdir()
     (tmp_path / "texts/abc.txt").write_text("stored text")
-    row = tmp_path / "acme/default/2026-09.json"
+    row = tmp_path / "cards/acme/default/2026-09.json"
     row.parent.mkdir(parents=True)
     row.write_text(
         json.dumps(

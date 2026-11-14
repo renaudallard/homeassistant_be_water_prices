@@ -30,7 +30,7 @@ card only as a picture: ``Prix.htm`` embeds a JPEG whose name carries
 the day the card took effect (``Tarif-2026-04-1-<cms hash>.jpg``).
 
 The picture is read by the project's card archiver, with Tesseract, and
-the text it read is kept on the archive branch beside the row it made
+the text it read is kept in the card archive beside the row it made
 (``scripts/archive_cards.py``). Nothing in Home Assistant decodes a
 picture: an installation reads that text back and finds the tariff in it
 itself, with :func:`._card_figures.read_figures`. That check takes the

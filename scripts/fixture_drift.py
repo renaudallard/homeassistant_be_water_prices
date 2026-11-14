@@ -547,7 +547,7 @@ def main() -> int:
         type=Path,
         default=None,
         metavar="DIR",
-        help="a checkout of the archive branch; PDFs it already holds are not rendered again",
+        help="the card archive, water/ of a cards repository clone; PDFs it already holds are not rendered again",
     )
     args = parser.parse_args()
     results, rc, cache = asyncio.run(_run(args.texts))

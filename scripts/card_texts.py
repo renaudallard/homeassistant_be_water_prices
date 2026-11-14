@@ -1,6 +1,6 @@
-"""The archive branch's texts as a render cache.
+"""The card archive's texts as a render cache.
 
-A card's bytes hash to a digest, and every row on the archive branch names,
+A card's bytes hash to a digest, and every row of the card archive names,
 per reader variant, the text that digest rendered to. Installed as the
 readers' render hook (``providers/_pdf.render_through``), a downloaded card
 whose bytes are already known is served that text instead of being rendered
@@ -9,7 +9,7 @@ measuring timing, bytes, status codes and freshness; only the render, which
 is the cost, is skipped when nothing changed.
 
 Shared by the card archiver, which also keeps bytes it has not seen, and the
-live check, which reads the branch and renders only what is new. Imports
+live check, which reads the archive and renders only what is new. Imports
 nothing from the integration so either script can use it as is.
 
 A card published as a picture is read the same way, with Tesseract instead
@@ -136,18 +136,19 @@ def readers_line() -> str:
 
 
 class StoredTexts:
-    """What the branch already knows about card bytes."""
+    """What the archive already knows about card bytes."""
 
     def __init__(self, archive: Path, *, serve: bool = True) -> None:
         self.archive = archive
         # False when every card must be rendered afresh (--rerender).
         self.serve = serve
-        # (variant, digest) -> text path on the branch, from every stored row
+        # (variant, digest) -> text path in the archive, from every stored row
         # whose text the installed reader and render code made.
         self.texts: dict[tuple[str, str], str] = {}
         readers = readers_line()
         ocr = ocr_line()
-        for row in archive.glob("*/*/????-??.json"):
+        # The rows sit under cards/, as scripts/archive_cards.py writes them.
+        for row in archive.glob("cards/*/*/????-??.json"):
             try:
                 sources = json.loads(row.read_text(encoding="utf-8")).get("_sources", [])
             except ValueError:

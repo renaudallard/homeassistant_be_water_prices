@@ -12,7 +12,7 @@ water it has drawn this year.
 ```
 utility page / PDF ──> providers/<utility>.py ──> WaterTariff
                                                      │
-card archive (archive branch) ─── on failure ────────┤
+card archive (be_price_cards) ─── on failure ────────┤
 last good card (Store) ────────── on failure ────────┤
                                                      v
 water meter, recorder, Energy dashboard ──> WaterCoordinator ──> CoordinatorData

@@ -25,8 +25,9 @@
 
 """Reading the project's card archive.
 
-The ``archive`` branch holds one row per utility, commune and month, and
-the texts each row was parsed from (see ``scripts/archive_cards.py``). The
+The card archive holds one row per utility, commune and month under
+``cards/``, and the texts each row was parsed from under ``texts/`` (see
+``scripts/archive_cards.py``). The
 coordinator reads a row when a refresh fails with nothing to serve; an
 extractor whose card is a picture reads the text the archive's OCR made of
 it, since nothing in Home Assistant decodes a picture.
@@ -57,14 +58,14 @@ from .base import ExtractorError, TransientFetchError
 # How many months back a read looks for a stored row, newest first and
 # stopping at the first one it finds. The daily run files a row a month,
 # so this month and the one before it cover an outage. The rest is for the
-# utility the runner cannot reach, whose rows reach the branch only when
+# utility the runner cannot reach, whose rows reach the archive only when
 # someone runs the archiver from a residential address, and for a month
 # the archiver spent locked out of a publication. A water tariff is
 # annual, so the oldest card this can reach is last year's, the card every
 # extractor already stands on in January, and the staleness clock still
 # runs from the day it was captured.
 ARCHIVE_MONTHS_BACK = 12
-# What a row may be before it is parsed. Of the 3,135 rows on the branch
+# What a row may be before it is parsed. Of the 3,135 rows in the archive
 # on 2 November 2026 the largest is 1,410 characters, nested three deep
 # with seven brackets and braces in all, strings included. Anything far
 # past either is not a row, and is refused before json.loads sees it: a
@@ -99,7 +100,7 @@ async def archived_row(
     Raises :class:`TransientFetchError` when the archive could not be
     asked (a network failure, a 5xx, a rate limit): that says nothing
     about whether the month is held."""
-    url = f"{CARD_ARCHIVE_URL}/{utility}/{quote(commune, safe='')}/{month:%Y-%m}.json"
+    url = f"{CARD_ARCHIVE_URL}/cards/{utility}/{quote(commune, safe='')}/{month:%Y-%m}.json"
     try:
         body = await fetch_text(session, url)
     except TransientFetchError:

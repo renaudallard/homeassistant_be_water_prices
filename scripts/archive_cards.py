@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Store today's tariff cards in the repository's card archive.
+"""Store today's tariff cards in the project's card archive.
 
 Walks every registered utility, fetches the tariff the integration would
 price on right now, once for the utility's default and once for each
 commune a per-commune utility lists, and writes what it parsed to
-``<out>/<utility>/<commune>/<YYYY-MM>.json`` (``default`` for the
+``<out>/cards/<utility>/<commune>/<YYYY-MM>.json`` (``default`` for the
 no-commune fetch). A water tariff is annual, so a card is filed under the
 month it was seen in. Every text the parse read is kept under
 ``<out>/texts/<sha256>.txt``, stored once however many rows read it, and a
@@ -12,14 +12,15 @@ month whose card is the same as the previous month's points at the texts
 that row already holds instead of storing the page again, so a year of an
 unchanged tariff costs one copy of its page rather than twelve.
 
-Run daily by .github/workflows/archive_cards.yml against the ``archive``
-branch. A month already on disk is rewritten only when the parse changed,
+Run daily by .github/workflows/archive_cards.yml against the ``water/``
+directory of the cards repository (``be_price_cards``), which it shares
+with the electricity and gas integrations. A month already on disk is rewritten only when the parse changed,
 so a quiet day leaves nothing to commit, and months older than
 ``--keep-months`` are removed on every run, with the texts nothing refers
 to any more.
 
 The cards themselves are kept too. With ``--pdfs DIR`` every PDF whose
-bytes the branch has not recorded yet is written to
+bytes the archive has not recorded yet is written to
 ``DIR/water-<YYYY-MM>/<sha256>.pdf``, a card picture to
 ``DIR/water-<YYYY-MM>/<sha256>.jpg`` (or ``.png``), and the workflow uploads each
 directory as the assets of the release of that name in the cards
@@ -27,7 +28,7 @@ repository shared with the electricity and gas integrations. Where each
 one landed is recorded in ``<out>/pdfs.json``; a row's ``_sources`` entry
 names its PDF or its picture by digest alone. The same digest keeps a daily
 run cheap: a card whose bytes have not changed is served the text the
-branch already holds for it instead of being rendered again.
+archive already holds for it instead of being rendered again.
 
 A card published as a picture (AIEC's) is read with Tesseract when it is
 installed, and its source is marked ``"ocr"`` with the engine that read
@@ -39,10 +40,10 @@ installation would.
 
 A parser fix reaches the stored months on its own. Every row carries the
 texts its parse read, so the run replays each row through the current
-extractor with those texts served from the branch, the clock pinned to
+extractor with those texts served from the archive, the clock pinned to
 the day the row was captured and no utility contacted, and rewrites the
 row when the parse came out differently. That happens only when the
-parser sources or the PDF reader changed since the branch was last
+parser sources or the PDF reader changed since the archive was last
 replayed (a digest of them is stamped in ``parser.txt``); ``--reparse``
 forces it. A parser that now reads a PDF the row has no text for gets the
 kept PDF back from the cards releases. Each PDF source names the reader
@@ -63,10 +64,10 @@ which is what the daily run asks for on six days of the week; the
 communes are walked on Sundays and on request.
 
 Usage:
-    python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa ...]
+    python scripts/archive_cards.py --out tmp/cards/water --pdfs tmp/pdfs [--only pidpa ...]
         [--defaults-only] [--reparse] [--rerender] [--ocr-failures FILE]
         [--pdf-base-url https://github.com/<owner>/<cards repo>/releases/download]
-        [--archive-base-url https://github.com/<owner>/<this repo>/blob/archive]
+        [--archive-base-url https://github.com/<owner>/<cards repo>/blob/main/water]
 """
 
 from __future__ import annotations
@@ -143,17 +144,21 @@ _OCR = "ocr"
 # Keys the daily run rewrites; two files that differ only here hold the
 # same card and the older one is kept.
 _VOLATILE_KEYS = ("_seen_on",)
-# The digest of the parser sources the branch was last replayed with.
+# The digest of the parser sources the archive was last replayed with.
 _PARSER_STAMP = "parser.txt"
 _MANIFEST = "pdfs.json"
+# Where the rows sit under the archive, as the electricity and gas archives
+# keep theirs, so the sheets and the manifest keep the top readable.
+_ROWS = "cards"
 # The running month and the thirty-six before it, the same retention the
 # electricity and gas namespaces keep, so all three hold the same span.
 _KEEP_MONTHS = 36
 # This integration's namespace in the cards repository, which it shares
 # with the electricity and gas integrations: its releases are
-# water-<YYYY-MM>, its listings live under water/ in that repository's tree.
+# water-<YYYY-MM>, and everything else the archive keeps lives under water/
+# in that repository's tree.
 _RELEASE_PREFIX = "water"
-# One sheet per utility of which months the branch holds, for the reader
+# One sheet per utility of which months the archive holds, for the reader
 # who wants to know whether a given month of a given commune is covered
 # without listing directories, each month linking to what it was parsed
 # from (a release lists PDFs by digest only) and to the JSON it produced;
@@ -165,32 +170,32 @@ _LEGEND = (
     "Each month links to what its tariff was parsed from and to what came out of it:",
     "`pdf` or `picture` is the card itself, in the cards repository's releases, `page`",
     "the text of the page as it was read, and `json` the tariff as the integration",
-    "parsed it, both on this branch. A blank cell is a month the branch does not hold.",
+    "parsed it, both in this archive. A blank cell is a month it does not hold.",
 )
 # What a parse depends on: the extractors, the shared readers beside them
 # and the constants they key on.
 _PARSER_SOURCES = ("providers/*.py", "const.py")
 
-_README = """# Tariff card archive
+_README = """# Water cards
 
-Written daily by `.github/workflows/archive_cards.yml` running
-`scripts/archive_cards.py` from the main branch. Not edited by hand.
+What homeassistant_be_water_prices read from each utility's tariff card,
+written daily by its `archive_cards.yml` workflow running
+`scripts/archive_cards.py`. Not edited by hand.
 
-- `<utility>/<commune>/<YYYY-MM>.json`: the tariff as the integration
+- `cards/<utility>/<commune>/<YYYY-MM>.json`: the tariff as the integration
   parsed it in that month, for the utility's no-commune fetch (`default`)
   or for one commune of a per-commune utility, named by the commune id the
   integration uses (`_commune_label` in the file says which commune that
-  is).
+  is). This is what an installation reads for a month its utility does
+  not serve.
 - `texts/<sha256>.txt`: every page, rendered PDF and picture read by OCR
   that a parse read, stored once and shared between the rows that read
   it. Each row lists its own under `_sources`, and names a PDF or a
   picture it read by SHA-256; a picture's source is marked `ocr`.
 - `pdfs.json`: where each PDF or picture is kept, as
   `<release tag>/<sha256>.pdf` (`.jpg`, `.png`) in
-  the releases of the cards repository (`be_price_cards`, shared with the
-  electricity and gas integrations; this integration's releases are
-  `water-<YYYY-MM>`).
-- `coverage.md` and `coverage/<utility>.md`: which months the branch
+  the `water-<YYYY-MM>` releases of this repository.
+- `coverage.md` and `coverage/<utility>.md`: which months the archive
   holds for each utility and commune, each linking to the PDF or the page
   it was parsed from and to the JSON above; one sheet per utility, the
   index naming them.
@@ -199,7 +204,9 @@ To get the original card of a utility, commune and month: open
 `coverage.md`, open the utility's sheet, find the row, click `pdf`,
 `picture` or `page`; `json` is what the integration parsed out of it.
 Months more than thirty-six before the running one are removed; a PDF or a
-picture stays as long as a remaining month names it.
+picture stays as long as a remaining month names it. Until November 2026
+the archive was the `archive` branch of homeassistant_be_water_prices,
+which older installations still read.
 """
 
 
@@ -272,9 +279,9 @@ class _Cards(StoredTexts):
     """What the run knows about card bytes, plus where they are kept.
 
     The render cache is the shared one (``card_texts.StoredTexts``): a
-    downloaded card whose bytes the branch has already seen is served the
+    downloaded card whose bytes the archive has already seen is served the
     stored text instead of being rendered again. On top of it, ``pdfs.json``
-    says which digests are already uploaded, and bytes the branch has not
+    says which digests are already uploaded, and bytes the archive has not
     recorded yet are held until a row names them and then written under
     ``pdf_dir`` in the directory of the month, for the workflow to upload
     to the release of that month.
@@ -474,13 +481,13 @@ def _parser_digest() -> str:
 
 
 def rerender_due(out: Path) -> bool:
-    """Whether the next run replays the branch and renders kept PDFs afresh
+    """Whether the next run replays the archive and renders kept PDFs afresh
     in it, their texts made by another pdfplumber or other render code than
     the installed ones; the workflow sizes the walk's budget on the same
     answer. Only until the replay has run under these readers: a row it could
     not replay keeps its old texts, and must not hold every later run on the
     long budget. A card picture does not count, as in the energy archives.
-    A branch never stamped is only stamped."""
+    An archive never stamped is only stamped."""
     stamp = out / _PARSER_STAMP
     if not stamp.exists() or stamp.read_text(encoding="utf-8").strip() == _parser_digest():
         return False
@@ -592,7 +599,8 @@ def _read_row(path: Path) -> dict[str, Any] | None:
 
 def _previous_row(out: Path, utility: str, commune: str, month_id: str) -> dict[str, Any] | None:
     """The row of the latest month before ``month_id``, if any."""
-    earlier = sorted(p for p in (out / utility / commune).glob("????-??.json") if p.stem < month_id)
+    folder = out / _ROWS / utility / commune
+    earlier = sorted(p for p in folder.glob("????-??.json") if p.stem < month_id)
     return _read_row(earlier[-1]) if earlier else None
 
 
@@ -629,7 +637,7 @@ def _write_card(
 ) -> bool:
     """Write the row's month file; True when the file changed.
 
-    The tariff is laid out one key per line so a day's diff on the branch
+    The tariff is laid out one key per line so a day's diff in the archive
     is readable, with the row's own keys beside it: the commune it was
     fetched for, the day it was seen and what it read. The texts are stored
     only when the row is: a month whose card is the same as the previous
@@ -640,7 +648,7 @@ def _write_card(
     card.update(meta)
     card["_seen_on"] = seen_on.isoformat()
     card["_sources"] = [s.entry("") for s in sources]
-    path = out / utility / commune / f"{month_id}.json"
+    path = out / _ROWS / utility / commune / f"{month_id}.json"
     if _same_card(_read_row(path), card):
         return False
     reuse: dict[tuple[str, str], str] = {}
@@ -663,7 +671,7 @@ def _write_card(
 
 
 def _rows(out: Path) -> list[Path]:
-    return sorted(out.glob("*/*/????-??.json"))
+    return sorted(out.glob(f"{_ROWS}/*/*/????-??.json"))
 
 
 def _prune(out: Path, keep_months: int, today: date) -> int:
@@ -754,7 +762,7 @@ def _pdf_link(digest: str, kept: dict[str, str], pdf_base_url: str | None) -> st
 
 
 def _link(label: str, base: str | None, rel: str) -> str:
-    """A link into the branch, or the bare label with nowhere to link to."""
+    """A link into the archive, or the bare label with nowhere to link to."""
     return f"[{label}]({base}/{rel})" if base else label
 
 
@@ -794,7 +802,7 @@ def _write_coverage(
     under ``coverage/`` and an index naming them.
 
     Deterministic in their order, so a day that changed nothing rewrites
-    them to the same bytes and the branch gets no commit for it. A sheet
+    them to the same bytes and the archive gets no commit for it. A sheet
     whose utility has no rows any more is removed.
     """
     held, kept = _kept_rows(out)
@@ -804,7 +812,7 @@ def _write_coverage(
         "# Coverage",
         "",
         "One sheet per utility, each a table with a row per commune (`default` is the",
-        "no-commune fetch) and a column per month the branch holds.",
+        "no-commune fetch) and a column per month the archive holds.",
         *_LEGEND,
         "",
     ]
@@ -815,7 +823,7 @@ def _write_coverage(
             f"# {utility}",
             "",
             "One row per commune (`default` is the no-commune fetch), one column per month",
-            "the branch holds.",
+            "the archive holds.",
             *_LEGEND,
             "",
             "| commune | label | " + " | ".join(months) + " |",
@@ -842,7 +850,7 @@ def _write_coverage(
 def _write_listings(
     out: Path, pdf_base_url: str | None = None, archive_base_url: str | None = None
 ) -> None:
-    """The coverage sheets and the branch README, rewritten when out of date.
+    """The coverage sheets and the archive's README, rewritten when out of date.
     The index of PDFs by release that earlier versions wrote is removed, the
     coverage sheets having taken it over."""
     _write_coverage(out, pdf_base_url, archive_base_url)
@@ -974,7 +982,7 @@ async def _replay_row(
 
     A PDF text other readers or render code made is not seeded, nor any
     under ``rerender``, so the card is fetched back from the kept copy and
-    rendered afresh; the pages still come from the branch, since there is
+    rendered afresh; the pages still come from the archive, since there is
     nothing to re-render there.
     """
     out = cards.out
@@ -1147,7 +1155,9 @@ async def archive(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--out", type=Path, required=True, help="archive checkout")
+    parser.add_argument(
+        "--out", type=Path, required=True, help="the archive, water/ of a cards repository clone"
+    )
     parser.add_argument("--only", action="append", default=[], help="restrict to a utility id")
     parser.add_argument("--keep-months", type=int, default=_KEEP_MONTHS)
     parser.add_argument(
@@ -1155,7 +1165,7 @@ def main() -> int:
         type=Path,
         default=None,
         metavar="DIR",
-        help="write every PDF the branch has not recorded yet under DIR",
+        help="write every PDF the archive has not recorded yet under DIR",
     )
     parser.add_argument(
         "--pdf-base-url",
@@ -1167,7 +1177,7 @@ def main() -> int:
         "--archive-base-url",
         default=None,
         metavar="URL",
-        help="where the branch is browsed, for the listing's links to rows and pages",
+        help="where the archive is browsed, for the listing's links to rows and pages",
     )
     parser.add_argument(
         "--defaults-only",

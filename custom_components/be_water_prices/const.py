@@ -71,15 +71,16 @@ FETCH_BUDGET_S = 180
 BACKFILL_YIELD_EVERY = 744
 
 # The project's own daily capture of every utility's card, one JSON per
-# utility, commune and month on the archive branch (scripts/archive_cards.py
-# writes it). Read when a refresh fails with nothing to serve, a restart
-# while the utility is down, and again once what is held has gone stale or
+# utility, commune and month under cards/ in the water/ directory of the
+# be_price_cards repository, beside the texts each was parsed from
+# (scripts/archive_cards.py writes it). Until November 2026 it was this
+# repository's archive branch, which stopped updating then. Read when a
+# refresh fails with nothing to serve, a restart while the utility is
+# down, and again once what is held has gone stale or
 # is last year's card, so the entry loads on the last card the archive saw
 # instead of retrying setup until the utility is back, and keeps up with the
 # archive while it stays away.
-CARD_ARCHIVE_URL = (
-    "https://raw.githubusercontent.com/renaudallard/homeassistant_be_water_prices/archive"
-)
+CARD_ARCHIVE_URL = "https://raw.githubusercontent.com/renaudallard/be_price_cards/main/water"
 
 # Treat the snapshot as stale once it has not been refreshed for this many days
 # OR the parsed valid_until is in the past, last year's card counting as valid

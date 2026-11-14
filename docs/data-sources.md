@@ -20,12 +20,20 @@ PDF and HTML machinery is in [provider-framework.md](provider-framework.md).
 
 ## The card archive
 
-The `archive` branch of this repository holds every utility's parsed card,
-one JSON file per utility, commune and month:
+The `water/` directory of
+[be_price_cards](https://github.com/renaudallard/be_price_cards), the
+repository the electricity and gas integrations keep their archives in
+too, holds every utility's parsed card, one JSON file per utility, commune
+and month:
 
 ```
-<utility>/<commune>/<YYYY-MM>.json
+cards/<utility>/<commune>/<YYYY-MM>.json
 ```
+
+Until November 2026 the archive was this repository's `archive` branch,
+with the rows at its root. The branch stopped updating when the archive
+moved and is left as it was for the installations that still read it; the
+first run in the cards repository took its tree over.
 
 `<utility>` is the extractor id and `<commune>` the id the integration
 passes to `fetch_for_commune` (Pidpa's slug, Farys's numeric id, De
@@ -61,18 +69,17 @@ reports is in [ci-and-testing.md](ci-and-testing.md). Water-link's CDN
 refuses GitHub's runners, so its rows are stored by running the script
 from a residential address.
 
-With `--pdfs DIR` each PDF or picture whose bytes the branch has not
+With `--pdfs DIR` each PDF or picture whose bytes the archive has not
 recorded is written to `DIR/water-<YYYY-MM>/<sha256>.pdf` (`.jpg`, `.png`)
 and the workflow uploads it to the release of that name in
-[be_price_cards](https://github.com/renaudallard/be_price_cards), the
-repository the electricity and gas integrations share. The integration
+be_price_cards. The integration
 never reads those releases; only the archiver's replay fetches a kept card
 back.
 
-The integration reads the branch through `CARD_ARCHIVE_URL`
-(`raw.githubusercontent.com`, the `archive` branch) from
+The integration reads the archive through `CARD_ARCHIVE_URL`
+(`raw.githubusercontent.com`, `be_price_cards/main/water`) from
 `providers/_archive.py`: `archived_row` asks for
-`<utility>/<commune>/<YYYY-MM>.json`, the commune percent-encoded, with the
+`cards/<utility>/<commune>/<YYYY-MM>.json`, the commune percent-encoded, with the
 usual User-Agent and nothing else. A transient failure is raised; any
 other HTTP error (a missing month is a 404), a body that is not JSON or a
 JSON value that is not an object reads as no row, and so does a body past

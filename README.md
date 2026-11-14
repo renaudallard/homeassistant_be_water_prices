@@ -781,8 +781,9 @@ counting from that fetch, rather than retrying setup until the site is
 back. A card fetched for another utility or commune is not used. An
 entry with no card kept, a fresh install or one moved to another
 utility or commune since, asks the project's card archive instead (the
-[`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
-branch, one JSON per utility, commune and month; this month's row, then
+[`water/`](https://github.com/renaudallard/be_price_cards/tree/main/water)
+directory of the be_price_cards repository, one JSON per utility, commune
+and month; this month's row, then
 back a month at a time for up to a year, stopping at the first one that
 holds a card, or as soon as GitHub fails to answer, since a month it
 could not read may still hold one) and loads on the card it captured,

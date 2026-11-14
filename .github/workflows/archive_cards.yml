@@ -24,8 +24,9 @@ on:
         required: false
         type: boolean
 
-# Read only, unless a job says otherwise: the push job writes the archive
-# branch, and the jobs that file issues write those.
+# Read only, unless a job says otherwise: the jobs that file issues write
+# those. No job writes this repository: the archive lives in the cards
+# repository and is pushed there with the cards token alone.
 permissions:
   contents: read
 
@@ -41,9 +42,10 @@ concurrency:
 # the walk the PDF reader and Tesseract on whatever the utilities serve,
 # which could leave a process, a git hook, a git config entry or a
 # GITHUB_ENV line behind for any later step on their runner; neither is
-# given a token. keep, push and token hold one and run only gh, git, jq and
-# the issue script, on what the others hand over as artifacts: plain files,
-# never a .git entry. ocr and report file issues with github.token alone.
+# given a token. keep, push and token hold the cards token and run only gh,
+# git, jq and the issue script, on what the others hand over as artifacts:
+# plain files, never a .git entry. ocr and report file issues with
+# github.token alone.
 jobs:
   walk:
     runs-on: ubuntu-latest
@@ -73,17 +75,32 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-fra
 
-      - name: Check out the archive branch
-        # The archive lives on its own branch so three years of daily
-        # commits stay out of main's history and out of every HACS
-        # download. Checked out as a worktree under tmp/, which main's
-        # .gitignore covers. The first run creates the branch unborn.
+      - name: Check out the cards repository
+        # Everything a card leaves behind lives in be_price_cards under
+        # water/, beside the cards themselves and the electricity and gas
+        # archives: the rows, the texts they were parsed from, the manifest
+        # and the sheets. Cloned shallow under tmp/, which main's .gitignore
+        # covers, and without the token: the repository is public, and this
+        # job runs third-party code.
+        #
+        # Until 2026-11 the archive lived on this repository's archive
+        # branch, which older installations still read and which is left as
+        # it was. A clone with no rows under water/cards yet takes the
+        # branch's tree once, its rows moved under cards/, so the first run
+        # here starts from every month the branch held rather than from none.
+        env:
+          CARDS_REPO: renaudallard/be_price_cards
         run: |
-          if git fetch --depth=1 origin archive; then
-            git worktree add --detach tmp/archive FETCH_HEAD
-            git -C tmp/archive checkout -B archive
-          else
-            git worktree add --orphan -b archive tmp/archive
+          git clone -q --depth=1 "https://github.com/${CARDS_REPO}.git" tmp/cards
+          mkdir -p tmp/cards/water
+          if [ ! -d tmp/cards/water/cards ] && git fetch -q --depth=1 origin archive; then
+            git archive FETCH_HEAD | tar -x -C tmp/cards/water
+            mkdir tmp/cards/water/cards
+            for dir in tmp/cards/water/*/; do
+              case "$(basename "$dir")" in cards|texts|coverage) continue ;; esac
+              mv "$dir" tmp/cards/water/cards/
+            done
+            echo "took the archive branch's rows over"
           fi
 
       - name: Size the walk's budget
@@ -92,7 +109,7 @@ jobs:
         # is rendered afresh, every one after a reader upgrade or a render
         # code change; the script decides from the same records on the rows.
         run: |
-          due=$(python -c 'import sys; sys.path.insert(0, "scripts"); from pathlib import Path; import archive_cards; print(str(archive_cards.rerender_due(Path("tmp/archive"))).lower())')
+          due=$(python -c 'import sys; sys.path.insert(0, "scripts"); from pathlib import Path; import archive_cards; print(str(archive_cards.rerender_due(Path("tmp/cards/water"))).lower())')
           echo "rerender=$due" >> "$GITHUB_OUTPUT"
 
       - name: Store today's cards
@@ -113,7 +130,6 @@ jobs:
           COMMUNES: ${{ github.event.inputs.communes }}
           REPARSE: ${{ github.event.inputs.reparse == 'true' && '--reparse' || '' }}
           RERENDER: ${{ github.event.inputs.rerender == 'true' && '--rerender' || '' }}
-          ARCHIVE_URL: ${{ github.server_url }}/${{ github.repository }}/blob/archive
         run: |
           communes=''
           if [ "$EVENT" = schedule ]; then
@@ -121,10 +137,10 @@ jobs:
           elif [ "$COMMUNES" = false ]; then
             communes='--defaults-only'
           fi
-          python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs \
+          python scripts/archive_cards.py --out tmp/cards/water --pdfs tmp/pdfs \
             --ocr-failures tmp/ocr_failures.txt \
             --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download" \
-            --archive-base-url "$ARCHIVE_URL" \
+            --archive-base-url "https://github.com/${CARDS_REPO}/blob/main/water" \
             $communes $REPARSE $RERENDER
 
       - name: Hand the walk over
@@ -139,8 +155,8 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: walk-archive
-          # The worktree's .git file stays behind with every other hidden one.
-          path: tmp/archive
+          # The clone's .git sits a level up, and any hidden file stays behind.
+          path: tmp/cards/water
           include-hidden-files: false
           if-no-files-found: error
           retention-days: 3
@@ -235,12 +251,12 @@ jobs:
         # the cards were seen in, the files by their SHA-256. Few water
         # utilities publish a PDF or a picture, so a month holds a handful of
         # files, but a card is a card and it belongs with the others rather
-        # than on a git branch. GitHub caps a release at a thousand assets;
+        # than in a git tree. GitHub caps a release at a thousand assets;
         # should a month ever overflow it spills into water-YYYY-MM-2, and
-        # the manifest on the branch says which release holds each file.
+        # the manifest under water/ says which release holds each file.
         # Needs a fine-grained token with contents read and write on that
         # repository in the BE_WATER_CARDS secret; without it the step says
-        # so and the branch still gets the parsed cards and their texts.
+        # so, and the push job, which needs it too, fails the run.
         env:
           GH_TOKEN: ${{ secrets.BE_WATER_CARDS }}
           CARDS_REPO: renaudallard/be_price_cards
@@ -276,7 +292,7 @@ jobs:
           fi
           ensure_release() {
             gh release view "$1" --repo "$CARDS_REPO" >/dev/null 2>&1 && return 0
-            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The tariff cards, PDFs and pictures, seen in $2 that the archive branch of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: search this repository for the file name; the sheets under https://github.com/${CARDS_REPO}/tree/main/water/coverage link every utility, commune and month to its card and to what was parsed out of it."
+            gh release create "$1" --repo "$CARDS_REPO" --title "Water cards $2" --notes "The tariff cards, PDFs and pictures, seen in $2 that the water archive of homeassistant_be_water_prices refers to, each named by its SHA-256. Which card each file is: search this repository for the file name; the sheets under https://github.com/${CARDS_REPO}/tree/main/water/coverage link every utility, commune and month to its card and to what was parsed out of it."
           }
           for dir in tmp/pdfs/water-*/; do
             [ -d "$dir" ] || continue
@@ -329,7 +345,7 @@ jobs:
           done
           # A month more than thirty-six back goes, unless the manifest still
           # points into it: a card is uploaded once, under the month it was
-          # first seen, and every later month on the branch names that copy,
+          # first seen, and every later month in the archive names that copy,
           # so the release lives as long as a row that read the card. The tag
           # is matched whole, so water-YYYY-MM does not cover water-YYYY-MM-2.
           # Only this integration's releases, not the electricity or gas ones,
@@ -362,11 +378,11 @@ jobs:
 
   index:
     # Runs this repository's code again, so no token. It runs whenever the
-    # walk succeeded, even when an upload failed: the branch is what the
-    # integration falls back on, and an expired upload token would
-    # otherwise stop it until someone noticed. A card the manifest does not
-    # name is offered again by the next run, and the sheets list it unlinked
-    # until then.
+    # walk succeeded, even when an upload failed: the rows are what the
+    # integration falls back on, and a failed upload would otherwise hold
+    # them back until someone noticed. A card the manifest does not name is
+    # offered again by the next run, and the sheets list it unlinked until
+    # then.
     needs: [walk, keep]
     if: ${{ !cancelled() && needs.walk.result == 'success' }}
     runs-on: ubuntu-latest
@@ -386,7 +402,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: walk-archive
-          path: tmp/archive
+          path: tmp/cards/water
 
       - name: Take the kept manifest
         # Missing when the keep job stopped before its uploads; the walk's
@@ -395,7 +411,7 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: kept-manifest
-          path: tmp/archive
+          path: tmp/cards/water
 
       - name: Index the kept cards for people
         # The walk wrote the coverage sheets before today's uploads were
@@ -403,20 +419,17 @@ jobs:
         # that exists. No fetch, a second or two.
         env:
           CARDS_REPO: renaudallard/be_price_cards
-          ARCHIVE_URL: ${{ github.server_url }}/${{ github.repository }}/blob/archive
         run: >-
-          python scripts/archive_cards.py --out tmp/archive --index-only
+          python scripts/archive_cards.py --out tmp/cards/water --index-only
           --pdf-base-url "https://github.com/${CARDS_REPO}/releases/download"
-          --archive-base-url "$ARCHIVE_URL"
+          --archive-base-url "https://github.com/${CARDS_REPO}/blob/main/water"
 
-      - name: Write the listings
-        # The sheets that name the cards live beside them, under this
-        # integration's own directory of the shared repository, so a person
-        # on the releases page is one click from the names. The root README
-        # is the same text the electricity and gas workflows write, so none
-        # of the three rewrites another's. The push job sends them.
+      - name: Write the root README
+        # The walk has already written the rows, the texts, the manifest, the
+        # sheets and water/README.md under tmp/cards/water. The root README is
+        # the same text the electricity and gas workflows write, so none of
+        # the three rewrites another's. The push job sends the lot.
         run: |
-          mkdir -p tmp/listings/water
           printf '%s\n' \
             "# Price cards" \
             "" \
@@ -429,104 +442,81 @@ jobs:
             "- \`water/\`: homeassistant_be_water_prices, releases \`water-<YYYY-MM>\`." \
             "" \
             "Nothing here is edited by hand." \
-            > tmp/listings/README.md
-          printf '%s\n' \
-            "# Water cards" \
-            "" \
-            "The tariff cards homeassistant_be_water_prices parsed, kept as the assets of the" \
-            "\`water-<YYYY-MM>\` releases of this repository and named by their SHA-256. Most" \
-            "water utilities publish a page rather than a PDF; the text of every page as it" \
-            "was read is on the archive branch, and the coverage table links to it. AIEC" \
-            "publishes its card as a picture, kept here too; the text Tesseract read off it" \
-            "is on the archive branch beside the row it made." \
-            "" \
-            "- \`coverage.md\`: the index of one sheet per utility under \`coverage/\`; each sheet" \
-            "  lists per commune the months held, each linking to the PDF, the picture or the" \
-            "  page it was parsed from and to the tariff as the integration parsed it." \
-            "" \
-            "The parsed cards themselves are the \`archive\` branch of" \
-            "https://github.com/renaudallard/homeassistant_be_water_prices." \
-            > tmp/listings/water/README.md
-          cp tmp/archive/coverage.md tmp/listings/water/
-          cp -r tmp/archive/coverage tmp/listings/water/
+            > tmp/cards/README.md
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: indexed-archive
-          path: tmp/archive
-          if-no-files-found: error
-          retention-days: 3
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: listings
-          path: tmp/listings
+          name: indexed-cards
+          path: |
+            tmp/cards/README.md
+            tmp/cards/water
           if-no-files-found: error
           retention-days: 3
 
   push:
-    # Holds the cards token and a github.token that writes this repository,
-    # and runs no code of this repository or its dependencies: fresh clones,
-    # the indexed files laid over them as plain files, git. Both tokens
-    # reach git through gh's credential helper, which reads GH_TOKEN, so
-    # neither is on a command line or in a file.
+    # Holds the cards token and runs no code of this repository or its
+    # dependencies: a fresh clone, the indexed files laid over it as plain
+    # files, git. The token reaches git through gh's credential helper,
+    # which reads GH_TOKEN, so it is on no command line and in no file. The
+    # workflow's own token stays read only: nothing here writes this
+    # repository.
     needs: index
     if: ${{ !cancelled() && needs.index.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: write
     steps:
+      - name: Check out the cards repository
+        env:
+          CARDS_REPO: renaudallard/be_price_cards
+        run: git clone -q --depth=1 "https://github.com/${CARDS_REPO}.git" tmp/cards
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: indexed-archive
+          name: indexed-cards
           path: tmp/indexed
 
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: listings
-          path: tmp/listings
-
-      - name: Keep to plain files
+      - name: Lay the indexed files over the clone
         # A .git entry in a hand-over would be a repository, or a hook, in
-        # the clone it is laid over.
-        run: find tmp/indexed tmp/listings -name .git -prune -exec rm -rf {} +
+        # the clone it is laid over, so it goes first. The water tree is
+        # replaced whole, so a row the walk pruned goes, and the root README
+        # is the one the three archives share.
+        run: |
+          find tmp/indexed -name .git -prune -exec rm -rf {} +
+          rm -rf tmp/cards/water
+          cp -R tmp/indexed/water tmp/cards/water
+          cp tmp/indexed/README.md tmp/cards/README.md
 
-      - name: Publish the listings in the cards repository
-        # A commit only when a sheet changed.
+      - name: Commit and push what changed
         env:
           GH_TOKEN: ${{ secrets.BE_WATER_CARDS }}
-          CARDS_REPO: renaudallard/be_price_cards
         run: |
-          [ -n "$GH_TOKEN" ] || exit 0
-          # The repository is public, so the clone needs no token.
-          git clone -q --depth=1 "https://github.com/${CARDS_REPO}.git" tmp/cards
-          mkdir -p tmp/cards/water
-          cp tmp/listings/README.md tmp/cards/README.md
-          cp tmp/listings/water/README.md tmp/listings/water/coverage.md tmp/cards/water/
-          rm -rf tmp/cards/water/coverage tmp/cards/water/pdfs.md
-          cp -r tmp/listings/water/coverage tmp/cards/water/
+          if [ -z "$GH_TOKEN" ]; then
+            echo "BE_WATER_CARDS is not set: the archive cannot be pushed" >&2
+            exit 1
+          fi
           cd tmp/cards
           git add -A
           if git diff --cached --quiet; then
-            echo "listings unchanged"
+            echo "no card changed today"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only the helper's name goes into .git/config; it hands git the
+          # token from GH_TOKEN when the push or the pull asks for one.
           git config credential.helper ''
           git config --add credential.helper '!gh auth git-credential'
-          git commit -q -m "Water listings of $(date -u +%Y-%m-%d)"
+          git commit -q -m "Water cards seen on $(date -u +%Y-%m-%d)"
           # The electricity and gas archives push to the same main, and the
           # concurrency group only queues runs of this repository, so their
-          # daily push can land between this step's clone and its push. The
-          # only path the three trees share is the root README.md, which all
-          # three write with the same text, so a rejected push fetches,
-          # rebases and tries again without a conflict. Should one of the
-          # texts drift, -X theirs (the commit being replayed) keeps this
-          # job's, which lists all three namespaces. A pull that fails, a
-          # network blip or a rebase that stops, is left to the next attempt
-          # rather than ending the step.
+          # daily push can land between this job's clone and this push. The
+          # three trees share one path, the root README.md, which all three
+          # jobs write with the same text, so rebasing onto another job's
+          # commit is conflict-free: a rejected push fetches, rebases and
+          # tries again rather than losing the run. Should one of the texts
+          # drift, -X theirs (the commit being replayed) keeps this job's.
+          # A pull that fails, a network blip or a rebase that stops, is left
+          # to the next attempt rather than ending the step.
           for attempt in 1 2 3 4 5; do
             git push -q origin HEAD:main && exit 0
             [ "$attempt" -lt 5 ] || break
@@ -535,40 +525,6 @@ jobs:
               || git rebase --abort 2>/dev/null || true
           done
           exit 1
-
-      - name: Commit and push what changed
-        # Whatever happened to the cards repository. The branch is what the
-        # integration falls back on, and an expired upload token or a
-        # listings push that lost its races would otherwise stop it until
-        # someone noticed.
-        if: ${{ !cancelled() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          # The repository is public, so the clone needs no token. A branch
-          # that is not there yet is born here, on the first run; a clone
-          # that failed for any other reason leaves a push that cannot be
-          # a fast-forward, and is refused.
-          if ! git clone -q --depth=1 --branch archive "https://github.com/${REPO}.git" tmp/branch; then
-            git init -q -b archive tmp/branch
-            git -C tmp/branch remote add origin "https://github.com/${REPO}.git"
-          fi
-          cd tmp/branch
-          # The index's tree replaces the branch's whole, so a row the walk
-          # pruned goes.
-          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -R ../indexed/. .
-          git add -A
-          if git diff --cached --quiet; then
-            echo "no card changed today"
-            exit 0
-          fi
-          git -c user.name="github-actions[bot]" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -q -m "Cards seen on $(date -u +%Y-%m-%d)"
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
-              push -q origin archive
 
   token:
     # Holds the cards token; runs gh and the issue script only.
@@ -611,8 +567,8 @@ jobs:
             echo
             echo "$left day(s) left. Create a new fine-grained token with contents read and"
             echo "write on the cards repository and store it as the BE_WATER_CARDS secret;"
-            echo "until then the cards of each day are offered again by the next run that"
-            echo "has a working token."
+            echo "until then neither the cards nor the rows of a day reach the archive, and"
+            echo "the next run that has a working token offers them again."
           } > token_body.md
           echo "token expires $expires" > token_fingerprint.txt
           # Its own label: file_ci_issue.sh finds the open issue by label, so
@@ -658,7 +614,7 @@ jobs:
           [ "$WALK" = 'failure' ] && failed='Store today'"'"'s cards (the walk stored nothing, or crashed)'
           [ "$KEEP" = 'failure' ] && failed='Keep the cards themselves (the upload to the cards repository; check the BE_WATER_CARDS token, it expires)'
           [ "$INDEX" = 'failure' ] && failed='Index the kept cards for people (the coverage sheets written after the upload)'
-          [ "$PUSH" = 'failure' ] && failed='Commit and push what changed (the archive branch, or the listings in the cards repository)'
+          [ "$PUSH" = 'failure' ] && failed='Commit and push what changed (the archive in the cards repository; check the BE_WATER_CARDS token, it expires)'
           {
             echo "## Run"
             echo

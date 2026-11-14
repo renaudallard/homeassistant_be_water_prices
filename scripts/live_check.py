@@ -404,10 +404,10 @@ def _exit_code(results: list[CheckResult]) -> int:
 
 
 async def _run(texts: Path | None = None) -> tuple[list[CheckResult], int, StoredTexts | None]:
-    """Every check, with the archive branch's texts as a render cache when
-    a checkout is given: a PDF whose bytes the branch already holds is
+    """Every check, with the card archive's texts as a render cache when
+    a checkout is given: a PDF whose bytes the archive already holds is
     downloaded and measured as before, but its text is read from the
-    branch instead of being rendered again."""
+    archive instead of being rendered again."""
     cache = StoredTexts(texts) if texts is not None else None
     with ExitStack() as hooks:
         if cache is not None:
@@ -485,7 +485,7 @@ def main() -> int:
         type=Path,
         default=None,
         metavar="DIR",
-        help="a checkout of the archive branch; PDFs it already holds are not rendered again",
+        help="the card archive, water/ of a cards repository clone; PDFs it already holds are not rendered again",
     )
     args = parser.parse_args()
     results, rc, cache = asyncio.run(_run(args.texts))

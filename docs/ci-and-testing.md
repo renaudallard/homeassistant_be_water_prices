@@ -257,11 +257,12 @@ check, the drift check and the archive skip it on a runner (`CI_BLOCKED`
 in `scripts/live_check.py`, keyed on `GITHUB_ACTIONS`), so a local run
 from a residential address does check it.
 
-Both checks read the archive branch's texts when given a checkout
-(`--texts tmp/archive`, which the workflows pass after fetching the
-branch): a PDF whose bytes the archive already holds is downloaded and
-parsed as before, but its text is taken from the branch instead of being
-rendered again, and the report ends with how many were served that way.
+Both checks read the card archive's texts when given one
+(`--texts tmp/cards/water`, which the workflows pass after cloning the
+cards repository): a PDF whose bytes the archive already holds is
+downloaded and parsed as before, but its text is taken from the archive
+instead of being rendered again, and the report ends with how many were
+served that way.
 
 The readers in `providers/_pdf.py` carry three seams for scripts that
 walk every utility in one go, all off in Home Assistant itself: a text
@@ -280,13 +281,14 @@ other way than through `fetch_pdf_text_layout` renders it with
 `scripts/archive_cards.py` walks every registered utility, fetches the
 tariff the integration would price on right now, once for the utility's
 default and once for each commune a per-commune utility lists, and
-writes what it parsed into a checkout of the `archive` branch:
+writes what it parsed into `water/` of a clone of the cards repository
+[`be_price_cards`](https://github.com/renaudallard/be_price_cards):
 
 ```bash
-python scripts/archive_cards.py --out tmp/archive --pdfs tmp/pdfs [--only pidpa]
+python scripts/archive_cards.py --out tmp/cards/water --pdfs tmp/pdfs [--only pidpa]
 ```
 
-What the branch holds, how a month's row is written and replayed through
+What the archive holds, how a month's row is written and replayed through
 the current parser, and how the integration reads it back are in
 [data-sources.md](data-sources.md#the-card-archive). Each PDF names the
 pdfplumber release and render code (`_pdf.py` and the stream guard in
@@ -307,7 +309,7 @@ written there one per line.
 `coverage/` without fetching anything.
 
 `archive_cards.yml` runs the archiver every morning at 05:23 UTC against
-the `archive` branch. It walks the communes of the per-commune utilities
+`water/` in the cards repository. It walks the communes of the per-commune utilities
 on Sundays and the sixteen default rows only on the other days (the
 tariffs are annual, and De Watergroep alone lists about seven hundred
 communes); a manual run walks them unless its `communes` input is
@@ -315,15 +317,14 @@ unticked, and `--defaults-only` is the local equivalent. It installs
 Tesseract and its French data from apt for AIEC's picture, and only this
 workflow does. It uploads the PDFs and card pictures of the day to the
 releases of the shared cards repository
-[`be_price_cards`](https://github.com/renaudallard/be_price_cards)
 (`water-<YYYY-MM>`, one per month the cards were seen in, deleted once it
 is more than thirty-six months old and the manifest no longer points into it;
 the electricity and gas integrations' releases live beside them as
 `electricity-<YYYY-MM>` and `gas-<YYYY-MM>`). It then rewrites the index
 and the per-utility sheets so each month links to a file that exists,
-publishes them under `water/` in that repository (rebasing and trying
-again when the electricity or gas archive pushed there first), and
-commits the branch when anything changed. A manual run can ask for
+and pushes the whole `water/` tree to that repository when anything
+changed, rebasing and trying again when the electricity or gas archive
+pushed there first. A manual run can ask for
 `--reparse` or `--rerender`. Water-link is skipped on a runner; an archive
 run from a residential address stores it.
 
@@ -336,18 +337,28 @@ dies with its runner. `keep` holds the cards token and uploads the cards
 with gh, jq and git alone, taking only files named as the walk names them
 (`water-<YYYY-MM>/<sha256>.pdf`, `.jpg` or `.png`). `index` rewrites the
 sheets with the integration's code and no token. `push` holds the cards
-token and a `github.token` that can write the branch, and only clones,
-lays the indexed files over the clones as plain files, with any `.git`
-entry dropped, and pushes. `token` warns of the cards token's expiry, and
-`ocr` and `report` file issues with `github.token` alone. Both tokens
-reach git through gh's credential helper (`gh auth git-credential`), which
-reads `GH_TOKEN`, so neither is on a command line or in a file, and the
-clones need none, both repositories being public. The upload needs a
-fine-grained token with contents read and write on the cards repository
-in the `BE_WATER_CARDS` secret; without it the branch still gets the
-parsed cards and their texts and the job says so. An upload or a listings
-push that fails, an expired token among them, does not hold the branch
-back either: the cards it missed are offered again by the next run.
+token, and only clones, lays the indexed files over the clone as plain
+files, with any `.git` entry dropped, and pushes. `token` warns of the
+cards token's expiry, and `ocr` and `report` file issues with
+`github.token` alone. No job can write this repository: the workflow's
+own token is read only everywhere, so nothing the walk could leave behind
+reaches its main, its tags or its releases. The cards token reaches git
+through gh's credential helper (`gh auth git-credential`), which reads
+`GH_TOKEN`, so it is on no command line and in no file, and the clones
+need none, the cards repository being public. The upload and the push
+need a fine-grained token with contents read and write on the cards
+repository in the `BE_WATER_CARDS` secret; without it the upload says so
+and the push fails the run. An upload that fails, an expired token among
+them, does not hold the rows back: the cards it missed are offered again
+by the next run.
+
+Until November 2026 the archive was this repository's `archive` branch,
+pushed with a `github.token` that could write the whole repository. The
+branch is left as it was, for the installations that still read it, and
+the walk's first run against the cards repository took its tree over,
+rows moved under `cards/`: the walk does that whenever the clone holds no
+`water/cards/` yet, so a run that failed before its push simply does it
+again.
 
 A run that stores nothing, a refused push or an expired token files an
 issue labelled `archive-cards`, naming the job that failed, one per
@@ -363,35 +374,33 @@ close the block.
 
 ### Finding a stored card by hand
 
-Everything on the
-[`archive`](https://github.com/renaudallard/homeassistant_be_water_prices/tree/archive)
-branch is addressed by the two ids the integration uses, which are the
-directory names: the utility (`pidpa`, `farys`, `inbw`, ...) and the
+Everything under
+[`water/`](https://github.com/renaudallard/be_price_cards/tree/main/water)
+in the cards repository is addressed by the two ids the integration uses,
+which are the directory names under `cards/`: the utility (`pidpa`, `farys`, `inbw`, ...) and the
 commune, as the id the integration passes to the extractor (`geel` for
 Pidpa, the numeric id for Farys, the GUID for De Watergroep, the name for
-Water-link), or `default` for the no-commune fetch. Browse the branch to
+Water-link), or `default` for the no-commune fetch. Browse the tree to
 see them; the commune's label is inside each file.
 
 1. **The parsed card** is one JSON per month at
-   `<utility>/<commune>/<YYYY-MM>.json`, for example
-   [`pidpa/geel/2026-09.json`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/pidpa/geel/2026-09.json).
+   `cards/<utility>/<commune>/<YYYY-MM>.json`, for example
+   [`cards/pidpa/geel/2026-09.json`](https://github.com/renaudallard/be_price_cards/blob/main/water/cards/pidpa/geel/2026-09.json).
    It holds the tariff exactly as the integration parsed it, plus
    `_seen_on` (the day it was captured), `_commune` and `_commune_label`
    for a commune row, and `_sources`: every page or document the parse
    read, each with its text file under `texts/` and, for a PDF, the digest
    of the file.
 2. **The page or the PDF the parser read** is easiest through
-   [`coverage.md`](https://github.com/renaudallard/homeassistant_be_water_prices/blob/archive/coverage.md)
-   at the branch root, which names one sheet per utility under
+   [`coverage.md`](https://github.com/renaudallard/be_price_cards/blob/main/water/coverage.md)
+   at the top of `water/`, which names one sheet per utility under
    `coverage/`: a row per commune, a column per month. Each month cell
-   carries two links: `page` opens the text of the page as it was read, on
-   the branch (`pdf` downloads the card from the cards repository's
-   releases instead, for a card parsed from a PDF), and `json` opens the
-   parsed row above. The same sheets are published under
-   [`water/`](https://github.com/renaudallard/be_price_cards/tree/main/water)
-   in the cards repository itself, and each release's notes point there,
-   so a file seen on the releases page can be named too: search that
-   repository for the file's name. Behind them is `pdfs.json`, which maps a
+   carries two links: `page` opens the text of the page as it was read
+   (`pdf` downloads the card from the cards repository's releases instead,
+   for a card parsed from a PDF), and `json` opens the parsed row above.
+   Each release's notes point at the sheets, so a file seen on the
+   releases page can be named too: search that repository for the file's
+   name. Behind them is `pdfs.json`, which maps a
    digest to `water-<YYYY-MM>/<digest>.pdf` in those releases; the digest
    in a JSON's `_sources` is the same key.
 3. **The text the parser read** is under `texts/`, named by the digest of
@@ -400,5 +409,5 @@ see them; the commune's label is inside each file.
    is the same as the previous month's names that month's text, so the
    same page is not stored twelve times a year.
 
-How the integration itself reads the branch is in
+How the integration itself reads the archive is in
 [data-sources.md](data-sources.md).

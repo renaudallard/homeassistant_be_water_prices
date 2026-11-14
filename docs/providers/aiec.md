@@ -24,7 +24,7 @@ parts of the Condroz.
   effect, `Tarif-2026-04-1-WEaf268c1c2a.jpg` on the fixture (the tail is
   the CMS dedupe hash).
 - The picture is read by the card archiver with Tesseract, in CI, and the
-  text it read is kept on the archive branch beside the row it made (see
+  text it read is kept in the card archive beside the row it made (see
   [data-sources.md](../data-sources.md#the-card-archive)). Nothing in Home
   Assistant decodes a picture: an installation reads that text and finds
   the tariff in it itself.
@@ -61,7 +61,7 @@ never for a label or a position.
 3. A date in `_TRANSCRIBED` is served from there.
 4. Otherwise the picture's text is asked for (`fetch_picture_text` in
    `providers/_pdf.py`). In Home Assistant that is the archive's reading:
-   `archived_picture_text` takes the newest AIEC row on the branch, this
+   `archived_picture_text` takes the newest AIEC row in the archive, this
    month's first and then back a month at a time, and the text of its
    source of variant `ocr` whose URL is the picture's. A row that read
    another picture, or none, gives nothing. The text is fetched only from
