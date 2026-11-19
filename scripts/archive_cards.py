@@ -576,14 +576,17 @@ def _sources_of(memo: _RecordingMemo, cards: _Cards) -> list[_Source]:
 
 
 def _write_text(out: Path, text: str) -> str:
-    """Store ``text`` once, content-addressed, and return its path in ``out``."""
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    rel = f"texts/{digest}.txt"
+    """Store ``text`` once, content-addressed, and return its path in ``out``.
+
+    With surrogatepass, as ``card_texts.read_text`` reads it back: pdfminer
+    reads a glyph of a font mapped through Identity as its code, so a card
+    can read as half a surrogate pair, which strict UTF-8 refuses."""
+    payload = text.encode("utf-8", "surrogatepass")
+    rel = f"texts/{hashlib.sha256(payload).hexdigest()}.txt"
     path = out / rel
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8", newline="") as handle:
-            handle.write(text)
+        path.write_bytes(payload)
     return rel
 
 
@@ -643,6 +646,11 @@ def _write_card(
     only when the row is: a month whose card is the same as the previous
     month's points at the texts that row holds, so an unchanged page is
     kept once rather than once a month.
+
+    Raises UnicodeEncodeError on a field holding half a surrogate pair, a
+    commune Water-link's card names for one: an installation reads the row
+    as UTF-8. Encoded before the file is opened, so the row held there
+    stays whole.
     """
     card: dict[str, Any] = tariff_to_dict(tariff)
     card.update(meta)
@@ -662,11 +670,9 @@ def _write_card(
     card["_sources"] = [
         s.entry(reuse.get((s.variant, s.url)) or _write_text(out, s.text)) for s in sources
     ]
+    payload = (json.dumps(card, indent=1, sort_keys=True, ensure_ascii=False) + "\n").encode()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(card, indent=1, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    path.write_bytes(payload)
     return True
 
 
@@ -930,7 +936,14 @@ async def _capture(
     run.patience.ok(ex.id)
     sources = _sources_of(run.memo, run.cards)
     meta = {} if commune == _DEFAULT else {"_commune": commune, "_commune_label": label or ""}
-    if _write_card(run.out, ex.id, commune, run.seen_month, tariff, sources, meta, run.today):
+    try:
+        changed = _write_card(
+            run.out, ex.id, commune, run.seen_month, tariff, sources, meta, run.today
+        )
+    except UnicodeEncodeError as err:  # one card must not stop the walk
+        run.summary.failed.append(f"{name}: {type(err).__name__}: {err}")
+        return
+    if changed:
         run.summary.stored += 1
     else:
         run.summary.unchanged += 1
@@ -1039,11 +1052,16 @@ async def _replay_row(
             summary.unreplayable.append(f"{label}: {type(err).__name__}: {err}")
             return
     sources = _sources_of(memo, cards)
+    meta: dict[str, str] = {k: row[k] for k in ("_commune", "_commune_label") if k in row}
+    try:
+        changed = _write_card(out, utility, commune, path.stem, tariff, sources, meta, seen_on)
+    except UnicodeEncodeError as err:  # reported, and the row stays as it was
+        summary.unreplayable.append(f"{label}: {type(err).__name__}: {err}")
+        return
     # A card the row had never named is kept now, under this row's month.
     cards.file(path.stem, (s.pdf for s in sources if s.pdf is not None))
     summary.replayed += 1
-    meta: dict[str, str] = {k: row[k] for k in ("_commune", "_commune_label") if k in row}
-    if _write_card(out, utility, commune, path.stem, tariff, sources, meta, seen_on):
+    if changed:
         summary.reparsed += 1
 
 

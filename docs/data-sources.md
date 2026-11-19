@@ -57,6 +57,13 @@ therefore the first day that month's row saw its card. A month whose card
 matches the month before points at that month's texts rather than storing
 them again, and months more than thirty-six before the running one
 (`_KEEP_MONTHS`) are pruned, with the texts nothing refers to any more.
+A text is written and read back with `surrogatepass`: pdfminer reads a
+glyph of a font mapped through Identity as its code, which can be half a
+surrogate pair that strict UTF-8 refuses, and one such card stopped the
+whole walk. A row is read as UTF-8 by every installation, so a row holding
+one in a field (a commune Water-link's card names) is not written: that
+card fails alone, in the walk and in a replay, and the row held before
+stays whole (`test_a_row_no_utf8_file_can_hold_fails_its_card_alone`).
 When the parser sources (`providers/*.py`, `const.py`), the PDF reader or
 Tesseract change, every stored row is replayed offline from its texts with
 the clock pinned to its `_seen_on`, and rewritten where the parse differs

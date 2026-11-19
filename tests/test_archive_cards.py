@@ -412,6 +412,81 @@ async def test_an_unchanged_card_is_kept_once_and_never_rendered_again(
     assert card["yearly_fixed_fee"] == 200.0
 
 
+# Half a surrogate pair, which pdfminer reads off a glyph of a font mapped
+# through Identity and strict UTF-8 refuses.
+_HALF_PAIR = "\ud83d"
+
+
+async def test_a_card_reading_as_half_a_surrogate_pair_is_stored_as_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Such a text raised out of the walk when it was stored: no row of any
+    utility and no stamp, every day the card was served. It is written and
+    read back as it was read, so the next walk is served it and a replay
+    parses the same string."""
+    rendered: list[bytes] = []
+
+    def render(payload: bytes) -> str:
+        rendered.append(payload)
+        return f"{_HALF_PAIR} card text for {payload.decode()}"
+
+    monkeypatch.setattr(_pdf, "extract_pdf_text_layout", render)
+    out = tmp_path / "out"
+    session = _Session({PDF_URL: b"%PDF v1", PAGE_URL: b"fee=100.0"})
+    extractors = [_extractor(_pdf_fetch(session)), _extractor(_page_fetch(session), uid="beta")]
+    first = await ac.archive(out, extractors=extractors, now=NOW, sleep=_no_sleep)
+    assert (first.stored, first.failed) == (2, [])
+    [source] = _row(out)["_sources"]
+    assert card_texts.read_text(out / source["text"]) == f"{_HALF_PAIR} card text for %PDF v1"
+    assert (out / "parser.txt").exists()
+    before = {p: p.read_bytes() for p in out.rglob("*") if p.is_file()}
+
+    second = await ac.archive(
+        out, extractors=extractors, now=NOW.replace(day=13), reparse=True, sleep=_no_sleep
+    )
+    assert (second.unchanged, second.failed) == (2, [])
+    assert (second.replayed, second.reparsed, second.unreplayable) == (2, 0, [])
+    assert rendered == [b"%PDF v1"]
+    assert {p: p.read_bytes() for p in out.rglob("*") if p.is_file()} == before
+
+
+async def test_a_row_no_utf8_file_can_hold_fails_its_card_alone(tmp_path: Path) -> None:
+    """A row is read as UTF-8 by every installation, so one holding half a
+    surrogate pair, a commune Water-link's card names for one, is not
+    written. That is its card's failure: the walk goes on to the next card,
+    and the row held from before stays whole, in the walk and in a replay."""
+    session = _Session({PAGE_URL: b"fee=100.0"})
+    quoted: set[str] = set()
+
+    async def fetch_for_commune(_session: Any, commune: str) -> WaterTariff:
+        text = await fetch_text(session, PAGE_URL)  # type: ignore[arg-type]
+        label = f"Tarieven 2026 ({commune}{_HALF_PAIR if commune in quoted else ''})"
+        return _tariff(fee=float(text.split("=", 1)[1]), label=label)
+
+    communes = (CommuneOption(id="1", label="9000 - Gent"), CommuneOption(id="2", label="Zaventem"))
+    extractor = _extractor(
+        _page_fetch(session), communes=communes, fetch_for_commune=fetch_for_commune
+    )
+    await ac.archive(tmp_path, extractors=[extractor], now=NOW, sleep=_no_sleep)
+    gent = tmp_path / "cards/acme/1/2026-09.json"
+    held = gent.read_bytes()
+
+    session.pages[PAGE_URL] = b"fee=110.0"
+    quoted.add("1")
+    summary = await ac.archive(
+        tmp_path, extractors=[extractor], now=NOW, reparse=True, sleep=_no_sleep
+    )
+    assert [line[:28] for line in summary.failed] == ["acme/1: UnicodeEncodeError: "]
+    assert summary.stored == 2
+    assert _row(tmp_path, "2")["yearly_fixed_fee"] == 110.0
+    assert [line.split(": ")[:2] for line in summary.unreplayable] == [
+        ["acme/1/2026-09", "UnicodeEncodeError"]
+    ]
+    assert summary.replayed == 2
+    assert gent.read_bytes() == held
+    assert (tmp_path / "parser.txt").exists()
+
+
 def _dated_fetch(session: _Session, parser: dict[str, str], seen: list[date]) -> Fetch:
     """The page fetch, noting today's date as an extractor keyed on the
     calendar would."""

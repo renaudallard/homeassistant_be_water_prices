@@ -47,10 +47,10 @@ _RENDER_CODE = (_PROVIDERS / "_pdf.py", _PROVIDERS / "_pdf_guard.py")
 
 
 def read_text(path: Path) -> str:
-    """A stored text exactly as it was fetched: no newline translation, so
-    a replay hands the parser the very bytes it read the first time."""
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        return handle.read()
+    """A stored text exactly as it was fetched: no newline translation, and
+    half a surrogate pair kept as the archive wrote it, so a replay hands
+    the parser the very string it read the first time."""
+    return path.read_bytes().decode("utf-8", "surrogatepass")
 
 
 def digest_of(pdf: str) -> str:
