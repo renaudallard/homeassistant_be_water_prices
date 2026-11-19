@@ -226,9 +226,13 @@ def test_a_page_dated_by_the_clock_says_so() -> None:
     html = fixture_html("aiem_2026.html")
     for dated in ("01/01/2026", "01 janvier 2026"):
         html = html.replace(dated, "")
-    tariff = parse_aiem(html)
+    # A page's year counts only next to today's, so on the real clock the
+    # dated fixture read as undated from 2028.
+    with patch(_TODAY, return_value=date(2026, 9, 6)):
+        tariff = parse_aiem(html)
+        dated_label = parse_aiem(fixture_html("aiem_2026.html")).publication_label
     assert tariff.publication_label.endswith("(page states no year)")
-    assert parse_aiem(fixture_html("aiem_2026.html")).publication_label == "AIEM prix de l'eau 2026"
+    assert dated_label == "AIEM prix de l'eau 2026"
 
 
 def test_a_page_stuck_on_last_year_is_dated_last_year(monkeypatch: pytest.MonkeyPatch) -> None:

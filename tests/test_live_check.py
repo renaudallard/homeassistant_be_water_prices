@@ -484,11 +484,14 @@ async def test_a_pdf_the_archive_holds_is_not_rendered_again(
     async def fetch(_session: Any) -> WaterTariff:
         text = await _pdf.fetch_pdf_text_layout(_Session(), "https://acme.test/card.pdf")  # type: ignore[arg-type]
         seen.append(text)
+        # Dated by the clock, as the file's other cards are: the check
+        # fails a card more than a year from today's, and a card fixed in
+        # 2026 failed this test from 2028.
         return WaterTariff(
             utility="acme",
             region="flanders",
-            valid_from=date(2026, 1, 1),
-            valid_until=date(2026, 12, 31),
+            valid_from=date(date.today().year, 1, 1),
+            valid_until=date(date.today().year, 12, 31),
             publication_label="Tarieven 2026",
             source_url="https://acme.test/card.pdf",
             yearly_fixed_fee=100.0,
