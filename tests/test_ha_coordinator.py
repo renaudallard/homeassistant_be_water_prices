@@ -1630,7 +1630,8 @@ async def test_live_ytd_burst_of_subbaseline_readings_does_not_reanchor(
 
 
 @pytest.mark.asyncio
-async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None:
+async def test_repair_issues_cleared_when_the_entry_is_removed(hass: HomeAssistant) -> None:
+    """An unload alone leaves them to the next setup, see test_repair_after_unload."""
     yesterday = belgian_today() - timedelta(days=1)
 
     async def _fetch(_session: Any) -> WaterTariff:
@@ -1655,7 +1656,7 @@ async def test_repair_issue_cleared_on_entry_unload(hass: HomeAssistant) -> None
             translation_key=key,
         )
 
-    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is None
     assert issue_reg.async_get_issue(DOMAIN, coordinator.several_meters_issue_id) is None

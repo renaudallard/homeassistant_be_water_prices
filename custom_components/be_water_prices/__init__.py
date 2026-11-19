@@ -179,7 +179,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> boo
     # down as well, and never calls async_unload_entry for an entry that
     # did not load, so this is what retires the coordinator of a failed
     # setup and takes its Repair cards down.
-    entry.async_on_unload(lambda: _forget_coordinator(hass, coordinator))
+    entry.async_on_unload(lambda: _forget_coordinator(hass, entry, coordinator))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Update the running-cost / YTD sensors live on each meter reading,
     # not just on the daily tick. Subscribes to the resolved meter entity
@@ -249,7 +249,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> bo
     if unloaded:
         # Home Assistant unloads only an entry that loaded, so the
         # coordinator is there. The on_unload callbacks that run next
-        # retire it and drop its Repair cards.
+        # retire it.
         coordinator = entry.runtime_data
         # Stop listening to the meter before the flush, not after it in
         # the on_unload callbacks: the flush awaits the executor, and a
@@ -264,31 +264,49 @@ async def async_unload_entry(hass: HomeAssistant, entry: WaterConfigEntry) -> bo
     return unloaded
 
 
-def _forget_coordinator(hass: HomeAssistant, coordinator: WaterCoordinator) -> None:
-    """Retire the entry's coordinator and drop its Repair cards.
+def _forget_coordinator(
+    hass: HomeAssistant, entry: WaterConfigEntry, coordinator: WaterCoordinator
+) -> None:
+    """Retire the entry's coordinator, and drop its Repair cards when no
+    setup follows.
 
     Runs from the entry's on_unload callbacks, which Home Assistant fires
     after a clean unload and after a setup that failed past the first
-    refresh. The cards that refresh raised would otherwise outlive the
-    entry, with a Retry button that has nothing left to refresh.
+    refresh. A reload is an unload too, and saving the options is a
+    reload: deleting the cards there lost the user's choice to ignore one,
+    and the next setup's first refresh raised it afresh. So they stay
+    through an unload, for that refresh to delete the ones that no longer
+    hold. A setup that failed, or an entry being disabled, has no refresh
+    coming, and its cards would outlive it with a Retry button that has
+    nothing left to refresh. A removal clears them in async_remove_entry.
     """
-    from homeassistant.helpers import issue_registry as ir
+    from homeassistant.config_entries import ConfigEntryState
 
     coordinator.async_retire()
-    ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
-    ir.async_delete_issue(hass, DOMAIN, coordinator.projection_issue_id)
-    ir.async_delete_issue(hass, DOMAIN, coordinator.several_meters_issue_id)
-    ir.async_delete_issue(hass, DOMAIN, coordinator.operator_issue_id)
+    if entry.state is not ConfigEntryState.UNLOAD_IN_PROGRESS or entry.disabled_by is not None:
+        _clear_repair_cards(hass, entry.entry_id)
+
+
+def _clear_repair_cards(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete the entry's Repair cards: every id of this integration's that
+    ends in the entry's id."""
+    from homeassistant.helpers import issue_registry as ir
+
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if domain == DOMAIN and issue_id.endswith(f"_{entry_id}"):
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Delete the entry's persisted YTD anchor and meter's days when it is removed.
+    """Delete the entry's persisted YTD anchor and meter's days when it is
+    removed, and its Repair cards, which an unload leaves for the next setup.
 
     Unload alone leaves the Store files behind, so removing and re-adding the
     same utility used to restore a baseline belonging to the deleted entry.
     """
     from .coordinator_store import async_remove_stores
 
+    _clear_repair_cards(hass, entry.entry_id)
     await async_remove_stores(hass, entry.entry_id)
 
 

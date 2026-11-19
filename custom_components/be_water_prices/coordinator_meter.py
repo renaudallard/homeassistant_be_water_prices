@@ -368,6 +368,10 @@ class _MeterMixin:
             return str(explicit)
         meter, count = await _discover_energy_water_meter(self.hass)
         self._sync_several_meters_issue(count)
+        if meter is None and self._owns_the_entry():
+            # No meter, no measured year to offer. The card outlives a
+            # reload, the one that dropped the meter from the options too.
+            ir.async_delete_issue(self.hass, DOMAIN, self.projection_issue_id)
         return meter
 
     @property

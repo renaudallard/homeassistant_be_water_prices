@@ -39,6 +39,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryDisabler
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
@@ -389,12 +390,13 @@ async def test_a_year_with_no_consumption_is_not_offered(hass: HomeAssistant) ->
 
 
 @pytest.mark.asyncio
-async def test_unloading_the_entry_clears_the_card(hass: HomeAssistant) -> None:
+async def test_disabling_the_entry_clears_the_card(hass: HomeAssistant) -> None:
+    """An unload alone leaves it to the next setup, see test_repair_after_unload."""
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=131.0))
     coordinator = entry.runtime_data
     issue_id = coordinator.projection_issue_id
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
-    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.config_entries.async_set_disabled_by(entry.entry_id, ConfigEntryDisabler.USER)
     await hass.async_block_till_done()
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 

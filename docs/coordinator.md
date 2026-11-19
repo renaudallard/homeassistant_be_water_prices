@@ -309,9 +309,15 @@ return the figures unconverted. No unit, ASCII `m3` and `m³`
 
 ## Repairs cards
 
-All four are keyed on the entry id and deleted by `_forget_coordinator` in
-`__init__.py` when the entry unloads or a setup fails past the first
-refresh.
+All four are keyed on the entry id. They outlive an unload: a reload is
+an unload and a setup, and saving the options is a reload, so a card
+deleted there lost the user's choice to ignore it and the first refresh
+raised it afresh. That refresh deletes the ones that no longer hold
+instead, the postcode card on a refresh that serves the held card too
+and the projection card once no meter resolves. Where no setup follows
+they go with the entry: `_forget_coordinator` in `__init__.py` deletes
+them when the entry is disabled or a setup fails past the first refresh,
+and `async_remove_entry` when it is removed (`_clear_repair_cards`).
 
 - `snapshot_stale_<entry_id>` (`_sync_repair_issue`), fixable: the fix
   flow in `repairs.py` runs `async_refresh` and aborts with `still_stale`

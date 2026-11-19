@@ -144,10 +144,12 @@ the entry id. All are warnings.
 | `operator_moved` | The saved postcode now resolves to operators that leave the entry's out, other than the ones recorded when it was picked by hand (`postcode_resolved`) | None: reconfigure, or ignore |
 
 `repairs.py` holds the two fix flows and `async_create_fix_flow`, which
-maps an issue id to its flow. The cards are dropped when the entry
-unloads or its setup fails (`_forget_coordinator` in `__init__.py`), and a
-coordinator that no longer speaks for its entry raises none
-(`_owns_the_entry`).
+maps an issue id to its flow. The cards stay through a reload, for its
+first refresh to delete the ones that no longer hold, so an ignored card
+stays ignored; they are dropped when the entry is disabled or removed or
+its setup fails (`_forget_coordinator` and `async_remove_entry` in
+`__init__.py`), and a coordinator that no longer speaks for its entry
+raises none (`_owns_the_entry`).
 
 ## Diagnostics
 

@@ -524,6 +524,9 @@ class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[Coordinator
             # ageing like one.
             self._hold(tariff, fetched_at)
         self._sync_repair_issue(data)
+        # The postcode card turns on the entry alone, and outlives a reload:
+        # one a reconfigure has answered goes while the utility is down too.
+        self._sync_operator_issue()
         return data
 
     def _hold(self, tariff: WaterTariff, fetched_at: datetime) -> None:

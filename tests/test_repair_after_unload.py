@@ -33,7 +33,8 @@ from datetime import date, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
-from homeassistant.config_entries import ConfigEntryState
+import pytest
+from homeassistant.config_entries import ConfigEntryDisabler, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
@@ -465,3 +466,150 @@ async def test_the_replaced_coordinator_is_retired_while_the_new_setup_runs(
         assert ir.async_get(hass).async_get_issue(DOMAIN, old.stale_issue_id) is None
         await reload
         await hass.async_block_till_done()
+
+
+def _stale_on(stale: dict[str, bool]) -> Any:
+    async def _fetch(_session: Any) -> WaterTariff:
+        card = _fresh_tariff()
+        if stale["on"]:
+            return replace(card, valid_until=date.today() - timedelta(days=1))
+        return card
+
+    return _fetch
+
+
+@pytest.mark.parametrize("still_stale", [True, False])
+async def test_a_reload_leaves_the_repair_cards_to_its_first_refresh(
+    hass: HomeAssistant, still_stale: bool
+) -> None:
+    """Saving the options reloads the entry. Deleting the cards at the
+    unload lost the user's choice to ignore one, and the first refresh of
+    the new setup raised it afresh: the cards stay through the unload, and
+    that refresh deletes one that no longer holds."""
+    stale = {"on": True}
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80},
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    registry = ir.async_get(hass)
+    issue_id = f"snapshot_stale_{entry.entry_id}"
+    with (
+        patch(_GET, return_value=_extractor(_stale_on(stale))),
+        patch(_YTD, new=AsyncMock(return_value=None)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert registry.async_get_issue(DOMAIN, issue_id) is not None
+        registry.async_ignore(DOMAIN, issue_id, True)
+        stale["on"] = still_stale
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        issue = registry.async_get_issue(DOMAIN, issue_id)
+        if still_stale:
+            assert issue is not None and issue.dismissed_version is not None
+        else:
+            assert issue is None
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.parametrize("stop", ["disable", "remove"])
+async def test_an_entry_stopped_for_good_takes_its_repair_cards_with_it(
+    hass: HomeAssistant, stop: str
+) -> None:
+    """Disabled or removed, no setup follows to delete the cards."""
+    entry = _metered_entry(hass)
+    with (
+        patch(_GET, return_value=_extractor(_stale_on({"on": True}))),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
+        patch(_FULL_YEAR, new=AsyncMock(return_value=131.0)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        registry = ir.async_get(hass)
+        cards = (f"snapshot_stale_{entry.entry_id}", f"projection_outdated_{entry.entry_id}")
+        assert all(registry.async_get_issue(DOMAIN, card) is not None for card in cards)
+        if stop == "disable":
+            await hass.config_entries.async_set_disabled_by(
+                entry.entry_id, ConfigEntryDisabler.USER
+            )
+        else:
+            await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
+    assert all(registry.async_get_issue(DOMAIN, card) is None for card in cards)
+
+
+async def test_a_meter_dropped_from_the_options_takes_its_projection_card(
+    hass: HomeAssistant,
+) -> None:
+    """The card offers the meter's year: once the reload that drops the
+    meter has run its first refresh, there is none to offer."""
+    entry = _metered_entry(hass)
+    with (
+        patch(_GET, return_value=_extractor(_stale_on({"on": False}))),
+        patch(_YTD, new=AsyncMock(return_value=(20.0, 0.0))),
+        patch(_FULL_YEAR, new=AsyncMock(return_value=131.0)),
+    ):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        registry = ir.async_get(hass)
+        card = f"projection_outdated_{entry.entry_id}"
+        assert registry.async_get_issue(DOMAIN, card) is not None
+        options = {k: v for k, v in entry.options.items() if k != CONF_WATER_METER_SENSOR}
+        hass.config_entries.async_update_entry(entry, options=options)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        assert entry.state is ConfigEntryState.LOADED
+        assert registry.async_get_issue(DOMAIN, card) is None
+        assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_a_postcode_card_a_reconfigure_answered_goes_while_the_utility_is_down(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """The card turns on the entry's postcode alone and outlives the reload:
+    the first refresh after it deletes one that no longer holds, a refresh
+    that serves the held card included."""
+    up = {"on": True}
+
+    async def _fetch(_session: Any) -> WaterTariff:
+        if not up["on"]:
+            raise RuntimeError("HTTP 503")
+        return replace(_fresh_tariff(), utility="pidpa")
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Pidpa",
+        data={CONF_UTILITY: "pidpa"},
+        # 2100 is Deurne, which resolves to Water-link.
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_POSTCODE: "2100"},
+        unique_id=f"{DOMAIN}_pidpa",
+    )
+    entry.add_to_hass(hass)
+    from custom_components.be_water_prices.providers import get as real_get
+
+    fake = WaterExtractor(id="pidpa", label="Pidpa", region="flanders", fetch=_fetch)
+
+    def _get(utility_id: str) -> WaterExtractor:
+        return fake if utility_id == "pidpa" else real_get(utility_id)
+
+    with patch(_GET, new=_get), patch(_YTD, new=AsyncMock(return_value=None)):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        registry = ir.async_get(hass)
+        card = f"operator_moved_{entry.entry_id}"
+        assert registry.async_get_issue(DOMAIN, card) is not None
+        # The held card reaches the Store a second after the fetch.
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=5))
+        await hass.async_block_till_done()
+        assert f"{DOMAIN}.{entry.entry_id}.card" in hass_storage
+        up["on"] = False
+        options = {k: v for k, v in entry.options.items() if k != CONF_POSTCODE}
+        hass.config_entries.async_update_entry(entry, options=options)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        assert entry.runtime_data.data.last_error
+        assert registry.async_get_issue(DOMAIN, card) is None
+        assert await hass.config_entries.async_unload(entry.entry_id)
