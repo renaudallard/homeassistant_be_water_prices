@@ -80,6 +80,26 @@ class _Session:
         return _Response(payload, kind)
 
 
+class _Offline:
+    """The session the archive opens, in every test here. A real one sent
+    each request a test let reach it to the resolver, through aiodns, which
+    the socket guard does not stop."""
+
+    async def __aenter__(self) -> _Offline:
+        return self
+
+    async def __aexit__(self, *_exc: object) -> None:
+        return None
+
+    def get(self, url: str, **_kw: Any) -> Any:
+        raise aiohttp.ClientConnectionError(f"offline: {url}")
+
+
+@pytest.fixture(autouse=True)
+def _offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ac.aiohttp, "ClientSession", lambda *_a, **_kw: _Offline())
+
+
 def _tariff(fee: float = 100.0, label: str = "Tarieven 2026") -> WaterTariff:
     return WaterTariff(
         utility="acme",
@@ -738,18 +758,6 @@ async def test_a_kept_card_not_downloaded_replays_again_next_run(
     digest = hashlib.sha256(b"%PDF v1").hexdigest()
     (out / "pdfs.json").write_text(json.dumps({digest: f"water-2026-09/{digest}.pdf"}))
     session.pages.clear()
-
-    class _Down:
-        async def __aenter__(self) -> _Down:
-            return self
-
-        async def __aexit__(self, *_exc: object) -> None:
-            return None
-
-        def get(self, url: str, **_kw: Any) -> Any:
-            raise aiohttp.ClientConnectionError(f"down: {url}")
-
-    monkeypatch.setattr(ac.aiohttp, "ClientSession", lambda *_a, **_kw: _Down())
     _readers(monkeypatch, "pdfplumber==2 render=a")
     summary = await ac.archive(
         out,
