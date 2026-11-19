@@ -96,7 +96,9 @@ loaded entry raises a translated `ServiceValidationError`
   up to the last hour the recorder has compiled, clamped to the card's
   `valid_from` and `valid_until`. `clear: true` deletes those sensors'
   statistics in full first and needs an `entry_id`
-  (`clear_needs_entry`). The same writer runs by itself on the first
+  (`clear_needs_entry`). A sensor the recorder does not compile, disabled
+  or excluded from it (`_compiled`), is neither written nor cleared. The
+  same writer runs by itself on the first
   setup of a year and whenever its gate moves: the gate
   (`backfill_year` in `entry.data`) carries the year, the utility, the
   card's year and the commune, and a stale snapshot defers it

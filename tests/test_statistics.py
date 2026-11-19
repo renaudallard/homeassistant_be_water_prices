@@ -878,14 +878,21 @@ async def test_a_daily_tick_rewrites_the_price_line_when_the_card_lands(
 
 
 async def _backfill_a_metered_entry(
-    hass: HomeAssistant, freezer: Any, *, clear: bool
+    hass: HomeAssistant,
+    freezer: Any,
+    *,
+    clear: bool,
+    disabled: tuple[str, ...] = (),
+    excluded: tuple[str, ...] = (),
 ) -> tuple[int, list[tuple[str, Any]]]:
     """Backfill a Brussels entry in October that has every sensor and a meter.
 
     The card runs to 31 December, the recorder's newest run marker lags an
     hour behind the clock, and every meter-driven figure carries a value,
-    so only the key filter keeps those sensors out. Returns the row count
-    and the recorder calls in the order they were made.
+    so only the key filter keeps those sensors out. The sensors named in
+    ``disabled`` are disabled by the user, those in ``excluded`` kept out of
+    the recorder. Returns the row count and the recorder calls in the order
+    they were made.
     """
     from datetime import UTC, date, datetime
 
@@ -925,11 +932,16 @@ async def _backfill_a_metered_entry(
     ent_reg = er.async_get(hass)
     for desc in SENSORS:
         ent_reg.async_get_or_create(
-            "sensor", DOMAIN, f"{entry.entry_id}_{desc.key}", suggested_object_id=f"v_{desc.key}"
+            "sensor",
+            DOMAIN,
+            f"{entry.entry_id}_{desc.key}",
+            suggested_object_id=f"v_{desc.key}",
+            disabled_by=er.RegistryEntryDisabler.USER if desc.key in disabled else None,
         )
 
     calls: list[tuple[str, Any]] = []
     recorder = MagicMock()
+    recorder.entity_filter = lambda sid: sid.removeprefix("sensor.v_") not in excluded
     recorder.async_add_executor_job = AsyncMock(
         return_value=datetime(2026, 10, 4, 18, 55, tzinfo=UTC)
     )
@@ -1004,3 +1016,19 @@ async def test_clear_wipes_each_written_sensor_before_its_rows_go_in(
         )
         for step in (("clear", [sid]), ("import", [sid]))
     ]
+
+
+@pytest.mark.parametrize("clear", [False, True])
+async def test_no_history_is_written_for_a_sensor_the_recorder_does_not_compile(
+    hass: HomeAssistant, freezer: Any, clear: bool
+) -> None:
+    """A sensor the user disabled or keeps out of the recorder compiles no
+    statistics of its own: the price line was written for it all the same,
+    and a clear wiped what it held."""
+    _rows, calls = await _backfill_a_metered_entry(
+        hass, freezer, clear=clear, disabled=("basis_rate",), excluded=("sanering_rate",)
+    )
+    touched = {
+        sid for kind, arg in calls for sid in (arg if kind == "clear" else [arg[0]["statistic_id"]])
+    }
+    assert touched == {"sensor.v_yearly_fee", "sensor.v_all_in_basis"}

@@ -108,7 +108,9 @@ async def async_backfill_prices(
     backfill never invents prices for a period where no tariff snapshot
     existed. With ``clear=True`` the targeted ``statistic_id`` rows are
     wiped first; otherwise the import upserts on (statistic_id, start)
-    and is safely idempotent.
+    and is safely idempotent. A sensor the recorder does not compile,
+    disabled or excluded from it, is left out, and a clear leaves its
+    statistics alone.
 
     Returns the total number of rows handed to the recorder.
     """
@@ -205,6 +207,9 @@ async def async_backfill_prices(
         if entity_id is None:
             # Sensor not created for this entry (e.g. comfort_rate outside Flanders).
             continue
+        if not _compiled(hass, entity_id):
+            _LOGGER.debug("%s is not recorded; its price line is not written", entity_id)
+            continue
         value = desc.value_fn(data)
         if value is None:
             continue
@@ -256,6 +261,22 @@ async def async_backfill_prices(
         " (cleared first)" if cleared_done else "",
     )
     return rows_total
+
+
+def _compiled(hass: HomeAssistant, entity_id: str) -> bool:
+    """Whether the recorder compiles the statistics of ``entity_id``: an
+    enabled sensor it records. One it does not is a sensor the user turned
+    off or keeps out of the recorder, and no history is written or cleared
+    for it."""
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+
+    found = er.async_get(hass).async_get(entity_id)
+    if found is not None and found.disabled_by is not None:
+        return False
+    recorded = get_instance(hass).entity_filter
+    return recorded is None or bool(recorded(entity_id))
 
 
 def _newest_statistics_run(hass: HomeAssistant) -> datetime | None:
@@ -547,9 +568,6 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
     rows written, or None when it could not tell or write, or a sensor has
     no live statistics yet to join its year to, to be asked again.
     """
-    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
-        get_instance,
-    )
     from homeassistant.helpers.recorder import DATA_INSTANCE
 
     if DATA_INSTANCE not in hass.data:
@@ -567,14 +585,13 @@ async def async_backfill_year(hass: HomeAssistant, entry: WaterConfigEntry) -> i
     if not hours:
         return 0
     ent_reg = er.async_get(hass)
-    recorded = get_instance(hass).entity_filter
     wanted: list[tuple[int, str, str, str | None, Callable[[float], float]]] = []
     for key, column, ours in _YEAR_KEYS:
         sid = ent_reg.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{key}")
         state = None if sid is None else hass.states.get(sid)
         if sid is None or state is None:
             continue
-        if recorded is not None and not recorded(sid):
+        if not _compiled(hass, sid):
             _LOGGER.debug("%s is not recorded; its year is not written", sid)
             continue
         opened = dt_util.parse_datetime(str(state.attributes.get("last_reset")))
