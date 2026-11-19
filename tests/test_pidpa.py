@@ -47,6 +47,9 @@ def _pdf_text() -> str:
     return extract_pdf_text_layout(fixture_bytes("pidpa_tariefplan_2025-2030.pdf"))
 
 
+# Lays out the Pidpa card unless this module already has: 25 s of CPU and
+# 51 on the clock on a busy Raspberry Pi 4.
+@pytest.mark.timeout(120)
 def test_parses_2026_drinkwater_block() -> None:
     t = parse_tariff(_pdf_text(), year=2026)
     assert t.basis_eur_per_m3 == 2.0848
@@ -56,6 +59,9 @@ def test_parses_2026_drinkwater_block() -> None:
     assert t.valid_until is not None and t.valid_until.year == 2026
 
 
+# Lays out the Pidpa card unless this module already has: 25 s of CPU and
+# 51 on the clock on a busy Raspberry Pi 4.
+@pytest.mark.timeout(120)
 def test_parses_saneringsbijdragen() -> None:
     t = parse_tariff(_pdf_text(), year=2026)
     # gemeentelijke (afvoer) > bovengemeentelijke (zuivering) -- the parser
@@ -64,12 +70,18 @@ def test_parses_saneringsbijdragen() -> None:
     assert t.sanering_bovengemeentelijk_eur_per_m3 == 1.1809
 
 
+# Lays out the Pidpa card unless this module already has: 25 s of CPU and
+# 51 on the clock on a busy Raspberry Pi 4.
+@pytest.mark.timeout(120)
 def test_uses_standard_flemish_vastrecht_structure() -> None:
     t = parse_tariff(_pdf_text(), year=2026)
     assert t.yearly_fixed_fee == 100.0  # 50 + 30 + 20
     assert t.yearly_fixed_fee_per_resident_discount == 20.0  # 10 + 6 + 4
 
 
+# Lays out the Pidpa card unless this module already has: 25 s of CPU and
+# 51 on the clock on a busy Raspberry Pi 4.
+@pytest.mark.timeout(120)
 def test_falls_back_to_last_year_when_target_outside_window() -> None:
     # Tariefplan covers 2025-2030; asking for 2031 should clamp to 2030.
     t = parse_tariff(_pdf_text(), year=2031)

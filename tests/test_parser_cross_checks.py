@@ -94,6 +94,9 @@ def test_farys_comfort_must_be_twice_the_basis() -> None:
         farys.parse_tariff(raw, year=2026)
 
 
+# Lays out the Pidpa card unless this module already has: 25 s of CPU and
+# 51 on the clock on a busy Raspberry Pi 4.
+@pytest.mark.timeout(120)
 def test_pidpa_pdf_comfort_must_be_twice_the_basis() -> None:
     text = _pdf("pidpa_tariefplan_2025-2030.pdf").replace("4,1696", "3,9999")
     with pytest.raises(ExtractorError, match="2× basistarief"):

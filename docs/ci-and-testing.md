@@ -51,7 +51,11 @@ than holding it for good.
 `pyproject.toml` runs pytest on `tests/` only (a repo copy kept under
 `tmp/` carries its own conftest), with `asyncio_mode = "auto"` and a 30
 second per-test timeout, so a parser loop that stops advancing fails its
-test instead of hanging the job. mypy is strict on the integration and on
+test instead of hanging the job. A test that may be the first of its module
+to lay out the Pidpa card has 120 seconds, as has the one reading every card
+twice in `test_pdf.py`: the card took 25 s of CPU and 51 on the clock on a
+busy Raspberry Pi 4, and a render that timed out was not cached, so each test
+after it in the module timed out too. mypy is strict on the integration and on
 `scripts/`; `tests.*` is left out on purpose, since the suite drives error
 paths with partial stubs and wrong inputs.
 

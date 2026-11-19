@@ -80,6 +80,9 @@ def test_pidpa_page_legs_that_do_not_make_the_total_are_refused() -> None:
         pidpa.parse_commune_tariff(page, commune_slug="geel", year=2026)
 
 
+# Lays out the Pidpa card unless this module already has: 25 s of CPU and
+# 51 on the clock on a busy Raspberry Pi 4.
+@pytest.mark.timeout(120)
 def test_pidpa_tariefplan() -> None:
     text = _swap(
         _pdf("pidpa_tariefplan_2025-2030.pdf"), "Zuivering € 20,00", "Zuivering € 25,00", 1
