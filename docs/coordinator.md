@@ -101,7 +101,9 @@ asks `_archived_row` for this month's row of the utility and commune
 `_ARCHIVE_MONTHS_BACK` (12) months, stopping at the first row found. A
 `TransientFetchError` (network, 5xx, 429) ends the walk with nothing, since
 taking an older month in its place could mean last year's card. The row is
-read with `tariff_from_dict`, relabelled with the commune's label, and
+read with `tariff_from_dict`, which refuses a row with a text that is no
+string or a rate or fee that is no finite number (the walk then ends with
+nothing), relabelled with the commune's label, and
 dated 06:00 UTC on its `_seen_on` day, never later than now, so a row
 written this morning is not a snapshot from the future. Where the rows
 come from is in [data-sources.md](data-sources.md).

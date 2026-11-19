@@ -238,9 +238,25 @@ def tariff_to_dict(tariff: WaterTariff) -> dict[str, Any]:
 def tariff_from_dict(data: Mapping[str, Any]) -> WaterTariff:
     """The inverse of :func:`tariff_to_dict`. Keys the dataclass has no
     field for are ignored, so a stored row can carry its own metadata
-    beside the tariff."""
-    names = {f.name for f in dataclasses.fields(WaterTariff)}
-    values: dict[str, Any] = {k: v for k, v in data.items() if k in names}
+    beside the tariff.
+
+    Raises ValueError for a text that is no string and a rate or fee that
+    is no finite number. Read from the card archive, such a card was served
+    and held: a NaN priced the year as NaN and came back from the Store as
+    null, and a string or an integer no float holds raised out of every
+    refresh while the utility was down.
+    """
+    fields = {f.name: f.type for f in dataclasses.fields(WaterTariff)}
+    values: dict[str, Any] = {k: v for k, v in data.items() if k in fields}
+    for name, value in values.items():
+        kind = fields[name]
+        if kind == "str" and not isinstance(value, str):
+            raise ValueError(f"{name} is no text")
+        if kind in ("float", "float | None") and not (value is None and kind != "float"):
+            figure = finite_figure(value)
+            if figure is None:
+                raise ValueError(f"{name} is no finite number")
+            values[name] = figure
     values["valid_from"] = date.fromisoformat(values["valid_from"])
     until = values.get("valid_until")
     values["valid_until"] = None if until is None else date.fromisoformat(until)

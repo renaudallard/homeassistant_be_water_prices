@@ -789,7 +789,9 @@ holds a card, or as soon as GitHub fails to answer, since a month it
 could not read may still hold one) and loads on the card it captured,
 dated the first day the archive saw that card in its month, so the
 35-day staleness clock runs from there, with the failure in
-`last_error`. A row is rewritten only when the card changes, so that
+`last_error`. A row the card cannot be read from, one with a rate or a
+fee that is no finite number among them, ends the walk with no card. A
+row is rewritten only when the card changes, so that
 date can be up to a month older than the archive's last sighting, and
 in an outage the utility shares with the archive the stale-snapshot
 Repair comes up early rather than late. Later failures serve that card

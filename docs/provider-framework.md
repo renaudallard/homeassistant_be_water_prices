@@ -96,7 +96,9 @@ Helpers in `base.py`:
   card archive (`scripts/archive_cards.py` writes rows with it and the
   coordinator reads them back). `tariff_from_dict` ignores keys the
   dataclass has no field for, so a row can carry its own metadata, such
-  as the archive's `_seen_on`.
+  as the archive's `_seen_on`, and raises `ValueError` for a text that is
+  no string or a rate or fee that is no finite number: `json.loads` takes
+  `NaN`, `Infinity` and an integer no float holds.
 - `relabel_with_human_commune(tariff, commune_id=..., commune_label=...)`:
   swaps the `(<commune id>)` in `publication_label` for the label the user
   picked (`CONF_COMMUNE_LABEL`), since Farys's ids are numbers and De
