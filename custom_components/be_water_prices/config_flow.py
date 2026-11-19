@@ -186,6 +186,22 @@ def _commune_for_postcode(utility_id: str, postcode: str | None) -> str | None:
     return None if hook is None else hook(postcode)
 
 
+def _whole_number(low: int, high: int) -> vol.All:
+    """A box for a whole figure from ``low`` to ``high``.
+
+    The selector holds a value to its bounds, and a NaN passes both
+    comparisons. The frontend sends none, but a script or a REST client
+    posting "nan" stored a NaN consumption, or a NaN household that every
+    refresh then failed to count. The range after it refuses one.
+    """
+    return vol.All(
+        NumberSelector(
+            NumberSelectorConfig(min=low, max=high, step=1, mode=NumberSelectorMode.BOX)
+        ),
+        vol.Range(min=low, max=high),
+    )
+
+
 def _options_schema(
     current: dict[str, Any],
     *,
@@ -197,14 +213,7 @@ def _options_schema(
         vol.Required(
             CONF_CONSUMPTION_M3_PER_YEAR,
             default=current.get(CONF_CONSUMPTION_M3_PER_YEAR, DEFAULT_CONSUMPTION_M3),
-        ): NumberSelector(
-            NumberSelectorConfig(
-                min=MIN_CONSUMPTION_M3,
-                max=MAX_CONSUMPTION_M3,
-                step=1,
-                mode=NumberSelectorMode.BOX,
-            )
-        ),
+        ): _whole_number(MIN_CONSUMPTION_M3, MAX_CONSUMPTION_M3),
     }
     if household:
         fields[
@@ -212,14 +221,7 @@ def _options_schema(
                 CONF_PERSONS,
                 default=current.get(CONF_PERSONS, DEFAULT_PERSONS),
             )
-        ] = NumberSelector(
-            NumberSelectorConfig(
-                min=MIN_PERSONS,
-                max=MAX_PERSONS,
-                step=1,
-                mode=NumberSelectorMode.BOX,
-            )
-        )
+        ] = _whole_number(MIN_PERSONS, MAX_PERSONS)
         fields[
             vol.Required(
                 CONF_SOCIAL_TARIFF,
@@ -670,10 +672,8 @@ class BeWaterPricesConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-a
             return await self._async_finish_reconfigure()
         schema = vol.Schema(
             {
-                vol.Required(CONF_PERSONS, default=self._saved_persons()): NumberSelector(
-                    NumberSelectorConfig(
-                        min=MIN_PERSONS, max=MAX_PERSONS, step=1, mode=NumberSelectorMode.BOX
-                    )
+                vol.Required(CONF_PERSONS, default=self._saved_persons()): _whole_number(
+                    MIN_PERSONS, MAX_PERSONS
                 ),
                 vol.Required(CONF_SOCIAL_TARIFF, default=False): BooleanSelector(),
             }

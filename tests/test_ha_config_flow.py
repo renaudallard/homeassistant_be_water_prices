@@ -2392,3 +2392,52 @@ async def test_a_postcode_on_the_default_card_adopts_nothing(hass: HomeAssistant
 
     _adopt_commune_for_postcode(hass, entry)
     assert CONF_COMMUNE not in entry.options
+
+
+@pytest.mark.parametrize("field", [CONF_CONSUMPTION_M3_PER_YEAR, CONF_PERSONS])
+async def test_an_options_figure_that_is_no_number_is_refused(
+    hass: HomeAssistant, field: str
+) -> None:
+    """The number box holds a value to its bounds, which a NaN passes. The
+    frontend sends none, a script calling the flow may: the options stored
+    it, and a household of NaN persons failed every refresh."""
+    saved = {CONF_CONSUMPTION_M3_PER_YEAR: 80, CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: False}
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="VIVAQUA",
+        data={CONF_UTILITY: "vivaqua"},
+        options=saved,
+        unique_id=f"{DOMAIN}_vivaqua",
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with pytest.raises(data_entry_flow.InvalidData):
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {**saved, field: "nan"}
+        )
+    assert entry.options == saved
+
+
+async def test_a_household_that_is_no_number_is_refused_on_a_move(hass: HomeAssistant) -> None:
+    """int() of a NaN raised out of the step, a server error for the client."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Farys",
+        data={CONF_UTILITY: "farys"},
+        options={CONF_CONSUMPTION_M3_PER_YEAR: 90, CONF_PERSONS: 2, CONF_SOCIAL_TARIFF: True},
+        unique_id=f"{DOMAIN}_farys",
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_postcode"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_POSTCODE: "1000"}
+    )
+    assert result["step_id"] == "reconfigure_household"
+    with pytest.raises(data_entry_flow.InvalidData):
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PERSONS: "nan", CONF_SOCIAL_TARIFF: False}
+        )
+    assert entry.data[CONF_UTILITY] == "farys"

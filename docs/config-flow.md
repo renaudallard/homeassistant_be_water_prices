@@ -36,7 +36,9 @@ utility. The title is the utility's label.
 3. **`manual`**: a dropdown of every registered utility, in registry order.
 4. **`options`**: the household form (`_options_schema`). The residents and
    the social tariff only appear for a Flemish or Brussels utility
-   (`_prices_household`).
+   (`_prices_household`). Both figures go through `_whole_number`, a
+   number box with a range after it: the box holds a value to its bounds,
+   which a NaN posted through the flow API passes.
    A per-commune utility (one whose extractor `supports_communes`) gets a
    commune dropdown filled from its live list (`_async_communes`); a list
    that cannot be fetched leaves the field out rather than blocking the
