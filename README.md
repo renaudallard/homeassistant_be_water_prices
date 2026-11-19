@@ -771,7 +771,10 @@ last year's card counting as valid until 31 March,
 flip `snapshot_stale` to `true` and raise a Repair issue under
 **Settings → Repairs**. The Repair card carries a **Retry** button
 that triggers an immediate coordinator refresh; the issue
-auto-clears as soon as the next fetch returns a fresh snapshot. A
+auto-clears as soon as the next fetch returns a fresh snapshot. When the
+fetch worked but the utility still serves a tariff whose period has
+ended, the retry says so, and the card stays until a newer tariff is
+published. A
 Repair you ignored stays ignored when saving the options reloads the
 entry; the cards go with the entry when it is disabled or removed. The
 daily live-check workflow opens a GitHub issue against the

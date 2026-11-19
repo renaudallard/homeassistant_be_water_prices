@@ -468,20 +468,29 @@ async def test_removing_the_entry_deletes_its_ytd_store(
 
 
 @pytest.mark.asyncio
-async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssistant) -> None:
+@pytest.mark.parametrize("fetch_fails", [False, True])
+async def test_repair_fix_flow_keeps_the_issue_when_still_stale(
+    hass: HomeAssistant, fetch_fails: bool
+) -> None:
     """A retry that did not help must leave the Repair card in place.
 
     Completing the flow makes the Repairs manager delete the issue, so a
     still-stale snapshot would silently lose its card until the next daily
-    tick recreated it, a day later.
+    tick recreated it, a day later. A retry whose fetch worked says the
+    utility has published nothing newer, not that the refresh failed: the
+    old wording sent the user looking for a failure there was none of.
     """
     yesterday = belgian_today() - timedelta(days=1)
+    fails = {"now": False}
 
     async def _fetch(_session: Any) -> WaterTariff:
         # Every fetch stays stale, so the retry cannot clear the issue.
+        if fails["now"]:
+            raise ExtractorError("HTTP 503 from upstream")
         return _this_years_card(yesterday)
 
     entry = await _setup_entry(hass, _fetch)
+    fails["now"] = fetch_fails
     coordinator = entry.runtime_data
     issue_reg = ir.async_get(hass)
     issue = issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id)
@@ -496,12 +505,15 @@ async def test_repair_fix_flow_keeps_the_issue_when_still_stale(hass: HomeAssist
     await hass.async_block_till_done()
 
     assert result["type"] == "abort"
-    assert result["reason"] == "still_stale"
+    assert result["reason"] == ("still_stale" if fetch_fails else "utility_late")
     # The abort text names the utility, so it needs the issue's
     # placeholders forwarded just like the form step above.
     assert result["description_placeholders"]["utility"] == "VIVAQUA"
+    if not fetch_fails:
+        assert result["description_placeholders"]["valid_until"] == yesterday.isoformat()
     assert coordinator.data is not None
     assert coordinator.data.snapshot_stale is True
+    assert bool(coordinator.data.last_error) is fetch_fails
     assert issue_reg.async_get_issue(DOMAIN, coordinator.stale_issue_id) is not None
 
 

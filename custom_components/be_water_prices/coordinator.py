@@ -431,14 +431,8 @@ class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[Coordinator
         age_days = delta.days
         if age_days > SNAPSHOT_STALE_AFTER_DAYS:
             return True
-        # Last year's card stands until 31 March, as it does when an
-        # extractor serves it. A card held from a December fetch, or a
-        # December row of the archive, still says 31 December, and the
-        # first failed refresh in January raised the Repair on it. The
-        # grace only ever adds time: a card dated later stands to its date.
-        today = dt_util.now().date()
-        carried = carry_prior_year_card(tariff, today.year).valid_until
-        return all(d is not None and d < today for d in (tariff.valid_until, carried))
+        until = served_until(tariff)
+        return until is not None and until < dt_util.now().date()
 
     @property
     def stale_issue_id(self) -> str:
@@ -758,6 +752,21 @@ class WaterCoordinator(_MeterMixin, _YtdMixin, DataUpdateCoordinator[Coordinator
 
 
 type WaterConfigEntry = ConfigEntry[WaterCoordinator]
+
+
+def served_until(tariff: WaterTariff) -> date | None:
+    """The last day ``tariff`` stands for, None when it states no end.
+
+    Last year's card stands until 31 March, as it does when an extractor
+    serves it. A card held from a December fetch, or a December row of the
+    archive, still says 31 December, and the first failed refresh in
+    January raised the Repair on it. The grace only ever adds time: a card
+    dated later stands to its date.
+    """
+    carried = carry_prior_year_card(tariff, dt_util.now().year).valid_until
+    if tariff.valid_until is None or carried is None:
+        return None
+    return max(tariff.valid_until, carried)
 
 
 def entry_coordinator(entry: WaterConfigEntry) -> WaterCoordinator | None:

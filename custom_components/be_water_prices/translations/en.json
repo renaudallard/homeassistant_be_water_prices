@@ -186,7 +186,8 @@
           }
         },
         "abort": {
-          "still_stale": "The refresh ran, but the {utility} snapshot is still stale, so the Repair card stays. Retry later, or check the integration's GitHub issues and the daily live-check workflow run for the underlying failure."
+          "still_stale": "The refresh ran, but the {utility} snapshot is still stale, so the Repair card stays. Retry later, or check the integration's GitHub issues and the daily live-check workflow run for the underlying failure.",
+          "utility_late": "The refresh worked, but {utility} still serves a tariff whose period ended on {valid_until}. It is asked again every day, and this Repair card stays until a newer tariff is published."
         }
       }
     },

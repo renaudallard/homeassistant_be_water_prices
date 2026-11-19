@@ -51,7 +51,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import issue_registry as ir
 
 from .const import CONF_CONSUMPTION_M3_PER_YEAR
-from .coordinator import entry_coordinator
+from .coordinator import entry_coordinator, served_until
 
 # Every ASCII punctuation character, each of which CommonMark lets a
 # backslash make literal.
@@ -105,6 +105,20 @@ class SnapshotStaleRepairFlow(RepairsFlow):
             # issue. That is right once the refresh has cleared it, but on
             # a retry that did not help it would hide the card until the
             # next daily tick recreated it. Aborting leaves it in place.
+            data = None if coordinator is None else coordinator.data
+            until = None if data is None else served_until(data.tariff)
+            if entry is not None and data is not None and not data.last_error and until:
+                # The fetch worked and the card is fresh, stale by its own
+                # end: the utility has published nothing newer, which a
+                # retry cannot change and no failure explains.
+                utility = (placeholders or {}).get("utility") or entry.title
+                return self.async_abort(
+                    reason="utility_late",
+                    description_placeholders={
+                        "utility": utility,
+                        "valid_until": until.isoformat(),
+                    },
+                )
             return self.async_abort(reason="still_stale", description_placeholders=placeholders)
         # The refresh returned a fresh snapshot, so _sync_repair_issue has
         # already deleted the issue; close the flow normally.

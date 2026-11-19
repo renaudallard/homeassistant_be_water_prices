@@ -210,7 +210,8 @@
           }
         },
         "abort": {
-          "still_stale": "Le rafraîchissement a été effectué, mais le snapshot {utility} est toujours obsolète, la carte Repair reste donc affichée. Réessayez plus tard, ou consultez les issues GitHub et le run quotidien de la workflow live-check pour la cause sous-jacente."
+          "still_stale": "Le rafraîchissement a été effectué, mais le snapshot {utility} est toujours obsolète, la carte Repair reste donc affichée. Réessayez plus tard, ou consultez les issues GitHub et le run quotidien de la workflow live-check pour la cause sous-jacente.",
+          "utility_late": "Le rafraîchissement a réussi, mais {utility} propose toujours un tarif dont la période s'est terminée le {valid_until}. Il est redemandé chaque jour, et cette carte Repair reste affichée jusqu'à la publication d'un tarif plus récent."
         }
       }
     },

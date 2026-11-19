@@ -210,7 +210,8 @@
           }
         },
         "abort": {
-          "still_stale": "De vernieuwing is uitgevoerd, maar de snapshot van {utility} is nog steeds verouderd, dus de Repair-kaart blijft staan. Probeer het later opnieuw, of bekijk de issues op GitHub en de dagelijkse live-check workflow run voor de onderliggende fout."
+          "still_stale": "De vernieuwing is uitgevoerd, maar de snapshot van {utility} is nog steeds verouderd, dus de Repair-kaart blijft staan. Probeer het later opnieuw, of bekijk de issues op GitHub en de dagelijkse live-check workflow run voor de onderliggende fout.",
+          "utility_late": "De vernieuwing is gelukt, maar {utility} biedt nog steeds een tarief aan waarvan de periode op {valid_until} is afgelopen. Het wordt elke dag opnieuw opgevraagd, en deze Repair-kaart blijft staan tot er een nieuwer tarief gepubliceerd is."
         }
       }
     },

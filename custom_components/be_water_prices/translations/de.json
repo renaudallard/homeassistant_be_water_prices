@@ -210,7 +210,8 @@
           }
         },
         "abort": {
-          "still_stale": "Die Aktualisierung wurde ausgeführt, aber der {utility}-Snapshot ist weiterhin veraltet, daher bleibt die Repair-Karte sichtbar. Versuchen Sie es später erneut, oder prüfen Sie die GitHub-Issues und den täglichen live-check Workflow-Lauf auf die zugrundeliegende Ursache."
+          "still_stale": "Die Aktualisierung wurde ausgeführt, aber der {utility}-Snapshot ist weiterhin veraltet, daher bleibt die Repair-Karte sichtbar. Versuchen Sie es später erneut, oder prüfen Sie die GitHub-Issues und den täglichen live-check Workflow-Lauf auf die zugrundeliegende Ursache.",
+          "utility_late": "Die Aktualisierung hat funktioniert, aber {utility} bietet weiterhin einen Tarif an, dessen Zeitraum am {valid_until} endete. Er wird täglich erneut abgefragt, und diese Repair-Karte bleibt bestehen, bis ein neuerer Tarif veröffentlicht wird."
         }
       }
     },

@@ -320,8 +320,10 @@ them when the entry is disabled or a setup fails past the first refresh,
 and `async_remove_entry` when it is removed (`_clear_repair_cards`).
 
 - `snapshot_stale_<entry_id>` (`_sync_repair_issue`), fixable: the fix
-  flow in `repairs.py` runs `async_refresh` and aborts with `still_stale`
-  when the snapshot did not recover, so the card stays. Its form renders
+  flow in `repairs.py` runs `async_refresh` and aborts with `utility_late`
+  when the fetch worked and the card is past its end (`served_until`, 31
+  March for last year's card), and with `still_stale` when the refresh
+  failed, so the card stays. Its form renders
   `last_error` as markdown, so the flow hands it over with every ASCII
   punctuation character backslashed and on one line (`_literal`): the
   message can quote what a card host chose, and a link or a remote
