@@ -41,6 +41,11 @@ needs a venv at `~/water_gate/.venv`, which the gate refreshes with uv when
 AIEC picture tests. A host that does not answer, or drops mid-run, gets the
 suite run locally instead.
 
+pytest gets 30 minutes, three times a run of the whole suite on one core of
+a Raspberry Pi, under `timeout` on the host it runs on, so a suite that
+hangs is stopped there and fails the gate with a line saying so, rather
+than holding it for good.
+
 ## The test suite
 
 `pyproject.toml` runs pytest on `tests/` only (a repo copy kept under
