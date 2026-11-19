@@ -140,6 +140,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           title_prefix='[fixture-drift] water fixtures need refresh'
+          # The report is written by the check job, which runs the readers
+          # on what the utilities serve, and this job is the one that writes
+          # issues: posted as markdown, a report that job was made to write
+          # could mention, link and embed as the bot. It goes in a code block
+          # no line of it can close: a CR would end a line, so it goes, and
+          # every line is indented four spaces, past the three a closing
+          # fence may have. The blank line ends a last line with no newline.
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           {
             echo "## Run"
@@ -148,7 +155,10 @@ jobs:
             echo
             echo "## Latest report"
             echo
-            cat tmp/report/report.md
+            echo '```'
+            tr '\r' ' ' < tmp/report/report.md | sed 's/^/    /'
+            echo
+            echo '```'
           } > issue_body.md
           # One issue per problem, found by its label; the drifted fields
           # and the errors are the fingerprint, so a drift that stays as it

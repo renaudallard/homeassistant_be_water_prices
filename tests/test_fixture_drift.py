@@ -282,7 +282,8 @@ async def test_what_a_utility_serves_reaches_the_issue_as_code(tmp_path: Path) -
     image and an issue reference in it rendered, and a crash's traceback ran
     on as lines of markdown, one of them a forged item. Each item is quoted
     as code, a span per line, and the workflow's fingerprint takes one line
-    per drifted field, per error and per skip."""
+    per drifted field, per error and per skip. The issue posts the report in
+    a code block on top (test_workflows.py)."""
     crafted = "@renaudallard [fix](https://evil.example/phish) ![](https://evil.example/p.png) #1"
 
     async def moved(_session: aiohttp.ClientSession) -> WaterTariff:
@@ -307,11 +308,12 @@ async def test_what_a_utility_serves_reaches_the_issue_as_code(tmp_path: Path) -
     ]
     work = tmp_path / "work"
     (work / "tmp" / "report").mkdir(parents=True)
-    (work / "tmp" / "report" / "report.md").write_text(_render(results), encoding="utf-8")
+    report = _render(results)
+    (work / "tmp" / "report" / "report.md").write_text(report, encoding="utf-8")
     (work / "scripts").mkdir()
     (work / "scripts" / "file_ci_issue.sh").write_text(
         'while [ $# -gt 0 ]; do case "$1" in\n'
-        '  --body) cp "$2" filed_body.md ;; --fingerprint) cp "$2" filed_fingerprint.txt ;;\n'
+        '  --fingerprint) cp "$2" filed_fingerprint.txt ;;\n'
         "esac; shift; done\n"
     )
     workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "fixture_drift.yml"
@@ -321,9 +323,7 @@ async def test_what_a_utility_serves_reaches_the_issue_as_code(tmp_path: Path) -
         ["bash", "-e", "-c", re.sub(r"\$\{\{[^}]*\}\}", "x", script)], cwd=work, check=True
     )
 
-    # Read as bytes: text mode would turn a CR into a line ending.
-    body = (work / "filed_body.md").read_bytes().decode("utf-8")
-    outside = re.sub(r"`[^`]*`", "", body)
+    outside = re.sub(r"`[^`]*`", "", report)
     for markup in ("@renaudallard", "evil.example", "#1", "**forged**", "\r"):
         assert markup not in outside, markup
     fingerprint = (work / "filed_fingerprint.txt").read_text(encoding="utf-8").splitlines()

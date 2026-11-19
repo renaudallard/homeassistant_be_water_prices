@@ -113,3 +113,79 @@ def test_the_release_zip_refuses_a_symbolic_link(tmp_path: Path, where: str) -> 
     assert done.returncode != 0
     assert "symbolic links under custom_components" in done.stderr
     assert not (tmp_path / "dist").exists()
+
+
+def _rendered(body: str) -> str:
+    """The lines of ``body`` outside its fenced code blocks, which GitHub
+    renders as markdown. By CommonMark's rule a block opens on a line of
+    three or more backticks or tildes, indented at most three spaces, and
+    closes on a line of at least as many of the same character and nothing
+    else but spaces and tabs. A CR ends a line as an LF does."""
+    outside: list[str] = []
+    fence = ""
+    for line in re.split(r"\r\n|\r|\n", body):
+        text = line.lstrip(" ")
+        run = re.match(r"`{3,}|~{3,}", text) if len(line) - len(text) <= 3 else None
+        if not fence:
+            if run is not None and (run[0][0] == "~" or "`" not in text[run.end() :]):
+                fence = run[0]
+            else:
+                outside.append(line)
+        elif (
+            run is not None
+            and run[0][0] == fence[0]
+            and len(run[0]) >= len(fence)
+            and not text[run.end() :].strip(" \t")
+        ):
+            fence = ""
+    return "\n".join(outside)
+
+
+# What a report must never get rendered: a mention, an image, a link, a tag,
+# and the fences and line endings that would let them out of a code block,
+# down to a last line with no newline.
+_CRAFTED_REPORT = (
+    "# Water extractor live check\n\n| utility | region | status | detail |\n"
+    "| Acme | flanders | FAIL | `HTTP 404` |\n"
+    "```\n@someone a mention\n"
+    "   `````\n![an image](https://evil.example/x.png)\n"
+    "~~~~\n[a link](https://evil.example)\n"
+    "```\r```\n<img src=https://evil.example/y.png>\n"
+    "```"
+)
+_CRAFTED = ("@someone", "![an image]", "[a link]", "evil.example", "<img")
+
+
+@pytest.mark.parametrize(
+    ("workflow", "step", "report"),
+    [
+        ("live_check.yml", "Open or update extractor-broken issue", "fail_report.md"),
+        ("fixture_drift.yml", "Open or update fixture-drift issue", "report.md"),
+    ],
+)
+def test_the_report_is_posted_in_a_code_block_it_cannot_close(
+    tmp_path: Path, workflow: str, step: str, report: str
+) -> None:
+    """The report is written by the job that runs the readers on what the
+    utilities serve, and was posted as markdown by the job that writes
+    issues: a report that job was made to write could mention, link and
+    embed as the bot. It is posted in a code block, its CRs gone and every
+    line indented past what a closing fence may have."""
+    work = tmp_path / "work"
+    (work / "tmp" / "report").mkdir(parents=True)
+    (work / "tmp" / "report" / report).write_bytes(_CRAFTED_REPORT.encode())
+    (work / "scripts").mkdir()
+    (work / "scripts" / "file_ci_issue.sh").write_text(
+        'while [ $# -gt 0 ]; do case "$1" in --body) cp "$2" filed_body.md ;; esac; shift; done\n'
+    )
+    steps = yaml.safe_load((WORKFLOWS / workflow).read_text())["jobs"]["file"]["steps"]
+    script = next(s["run"] for s in steps if s.get("name") == step)
+    subprocess.run(
+        ["bash", "-e", "-c", re.sub(r"\$\{\{[^}]*\}\}", "x", script)], cwd=work, check=True
+    )
+    body = (work / "filed_body.md").read_bytes().decode("utf-8")
+    rendered = _rendered(body)
+    for crafted in _CRAFTED:
+        assert crafted in body
+        assert crafted not in rendered
+    assert re.fullmatch(r"## Run\n\nx/x/actions/runs/x\n\n## [^\n]+\n\n", rendered)

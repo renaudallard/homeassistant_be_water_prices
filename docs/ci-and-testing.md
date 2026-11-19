@@ -212,8 +212,16 @@ checkout (`persist-credentials: false`), since it runs the extractors'
 parsers on whatever the utilities serve; it hands the failing report over
 as an artifact to a second job, `file`, which alone can write issues and
 runs only `file_ci_issue.sh`, on a report downloaded into a folder of its
-own. The concurrency group lets a newer run replace one still going, so
-the same issue is not filed twice.
+own. The spans are not what the issue rests on: posted as markdown by the
+job that writes issues, a report the check job was made to write could
+mention, link and embed as the bot. The `file` job posts it inside a code
+block it builds itself, with tr and sed and no code of the repository: the
+report's CRs go, since a CR ends a line, and every line is indented four
+spaces, past the three a closing fence may have, so no line of it closes
+the block. The tables therefore show as plain text in the issue
+(`test_the_report_is_posted_in_a_code_block_it_cannot_close`, which covers
+the drift check's issue too). The concurrency group lets a newer run
+replace one still going, so the same issue is not filed twice.
 
 ### fixture_drift.yml
 
@@ -238,7 +246,9 @@ reason phrase, a page's text or a crash's whole traceback, so each is
 written as code the way the live check writes a detail, every line a span
 of its own on the item's one line: the fingerprint takes that line for the
 utility, and no line of a traceback can pass for an item of its own
-(`test_what_a_utility_serves_reaches_the_issue_as_code`).
+(`test_what_a_utility_serves_reaches_the_issue_as_code`). The `file` job
+posts the report in a code block of its own making, as the live check's
+does.
 
 ### archive_cards.yml
 
