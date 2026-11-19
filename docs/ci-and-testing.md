@@ -73,7 +73,12 @@ paths with partial stubs and wrong inputs.
 statistics compiler on a real recorder database. `recorder_mock` has to be
 set up before `hass`, so `tests/recorder/conftest.py` overrides the two
 fixtures that request `hass` with no-ops, and each test there sets the
-zone itself.
+zone itself. The same conftest times those tests out with pytest-timeout's
+thread method, which ends the process, keeping the seconds a test asks
+for: stopped by a signal while a worker thread waited on the recorder, a
+test hung in its teardown, where Home Assistant's executor waits on a
+clock the test froze, and again at exit. `test_a_renamed_meter_keeps_its_year`
+takes 16 s of CPU on a Raspberry Pi 4 and has 120.
 
 The parsers are tested against real 2026 publications under
 `tests/fixtures/` (HTML pages, the Farys AJAX answers as JSON, and the

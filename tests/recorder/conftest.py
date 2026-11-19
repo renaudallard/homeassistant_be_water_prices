@@ -33,6 +33,8 @@ load this integration at all, so they need neither.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 
@@ -55,3 +57,25 @@ def _force_brussels_timezone():  # type: ignore[no-untyped-def]
     Each test here sets the zone itself once ``hass`` exists.
     """
     yield
+
+
+_HERE = Path(__file__).parent
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Time the tests here out with pytest-timeout's thread method.
+
+    The default, a signal, stops a test while a worker thread waits on the
+    recorder, and the test then hangs in its teardown, where Home
+    Assistant's executor waits for seconds of a clock the test froze, and
+    again at exit: stopped at 1.6 s, a year backfill test was still there
+    two minutes later. The thread method ends the process instead. The
+    seconds a test asks for are kept.
+    """
+    for item in items:
+        if not item.path.is_relative_to(_HERE):
+            continue
+        own = item.get_closest_marker("timeout")
+        args = own.args if own is not None else ()
+        kwargs = {**(own.kwargs if own is not None else {}), "method": "thread"}
+        item.add_marker(pytest.mark.timeout(*args, **kwargs), append=False)

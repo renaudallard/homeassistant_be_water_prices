@@ -138,6 +138,8 @@ def _vivaqua() -> Any:
         yield
 
 
+# 16 s of CPU on a Raspberry Pi 4, more than half the suite's 30 s.
+@pytest.mark.timeout(120)
 @pytest.mark.usefixtures("_vivaqua")
 async def test_a_renamed_meter_keeps_its_year(hass: HomeAssistant, freezer: Any) -> None:
     """The old id has no statistic left, and its zero is not the year's.
