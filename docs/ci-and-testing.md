@@ -199,6 +199,14 @@ span GitHub renders no mention, link, image or issue reference. The detail
 loses its backticks, which would close a span, and its pipes keep their
 escape.
 
+A detail can also hold half a surrogate pair: aiohttp reads a header byte
+that is not UTF-8 as one, and a redirect to a moved page names its path
+whole. Printed to a strict stream it raised once every check had run, and
+the workflow filed a crash in place of the failure. The live check, the
+drift check and the card archive print it as an escape (`escape_stdout` in
+`scripts/issue_text.py`), so the report stays UTF-8 and the same bytes on
+every run (`test_main_prints_a_detail_utf8_cannot_carry_as_an_escape`).
+
 The check runs in a job with a read-only token and no credentials in its
 checkout (`persist-credentials: false`), since it runs the extractors'
 parsers on whatever the utilities serve; it hands the failing report over

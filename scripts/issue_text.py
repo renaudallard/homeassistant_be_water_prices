@@ -27,10 +27,14 @@
 it is posted in renders none of it.
 
 Shared by the live check and the fixture drift check, whose reports become
-issue bodies. Imports nothing, so either script can use it as is.
+issue bodies, and by the card archive for its summary. Imports nothing of
+the integration, so any script can use it as is.
 """
 
 from __future__ import annotations
+
+import io
+import sys
 
 
 def code_spans(text: str) -> str:
@@ -49,3 +53,18 @@ def code_spans(text: str) -> str:
     """
     lines = text.replace("`", "").replace("\r", "\n").split("\n")
     return "<br>".join(f"`{line}`" for line in lines if line.strip())
+
+
+def escape_stdout() -> None:
+    """Have stdout print as an escape what UTF-8 cannot carry.
+
+    A detail or a failure can quote what a utility serves, and aiohttp reads
+    a header byte that is not UTF-8 as half a surrogate pair: a redirect to a
+    moved page names that path whole. A strict stream raised on it once the
+    work was done, and the report or the archive's summary was lost with
+    the run; one that escapes surrogates wrote the byte back, which no UTF-8
+    reader takes. Printed as an escape it stays UTF-8 and the same bytes on
+    every run, which the issue job posts and fingerprints.
+    """
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(errors="backslashreplace")

@@ -33,7 +33,9 @@ a false GitHub issue; only a genuine parse / shape / 4xx failure is FAIL.
 from __future__ import annotations
 
 import asyncio
+import io
 import ssl
+import sys
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import date
@@ -255,6 +257,33 @@ def test_a_detail_is_shown_as_code_spans() -> None:
         "<br>`::warning title=spoofed::fake` |",
         "| Y | flanders | FAIL |  |",
     ]
+
+
+def test_main_prints_a_detail_utf8_cannot_carry_as_an_escape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """aiohttp reads a header byte that is not UTF-8 as half a surrogate
+    pair, and a redirect to a moved page quotes its path whole. Printed to a
+    strict stream the report raised once every check had run, and the
+    workflow filed a crash in place of the failure. It is printed as an
+    escape, the same bytes on every run."""
+    from scripts import live_check
+
+    detail = "https://acme.test/x redirected to /404/\udcff: the page moved or was removed"
+
+    async def run(_texts: Path | None) -> tuple[list[CheckResult], int, None]:
+        return [CheckResult("acme", "Acme", "flanders", "FAIL", detail)], EXIT_REAL_FAIL, None
+
+    monkeypatch.setattr(live_check, "_run", run)
+    monkeypatch.setattr(sys, "argv", ["live_check.py"])
+    printed = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(printed, encoding="utf-8"))
+    assert live_check.main() == EXIT_REAL_FAIL
+    sys.stdout.flush()
+    escaped = "redirected to /404/\\udcff: the page moved"
+    assert f"| Acme | flanders | FAIL | `https://acme.test/x {escaped} or was removed` |" in (
+        printed.getvalue().decode("utf-8")
+    )
 
 
 def test_render_names_what_it_could_not_check() -> None:

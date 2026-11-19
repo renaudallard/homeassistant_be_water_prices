@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import json
 import shutil
 import subprocess
@@ -1096,6 +1097,29 @@ def test_main_fails_the_run_only_when_nothing_was_archived(
     assert ac.main() == 1
     monkeypatch.setattr(ac, "all_extractors", lambda: (_extractor(_page_fetch()),))
     assert ac.main() == 0
+
+
+def test_main_prints_a_failure_utf8_cannot_carry_as_an_escape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """aiohttp reads a header byte that is not UTF-8 as half a surrogate
+    pair, and a redirect to a moved page quotes its path whole. Printed to a
+    strict stream the summary raised once the rows were written, and failed
+    a walk that had stored them. It is printed as an escape."""
+
+    async def moved(_session: Any) -> WaterTariff:
+        raise ExtractorError("https://acme.test/x redirected to /404/\udcff: the page moved")
+
+    monkeypatch.setattr(sys, "argv", ["archive_cards.py", "--out", str(tmp_path)])
+    monkeypatch.setattr(
+        ac, "all_extractors", lambda: (_extractor(_page_fetch()), _extractor(moved, uid="beta"))
+    )
+    printed = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(printed, encoding="utf-8"))
+    assert ac.main() == 0
+    sys.stdout.flush()
+    line = "beta/default: ExtractorError: https://acme.test/x redirected to /404/\\udcff"
+    assert f"  failed {line}: the page moved\n" in printed.getvalue().decode("utf-8")
 
 
 def _workflow_step(job: str, name: str) -> str:

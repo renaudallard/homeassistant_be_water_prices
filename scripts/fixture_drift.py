@@ -74,7 +74,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 # the card archiver's own, so a live PDF the archive already holds is not
 # rendered again here; the fixture side renders as always.
 from card_texts import StoredTexts  # noqa: E402
-from issue_text import code_spans  # noqa: E402
+from issue_text import code_spans, escape_stdout  # noqa: E402
 
 from custom_components.be_water_prices.const import FETCH_BUDGET_S  # noqa: E402
 from custom_components.be_water_prices.providers import (  # noqa: E402
@@ -550,6 +550,7 @@ def main() -> int:
         help="the card archive, water/ of a cards repository clone; PDFs it already holds are not rendered again",
     )
     args = parser.parse_args()
+    escape_stdout()
     results, rc, cache = asyncio.run(_run(args.texts))
     print(_render(results, cache))
     return rc

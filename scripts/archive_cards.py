@@ -107,6 +107,7 @@ from card_texts import (  # noqa: E402
     read_text,
     readers_line,
 )
+from issue_text import escape_stdout  # noqa: E402
 from live_check import CI_BLOCKED  # noqa: E402
 
 from custom_components.be_water_prices.providers import all_extractors  # noqa: E402
@@ -1230,6 +1231,7 @@ def main() -> int:
         # links written by the walk before it point at files that now exist.
         _write_listings(args.out, args.pdf_base_url, args.archive_base_url)
         return 0
+    escape_stdout()
     summary = asyncio.run(
         archive(
             args.out,

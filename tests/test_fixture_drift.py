@@ -28,8 +28,10 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import re
 import subprocess
+import sys
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -247,6 +249,31 @@ async def test_run_exit_code_follows_the_worst_outcome(
     _results, rc, cache = await fixture_drift._run()
     assert rc == expected_rc
     assert cache is None
+
+
+def test_main_prints_an_error_utf8_cannot_carry_as_an_escape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """aiohttp reads a header byte that is not UTF-8 as half a surrogate
+    pair, and a redirect to a moved page quotes its path whole. Printed to a
+    strict stream the report raised once every check had run, and the
+    workflow filed a crash in place of the error. It is printed as an
+    escape, the same bytes on every run."""
+    from scripts import fixture_drift
+
+    async def moved(_session: aiohttp.ClientSession) -> WaterTariff:
+        raise ExtractorError("https://acme.test/x redirected to /404/\udcff: the page moved")
+
+    check = FixtureCheck("TEST", "vivaqua_linear_2026.html", _dummy_tariff, moved)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(fixture_drift, "CHECKS", [check])
+    monkeypatch.setattr(sys, "argv", ["fixture_drift.py"])
+    printed = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(printed, encoding="utf-8"))
+    assert fixture_drift.main() == 1
+    sys.stdout.flush()
+    error = "live fetch failed: https://acme.test/x redirected to /404/\\udcff: the page moved"
+    assert f"- **TEST**: `{error}`" in printed.getvalue().decode("utf-8")
 
 
 async def test_what_a_utility_serves_reaches_the_issue_as_code(tmp_path: Path) -> None:
