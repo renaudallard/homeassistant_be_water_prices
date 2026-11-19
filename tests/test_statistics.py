@@ -1032,3 +1032,27 @@ async def test_no_history_is_written_for_a_sensor_the_recorder_does_not_compile(
         sid for kind, arg in calls for sid in (arg if kind == "clear" else [arg[0]["statistic_id"]])
     }
     assert touched == {"sensor.v_yearly_fee", "sensor.v_all_in_basis"}
+
+
+@pytest.mark.parametrize(("minutes", "asked"), [(59, False), (60, True)])
+async def test_an_unsettled_year_is_asked_for_again_after_an_hour(
+    hass: HomeAssistant, freezer: Any, minutes: int, asked: bool
+) -> None:
+    """While the recorder cannot tell, the year is asked for at most once
+    an hour, and again once the hour is up."""
+    from datetime import timedelta
+
+    from custom_components.be_water_prices.statistics import async_maybe_backfill_year
+
+    freezer.move_to("2026-10-04 20:30:00+00:00")
+    entry = _entry(hass)
+    coordinator = MagicMock()
+    coordinator.data.ytd_consumption_m3 = 20.0
+    coordinator.data.current_year_cost_eur = 50.0
+    coordinator.year_backfilled = None
+    coordinator.year_backfill_tried = dt_util.utcnow() - timedelta(minutes=minutes)
+    entry.runtime_data = coordinator
+    backfill = AsyncMock(return_value=None)
+    with patch("custom_components.be_water_prices.statistics.async_backfill_year", backfill):
+        await async_maybe_backfill_year(hass, entry)
+    assert backfill.await_count == (1 if asked else 0)

@@ -411,6 +411,18 @@ async def test_measured_year_close_to_the_configured_one_stays_quiet(
     assert ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id) is None
 
 
+@pytest.mark.parametrize(("metered", "prompted"), [(87.0, False), (88.0, True)])
+@pytest.mark.asyncio
+async def test_a_measured_year_ten_percent_off_prompts(
+    hass: HomeAssistant, metered: float, prompted: bool
+) -> None:
+    """PROJECTION_DRIFT_RATIO is 10 %: 8 m3 off 80 is offered, 7 is not."""
+    entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=metered))
+    coordinator = entry.runtime_data
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, coordinator.projection_issue_id)
+    assert (issue is not None) is prompted
+
+
 @pytest.mark.asyncio
 async def test_partial_year_never_prompts(hass: HomeAssistant) -> None:
     entry = await _setup_entry(hass, configured=80, full_year=AsyncMock(return_value=None))

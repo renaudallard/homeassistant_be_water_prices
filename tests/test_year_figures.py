@@ -655,6 +655,25 @@ async def test_a_restart_publishes_the_last_read_until_the_next_one_lands(
 
 
 @pytest.mark.asyncio
+async def test_a_read_as_old_as_the_hold_is_restored(hass: HomeAssistant, freezer: Any) -> None:
+    """Seven days is the hold, so a read made a week ago still stands in
+    while the new one is made; one a day older does not (below)."""
+    freezer.move_to(_NOW)
+    entry = await _setup_entry(hass, AsyncMock(return_value=_a_year_of_water()))
+    freezer.tick(timedelta(days=7))
+    release = asyncio.Event()
+
+    async def _rows(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
+        await release.wait()
+        return []
+
+    await _restart(hass, entry, AsyncMock(side_effect=_rows))
+    assert _state(hass, "rolling_year_consumption") == pytest.approx(91.25)
+    release.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+
+@pytest.mark.asyncio
 async def test_a_read_older_than_the_hold_is_not_restored(
     hass: HomeAssistant, freezer: Any
 ) -> None:

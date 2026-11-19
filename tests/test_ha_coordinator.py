@@ -3496,6 +3496,35 @@ def test_a_snapshot_from_the_future_is_stale() -> None:
     assert WaterCoordinator._is_stale(tariff, now - timedelta(days=40)) is True
 
 
+def test_a_leap_year_spreads_its_fees_over_366_days() -> None:
+    """1 July 2028 is day 183 of 366, so half a year of fixed costs is
+    billed by then; over 365 days it was a little more."""
+    from types import SimpleNamespace
+
+    from custom_components.be_water_prices.coordinator_ytd import _YtdMixin
+    from custom_components.be_water_prices.pricing import compute_annual_cost
+
+    owner = SimpleNamespace(entry=SimpleNamespace(options={}))
+    tariff = _fresh_tariff()
+    half = _YtdMixin._ytd_cost_from_m3(owner, tariff, 0.0, 2028, date(2028, 7, 1))  # type: ignore[arg-type]
+    whole = compute_annual_cost(tariff, 0.0, 1)
+    assert half is not None and whole is not None
+    assert half == pytest.approx(whole / 2, abs=0.006)
+
+
+def test_a_snapshot_stands_for_thirty_five_whole_days(freezer: Any) -> None:
+    """Stale once it is more than 35 whole days old, and not before."""
+    from datetime import UTC, datetime, timedelta
+
+    from custom_components.be_water_prices.coordinator import WaterCoordinator
+
+    freezer.move_to("2026-10-15 10:00:00+00:00")
+    tariff = _fresh_tariff()
+    now = datetime.now(UTC)
+    assert WaterCoordinator._is_stale(tariff, now - timedelta(days=36, seconds=-1)) is False
+    assert WaterCoordinator._is_stale(tariff, now - timedelta(days=36)) is True
+
+
 @pytest.mark.asyncio
 async def test_the_cost_floor_does_not_outlive_a_social_tariff_being_granted(
     hass: HomeAssistant, hass_storage: dict[str, Any]

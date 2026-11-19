@@ -89,3 +89,18 @@ async def test_a_real_row_is_read_whole_off_the_event_loop(
     row = await archived_row(None, "water_link", "Beveren-Kruibeke-Zwijndrecht", date(2026, 9, 15))  # type: ignore[arg-type]
     assert row == json.loads(_REAL_ROW)
     assert on_the_loop == [False]
+
+
+@pytest.mark.parametrize(("extra", "read"), [(0, True), (1, False)])
+async def test_a_row_as_long_as_the_limit_is_still_read(
+    monkeypatch: pytest.MonkeyPatch, extra: int, read: bool
+) -> None:
+    """MAX_ROW_CHARS is the longest row read, not the first one refused."""
+    shell = json.dumps({"utility": "swde", "pad": ""})
+    body = json.dumps(
+        {"utility": "swde", "pad": "x" * (_archive.MAX_ROW_CHARS - len(shell) + extra)}
+    )
+    assert len(body) == _archive.MAX_ROW_CHARS + extra
+    _serve(monkeypatch, body)
+    row = await archived_row(None, "swde", "default", date(2026, 11, 1))  # type: ignore[arg-type]
+    assert (row is not None) is read

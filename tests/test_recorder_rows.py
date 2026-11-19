@@ -484,6 +484,24 @@ async def test_the_first_days_of_a_year_are_empty_not_unreadable() -> None:
     assert total == 0.0
 
 
+@pytest.mark.parametrize(("buckets", "unreadable"), [(3, False), (4, True)])
+async def test_two_refusals_are_a_handful_and_three_are_not(buckets: int, unreadable: bool) -> None:
+    """The first bucket is the boundary trim, every one after it refused:
+    two of those may still be a year that used nothing, three may not."""
+    rows = [
+        _row(date(2026, 1, 1 + n), change=0.3, state=0.0, total=0.3 * (n + 1))
+        for n in range(buckets)
+    ]
+    with patch(_ROWS, new=AsyncMock(return_value=rows)):
+        read = co._recorder_ytd_m3(None, "sensor.m", date(2026, 1, 1), date(2026, 3, 1))  # type: ignore[arg-type]
+        if unreadable:
+            with pytest.raises(co.RecorderUnavailable, match="every one of 3"):
+                await read
+        else:
+            total, _ = await read
+            assert total == 0.0
+
+
 async def test_a_month_of_refusals_is_still_unreadable() -> None:
     """The distinction is how many, not whether."""
     rows = [
