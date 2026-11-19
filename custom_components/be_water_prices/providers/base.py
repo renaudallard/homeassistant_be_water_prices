@@ -44,6 +44,7 @@ Utilities that publish VAT-incl numbers (VIVAQUA does) divide by
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -207,6 +208,19 @@ def vat_from_pair(label: str, ex_vat: float, with_vat: float) -> float:
     if ex_vat <= 0:
         raise ExtractorError(f"{label} prints {ex_vat} ex-VAT, which gives no VAT rate")
     return vat_from_percent(label, (with_vat / ex_vat - 1.0) * 100.0)
+
+
+def finite_figure(value: object) -> float | None:
+    """A JSON number as a finite float, or None for anything else: a bool,
+    a string, NaN, an infinity, or an integer of 309 digits or more, which
+    no float holds and which math.isfinite raises OverflowError on."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    try:
+        number = float(value)
+    except OverflowError:
+        return None
+    return number if math.isfinite(number) else None
 
 
 def tariff_to_dict(tariff: WaterTariff) -> dict[str, Any]:

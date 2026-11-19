@@ -30,7 +30,6 @@ record is read back.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -40,7 +39,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 from .providers import WaterTariff
-from .providers.base import tariff_from_dict
+from .providers.base import finite_figure, tariff_from_dict
 from .ytd_fold import _YtdCycle
 
 # Bumped only if the persisted YTD cycle dict changes shape incompatibly.
@@ -203,13 +202,6 @@ class _MeteredDays:
     register: bool = True
 
 
-def _figure(value: object) -> float | None:
-    """``value`` as a finite float, or None when it is not a number."""
-    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
-        return None
-    return float(value)
-
-
 def _cycle_from_record(data: object) -> _YtdCycle | None:
     """The persisted cycle, or None when the record does not describe one.
 
@@ -233,23 +225,23 @@ def _cycle_from_record(data: object) -> _YtdCycle | None:
         key: data.get(key)
         for key in ("m3", "cost", "offset_m3", "recorder_hwm", "seen_at", "started_at")
     }
-    if any(value is not None and _figure(value) is None for value in figures.values()):
+    if any(value is not None and finite_figure(value) is None for value in figures.values()):
         return None
     return _YtdCycle(
         meter=meter,
         year=year,
-        m3=_figure(figures["m3"]),
-        cost=_figure(figures["cost"]),
-        offset_m3=_figure(figures["offset_m3"]),
+        m3=finite_figure(figures["m3"]),
+        cost=finite_figure(figures["cost"]),
+        offset_m3=finite_figure(figures["offset_m3"]),
         basis=basis,
-        recorder_hwm=_figure(figures["recorder_hwm"]),
+        recorder_hwm=finite_figure(figures["recorder_hwm"]),
         # No stamp means nothing has been seen on this meter since the
         # record was written, and the honest answer to "how long ago" is
         # that we do not know. Read as no gap, so the meter earns its
         # allowance back from the first reading rather than being handed
         # one on the strength of an unknown.
-        seen_at=_figure(figures["seen_at"]),
-        started_at=_figure(figures["started_at"]),
+        seen_at=finite_figure(figures["seen_at"]),
+        started_at=finite_figure(figures["started_at"]),
     )
 
 
@@ -303,7 +295,7 @@ def _metered_from_record(data: object) -> _MeteredDays | None:
         return None
     try:
         read_on = date.fromisoformat(str(data.get("read_on")))
-        days = {date.fromisoformat(str(day)): _figure(m3) for day, m3 in stored.items()}
+        days = {date.fromisoformat(str(day)): finite_figure(m3) for day, m3 in stored.items()}
     except ValueError:
         return None
     if any(m3 is None for m3 in days.values()):

@@ -177,3 +177,23 @@ def test_a_recorder_high_water_mark_that_is_not_a_number_is_refused() -> None:
         )
         is None
     )
+
+
+def test_a_stored_figure_past_any_float_is_refused() -> None:
+    """The file is in .storage where anyone can edit it. An integer of 309
+    digits or more made the finiteness check itself raise OverflowError,
+    out of the setup, at every attempt, where a bad record costs a read."""
+    import json
+
+    from custom_components.be_water_prices.coordinator_store import (
+        _cycle_from_record,
+        _metered_from_record,
+    )
+
+    huge = "1" + "0" * 400
+    cycle = json.loads(f'{{"meter": "sensor.water_meter", "year": 2026, "m3": {huge}}}')
+    assert _cycle_from_record(cycle) is None
+    days = json.loads(
+        f'{{"meter": "sensor.water_meter", "read_on": "2026-11-01", "days": {{"2026-10-31": {huge}}}}}'
+    )
+    assert _metered_from_record(days) is None
